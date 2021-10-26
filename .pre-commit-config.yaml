@@ -1,9 +1,21 @@
 repos:
-  - repo: https://github.com/gruntwork-io/pre-commit
-    rev: v0.1.16 # Get the latest from: https://github.com/gruntwork-io/pre-commit/releases
-    hooks:
-      - id: shellcheck
-      - id: gofmt
-      - id: golint
-      - id: goimports
-      - id: markdown-link-check
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.0.1
+  hooks:
+    - id: trailing-whitespace
+    - id: end-of-file-fixer
+    - id: check-yaml
+    - id: check-added-large-files
+    - id: mixed-line-ending
+- repo: https://github.com/gruntwork-io/pre-commit
+  rev: v0.1.16
+  hooks:
+    - id: shellcheck
+    - id: gofmt
+    - id: golint
+    - id: goimports
+    - id: markdown-link-check
+- repo: https://github.com/IamTheFij/docker-pre-commit
+  rev: v2.0.1
+  hooks:
+    - id: hadolint
