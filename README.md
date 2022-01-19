@@ -5,25 +5,19 @@
 ![Amazon Linux 1](https://img.shields.io/badge/docker-amazonlinux--1-faaf34.svg?style=flat "Amazon Linux 1")
 ![Amazon Linux 2](https://img.shields.io/badge/docker-amazonlinux--2-faaf34.svg?style=flat "Amazon Linux 2")
 
-![CentOS 7](https://img.shields.io/badge/docker-centos--7-10233f.svg?style=flat "CentOS 7")
 ![CentOS 8](https://img.shields.io/badge/docker-centos--8-10233f.svg?style=flat "CentOS 8")
 
 ![Debian Jessie](https://img.shields.io/badge/docker-debian--jessie-d70a53.svg?style=flat "Debian Jessie")
 ![Debian Stretch](https://img.shields.io/badge/docker-debian--stretch-d70a53.svg?style=flat "Debian Stretch")
 ![Debian Buster](https://img.shields.io/badge/docker-debian--buster-d70a53.svg?style=flat "Debian Buster")
 
-![Oracle Linux 7](https://img.shields.io/badge/docker-oraclelinux--7-f82200.svg?style=flat "Oracle Linux 7")
 ![Oracle Linux 8](https://img.shields.io/badge/docker-oraclelinux--8-f82200.svg?style=flat "Oracle Linux 8")
 
-![Fedora 32](https://img.shields.io/badge/docker-fedora--32-294172.svg?style=flat "Fedora 32")
 ![Fedora 33](https://img.shields.io/badge/docker-fedora--33-294172.svg?style=flat "Fedora 33")
 
-![Ubuntu Trusty](https://img.shields.io/badge/docker-ubuntu--trusty-dd4814.svg?style=flat "Ubuntu Trusty")
 ![Ubuntu Xenial](https://img.shields.io/badge/docker-ubuntu--xenial-dd4814.svg?style=flat "Ubuntu Xenial")
 ![Ubuntu Bionic](https://img.shields.io/badge/docker-ubuntu--bionic-dd4814.svg?style=flat "Ubuntu Bionic")
-![Ubuntu Eoan](https://img.shields.io/badge/docker-ubuntu--eoan-dd4814.svg?style=flat "Ubuntu Eoan")
 ![Ubuntu Focal](https://img.shields.io/badge/docker-ubuntu--focal-dd4814.svg?style=flat "Ubuntu Focal")
-![Ubuntu Groovy](https://img.shields.io/badge/docker-ubuntu--groovy-dd4814.svg?style=flat "Ubuntu Groovy")
 
 Yap allows building packages for multiple linux distributions with a
 consistent package spec format. Currently `deb`, `rpm` and `pacman` packages
@@ -109,15 +103,16 @@ key:ubuntu="this will apply only to ubuntu builds"
 
 | target | value |
 | ------ | ----- |
-| `archlinux` | All archlinux releases |
-| `amazonlinux` | All amazonlinux releases |
+| `arch` | All archlinux releases |
+| `astra` | All astralinux releases |
+| `amazon` | All amazonlinux releases |
 | `centos` | All centos releases |
 | `debian` | All debian releases |
 | `fedora` | All fedora releases |
-| `oraclelinux` | All oraclelinux releases |
+| `oracle` | All oraclelinux releases |
 | `ubuntu` | All ubuntu releases |
-| `amazonlinux-1` | Amazonlinux 1 |
-| `amazonlinux-2` | Amazonlinux 2 |
+| `amazon-1` | Amazonlinux 1 |
+| `amazon-2` | Amazonlinux 2 |
 | `centos-7` | Centos 7 |
 | `centos-8` | Centos 8 |
 | `debian-jessie` | Debian jessie |
@@ -125,14 +120,11 @@ key:ubuntu="this will apply only to ubuntu builds"
 | `debian-buster` | Debian buster |
 | `fedora-32` | Fedora 32 |
 | `fedora-33` | Fedora 33 |
-| `oraclelinux-7` | Oraclelinux 7 |
-| `oraclelinux-8` | Oraclelinux 8 |
-| `ubuntu-trusty` | Ubuntu trusty |
-| `ubuntu-xenial` | Ubuntu xenial |
+| `oracle-7` | Oraclelinux 7 |
+| `rocky-8` | Rockylinux 8 |
+| `oracle-8` | Oraclelinux 8 |
 | `ubuntu-bionic` | Ubuntu bionic |
-| `ubuntu-eoan` | Ubuntu eoan |
 | `ubuntu-focal` | Ubuntu focal |
-| `ubuntu-groovy` | Ubuntu groovy |
 
 ### directives
 
@@ -141,30 +133,26 @@ key:ubuntu="this will apply only to ubuntu builds"
 | `apt` | All deb packages |
 | `pacman` | All pkg packages |
 | `yum` | All rpm packages |
-| `archlinux` | All archlinux releases |
+| `arch` | All archlinux releases |
 | `amazonlinux` | All amazonlinux releases |
 | `centos` | All centos releases |
 | `debian` | All debian releases |
 | `fedora` | All fedora releases |
-| `oraclelinux` | All oraclelinux releases |
+| `oracle` | All oraclelinux releases |
 | `ubuntu` | All ubuntu releases |
-| `amazonlinux-1` | Amazonlinux 1 |
-| `amazonlinux-2` | Amazonlinux 2 |
-| `centos-7` | Centos 7 |
+| `amazon-1` | Amazonlinux 1 |
+| `amazon-2` | Amazonlinux 2 |
 | `centos-8` | Centos 8 |
 | `debian-jessie` | Debian jessie |
 | `debian-stretch` | Debian stretch |
 | `debian-buster` | Debian buster |
 | `fedora-32` | Fedora 32 |
 | `fedora-33` | Fedora 33 |
-| `oraclelinux-7` | Oraclelinux 7 |
-| `oraclelinux-8` | Oraclelinux 8 |
-| `ubuntu-trusty` | Ubuntu trusty |
+| `oracle-8` | Oraclelinux 8 |
+| `rocky-8` | Rockylinux 8 |
 | `ubuntu-xenial` | Ubuntu xenial |
 | `ubuntu-bionic` | Ubuntu bionic |
-| `ubuntu-eoan` | Ubuntu eoan |
 | `ubuntu-focal` | Ubuntu focal |
-| `ubuntu-groovy` | Ubuntu groovy |
 
 Directives are used to specify variables that only apply to a limited set of
 build targets. All variables can use directives including user defined
@@ -189,7 +177,7 @@ docker run --rm -t -v $(pwd):/yap yap/ubuntu-bionic
 
 ```sh
 targets=(
-    "archlinux"
+    "arch"
     "centos"
     "debian"
     "ubuntu"

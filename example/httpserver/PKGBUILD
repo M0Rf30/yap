@@ -1,5 +1,5 @@
 targets=(
-  "archlinux"
+  "arch"
   "centos"
   "debian"
   "ubuntu"

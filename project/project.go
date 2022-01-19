@@ -63,9 +63,15 @@ func (m *MultipleProject) Close() error {
 
 func NewMultipleProject(distro string, release string, path string) (*MultipleProject, error) {
 	file, err := os.Open(filepath.Join(path, "yap.json"))
+
 	if err != nil {
-		return nil, err
+		file, err = os.Open(filepath.Join(path, "pacur.json"))
+		if err != nil {
+			fmt.Printf("%s❌ :: %sfailed to open yap.json (pacur.json) file within '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
+			os.Exit(1)
+		}
 	}
+
 	prjBsContent, err := ioutil.ReadAll(file)
 	if err != nil {
 		return nil, err
