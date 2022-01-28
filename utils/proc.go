@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 
@@ -21,10 +20,14 @@ func Exec(dir, name string, arg ...string) (err error) {
 
 	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), name, string(constants.ColorWhite))
+		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			name,
+			string(constants.ColorWhite))
 	}
 
-	return
+	return err
 }
 
 func ExecInput(dir, input, name string, arg ...string) (err error) {
@@ -34,8 +37,12 @@ func ExecInput(dir, input, name string, arg ...string) (err error) {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to get stdin in exec '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), name, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to get stdin in exec '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			name,
+			string(constants.ColorWhite))
+
 		return
 	}
 	defer stdin.Close()
@@ -46,26 +53,38 @@ func ExecInput(dir, input, name string, arg ...string) (err error) {
 
 	err = cmd.Start()
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), name, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			name,
+			string(constants.ColorWhite))
+
 		return
 	}
 
 	_, err = io.WriteString(stdin, input)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to write stdin in exec '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), name, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to write stdin in exec '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			name,
+			string(constants.ColorWhite))
+
 		return
 	}
 
 	err = cmd.Wait()
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), name, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			name,
+			string(constants.ColorWhite))
+
 		return
 	}
 
-	return
+	return err
 }
 
 func ExecOutput(dir, name string, arg ...string) (output string, err error) {
@@ -78,11 +97,16 @@ func ExecOutput(dir, name string, arg ...string) (output string, err error) {
 
 	outputByt, err := cmd.Output()
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), name, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			name,
+			string(constants.ColorWhite))
+
 		return
 	}
+
 	output = string(outputByt)
 
-	return
+	return output, err
 }

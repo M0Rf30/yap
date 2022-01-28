@@ -7,10 +7,7 @@ import (
 )
 
 const (
-	DockerOrg = "yap/"
-)
-
-var (
+	DockerOrg   = "yap/"
 	ColorYellow = "\033[33m"
 	ColorBlue   = "\033[34m"
 	ColorWhite  = "\033[37m"
@@ -73,6 +70,8 @@ var (
 )
 
 func init() {
+	var packager string
+
 	for _, release := range Releases {
 		ReleasesSet.Add(release)
 		distro := strings.Split(release, "-")[0]
@@ -81,8 +80,6 @@ func init() {
 	}
 
 	for _, distro := range Distros {
-		packager := ""
-
 		switch DistroPack[distro] {
 		case "debian":
 			packager = "apt"

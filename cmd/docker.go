@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// dockerCmd represents the docker command
+// dockerCmd represents the docker command.
 var dockerCmd = &cobra.Command{
 	Use:   "docker",
 	Short: "Pull the built images",

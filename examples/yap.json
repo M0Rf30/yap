@@ -1,11 +1,11 @@
 {
-    "name": "httpserver project",
-    "description": "The project description",
+    "name": "Yap",
+    "description": "Yet another packager",
     "build_dir": "/tmp",
     "output": "artifacts",
     "projects": [
         {
-            "name": "httpserver",
+            "name": "yap",
             "install": true
         }
     ]

@@ -1,5 +1,13 @@
 package redhat
 
+const (
+	Communications = "Applications/Communications"
+	Engineering    = "Applications/Engineering"
+	Internet       = "Applications/Internet"
+	Multimedia     = "Applications/Multimedia"
+	Tools          = "Development/Tools"
+)
+
 func ConvertSection(section string) (converted string) {
 	switch section {
 	case "admin":
@@ -7,9 +15,9 @@ func ConvertSection(section string) (converted string) {
 	case "localization":
 		converted = "Development/Languages"
 	case "mail":
-		converted = "Applications/Communications"
+		converted = Communications
 	case "comm":
-		converted = "Applications/Communications"
+		converted = Communications
 	case "math":
 		converted = "Applications/Productivity"
 	case "database":
@@ -19,43 +27,43 @@ func ConvertSection(section string) (converted string) {
 	case "debug":
 		converted = "Development/Debuggers"
 	case "net":
-		converted = "Applications/Internet"
+		converted = Internet
 	case "news":
 		converted = "Applications/Publishing"
 	case "devel":
-		converted = "Development/Tools"
+		converted = Tools
 	case "doc":
 		converted = "Documentation"
 	case "editors":
 		converted = "Applications/Editors"
 	case "electronics":
-		converted = "Applications/Engineering"
+		converted = Engineering
 	case "embedded":
-		converted = "Applications/Engineering"
+		converted = Engineering
 	case "fonts":
 		converted = "Interface/Desktops"
 	case "games":
 		converted = "Amusements/Games"
 	case "science":
-		converted = "Applications/Engineering"
+		converted = Engineering
 	case "shells":
 		converted = "System Environment/Shells"
 	case "sound":
-		converted = "Applications/Multimedia"
+		converted = Multimedia
 	case "graphics":
-		converted = "Applications/Multimedia"
+		converted = Multimedia
 	case "text":
 		converted = "Applications/Text"
 	case "httpd":
-		converted = "Applications/Internet"
+		converted = Internet
 	case "vcs":
-		converted = "Development/Tools"
+		converted = Tools
 	case "interpreters":
-		converted = "Development/Tools"
+		converted = Tools
 	case "video":
-		converted = "Applications/Multimedia"
+		converted = Multimedia
 	case "web":
-		converted = "Applications/Internet"
+		converted = Internet
 	case "kernel":
 		converted = "System Environment/Kernel"
 	case "x11":
@@ -68,5 +76,5 @@ func ConvertSection(section string) (converted string) {
 		converted = section
 	}
 
-	return
+	return converted
 }

@@ -1,14 +1,16 @@
-FROM opensuse/tumbleweed
-MAINTAINER M0Rf30
+FROM opensuse/tumbleweed:latest
+LABEL maintainer="Yap <contact@packagefoundation.org>"
 
-RUN zypper update \
-&& zypper -n install -y tar expect rpm-build rsync make automake gcc wget zip git bzr mercurial unzip \
-&& zypper -n install -y go
+RUN \
+  zypper -n install -y automake bash-completion expect gcc git make rpm-build rsync tar unzip zip; \
+  zypper -n install -y go
 
-ENV GOPATH /go
-ENV PATH /usr/local/go/bin:$PATH:/go/bin
-
-RUN go get github.com/packagefoundation/yap
+COPY . /project
+WORKDIR /project
+RUN \
+  go build -ldflags "-w -s" -o /usr/bin/; \
+  yap completion bash > /usr/share/bash-completion/completions/yap; \
+  echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \
+  rm -rf /project/*
 
 ENTRYPOINT ["yap"]
-CMD ["build", "opensuse"]

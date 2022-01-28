@@ -22,11 +22,9 @@ type DistroProject interface {
 type singleProjectConf struct {
 	Name    string `json:"name"`
 	Install bool   `json:"install"`
-	// TODO we could easily build a dep tree and then build all the stuff in parallel automatically
-	//Parallel bool `json:"parallel"`
-	//DependsOn []string `json:"depends_on"`
 }
 
+//nolint:tagliatelle
 type multipleProjectConf struct {
 	Name        string              `json:"name"`
 	Description string              `json:"description"`
@@ -36,11 +34,17 @@ type multipleProjectConf struct {
 }
 
 type Project struct {
-	Name         string
-	DependsOn    []*Project
+	BuildRoot    string
 	Builder      *builder.Builder
-	Packer       packer.Packer
+	DependsOn    []*Project
+	Distro       string
 	HasToInstall bool
+	MirrorRoot   string
+	Name         string
+	Packer       packer.Packer
+	Path         string
+	Release      string
+	Root         string
 }
 
 type MultipleProject struct {
@@ -58,16 +62,20 @@ func (m *MultipleProject) Close() error {
 	for _, p := range m.project {
 		os.RemoveAll(p.Builder.Pack.PackageDir)
 	}
+
 	return nil
 }
 
 func NewMultipleProject(distro string, release string, path string) (*MultipleProject, error) {
 	file, err := os.Open(filepath.Join(path, "yap.json"))
-
 	if err != nil {
 		file, err = os.Open(filepath.Join(path, "pacur.json"))
 		if err != nil {
-			fmt.Printf("%s❌ :: %sfailed to open yap.json (pacur.json) file within '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
+			fmt.Printf("%s❌ :: %sfailed to open yap.json (pacur.json) file within '%s'%s\n",
+				string(constants.ColorBlue),
+				string(constants.ColorYellow),
+				path,
+				string(constants.ColorWhite))
 			os.Exit(1)
 		}
 	}
@@ -76,36 +84,44 @@ func NewMultipleProject(distro string, release string, path string) (*MultiplePr
 	if err != nil {
 		return nil, err
 	}
+
 	mpc := multipleProjectConf{}
+
 	if err := json.Unmarshal(prjBsContent, &mpc); err != nil {
 		return nil, err
 	}
 
 	projects := make([]*Project, 0)
-	buildDir := filepath.Join(os.TempDir())
+	buildDir := os.TempDir()
+
 	if mpc.BuildDir != "" {
-		buildDir = filepath.Join(mpc.BuildDir)
+		buildDir = mpc.BuildDir
 	}
+
 	if err := utils.ExistsMakeDir(buildDir); err != nil {
 		return nil, err
 	}
+
 	for _, child := range mpc.Projects {
 		pac, err := parse.File(distro, release, filepath.Join(buildDir, child.Name), filepath.Join(path, child.Name))
 		if err != nil {
 			return nil, err
 		}
+
 		if err := pac.Compile(); err != nil {
 			return nil, err
 		}
+
 		pcker, err := packer.GetPacker(pac, distro, release)
 		if err != nil {
 			return nil, err
 		}
+
 		if err := pcker.Prep(); err != nil {
 			return nil, err
 		}
 
-		p := &Project{
+		proj := &Project{
 			Name:         child.Name,
 			DependsOn:    nil,
 			Builder:      &builder.Builder{Pack: pac},
@@ -113,7 +129,7 @@ func NewMultipleProject(distro string, release string, path string) (*MultiplePr
 			HasToInstall: child.Install,
 		}
 
-		projects = append(projects, p)
+		projects = append(projects, proj)
 	}
 
 	return &MultipleProject{
@@ -125,19 +141,27 @@ func NewMultipleProject(distro string, release string, path string) (*MultiplePr
 }
 
 func (m *MultipleProject) BuildAll() error {
-	for _, p := range m.project {
-		fmt.Printf("%s🚀 :: %s%s: launching build for project ...%s\n", string(constants.ColorBlue), string(constants.ColorYellow), p.Name, string(constants.ColorWhite))
-		if err := p.Builder.Build(); err != nil {
+	for _, proj := range m.project {
+		fmt.Printf("%s🚀 :: %s%s: launching build for project ...%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			proj.Name,
+			string(constants.ColorWhite))
+
+		if err := proj.Builder.Build(); err != nil {
 			return err
 		}
-		artefactPaths, err := p.Packer.Build()
+
+		artefactPaths, err := proj.Packer.Build()
 		if err != nil {
 			return err
 		}
+
 		if m.output != "" {
 			if err := utils.ExistsMakeDir(m.output); err != nil {
 				return err
 			}
+
 			for _, ap := range artefactPaths {
 				filename := filepath.Base(ap)
 				if err := utils.Copy("", ap, filepath.Join(m.output, filename), false); err != nil {
@@ -145,12 +169,19 @@ func (m *MultipleProject) BuildAll() error {
 				}
 			}
 		}
-		if p.HasToInstall {
-			fmt.Printf("%s🤓 :: %s%s: installing package ...%s\n", string(constants.ColorBlue), string(constants.ColorYellow), p.Name, string(constants.ColorWhite))
-			if err := p.Packer.Install(); err != nil {
+
+		if proj.HasToInstall {
+			fmt.Printf("%s🤓 :: %s%s: installing package ...%s\n",
+				string(constants.ColorBlue),
+				string(constants.ColorYellow),
+				proj.Name,
+				string(constants.ColorWhite))
+
+			if err := proj.Packer.Install(); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }

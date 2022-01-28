@@ -8,9 +8,7 @@ import (
 	"strings"
 )
 
-var (
-	keyReg = regexp.MustCompile(`(\$\{[^\}]+\})`)
-)
+var keyReg = regexp.MustCompile(`(\$\{[^\}]+\})`)
 
 type resolverFunc struct {
 	resolve func(r *Resolver, key string) (string, bool)
@@ -81,33 +79,36 @@ func (r *Resolver) resolve(item *element) (err error) {
 		if !wasSolved {
 			fmt.Printf(`resolver: Failed to resolve '%s' in '%s="%s"'`,
 				keyFull, item.Key, *item.Val)
+
 			return
 		}
 	}
 
 	r.data[item.Key] = *item.Val
 
-	return
+	return err
 }
 
+//nolint:gomnd
+//noling:forcetypeassert
 func (r *Resolver) Resolve() (err error) {
 	for {
 		elem := r.queue.Front()
+
 		if elem == nil {
 			return
 		}
 
 		item := elem.Value.(*element)
-		item.Count += 1
+		item.Count++
 
 		err = r.resolve(item)
 		if err != nil {
 			if item.Count > 32 {
 				return
-			} else {
-				err = nil
-				r.queue.PushBack(elem.Value)
 			}
+
+			r.queue.PushBack(elem.Value)
 		}
 
 		r.queue.Remove(elem)

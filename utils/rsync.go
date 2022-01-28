@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 
@@ -10,7 +9,7 @@ import (
 )
 
 func Rsync(source, dest string) (err error) {
-	cmd := exec.Command("rsync", "-a", "-A",
+	cmd := exec.Command("rsync", "-a", "-A", //nolint:gosec
 		source+string(os.PathSeparator),
 		dest+string(os.PathSeparator))
 	cmd.Stdout = os.Stdout
@@ -18,8 +17,13 @@ func Rsync(source, dest string) (err error) {
 
 	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to rsync '%s' to '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), source, dest, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to rsync '%s' to '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			source,
+			dest,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -27,7 +31,7 @@ func Rsync(source, dest string) (err error) {
 }
 
 func RsyncExt(source, dest, ext string) (err error) {
-	cmd := exec.Command("rsync", "-a", "-A",
+	cmd := exec.Command("rsync", "-a", "-A", //nolint:gosec
 		"--include", "*"+ext, "--exclude", "*",
 		source+string(os.PathSeparator),
 		dest+string(os.PathSeparator))
@@ -36,8 +40,13 @@ func RsyncExt(source, dest, ext string) (err error) {
 
 	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to rsync '%s' to '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), source, dest, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to rsync '%s' to '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			source,
+			dest,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -45,7 +54,7 @@ func RsyncExt(source, dest, ext string) (err error) {
 }
 
 func RsyncMatch(source, dest, match string) (err error) {
-	cmd := exec.Command("rsync", "-a", "-A",
+	cmd := exec.Command("rsync", "-a", "-A", //nolint:gosec
 		"--include", "*"+match+"*", "--exclude", "*",
 		source+string(os.PathSeparator),
 		dest+string(os.PathSeparator))
@@ -54,8 +63,13 @@ func RsyncMatch(source, dest, match string) (err error) {
 
 	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to rsync '%s' to '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), source, dest, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to rsync '%s' to '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			source,
+			dest,
+			string(constants.ColorWhite))
+
 		return
 	}
 

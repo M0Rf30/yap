@@ -49,6 +49,7 @@ func (p *Pacman) createInstall() (exists bool, err error) {
 		for _, line := range p.Pack.PreInst {
 			data += fmt.Sprintf("    %s\n", line)
 		}
+
 		data += "}\n"
 	}
 
@@ -57,6 +58,7 @@ func (p *Pacman) createInstall() (exists bool, err error) {
 		for _, line := range p.Pack.PostInst {
 			data += fmt.Sprintf("    %s\n", line)
 		}
+
 		data += "}\n"
 	}
 
@@ -65,6 +67,7 @@ func (p *Pacman) createInstall() (exists bool, err error) {
 		for _, line := range p.Pack.PreInst {
 			data += fmt.Sprintf("    %s\n", line)
 		}
+
 		data += "}\n"
 	}
 
@@ -73,6 +76,7 @@ func (p *Pacman) createInstall() (exists bool, err error) {
 		for _, line := range p.Pack.PostInst {
 			data += fmt.Sprintf("    %s\n", line)
 		}
+
 		data += "}\n"
 	}
 
@@ -81,6 +85,7 @@ func (p *Pacman) createInstall() (exists bool, err error) {
 		for _, line := range p.Pack.PreRm {
 			data += fmt.Sprintf("    %s\n", line)
 		}
+
 		data += "}\n"
 	}
 
@@ -89,6 +94,7 @@ func (p *Pacman) createInstall() (exists bool, err error) {
 		for _, line := range p.Pack.PostRm {
 			data += fmt.Sprintf("    %s\n", line)
 		}
+
 		data += "}\n"
 	}
 
@@ -96,12 +102,13 @@ func (p *Pacman) createInstall() (exists bool, err error) {
 	if exists {
 		path := filepath.Join(p.pacmanDir, p.Pack.PkgName+".install")
 		err = utils.CreateWrite(path, data)
+
 		if err != nil {
 			return
 		}
 	}
 
-	return
+	return exists, err
 }
 
 func (p *Pacman) createMake() (err error) {
@@ -125,15 +132,16 @@ func (p *Pacman) createMake() (err error) {
 	for _, item := range p.Pack.License {
 		data += fmt.Sprintf("    %s\n", strconv.Quote(item))
 	}
-	data += ")\n"
 
-	data += fmt.Sprintf("url=%s\n", strconv.Quote(p.Pack.Url))
+	data += ")\n"
+	data += fmt.Sprintf("url=%s\n", strconv.Quote(p.Pack.URL))
 
 	if len(p.Pack.Depends) > 0 {
 		data += "depends=(\n"
 		for _, item := range p.Pack.Depends {
 			data += fmt.Sprintf("    %s\n", strconv.Quote(item))
 		}
+
 		data += ")\n"
 	}
 
@@ -142,6 +150,7 @@ func (p *Pacman) createMake() (err error) {
 		for _, item := range p.Pack.OptDepends {
 			data += fmt.Sprintf("    %s\n", strconv.Quote(item))
 		}
+
 		data += ")\n"
 	}
 
@@ -150,6 +159,7 @@ func (p *Pacman) createMake() (err error) {
 		for _, item := range p.Pack.Provides {
 			data += fmt.Sprintf("    %s\n", strconv.Quote(item))
 		}
+
 		data += ")\n"
 	}
 
@@ -158,6 +168,7 @@ func (p *Pacman) createMake() (err error) {
 		for _, item := range p.Pack.Conflicts {
 			data += fmt.Sprintf("    %s\n", strconv.Quote(item))
 		}
+
 		data += ")\n"
 	}
 
@@ -170,10 +181,12 @@ func (p *Pacman) createMake() (err error) {
 
 	if len(p.Pack.Backup) > 0 {
 		data += "backup=(\n"
+
 		for _, item := range p.Pack.Backup {
 			item = strings.TrimPrefix(item, "/")
 			data += fmt.Sprintf("    %s\n", strconv.Quote(item))
 		}
+
 		data += ")\n"
 	}
 
@@ -189,7 +202,7 @@ func (p *Pacman) createMake() (err error) {
 
 	fmt.Println(data)
 
-	return
+	return err
 }
 
 func (p *Pacman) pacmanBuild() (err error) {
@@ -273,24 +286,22 @@ func (p *Pacman) Build() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer p.remDirs()
 
 	err = p.createMake()
 	if err != nil {
 		return nil, err
-
 	}
 
 	err = p.pacmanBuild()
 	if err != nil {
 		return nil, err
-
 	}
 
 	err = p.clean()
 	if err != nil {
 		return nil, err
-
 	}
 
 	err = p.copy()
@@ -317,9 +328,11 @@ func (p *Pacman) Install() error {
 		if err != nil {
 			return err
 		}
+
 		if err := utils.Exec("", "sudo", "-u", "root", "pacman -U --noconfirm", absPath); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }

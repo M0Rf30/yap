@@ -3,7 +3,6 @@ package redhat
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +36,7 @@ func (r *Redhat) getDepends() (err error) {
 	args = append(args, r.Pack.MakeDepends...)
 
 	err = utils.Exec("", "yum", args...)
+
 	if err != nil {
 		return
 	}
@@ -52,6 +52,7 @@ func (r *Redhat) getFiles() (files []string, err error) {
 		if !strings.HasPrefix(path, "/") {
 			path = "/" + path
 		}
+
 		backup.Add(path)
 	}
 
@@ -76,30 +77,28 @@ func (r *Redhat) getFiles() (files []string, err error) {
 			path = `%config "/` + path + `"`
 		} else {
 			path = `"/` + path + `"`
-
 		}
+
 		files = append(files, path)
 	}
 
-	return
+	return files, err
 }
 
 func (r *Redhat) createSpec(files []string) (err error) {
 	path := filepath.Join(r.specsDir, r.Pack.PkgName+".spec")
 
 	release := "%{?dist}"
-	if r.Pack.Distro == "amazonlinux" && r.Pack.Release == "1" {
-		release = ".amzn1"
-	} else if r.Pack.Distro == "amazonlinux" && r.Pack.Release == "2" {
-		release = ".amzn2"
-	} else if r.Pack.Distro == "centos" && r.Pack.Release == "7" {
-		release = ".el7"
-	} else if r.Pack.Distro == "centos" && r.Pack.Release == "8" {
-		release = ".el8"
-	} else if r.Pack.Distro == "oraclelinux" && r.Pack.Release == "7" {
-		release = ".ol7"
-	} else if r.Pack.Distro == "oraclelinux" && r.Pack.Release == "8" {
-		release = ".ol8"
+
+	switch {
+	case r.Pack.Distro == "amazon":
+		release = ".amzn" + r.Pack.Release
+	case r.Pack.Distro == "centos":
+		release = ".el" + r.Pack.Release
+	case r.Pack.Distro == "oracle":
+		release = ".ol" + r.Pack.Release
+	case r.Pack.Distro == "rocky":
+		release = ".el" + r.Pack.Release
 	}
 
 	data := ""
@@ -108,7 +107,7 @@ func (r *Redhat) createSpec(files []string) (err error) {
 	data += fmt.Sprintf("Version: %s\n", r.Pack.PkgVer)
 	data += fmt.Sprintf("Release: %s%s\n", r.Pack.PkgRel, release)
 	data += fmt.Sprintf("Group: %s\n", ConvertSection(r.Pack.Section))
-	data += fmt.Sprintf("URL: %s\n", r.Pack.Url)
+	data += fmt.Sprintf("URL: %s\n", r.Pack.URL)
 	data += fmt.Sprintf("License: %s\n", r.Pack.License)
 	data += fmt.Sprintf("Packager: %s\n", r.Pack.Maintainer)
 
@@ -140,6 +139,7 @@ func (r *Redhat) createSpec(files []string) (err error) {
 		for _, line := range r.Pack.PkgDescLong {
 			data += line + "\n"
 		}
+
 		data += "\n"
 	}
 
@@ -147,11 +147,12 @@ func (r *Redhat) createSpec(files []string) (err error) {
 	data += fmt.Sprintf("rsync -a -A %s/ $RPM_BUILD_ROOT/\n",
 		r.Pack.PackageDir)
 	data += "\n"
-
 	data += "%files\n"
+
 	for _, line := range files {
 		data += line + "\n"
 	}
+
 	data += "\n"
 
 	if len(r.Pack.PreInst) > 0 {
@@ -159,6 +160,7 @@ func (r *Redhat) createSpec(files []string) (err error) {
 		for _, line := range r.Pack.PreInst {
 			data += line + "\n"
 		}
+
 		data += "\n"
 	}
 
@@ -167,21 +169,25 @@ func (r *Redhat) createSpec(files []string) (err error) {
 		for _, line := range r.Pack.PostInst {
 			data += line + "\n"
 		}
+
 		data += "\n"
 	}
 
 	if len(r.Pack.PreRm) > 0 {
 		data += "%preun\n"
 		data += "if [[ \"$1\" -ne 0 ]]; then exit 0; fi\n"
+
 		for _, line := range r.Pack.PreRm {
 			data += line + "\n"
 		}
+
 		data += "\n"
 	}
 
 	if len(r.Pack.PostRm) > 0 {
 		data += "%postun\n"
 		data += "if [[ \"$1\" -ne 0 ]]; then exit 0; fi\n"
+
 		for _, line := range r.Pack.PostRm {
 			data += line + "\n"
 		}
@@ -194,7 +200,7 @@ func (r *Redhat) createSpec(files []string) (err error) {
 
 	fmt.Println(data)
 
-	return
+	return err
 }
 
 func (r *Redhat) rpmBuild() (err error) {
@@ -257,6 +263,7 @@ func (r *Redhat) clean() (err error) {
 	if !ok {
 		fmt.Printf("redhat: Failed to find match for '%s'\n",
 			r.Pack.FullRelease)
+
 		return
 	}
 
@@ -274,7 +281,7 @@ func (r *Redhat) copy() (err error) {
 	if err != nil {
 		fmt.Printf("redhat: Failed to find rpms from '%s'\n",
 			r.rpmsDir)
-		log.Fatal(err)
+
 		return
 	}
 
@@ -300,6 +307,7 @@ func (r *Redhat) Build() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer r.remDirs()
 
 	files, err := r.getFiles()
@@ -334,6 +342,7 @@ func (r *Redhat) Build() ([]string, error) {
 
 	r.remDirs()
 	err = r.makeDirs()
+
 	if err != nil {
 		return nil, err
 	}
@@ -352,9 +361,11 @@ func (r *Redhat) Install() error {
 		if err != nil {
 			return err
 		}
+
 		if err := utils.Exec("", "yum", "install", "-y", absPath); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }

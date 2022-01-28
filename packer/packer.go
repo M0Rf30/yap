@@ -17,9 +17,8 @@ type Packer interface {
 	Install() error
 }
 
-func GetPacker(pac *pack.Pack, distro, release string) (
+func GetPacker(pac *pack.Pack, distro, release string) ( //nolint:ireturn
 	pcker Packer, err error) {
-
 	switch constants.DistroPack[distro] {
 	case "pacman":
 		pcker = &pacman.Pacman{
@@ -43,5 +42,5 @@ func GetPacker(pac *pack.Pack, distro, release string) (
 		os.Exit(1)
 	}
 
-	return
+	return pcker, err
 }

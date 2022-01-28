@@ -11,6 +11,8 @@ import (
 	"github.com/packagefoundation/yap/utils"
 )
 
+const IDLenght = 12
+
 type Builder struct {
 	id   string
 	Pack *pack.Pack
@@ -85,27 +87,43 @@ func (b *Builder) pkg() (err error) {
 }
 
 func (b *Builder) Build() (err error) {
-	b.id = utils.RandStr(12)
+	b.id = utils.RandStr(IDLenght)
 
 	err = b.initDirs()
 	if err != nil {
 		return
 	}
-	fmt.Printf("\t%s🖧  :: %sgetting sources ...%s\n", string(constants.ColorBlue), string(constants.ColorYellow), string(constants.ColorWhite))
+
+	fmt.Printf("\t%s🖧  :: %sgetting sources ...%s\n",
+		string(constants.ColorBlue),
+		string(constants.ColorYellow),
+		string(constants.ColorWhite))
+
 	err = b.getSources()
 	if err != nil {
 		return
 	}
-	fmt.Printf("\t%s🏗️  :: %sbuilding ...%s\n", string(constants.ColorBlue), string(constants.ColorYellow), string(constants.ColorWhite))
+
+	fmt.Printf("\t%s🏗️  :: %sbuilding ...%s\n",
+		string(constants.ColorBlue),
+		string(constants.ColorYellow),
+		string(constants.ColorWhite))
+
 	err = b.build()
+
 	if err != nil {
 		return
 	}
-	fmt.Printf("\t%s📦 :: %sgenerating package ...%s\n", string(constants.ColorBlue), string(constants.ColorYellow), string(constants.ColorWhite))
+
+	fmt.Printf("\t%s📦 :: %sgenerating package ...%s\n",
+		string(constants.ColorBlue),
+		string(constants.ColorYellow),
+		string(constants.ColorWhite))
+
 	err = b.pkg()
 	if err != nil {
 		return
 	}
 
-	return
+	return err
 }

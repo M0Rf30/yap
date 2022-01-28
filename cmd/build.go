@@ -9,18 +9,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	NoCache bool
-)
+const argLenght = 2
 
-// buildCmd represents the command to build the entire project
+var noCache bool
+
+// buildCmd represents the command to build the entire project.
 var buildCmd = &cobra.Command{
 	Use:   "build [target] [path]",
 	Short: "Build multiple PKGBUILD definitions within a yap.json or pacur.json project",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		path, err := os.Getwd()
-		if len(args) == 2 {
+		if len(args) == argLenght {
 			path = args[1]
 		}
 		if err != nil {
@@ -38,7 +38,7 @@ var buildCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
-		if NoCache {
+		if noCache {
 			if err := multiplePrj.NoCache(); err != nil {
 				log.Fatal(err)
 			}
@@ -55,5 +55,5 @@ var buildCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(buildCmd)
-	buildCmd.Flags().BoolVarP(&NoCache, "no-cache", "c", false, "Do not use cache when building the project")
+	buildCmd.Flags().BoolVarP(&noCache, "no-cache", "c", false, "Do not use cache when building the project")
 }

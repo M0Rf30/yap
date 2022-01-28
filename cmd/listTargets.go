@@ -13,7 +13,7 @@ func ListTargets() {
 	}
 }
 
-// listTargetsCmd represents the listTargets command
+// listTargetsCmd represents the listTargets command.
 var listTargetsCmd = &cobra.Command{
 	Use:   "list-targets",
 	Short: "List a bunch of available build targets",

@@ -66,10 +66,12 @@ func (d *Debian) createConfFiles() (err error) {
 	path := filepath.Join(d.debDir, "conffiles")
 
 	data := ""
+
 	for _, name := range d.Pack.Backup {
 		if !strings.HasPrefix(name, "/") {
 			name = "/" + name
 		}
+
 		data += name + "\n"
 	}
 
@@ -115,13 +117,14 @@ func (d *Debian) createControl() (err error) {
 
 	data += fmt.Sprintf("Section: %s\n", d.Pack.Section)
 	data += fmt.Sprintf("Priority: %s\n", d.Pack.Priority)
-	data += fmt.Sprintf("Homepage: %s\n", d.Pack.Url)
+	data += fmt.Sprintf("Homepage: %s\n", d.Pack.URL)
 	data += fmt.Sprintf("Description: %s\n", d.Pack.PkgDesc)
 
 	for _, line := range d.Pack.PkgDescLong {
 		if line == "" {
 			line = "."
 		}
+
 		data += fmt.Sprintf("  %s\n", line)
 	}
 
@@ -130,7 +133,7 @@ func (d *Debian) createControl() (err error) {
 		return
 	}
 
-	return
+	return err
 }
 
 func (d *Debian) createMd5Sums() (err error) {
@@ -201,13 +204,13 @@ func (d *Debian) createScripts() (err error) {
 			return
 		}
 
-		err = utils.Chmod(path, 0755)
+		err = utils.Chmod(path, 0o755)
 		if err != nil {
 			return
 		}
 	}
 
-	return
+	return err
 }
 
 func (d *Debian) clean() (err error) {
@@ -270,6 +273,7 @@ func (d *Debian) Prep() (err error) {
 func (d *Debian) Build() ([]string, error) {
 	var err error
 	d.installSize, err = utils.GetDirSize(d.Pack.PackageDir)
+
 	if err != nil {
 		return nil, err
 	}
@@ -281,9 +285,11 @@ func (d *Debian) Build() ([]string, error) {
 
 	d.debDir = filepath.Join(d.Pack.PackageDir, "DEBIAN")
 	err = utils.ExistsMakeDir(d.debDir)
+
 	if err != nil {
 		return nil, err
 	}
+
 	defer os.RemoveAll(d.debDir)
 
 	err = d.createConfFiles()
@@ -325,6 +331,7 @@ func (d *Debian) Build() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	d.debOutput = dpkgDeb
 
 	return []string{dpkgDeb}, nil
@@ -335,5 +342,6 @@ func (d *Debian) Install() error {
 	if err != nil {
 		return err
 	}
+
 	return utils.Exec("", "apt-get", "install", "-y", absPath)
 }

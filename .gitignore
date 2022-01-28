@@ -10,3 +10,7 @@ Thumbs.db
 *.egg
 *.egg-info
 /yap
+artifacts
+*.deb
+*.rpm
+*.tar.*

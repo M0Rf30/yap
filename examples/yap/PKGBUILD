@@ -1,0 +1,52 @@
+targets=(
+  "arch"
+  "centos"
+  "debian"
+  "ubuntu"
+)
+pkgname="yap"
+pkgver="1.0"
+pkgrel="1"
+pkgdesc="Package software with ease"
+pkgdesc:centos="Package software with ease for CentOS"
+pkgdesc:debian="Package software with ease for Debian"
+pkgdesc:fedora="Package software with ease for Fedora"
+pkgdesc:ubuntu="Package software with ease for Ubuntu"
+pkgdesclong=(
+  "Yap allows building packages for multiple GNU/Linux"
+  "distributions with a consistent package spec format"
+)
+maintainer="Example <example@yap.org>"
+arch="all"
+license=("GPLv3")
+section="utils"
+priority="optional"
+url="https://github.com/PackageFoundation/${pkgname}"
+sources=(
+  "${url}/archive/main.tar.gz"
+)
+hashsums=(
+  "SKIP"
+)
+
+build() {
+  cd "${srcdir}/${pkgname}-main"
+  go build
+
+  ./"${pkgname}" completion bash >"${srcdir}/${pkgname}.bash"
+  ./"${pkgname}" completion fish >"${srcdir}/${pkgname}.fish"
+
+}
+
+package() {
+  cd "${srcdir}/${pkgname}-main"
+  install -Dm 755 "${pkgname}" \
+    "${pkgdir}/usr/bin/${pkgname}"
+
+  install -Dm644 "../${pkgname}.bash" \
+    "${pkgdir}/usr/share/bash-completion/completions/${pkgname}"
+  install -Dm644 "../${pkgname}.fish" \
+    "${pkgdir}/usr/share/fish/completions/${pkgname}.fish"
+  install -Dm644 -t "${pkgdir}/usr/share/licenses/${pkgname}/GPL3" LICENSE
+  install -Dm644 -t "${pkgdir}/usr/share/doc/${pkgname}" README.md
+}

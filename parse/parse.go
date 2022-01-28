@@ -3,7 +3,6 @@ package parse
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,16 +16,14 @@ const (
 	blockFunc = 2
 )
 
-var (
-	itemReg = regexp.MustCompile("(\"[^\"]+\")|(`[^`]+`)")
-)
+var itemReg = regexp.MustCompile("(\"[^\"]+\")|(`[^`]+`)")
 
 func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err error) {
 	home, err = filepath.Abs(home)
 	if err != nil {
 		fmt.Printf("parse: Failed to get root directory from '%s'\n",
 			home)
-		log.Fatal(err)
+
 		return
 	}
 
@@ -39,6 +36,7 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 	if err != nil {
 		return
 	}
+
 	path := filepath.Join(compiledOutput, "PKGBUILD")
 
 	pac = &pack.Pack{
@@ -58,7 +56,7 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 	}
 	defer file.Close()
 
-	n := 0
+	num := 0
 	blockType := 0
 	blockKey := ""
 	blockData := ""
@@ -67,38 +65,43 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		n += 1
+		num++
 
 		if line == "" || line[:1] == "#" {
 			continue
 		}
 
-		if blockType == blockList {
+		if blockType == blockList { //nolint:gocritic,nestif
 			if line == ")" {
 				for _, item := range itemReg.FindAllString(blockData, -1) {
 					blockItems = append(blockItems, item[1:len(item)-1])
 				}
-				err = pac.AddItem(blockKey, blockItems, n, line)
+
+				err = pac.AddItem(blockKey, blockItems, num, line)
+
 				if err != nil {
 					return
 				}
+
 				blockType = 0
 				blockKey = ""
 				blockData = ""
 				blockItems = []string{}
+
 				continue
 			}
 
 			blockData += strings.TrimSpace(line)
 		} else if blockType == blockFunc {
 			if line == "}" {
-				err = pac.AddItem(blockKey, blockItems, n, line)
+				err = pac.AddItem(blockKey, blockItems, num, line)
 				if err != nil {
 					return
 				}
 				blockType = 0
 				blockKey = ""
 				blockItems = []string{}
+
 				continue
 			}
 
@@ -111,7 +114,8 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 				parts := strings.SplitN(line, "=", 2)
 				if len(parts) != 2 {
 					fmt.Printf("parse: Line missing '=' (%d: %s)",
-						n, line)
+						num, line)
+
 					return
 				}
 
@@ -120,12 +124,14 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 
 				if key[:1] == " " {
 					fmt.Printf("parse: Extra space padding (%d: %s)",
-						n, line)
+						num, line)
+
 					return
 				} else if key[len(key)-1:] == " " {
 					fmt.Printf(
 						"parse: Extra space before '=' (%d: %s)",
-						n, line)
+						num, line)
+
 					return
 				}
 
@@ -135,11 +141,12 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 					if val[valLen-1:] != val[:1] {
 						fmt.Printf("parse: Unexpected char '%s' "+
 							"expected '%s' (%d: %s)",
-							val[valLen-1:], val[:1], n, line)
+							val[valLen-1:], val[:1], num, line)
+
 						return
 					}
 
-					err = pac.AddItem(key, val[1:valLen-1], n, line)
+					err = pac.AddItem(key, val[1:valLen-1], num, line)
 					if err != nil {
 						return
 					}
@@ -148,7 +155,8 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 						if val[1:2] != `"` && val[1:2] != "`" {
 							fmt.Printf("parse: Unexpected char '%s' "+
 								"expected '\"' or '`' (%d: %s)",
-								val[1:2], n, line)
+								val[1:2], num, line)
+
 							return
 						}
 
@@ -156,12 +164,13 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 							fmt.Printf("parse: Unexpected char '%s' "+
 								"expected '%s' (%d: %s)",
 								val[valLen-2:valLen-1], val[1:2],
-								n, line)
+								num, line)
+
 							return
 						}
 
 						val = val[2 : len(val)-2]
-						err = pac.AddItem(key, []string{val}, n, line)
+						err = pac.AddItem(key, []string{val}, num, line)
 						if err != nil {
 							return
 						}
@@ -172,17 +181,19 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 				case " ":
 					fmt.Printf(
 						"parse: Extra space after '=' (%d: %s)",
-						n, line)
+						num, line)
+
 					return
 				default:
 					fmt.Printf(
 						"parse: Unexpected char '%s' expected "+
-							"'\"' or '`' (%d: %s)", val[:1], n, line)
+							"'\"' or '`' (%d: %s)", val[:1], num, line)
+
 					return
 				}
 			}
 		}
 	}
 
-	return
+	return pac, err
 }

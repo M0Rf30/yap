@@ -9,13 +9,12 @@ import (
 	"github.com/packagefoundation/yap/constants"
 )
 
-var (
-	chars = []rune(
-		"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-)
+var chars = []rune(
+	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-func HttpGet(url, output string, protocol string) (err error) {
+func HTTPGet(url, output string, protocol string) (err error) {
 	var cmd *exec.Cmd
+
 	switch protocol {
 	case "http":
 		cmd = exec.Command("curl", "-gqb", "\"\"", "-fLC", "-", "-o", output, url)
@@ -30,7 +29,12 @@ func HttpGet(url, output string, protocol string) (err error) {
 
 	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to get %s%s\n", string(constants.ColorBlue), string(constants.ColorYellow), url, string(constants.ColorWhite))
+		fmt.Printf("%s❌ :: %sfailed to get %s%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			url,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -40,9 +44,11 @@ func HttpGet(url, output string, protocol string) (err error) {
 func RandStr(n int) (str string) {
 	strList := make([]rune, n)
 	for i := range strList {
-		strList[i] = chars[rand.Intn(len(chars))]
+		strList[i] = chars[rand.Intn(len(chars))] //nolint:gosec
 	}
+
 	str = string(strList)
+
 	return
 }
 

@@ -15,8 +15,12 @@ import (
 func ReadFile(path string) (data []byte, err error) {
 	data, err = ioutil.ReadFile(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read file '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to read file '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -26,8 +30,12 @@ func ReadFile(path string) (data []byte, err error) {
 func ReadDir(path string) (items []os.FileInfo, err error) {
 	items, err = ioutil.ReadDir(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -35,10 +43,14 @@ func ReadDir(path string) (items []os.FileInfo, err error) {
 }
 
 func MkdirAll(path string) (err error) {
-	err = os.MkdirAll(path, 0755)
+	err = os.MkdirAll(path, 0o755)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to mkdir '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to mkdir '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -48,8 +60,12 @@ func MkdirAll(path string) (err error) {
 func Chmod(path string, perm os.FileMode) (err error) {
 	err = os.Chmod(path, perm)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to chmod '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to chmod '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -63,6 +79,7 @@ func ChownR(path string, user, group string) (err error) {
 		fmt.Sprintf("%s:%s", user, group),
 		path,
 	)
+
 	if err != nil {
 		return
 	}
@@ -73,8 +90,12 @@ func ChownR(path string, user, group string) (err error) {
 func Remove(path string) (err error) {
 	err = os.Remove(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -84,8 +105,12 @@ func Remove(path string) (err error) {
 func RemoveAll(path string) (err error) {
 	err = os.RemoveAll(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -101,10 +126,15 @@ func ExistsMakeDir(path string) (err error) {
 				return
 			}
 		} else {
-			fmt.Printf("%s❌ :: %sfailed to stat '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-			log.Fatal(err)
+			fmt.Printf("%s❌ :: %sfailed to stat '%s'%s\n",
+				string(constants.ColorBlue),
+				string(constants.ColorYellow),
+				path,
+				string(constants.ColorWhite))
+
 			return
 		}
+
 		return
 	}
 
@@ -114,8 +144,12 @@ func ExistsMakeDir(path string) (err error) {
 func Create(path string) (file *os.File, err error) {
 	file, err = os.Create(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to create '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to create '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -131,8 +165,12 @@ func CreateWrite(path string, data string) (err error) {
 
 	_, err = file.WriteString(data)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to write to file '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to write to file '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -142,8 +180,12 @@ func CreateWrite(path string, data string) (err error) {
 func Open(path string) (file *os.File, err error) {
 	file, err = os.Open(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open file '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to open file '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -152,6 +194,7 @@ func Open(path string) (file *os.File, err error) {
 
 func Move(source, dest string) (err error) {
 	err = Exec("", "mv", source, dest)
+
 	if err != nil {
 		return
 	}
@@ -165,6 +208,7 @@ func Copy(dir, source, dest string, presv bool) (err error) {
 	if presv {
 		args = append(args, "-p")
 	}
+
 	args = append(args, source, dest)
 
 	err = Exec(dir, "cp", args...)
@@ -181,6 +225,7 @@ func CopyFile(dir, source, dest string, presv bool) (err error) {
 	if presv {
 		args = append(args, "-p")
 	}
+
 	args = append(args, source, dest)
 
 	err = Exec(dir, "cp", args...)
@@ -194,8 +239,12 @@ func CopyFile(dir, source, dest string, presv bool) (err error) {
 func CopyFiles(source, dest string, presv bool) (err error) {
 	files, err := ioutil.ReadDir(source)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), source, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			source,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -216,8 +265,12 @@ func CopyFiles(source, dest string, presv bool) (err error) {
 func FindExt(path, ext string) (matches []string, err error) {
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -237,8 +290,12 @@ func FindExt(path, ext string) (matches []string, err error) {
 func FindMatch(path, match string) (matches []string, err error) {
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -274,8 +331,12 @@ func GetDirSize(path string) (size int, err error) {
 
 	size, err = strconv.Atoi(split[len(split)-2])
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to get dir size '%s'%s\n", string(constants.ColorBlue), string(constants.ColorYellow), path, string(constants.ColorWhite))
-		log.Fatal(err)
+		fmt.Printf("%s❌ :: %sfailed to get dir size '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
 		return
 	}
 
@@ -290,6 +351,7 @@ func Exists(path string) (exists bool, err error) {
 		} else {
 			fmt.Printf("utils: Exists check error for '%s'\n", path)
 			log.Fatal(err)
+
 			return
 		}
 	} else {

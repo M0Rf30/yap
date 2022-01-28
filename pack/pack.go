@@ -28,7 +28,7 @@ type Pack struct {
 	License     []string
 	Section     string
 	Priority    string
-	Url         string
+	URL         string
 	Depends     []string
 	DebTemplate string
 	DebConfig   string
@@ -57,17 +57,22 @@ func (p *Pack) Init() {
 	}
 }
 
-func (p *Pack) parseDirective(input string) (key string, pry int, err error) {
+func (p *Pack) parseDirective(input string) (key string, pry int, err error) { //nolint:unparam
 	split := strings.Split(input, ":")
 	key = split[0]
 
-	if len(split) == 1 {
+	numElem := 2
+
+	switch {
+	case len(split) == 1:
 		pry = 0
+
 		return
-	} else if len(split) != 2 {
+	case len(split) != numElem:
 		fmt.Printf("pack: Invalid use of ':' directive in '%s'\n", input)
+
 		return
-	} else {
+	default:
 		pry = -1
 	}
 
@@ -77,6 +82,7 @@ func (p *Pack) parseDirective(input string) (key string, pry int, err error) {
 
 	if key == "pkgver" || key == "pkgrel" {
 		fmt.Printf("pack: Cannot use directive for '%s'\n", key)
+
 		return
 	}
 
@@ -86,6 +92,7 @@ func (p *Pack) parseDirective(input string) (key string, pry int, err error) {
 		if dirc == p.FullRelease {
 			pry = 3
 		}
+
 		return
 	}
 
@@ -93,6 +100,7 @@ func (p *Pack) parseDirective(input string) (key string, pry int, err error) {
 		if dirc == p.Distro {
 			pry = 2
 		}
+
 		return
 	}
 
@@ -100,11 +108,13 @@ func (p *Pack) parseDirective(input string) (key string, pry int, err error) {
 		if dirc == constants.DistroPackager[p.Distro] {
 			pry = 1
 		}
+
 		return
 	}
 
 	fmt.Printf("pack: Unknown directive '%s'\n", dirc)
-	return
+
+	return key, pry, err
 }
 
 func (p *Pack) Resolve() (err error) {
@@ -124,7 +134,7 @@ func (p *Pack) Resolve() (err error) {
 	reslv.AddList("license", p.License)
 	reslv.Add("section", &p.Section)
 	reslv.Add("priority", &p.Priority)
-	reslv.Add("url", &p.Url)
+	reslv.Add("url", &p.URL)
 	reslv.AddList("depends", p.Depends)
 	reslv.AddList("optdepends", p.OptDepends)
 	reslv.AddList("makedepends", p.MakeDepends)
@@ -144,7 +154,7 @@ func (p *Pack) Resolve() (err error) {
 
 	if p.Variables != nil {
 		for key, val := range p.Variables {
-			reslv.Add(key, &val)
+			reslv.Add(key, &val) //nolint:gosec
 		}
 	}
 
@@ -153,12 +163,11 @@ func (p *Pack) Resolve() (err error) {
 		return
 	}
 
-	return
+	return err
 }
 
 func (p *Pack) AddItem(key string, data interface{}, n int, line string) (
 	err error) {
-
 	key, priority, err := p.parseDirective(key)
 	if err != nil {
 		return
@@ -171,6 +180,7 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) (
 	if priority < p.priorities[key] {
 		return
 	}
+
 	p.priorities[key] = priority
 
 	switch key {
@@ -197,7 +207,7 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) (
 	case "priority":
 		p.Priority = data.(string)
 	case "url":
-		p.Url = data.(string)
+		p.URL = data.(string)
 	case "depends":
 		p.Depends = data.([]string)
 	case "optdepends":
@@ -234,19 +244,22 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) (
 		if p.Variables == nil {
 			p.Variables = map[string]string{}
 		}
+
 		p.Variables[key] = data.(string)
 	}
 
-	return
+	return err
 }
 
 func (p *Pack) Validate() (err error) {
-	if len(p.Sources) == len(p.HashSums) {
-	} else if len(p.Sources) > len(p.HashSums) {
-		fmt.Printf("pack: Missing hash sum for source")
-		return
-	} else {
+	switch {
+	case len(p.Sources) < len(p.HashSums):
 		fmt.Printf("pack: Too many hash sums for sources")
+
+		return
+	case len(p.Sources) > len(p.HashSums):
+		fmt.Printf("pack: Missing hash sum for source")
+
 		return
 	}
 
