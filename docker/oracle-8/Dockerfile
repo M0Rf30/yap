@@ -26,9 +26,9 @@ ENV PATH /usr/lib/go/bin:$PATH:/go/bin
 COPY . /project
 WORKDIR /project
 RUN \
-  go build -ldflags "-w -s" -o /usr/bin/; \
+  go build -ldflags "-w -s" -trimpath -mod=readonly -modcacherw -buildmode=pie -o /usr/bin/; \
   yap completion bash > /etc/bash_completion.d/yap; \
   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \
-  rm -rf /project/*
+  rm -rf /project
 
 ENTRYPOINT ["yap"]

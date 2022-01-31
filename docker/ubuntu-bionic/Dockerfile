@@ -3,7 +3,7 @@ LABEL maintainer="Yap <contact@packagefoundation.org>"
 
 ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN \  
+RUN \
   apt-get update; \
   apt-get upgrade; \
   apt-get install -y --no-install-recommends \
@@ -24,8 +24,9 @@ ENV PATH /usr/lib/go/bin:$PATH:/go/bin
 COPY . /project
 WORKDIR /project
 RUN \
-  go build -ldflags "-w -s" -o /usr/bin/; \
+  go build -ldflags "-w -s" -trimpath -mod=readonly -modcacherw -o /usr/bin/; \
    yap completion bash > /etc/bash_completion.d/yap; \
-   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bash.bashrc
-  
+   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bash.bashrc; \
+   rm -rf /project
+
 ENTRYPOINT ["yap"]

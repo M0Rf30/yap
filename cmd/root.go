@@ -8,7 +8,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "yap",
 	Short: "Automated deb, rpm and pkgbuild build system",
-	Long: `Yap allows building packages for multiple linux distributions with a
+	Long: `Yap allows building packages for multiple GNU/Linux distributions with a
 consistent package spec format.
 
 Complete documentation is available at
