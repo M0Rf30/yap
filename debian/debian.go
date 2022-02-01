@@ -24,11 +24,6 @@ func (d *Debian) getDepends() (err error) {
 		return
 	}
 
-	err = utils.Exec("", "apt-get", "--assume-yes", "update")
-	if err != nil {
-		return
-	}
-
 	args := []string{
 		"--assume-yes",
 		"install",
@@ -36,6 +31,15 @@ func (d *Debian) getDepends() (err error) {
 	args = append(args, d.Pack.MakeDepends...)
 
 	err = utils.Exec("", "apt-get", args...)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (d *Debian) getUpdates() (err error) {
+	err = utils.Exec("", "apt-get", "--assume-yes", "update")
 	if err != nil {
 		return
 	}
@@ -263,6 +267,15 @@ func (d *Debian) dpkgDeb() (string, error) {
 
 func (d *Debian) Prep() (err error) {
 	err = d.getDepends()
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (d *Debian) Update() (err error) {
+	err = d.getUpdates()
 	if err != nil {
 		return
 	}

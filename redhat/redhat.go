@@ -222,6 +222,10 @@ func (r *Redhat) Prep() (err error) {
 	return
 }
 
+func (r *Redhat) Update() (err error) {
+	return
+}
+
 func (r *Redhat) makeDirs() (err error) {
 	r.redhatDir = filepath.Join(r.Pack.Root, "redhat")
 	r.buildDir = filepath.Join(r.redhatDir, "BUILD")

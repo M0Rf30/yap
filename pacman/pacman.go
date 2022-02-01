@@ -22,11 +22,6 @@ func (p *Pacman) getDepends() (err error) {
 		return
 	}
 
-	err = utils.Exec("", "pacman", "-Sy")
-	if err != nil {
-		return
-	}
-
 	args := []string{
 		"-S",
 		"--noconfirm",
@@ -34,6 +29,15 @@ func (p *Pacman) getDepends() (err error) {
 	args = append(args, p.Pack.MakeDepends...)
 
 	err = utils.Exec("", "pacman", args...)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (p *Pacman) getUpdates() (err error) {
+	err = utils.Exec("", "pacman", "-Sy")
 	if err != nil {
 		return
 	}
@@ -226,6 +230,15 @@ func (p *Pacman) pacmanBuild() (err error) {
 
 func (p *Pacman) Prep() (err error) {
 	err = p.getDepends()
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (p *Pacman) Update() (err error) {
+	err = p.getUpdates()
 	if err != nil {
 		return
 	}

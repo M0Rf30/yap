@@ -15,6 +15,7 @@ type Packer interface {
 	Prep() error
 	Build() ([]string, error)
 	Install() error
+	Update() error
 }
 
 func GetPacker(pac *pack.Pack, distro, release string) ( //nolint:ireturn

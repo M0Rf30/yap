@@ -102,6 +102,22 @@ func NewMultipleProject(distro string, release string, path string) (*MultiplePr
 		return nil, err
 	}
 
+	pac, err := parse.File(distro, release,
+		filepath.Join(buildDir, mpc.Projects[0].Name),
+		filepath.Join(path, mpc.Projects[0].Name))
+	if err != nil {
+		return nil, err
+	}
+
+	pcker, err := packer.GetPacker(pac, distro, release)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := pcker.Update(); err != nil {
+		return nil, err
+	}
+
 	for _, child := range mpc.Projects {
 		pac, err := parse.File(distro, release, filepath.Join(buildDir, child.Name), filepath.Join(path, child.Name))
 		if err != nil {
