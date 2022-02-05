@@ -168,22 +168,8 @@ func (m *MultipleProject) BuildAll() error {
 			return err
 		}
 
-		artefactPaths, err := proj.Packer.Build()
-		if err != nil {
+		if _, err := proj.Packer.Build(m.output); err != nil {
 			return err
-		}
-
-		if m.output != "" {
-			if err := utils.ExistsMakeDir(m.output); err != nil {
-				return err
-			}
-
-			for _, ap := range artefactPaths {
-				filename := filepath.Base(ap)
-				if err := utils.Copy("", ap, filepath.Join(m.output, filename), false); err != nil {
-					return err
-				}
-			}
 		}
 
 		if proj.HasToInstall {

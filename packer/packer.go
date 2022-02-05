@@ -13,7 +13,7 @@ import (
 
 type Packer interface {
 	Prep() error
-	Build() ([]string, error)
+	Build(outputDir string) ([]string, error)
 	Install() error
 	Update() error
 }
