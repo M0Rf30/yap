@@ -111,6 +111,10 @@ func (r *Redhat) createSpec(files []string) (err error) {
 	data += fmt.Sprintf("License: %s\n", r.Pack.License)
 	data += fmt.Sprintf("Packager: %s\n", r.Pack.Maintainer)
 
+	if r.Pack.Arch == "all" {
+		data += "BuildArch: noarch\n"
+	}
+
 	for _, pkg := range r.Pack.Provides {
 		data += fmt.Sprintf("Provides: %s\n", pkg)
 	}

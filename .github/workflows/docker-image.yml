@@ -77,17 +77,6 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
-            packagefoundation/yap-centos-8:latest
-            ghcr.io/packagefoundation/yap-centos-8:latest
-          file: docker/centos-8/Dockerfile
-
-      - name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
             packagefoundation/yap-debian-buster:latest
             ghcr.io/packagefoundation/yap-debian-buster:latest
           file: docker/debian-buster/Dockerfile
@@ -200,14 +189,6 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: "packagefoundation/yap-arch:latest"
-          format: "template"
-          template: "@/contrib/sarif.tpl"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "packagefoundation/yap-centos-8:latest"
           format: "template"
           template: "@/contrib/sarif.tpl"
           output: "trivy-results.sarif"
