@@ -12,7 +12,7 @@ import (
 var chars = []rune(
 	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-func HTTPGet(url, output string, protocol string) (err error) {
+func HTTPGet(url, output string, protocol string) error {
 	var cmd *exec.Cmd
 
 	switch protocol {
@@ -27,7 +27,7 @@ func HTTPGet(url, output string, protocol string) (err error) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to get %s%s\n",
 			string(constants.ColorBlue),
@@ -35,30 +35,31 @@ func HTTPGet(url, output string, protocol string) (err error) {
 			url,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func RandStr(n int) (str string) {
+func RandStr(n int) string {
 	strList := make([]rune, n)
 	for i := range strList {
 		strList[i] = chars[rand.Intn(len(chars))] //nolint:gosec
 	}
 
-	str = string(strList)
+	str := string(strList)
 
-	return
+	return str
 }
 
-func PullContainers() (err error) {
+func PullContainers() error {
+	var err error
 	for _, release := range constants.Releases {
 		err = Exec("", "podman", "pull", constants.DockerOrg+release)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
-	return
+	return err
 }

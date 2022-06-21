@@ -13,13 +13,14 @@ import (
 
 type Packer interface {
 	Prep() error
-	Build(outputDir string) ([]string, error)
+	Build() ([]string, error)
 	Install() error
 	Update() error
 }
 
-func GetPacker(pac *pack.Pack, distro, release string) ( //nolint:ireturn
-	pcker Packer, err error) {
+func GetPacker(pac *pack.Pack, distro, release string) Packer {
+	var pcker Packer
+
 	switch constants.DistroPack[distro] {
 	case "pacman":
 		pcker = &pacman.Pacman{
@@ -43,5 +44,5 @@ func GetPacker(pac *pack.Pack, distro, release string) ( //nolint:ireturn
 		os.Exit(1)
 	}
 
-	return pcker, err
+	return pcker
 }

@@ -3,8 +3,7 @@ name: Bug report
 about: Create a report to help us improve
 title: "[Error]"
 labels: bug
-assignees: ''
-
+assignees: ""
 ---
 
 **Describe the bug**
@@ -21,8 +20,9 @@ Run the commands with `--verbose` and post the log here as a file upload
 Attach also the output of `podman logs` or `docker logs`, possibly with `--latest` flag
 
 **Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Version [e.g. 22]
+
+- OS: [e.g. iOS]
+- Version [e.g. 22]
 
 **Additional context**
 Add any other context about the problem here.

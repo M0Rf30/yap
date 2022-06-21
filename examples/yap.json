@@ -1,7 +1,7 @@
 {
   "name": "Yap",
   "description": "Yet another packager",
-  "build_dir": "/tmp",
+  "buildDir": "/tmp",
   "output": "artifacts",
   "projects": [
     {

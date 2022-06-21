@@ -3,8 +3,7 @@ name: Discussion issue template
 about: Describe this issue template's purpose here.
 title: "[Discussion]"
 labels: question
-assignees: ''
-
+assignees: ""
 ---
 
 Is your feature request related to a problem? Please describe.

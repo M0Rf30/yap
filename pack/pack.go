@@ -2,6 +2,7 @@ package pack
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/packagefoundation/yap/constants"
@@ -57,9 +58,13 @@ func (p *Pack) Init() {
 	}
 }
 
-func (p *Pack) parseDirective(input string) (key string, pry int, err error) { //nolint:unparam
+func (p *Pack) parseDirective(input string) (string, int, error) {
+	var err error
+
+	var pry int
+
 	split := strings.Split(input, ":")
-	key = split[0]
+	key := split[0]
 
 	numElem := 2
 
@@ -67,23 +72,23 @@ func (p *Pack) parseDirective(input string) (key string, pry int, err error) { /
 	case len(split) == 1:
 		pry = 0
 
-		return
+		return key, pry, err
 	case len(split) != numElem:
 		fmt.Printf("pack: Invalid use of ':' directive in '%s'\n", input)
 
-		return
+		return key, pry, err
 	default:
 		pry = -1
 	}
 
 	if p.Distro == "" {
-		return
+		return key, pry, err
 	}
 
 	if key == "pkgver" || key == "pkgrel" {
 		fmt.Printf("pack: Cannot use directive for '%s'\n", key)
 
-		return
+		return key, pry, err
 	}
 
 	dirc := split[1]
@@ -93,7 +98,7 @@ func (p *Pack) parseDirective(input string) (key string, pry int, err error) { /
 			pry = 3
 		}
 
-		return
+		return key, pry, err
 	}
 
 	if constants.DistrosSet.Contains(dirc) {
@@ -101,7 +106,7 @@ func (p *Pack) parseDirective(input string) (key string, pry int, err error) { /
 			pry = 2
 		}
 
-		return
+		return key, pry, err
 	}
 
 	if constants.PackagersSet.Contains(dirc) {
@@ -109,7 +114,7 @@ func (p *Pack) parseDirective(input string) (key string, pry int, err error) { /
 			pry = 1
 		}
 
-		return
+		return key, pry, err
 	}
 
 	fmt.Printf("pack: Unknown directive '%s'\n", dirc)
@@ -117,7 +122,7 @@ func (p *Pack) parseDirective(input string) (key string, pry int, err error) { /
 	return key, pry, err
 }
 
-func (p *Pack) Resolve() (err error) {
+func (p *Pack) Resolve() error {
 	reslv := resolver.New()
 
 	reslv.AddList("targets", p.Targets)
@@ -158,27 +163,26 @@ func (p *Pack) Resolve() (err error) {
 		}
 	}
 
-	err = reslv.Resolve()
+	err := reslv.Resolve()
 	if err != nil {
-		return
+		return err
 	}
 
 	return err
 }
 
-func (p *Pack) AddItem(key string, data interface{}, n int, line string) (
-	err error) {
+func (p *Pack) AddItem(key string, data interface{}, n int, line string) error {
 	key, priority, err := p.parseDirective(key)
 	if err != nil {
-		return
+		return err
 	}
 
 	if priority == -1 {
-		return
+		return err
 	}
 
 	if priority < p.priorities[key] {
-		return
+		return err
 	}
 
 	p.priorities[key] = priority
@@ -251,31 +255,20 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) (
 	return err
 }
 
-func (p *Pack) Validate() (err error) {
-	switch {
-	case len(p.Sources) < len(p.HashSums):
-		fmt.Printf("pack: Too many hash sums for sources")
-
-		return
-	case len(p.Sources) > len(p.HashSums):
-		fmt.Printf("pack: Missing hash sum for source")
-
-		return
+func (p *Pack) Validate() {
+	if len(p.Sources) != len(p.HashSums) {
+		fmt.Printf("pack: Different number of sources and relative hashsums")
+		os.Exit(1)
 	}
-
-	return
 }
 
-func (p *Pack) Compile() (err error) {
-	err = p.Validate()
+func (p *Pack) Compile() error {
+	p.Validate()
+
+	err := p.Resolve()
 	if err != nil {
-		return
+		return err
 	}
 
-	err = p.Resolve()
-	if err != nil {
-		return
-	}
-
-	return
+	return err
 }

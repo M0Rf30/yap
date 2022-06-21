@@ -34,7 +34,7 @@ var buildCmd = &cobra.Command{
 			release = split[1]
 		}
 
-		multiplePrj, err := project.NewMultipleProject(distro, release, path)
+		multiplePrj, err := project.MultiProject(distro, release, path)
 		if err != nil {
 			log.Fatal(err)
 		}

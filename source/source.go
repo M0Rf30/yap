@@ -51,33 +51,36 @@ func (s *Source) parsePath() {
 	s.Path = filepath.Join(s.Output, utils.Filename(s.Source))
 }
 
-func (s *Source) getURL(protocol string) (err error) {
+func (s *Source) getURL(protocol string) error {
 	exists, err := utils.Exists(s.Path)
 	if err != nil {
-		return
+		return err
 	}
 
 	if !exists {
 		err = utils.HTTPGet(s.Source, s.Path, protocol)
+
 		if err != nil {
-			return
+			return err
 		}
 	}
 
-	return
+	return err
 }
 
-func (s *Source) getPath() (err error) {
-	err = utils.Copy(s.Root, s.Source, s.Path, true)
+func (s *Source) getPath() error {
+	err := utils.Copy(s.Root, s.Source, s.Path, true)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (s *Source) extract() (err error) {
+func (s *Source) extract() error {
 	var cmd *exec.Cmd
+
+	var err error
 
 	switch {
 	case strings.HasSuffix(s.Path, ".tar"):
@@ -91,7 +94,7 @@ func (s *Source) extract() (err error) {
 		if len(split) > 2 && split[len(split)-2] == "tar" {
 			cmd = exec.Command("tar", "--no-same-owner", "-xf", s.Path) //nolint:gosec
 		} else {
-			return
+			return err
 		}
 	}
 
@@ -105,22 +108,24 @@ func (s *Source) extract() (err error) {
 			string(constants.ColorBlue),
 			string(constants.ColorYellow), s.Source)
 
-		return
+		return err
 	}
 
 	return err
 }
 
-func (s *Source) validate() (err error) {
+func (s *Source) validate() error {
+	var err error
+
 	if strings.ToLower(s.Hash) == "skip" {
-		return
+		return err
 	}
 
 	file, err := os.Open(s.Path)
 	if err != nil {
 		fmt.Printf("source: Failed to open file for hash")
 
-		return
+		return err
 	}
 
 	defer file.Close()
@@ -135,12 +140,12 @@ func (s *Source) validate() (err error) {
 	default:
 		fmt.Printf("source: Unknown hash type for hash '%s'\n", s.Hash)
 
-		return
+		return err
 	}
 
 	_, err = io.Copy(hash, file)
 	if err != nil {
-		return
+		return err
 	}
 
 	sum := hash.Sum([]byte{})
@@ -154,8 +159,10 @@ func (s *Source) validate() (err error) {
 	return err
 }
 
-func (s *Source) Get() (err error) {
+func (s *Source) Get() error {
 	s.parsePath()
+
+	var err error
 
 	switch s.getType() {
 	case http:
@@ -173,17 +180,17 @@ func (s *Source) Get() (err error) {
 	}
 
 	if err != nil {
-		return
+		return err
 	}
 
 	err = s.validate()
 	if err != nil {
-		return
+		return err
 	}
 
 	err = s.extract()
 	if err != nil {
-		return
+		return err
 	}
 
 	return err

@@ -18,80 +18,78 @@ type Builder struct {
 	Pack *pack.Pack
 }
 
-func (b *Builder) initDirs() (err error) {
-	err = utils.ExistsMakeDir(b.Pack.SourceDir)
+func (b *Builder) initDirs() error {
+	err := utils.ExistsMakeDir(b.Pack.SourceDir)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = utils.ExistsMakeDir(b.Pack.PackageDir)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (b *Builder) getSources() (err error) {
-	for i, path := range b.Pack.Sources {
+func (b *Builder) getSources() error {
+	var err error
+
+	for index, path := range b.Pack.Sources {
 		source := source.Source{
 			Root:   b.Pack.Root,
-			Hash:   b.Pack.HashSums[i],
+			Hash:   b.Pack.HashSums[index],
 			Source: path,
 			Output: b.Pack.SourceDir,
+			Path:   "",
 		}
-
 		err = source.Get()
+
 		if err != nil {
-			return
+			return err
 		}
 	}
 
-	return
+	return err
 }
 
-func (b *Builder) build() (err error) {
+func (b *Builder) build() error {
 	path := filepath.Join(string(os.PathSeparator), "tmp",
 		fmt.Sprintf("yap_%s_build", b.id))
 	defer os.Remove(path)
 
-	err = createScript(path, b.Pack.Build)
+	err := runScript(path, b.Pack.SourceDir)
 	if err != nil {
-		return
+		return err
 	}
 
-	err = runScript(path, b.Pack.SourceDir)
-	if err != nil {
-		return
-	}
-
-	return
+	return err
 }
 
-func (b *Builder) pkg() (err error) {
+func (b *Builder) Package() error {
 	path := filepath.Join(string(os.PathSeparator), "tmp",
 		fmt.Sprintf("yap_%s_package", b.id))
 	defer os.Remove(path)
 
-	err = createScript(path, b.Pack.Package)
+	err := createScript(path, b.Pack.Package)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = runScript(path, b.Pack.SourceDir)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (b *Builder) Build() (err error) {
+func (b *Builder) Build() error {
 	b.id = utils.RandStr(IDLenght)
 
-	err = b.initDirs()
+	err := b.initDirs()
 	if err != nil {
-		return
+		return err
 	}
 
 	fmt.Printf("\t%s🖧  :: %sgetting sources ...%s\n",
@@ -101,7 +99,7 @@ func (b *Builder) Build() (err error) {
 
 	err = b.getSources()
 	if err != nil {
-		return
+		return err
 	}
 
 	fmt.Printf("\t%s🏗️  :: %sbuilding ...%s\n",
@@ -112,7 +110,7 @@ func (b *Builder) Build() (err error) {
 	err = b.build()
 
 	if err != nil {
-		return
+		return err
 	}
 
 	fmt.Printf("\t%s📦 :: %sgenerating package ...%s\n",
@@ -120,9 +118,9 @@ func (b *Builder) Build() (err error) {
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
 
-	err = b.pkg()
+	err = b.Package()
 	if err != nil {
-		return
+		return err
 	}
 
 	return err

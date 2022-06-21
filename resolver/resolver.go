@@ -51,15 +51,15 @@ func (r *Resolver) AddList(key string, vals []string) {
 	}
 }
 
-func (r *Resolver) resolve(item *element) (err error) {
+func (r *Resolver) resolve(item *element) {
 	keys := keyReg.FindAllString(*item.Val, -1)
 	resolvers := []resolverFunc{
-		{resolve: func(r *Resolver, key string) (val string, success bool) {
-			val, success = r.data[key]
+		{resolve: func(r *Resolver, key string) (string, bool) {
+			val, success := r.data[key]
 
-			return
+			return val, success
 		}},
-		{resolve: func(r *Resolver, key string) (val string, success bool) { return os.LookupEnv(key) }},
+		{resolve: func(r *Resolver, key string) (string, bool) { return os.LookupEnv(key) }},
 	}
 
 	for _, keyFull := range keys {
@@ -80,46 +80,45 @@ func (r *Resolver) resolve(item *element) (err error) {
 			fmt.Printf(`resolver: Failed to resolve '%s' in '%s="%s"'`,
 				keyFull, item.Key, *item.Val)
 
-			return
+			os.Exit(1)
 		}
 	}
 
 	r.data[item.Key] = *item.Val
-
-	return err
 }
 
 //nolint:gomnd
 //noling:forcetypeassert
-func (r *Resolver) Resolve() (err error) {
+func (r *Resolver) Resolve() error {
+	var err error
+
 	for {
 		elem := r.queue.Front()
 
 		if elem == nil {
-			return
+			return err
 		}
 
 		item := elem.Value.(*element)
 		item.Count++
 
-		err = r.resolve(item)
-		if err != nil {
-			if item.Count > 32 {
-				return
-			}
+		r.resolve(item)
 
-			r.queue.PushBack(elem.Value)
+		if item.Count > 32 {
+			return err
 		}
+
+		r.queue.PushBack(elem.Value)
 
 		r.queue.Remove(elem)
 	}
 }
 
-func New() (reslv *Resolver) {
-	reslv = &Resolver{
+func New() *Resolver {
+	reslv := &Resolver{
 		queue: list.New(),
 		data:  map[string]string{},
 	}
 
-	return
+	return reslv
 }

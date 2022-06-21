@@ -8,14 +8,14 @@ import (
 	"github.com/packagefoundation/yap/constants"
 )
 
-func Rsync(source, dest string) (err error) {
+func Rsync(source, dest string) error {
 	cmd := exec.Command("rsync", "-a", "-A", //nolint:gosec
 		source+string(os.PathSeparator),
 		dest+string(os.PathSeparator))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to rsync '%s' to '%s'%s\n",
 			string(constants.ColorBlue),
@@ -24,13 +24,13 @@ func Rsync(source, dest string) (err error) {
 			dest,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func RsyncExt(source, dest, ext string) (err error) {
+func RsyncExt(source, dest, ext string) error {
 	cmd := exec.Command("rsync", "-a", "-A", //nolint:gosec
 		"--include", "*"+ext, "--exclude", "*",
 		source+string(os.PathSeparator),
@@ -38,7 +38,7 @@ func RsyncExt(source, dest, ext string) (err error) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to rsync '%s' to '%s'%s\n",
 			string(constants.ColorBlue),
@@ -47,13 +47,13 @@ func RsyncExt(source, dest, ext string) (err error) {
 			dest,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func RsyncMatch(source, dest, match string) (err error) {
+func RsyncMatch(source, dest, match string) error {
 	cmd := exec.Command("rsync", "-a", "-A", //nolint:gosec
 		"--include", "*"+match+"*", "--exclude", "*",
 		source+string(os.PathSeparator),
@@ -61,7 +61,7 @@ func RsyncMatch(source, dest, match string) (err error) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to rsync '%s' to '%s'%s\n",
 			string(constants.ColorBlue),
@@ -70,8 +70,8 @@ func RsyncMatch(source, dest, match string) (err error) {
 			dest,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
-	return
+	return err
 }

@@ -4,25 +4,25 @@ import (
 	"github.com/packagefoundation/yap/utils"
 )
 
-func createScript(path string, cmds []string) (err error) {
+func createScript(path string, cmds []string) error {
 	data := "set -e\n"
 	for _, cmd := range cmds {
 		data += cmd + "\n"
 	}
 
-	err = utils.CreateWrite(path, data)
+	err := utils.CreateWrite(path, data)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func runScript(path, dir string) (err error) {
-	err = utils.Exec(dir, "sh", path)
+func runScript(path, dir string) error {
+	err := utils.Exec(dir, "sh", path)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }

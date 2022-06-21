@@ -2,6 +2,7 @@ package pacman
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,9 +18,10 @@ type Pacman struct {
 	pacmanDir string
 }
 
-func (p *Pacman) getDepends() (err error) {
+func (p *Pacman) getDepends() error {
+	var err error
 	if len(p.Pack.MakeDepends) == 0 {
-		return
+		return err
 	}
 
 	args := []string{
@@ -30,22 +32,24 @@ func (p *Pacman) getDepends() (err error) {
 
 	err = utils.Exec("", "pacman", args...)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (p *Pacman) getUpdates() (err error) {
-	err = utils.Exec("", "pacman", "-Sy")
+func (p *Pacman) getUpdates() error {
+	err := utils.Exec("", "pacman", "-Sy")
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (p *Pacman) createInstall() (exists bool, err error) {
+func (p *Pacman) createInstall() (bool, error) {
+	var err error
+
 	data := ""
 
 	if len(p.Pack.PreInst) > 0 {
@@ -102,25 +106,25 @@ func (p *Pacman) createInstall() (exists bool, err error) {
 		data += "}\n"
 	}
 
-	exists = len(data) > 0
+	exists := len(data) > 0
 	if exists {
 		path := filepath.Join(p.pacmanDir, p.Pack.PkgName+".install")
 		err = utils.CreateWrite(path, data)
 
 		if err != nil {
-			return
+			return exists, err
 		}
 	}
 
 	return exists, err
 }
 
-func (p *Pacman) createMake() (err error) {
+func (p *Pacman) createMake() error {
 	path := filepath.Join(p.pacmanDir, "PKGBUILD")
 
 	installExists, err := p.createInstall()
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 
 	data := ""
@@ -201,107 +205,99 @@ func (p *Pacman) createMake() (err error) {
 
 	err = utils.CreateWrite(path, data)
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
-
-	fmt.Println(data)
 
 	return err
 }
 
-func (p *Pacman) pacmanBuild() (err error) {
-	err = utils.ChownR(p.pacmanDir, "nobody", "nobody")
+func (p *Pacman) pacmanBuild() error {
+	err := utils.ChownR(p.pacmanDir, "nobody", "nobody")
 	if err != nil {
-		return
+		return err
 	}
 
 	err = utils.ChownR(p.Pack.PackageDir, "nobody", "nobody")
 	if err != nil {
-		return
+		return err
 	}
 
 	err = utils.Exec(p.pacmanDir, "sudo", "-u", "nobody", "makepkg")
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (p *Pacman) Prep() (err error) {
-	err = p.getDepends()
+func (p *Pacman) Prep() error {
+	err := p.getDepends()
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (p *Pacman) Update() (err error) {
-	err = p.getUpdates()
+func (p *Pacman) Update() error {
+	err := p.getUpdates()
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (p *Pacman) makeDirs() (err error) {
+func (p *Pacman) makeDirs() error {
 	p.pacmanDir = filepath.Join(p.Pack.Root, "pacman")
 
-	err = utils.ExistsMakeDir(p.pacmanDir)
+	err := utils.ExistsMakeDir(p.pacmanDir)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (p *Pacman) clean() (err error) {
+func (p *Pacman) clean() error {
+	var err error
 	if !constants.CleanPrevious {
-		return
+		return err
 	}
 
 	pkgPaths, err := utils.FindExt(p.Pack.Home, ".pkg.tar.zst")
 	if err != nil {
-		return
+		return err
 	}
 
 	for _, pkgPath := range pkgPaths {
 		_ = utils.Remove(pkgPath)
 	}
 
-	return
+	return err
 }
 
-func (p *Pacman) copy(destination string) (err error) {
+func (p *Pacman) copy() error {
 	pkgs, err := utils.FindExt(p.pacmanDir, ".pkg.tar.zst")
 	if err != nil {
-		return
+		return err
 	}
 
 	for _, pkg := range pkgs {
-		pkgDestination := filepath.Join(p.Pack.Home, destination)
-
-		err = utils.ExistsMakeDir(pkgDestination)
+		err = utils.CopyFile("", pkg, p.Pack.Home, false)
 		if err != nil {
-			return
-		}
-
-		err = utils.CopyFile("", pkg, pkgDestination, false)
-		if err != nil {
-			return
+			return err
 		}
 	}
 
-	return
+	return err
 }
 
 func (p *Pacman) remDirs() {
 	os.RemoveAll(p.pacmanDir)
 }
 
-func (p *Pacman) Build(outputDir string) ([]string, error) {
+func (p *Pacman) Build() ([]string, error) {
 	err := p.makeDirs()
 	if err != nil {
 		return nil, err
@@ -324,7 +320,7 @@ func (p *Pacman) Build(outputDir string) ([]string, error) {
 		return nil, err
 	}
 
-	err = p.copy(outputDir)
+	err = p.copy()
 	if err != nil {
 		return nil, err
 	}

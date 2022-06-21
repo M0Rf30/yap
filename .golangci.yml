@@ -1,0 +1,31 @@
+# Options for analysis running.
+linters:
+  # Enable specific linter
+  # https://golangci-lint.run/usage/linters/#enabled-by-default-linters
+  enable-all: true
+  # Disable specific linter
+  # https://golangci-lint.run/usage/linters/#disabled-by-default-linters--e--enable
+  disable:
+    # here some dropped deprecated checks
+    # reduce warning messages
+    - exhaustivestruct
+    - golint
+    - interfacer
+    - maligned
+    - scopelint
+    # here some custom dropped checks temporary disabled
+    # they will be enabled
+    - cyclop
+    - exhaustruct
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - gocritic
+    - gocyclo
+    - gofumpt
+    - gomnd
+    - ireturn
+    - typecheck
+    - wrapcheck

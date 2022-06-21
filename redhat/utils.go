@@ -1,14 +1,8 @@
 package redhat
 
-const (
-	Communications = "Applications/Communications"
-	Engineering    = "Applications/Engineering"
-	Internet       = "Applications/Internet"
-	Multimedia     = "Applications/Multimedia"
-	Tools          = "Development/Tools"
-)
+func ConvertSection(section string) string {
+	var converted string
 
-func ConvertSection(section string) (converted string) {
 	switch section {
 	case "admin":
 		converted = "Applications/System"

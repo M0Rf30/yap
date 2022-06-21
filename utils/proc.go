@@ -9,7 +9,7 @@ import (
 	"github.com/packagefoundation/yap/constants"
 )
 
-func Exec(dir, name string, arg ...string) (err error) {
+func Exec(dir, name string, arg ...string) error {
 	cmd := exec.Command(name, arg...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -18,7 +18,7 @@ func Exec(dir, name string, arg ...string) (err error) {
 		cmd.Dir = dir
 	}
 
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n",
 			string(constants.ColorBlue),
@@ -30,7 +30,7 @@ func Exec(dir, name string, arg ...string) (err error) {
 	return err
 }
 
-func ExecInput(dir, input, name string, arg ...string) (err error) {
+func ExecInput(dir, input, name string, arg ...string) error {
 	cmd := exec.Command(name, arg...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -43,7 +43,7 @@ func ExecInput(dir, input, name string, arg ...string) (err error) {
 			name,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 	defer stdin.Close()
 
@@ -59,7 +59,7 @@ func ExecInput(dir, input, name string, arg ...string) (err error) {
 			name,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
 	_, err = io.WriteString(stdin, input)
@@ -70,7 +70,7 @@ func ExecInput(dir, input, name string, arg ...string) (err error) {
 			name,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
 	err = cmd.Wait()
@@ -81,13 +81,13 @@ func ExecInput(dir, input, name string, arg ...string) (err error) {
 			name,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
 	return err
 }
 
-func ExecOutput(dir, name string, arg ...string) (output string, err error) {
+func ExecOutput(dir, name string, arg ...string) (string, error) {
 	cmd := exec.Command(name, arg...)
 	cmd.Stderr = os.Stderr
 
@@ -95,18 +95,17 @@ func ExecOutput(dir, name string, arg ...string) (output string, err error) {
 		cmd.Dir = dir
 	}
 
-	outputByt, err := cmd.Output()
+	outputByte, err := cmd.Output()
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to exec '%s'%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			name,
 			string(constants.ColorWhite))
-
-		return
+		os.Exit(1)
 	}
 
-	output = string(outputByt)
+	output := string(outputByte)
 
 	return output, err
 }

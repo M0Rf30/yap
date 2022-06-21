@@ -24,9 +24,10 @@ type Redhat struct {
 	srpmsDir     string
 }
 
-func (r *Redhat) getDepends() (err error) {
+func (r *Redhat) getDepends() error {
+	var err error
 	if len(r.Pack.MakeDepends) == 0 {
-		return
+		return err
 	}
 
 	args := []string{
@@ -38,13 +39,14 @@ func (r *Redhat) getDepends() (err error) {
 	err = utils.Exec("", "yum", args...)
 
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (r *Redhat) getFiles() (files []string, err error) {
+func (r *Redhat) getFiles() ([]string, error) {
+	files := make([]string, 0)
 	backup := set.NewSet()
 	paths := set.NewSet()
 
@@ -58,7 +60,7 @@ func (r *Redhat) getFiles() (files []string, err error) {
 
 	output, err := utils.ExecOutput(r.Pack.PackageDir, "find", ".", "-printf", "%P\n")
 	if err != nil {
-		return
+		return files, err
 	}
 
 	for _, path := range strings.Split(output, "\n") {
@@ -85,7 +87,7 @@ func (r *Redhat) getFiles() (files []string, err error) {
 	return files, err
 }
 
-func (r *Redhat) createSpec(files []string) (err error) {
+func (r *Redhat) createSpec(files []string) error {
 	path := filepath.Join(r.specsDir, r.Pack.PkgName+".spec")
 
 	release := "%{?dist}"
@@ -197,40 +199,42 @@ func (r *Redhat) createSpec(files []string) (err error) {
 		}
 	}
 
-	err = utils.CreateWrite(path, data)
+	err := utils.CreateWrite(path, data)
 	if err != nil {
-		return
+		return err
 	}
-
-	fmt.Println(data)
 
 	return err
 }
 
-func (r *Redhat) rpmBuild() (err error) {
-	err = utils.Exec(r.specsDir, "rpmbuild", "--define",
+func (r *Redhat) rpmBuild() error {
+	err := utils.Exec(r.specsDir, "rpmbuild", "--define",
 		"_topdir "+r.redhatDir, "-bb", r.Pack.PkgName+".spec")
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (r *Redhat) Prep() (err error) {
-	err = r.getDepends()
+func (r *Redhat) Prep() error {
+	err := r.getDepends()
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func (r *Redhat) Update() (err error) {
-	return
+func (r *Redhat) Update() error {
+	var err error
+
+	return err
 }
 
-func (r *Redhat) makeDirs() (err error) {
+func (r *Redhat) makeDirs() error {
+	var err error
+
 	r.redhatDir = filepath.Join(r.Pack.Root, "redhat")
 	r.buildDir = filepath.Join(r.redhatDir, "BUILD")
 	r.buildRootDir = filepath.Join(r.redhatDir, "BUILDROOT")
@@ -250,21 +254,22 @@ func (r *Redhat) makeDirs() (err error) {
 	} {
 		err = utils.ExistsMakeDir(path)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
-	return
+	return err
 }
 
-func (r *Redhat) clean() (err error) {
+func (r *Redhat) clean() error {
+	var err error
 	if !constants.CleanPrevious {
-		return
+		return err
 	}
 
 	pkgPaths, err := utils.FindExt(r.Pack.Home, ".rpm")
 	if err != nil {
-		return
+		return err
 	}
 
 	match, ok := constants.ReleasesMatch[r.Pack.FullRelease]
@@ -272,7 +277,7 @@ func (r *Redhat) clean() (err error) {
 		fmt.Printf("redhat: Failed to find match for '%s'\n",
 			r.Pack.FullRelease)
 
-		return
+		return err
 	}
 
 	for _, pkgPath := range pkgPaths {
@@ -281,43 +286,38 @@ func (r *Redhat) clean() (err error) {
 		}
 	}
 
-	return
+	return err
 }
 
-func (r *Redhat) copy(destination string) (err error) {
+func (r *Redhat) copy() error {
+	var err error
 	archs, err := ioutil.ReadDir(r.rpmsDir)
+
 	if err != nil {
 		fmt.Printf("redhat: Failed to find rpms from '%s'\n",
 			r.rpmsDir)
 
-		return
+		return err
 	}
 
 	for _, arch := range archs {
-		rpmDestination := filepath.Join(r.Pack.Home, destination)
-
-		err = utils.ExistsMakeDir(rpmDestination)
-		if err != nil {
-			return
-		}
-
 		err = utils.CopyFiles(filepath.Join(
 			r.rpmsDir,
 			arch.Name(),
-		), rpmDestination, false)
+		), r.Pack.Home, false)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
-	return
+	return err
 }
 
 func (r *Redhat) remDirs() {
 	os.RemoveAll(r.redhatDir)
 }
 
-func (r *Redhat) Build(outputDir string) ([]string, error) {
+func (r *Redhat) Build() ([]string, error) {
 	err := r.makeDirs()
 	if err != nil {
 		return nil, err
@@ -345,7 +345,7 @@ func (r *Redhat) Build(outputDir string) ([]string, error) {
 		return nil, err
 	}
 
-	err = r.copy(outputDir)
+	err = r.copy()
 	if err != nil {
 		return nil, err
 	}

@@ -12,8 +12,8 @@ import (
 	"github.com/packagefoundation/yap/constants"
 )
 
-func ReadFile(path string) (data []byte, err error) {
-	data, err = ioutil.ReadFile(path)
+func ReadFile(path string) ([]byte, error) {
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read file '%s'%s\n",
 			string(constants.ColorBlue),
@@ -21,14 +21,14 @@ func ReadFile(path string) (data []byte, err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return data, err
 	}
 
-	return
+	return data, err
 }
 
-func ReadDir(path string) (items []os.FileInfo, err error) {
-	items, err = ioutil.ReadDir(path)
+func ReadDir(path string) ([]os.FileInfo, error) {
+	items, err := ioutil.ReadDir(path)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
 			string(constants.ColorBlue),
@@ -36,14 +36,14 @@ func ReadDir(path string) (items []os.FileInfo, err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return items, err
 	}
 
-	return
+	return items, err
 }
 
-func MkdirAll(path string) (err error) {
-	err = os.MkdirAll(path, 0o755)
+func MkdirAll(path string) error {
+	err := os.MkdirAll(path, 0o755)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to mkdir '%s'%s\n",
 			string(constants.ColorBlue),
@@ -51,14 +51,14 @@ func MkdirAll(path string) (err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func Chmod(path string, perm os.FileMode) (err error) {
-	err = os.Chmod(path, perm)
+func Chmod(path string, perm os.FileMode) error {
+	err := os.Chmod(path, perm)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to chmod '%s'%s\n",
 			string(constants.ColorBlue),
@@ -66,14 +66,14 @@ func Chmod(path string, perm os.FileMode) (err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func ChownR(path string, user, group string) (err error) {
-	err = Exec("",
+func ChownR(path string, user, group string) error {
+	err := Exec("",
 		"chown",
 		"-R",
 		fmt.Sprintf("%s:%s", user, group),
@@ -81,14 +81,14 @@ func ChownR(path string, user, group string) (err error) {
 	)
 
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func Remove(path string) (err error) {
-	err = os.Remove(path)
+func Remove(path string) error {
+	err := os.Remove(path)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
 			string(constants.ColorBlue),
@@ -96,14 +96,14 @@ func Remove(path string) (err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func RemoveAll(path string) (err error) {
-	err = os.RemoveAll(path)
+func RemoveAll(path string) error {
+	err := os.RemoveAll(path)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
 			string(constants.ColorBlue),
@@ -111,19 +111,19 @@ func RemoveAll(path string) (err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func ExistsMakeDir(path string) (err error) {
-	_, err = os.Stat(path)
+func ExistsMakeDir(path string) error {
+	_, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = MkdirAll(path)
 			if err != nil {
-				return
+				return err
 			}
 		} else {
 			fmt.Printf("%s❌ :: %sfailed to stat '%s'%s\n",
@@ -132,17 +132,17 @@ func ExistsMakeDir(path string) (err error) {
 				path,
 				string(constants.ColorWhite))
 
-			return
+			return err
 		}
 
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func Create(path string) (file *os.File, err error) {
-	file, err = os.Create(path)
+func Create(path string) (*os.File, error) {
+	file, err := os.Create(path)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to create '%s'%s\n",
 			string(constants.ColorBlue),
@@ -150,16 +150,16 @@ func Create(path string) (file *os.File, err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return file, err
 	}
 
-	return
+	return file, err
 }
 
-func CreateWrite(path string, data string) (err error) {
+func CreateWrite(path string, data string) error {
 	file, err := Create(path)
 	if err != nil {
-		return
+		return err
 	}
 	defer file.Close()
 
@@ -171,14 +171,14 @@ func CreateWrite(path string, data string) (err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func Open(path string) (file *os.File, err error) {
-	file, err = os.Open(path)
+func Open(path string) (*os.File, error) {
+	file, err := os.Open(path)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to open file '%s'%s\n",
 			string(constants.ColorBlue),
@@ -186,23 +186,23 @@ func Open(path string) (file *os.File, err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return file, err
 	}
 
-	return
+	return file, err
 }
 
-func Move(source, dest string) (err error) {
-	err = Exec("", "mv", source, dest)
+func Move(source, dest string) error {
+	err := Exec("", "mv", source, dest)
 
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func Copy(dir, source, dest string, presv bool) (err error) {
+func Copy(dir, source, dest string, presv bool) error {
 	args := []string{"-r", "-T", "-f"}
 
 	if presv {
@@ -211,15 +211,15 @@ func Copy(dir, source, dest string, presv bool) (err error) {
 
 	args = append(args, source, dest)
 
-	err = Exec(dir, "cp", args...)
+	err := Exec(dir, "cp", args...)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func CopyFile(dir, source, dest string, presv bool) (err error) {
+func CopyFile(dir, source, dest string, presv bool) error {
 	args := []string{"-f"}
 
 	if presv {
@@ -228,15 +228,15 @@ func CopyFile(dir, source, dest string, presv bool) (err error) {
 
 	args = append(args, source, dest)
 
-	err = Exec(dir, "cp", args...)
+	err := Exec(dir, "cp", args...)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
-func CopyFiles(source, dest string, presv bool) (err error) {
+func CopyFiles(source, dest string, presv bool) error {
 	files, err := ioutil.ReadDir(source)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
@@ -245,7 +245,7 @@ func CopyFiles(source, dest string, presv bool) (err error) {
 			source,
 			string(constants.ColorWhite))
 
-		return
+		return err
 	}
 
 	for _, file := range files {
@@ -255,15 +255,18 @@ func CopyFiles(source, dest string, presv bool) (err error) {
 
 		err = CopyFile("", filepath.Join(source, file.Name()), dest, presv)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
-	return
+	return err
 }
 
-func FindExt(path, ext string) (matches []string, err error) {
+func FindExt(path, ext string) ([]string, error) {
+	var matches []string
+
 	files, err := ioutil.ReadDir(path)
+
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
 			string(constants.ColorBlue),
@@ -271,7 +274,7 @@ func FindExt(path, ext string) (matches []string, err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return matches, err
 	}
 
 	for _, file := range files {
@@ -284,11 +287,14 @@ func FindExt(path, ext string) (matches []string, err error) {
 		}
 	}
 
-	return
+	return matches, err
 }
 
-func FindMatch(path, match string) (matches []string, err error) {
+func FindMatch(path, match string) ([]string, error) {
+	var matches []string
+
 	files, err := ioutil.ReadDir(path)
+
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
 			string(constants.ColorBlue),
@@ -296,7 +302,7 @@ func FindMatch(path, match string) (matches []string, err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return matches, err
 	}
 
 	for _, file := range files {
@@ -309,7 +315,7 @@ func FindMatch(path, match string) (matches []string, err error) {
 		}
 	}
 
-	return
+	return matches, err
 }
 
 func Filename(path string) string {
@@ -321,15 +327,15 @@ func Filename(path string) string {
 	return path[n+1:]
 }
 
-func GetDirSize(path string) (size int, err error) {
+func GetDirSize(path string) (int, error) {
 	output, err := ExecOutput("", "du", "-c", "-s", path)
 	if err != nil {
-		return
+		os.Exit(1)
 	}
 
 	split := strings.Fields(output)
 
-	size, err = strconv.Atoi(split[len(split)-2])
+	size, err := strconv.Atoi(split[len(split)-2])
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to get dir size '%s'%s\n",
 			string(constants.ColorBlue),
@@ -337,14 +343,16 @@ func GetDirSize(path string) (size int, err error) {
 			path,
 			string(constants.ColorWhite))
 
-		return
+		return size, err
 	}
 
-	return
+	return size, err
 }
 
-func Exists(path string) (exists bool, err error) {
-	_, err = os.Stat(path)
+func Exists(path string) (bool, error) {
+	exists := false
+	_, err := os.Stat(path)
+
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = nil
@@ -352,11 +360,11 @@ func Exists(path string) (exists bool, err error) {
 			fmt.Printf("utils: Exists check error for '%s'\n", path)
 			log.Fatal(err)
 
-			return
+			return exists, err
 		}
 	} else {
 		exists = true
 	}
 
-	return
+	return exists, err
 }

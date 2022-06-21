@@ -18,28 +18,12 @@ const (
 
 var itemReg = regexp.MustCompile("(\"[^\"]+\")|(`[^`]+`)")
 
-func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err error) {
-	home, err = filepath.Abs(home)
-	if err != nil {
-		fmt.Printf("parse: Failed to get root directory from '%s'\n",
-			home)
-
-		return
-	}
-
-	err = utils.ExistsMakeDir(compiledOutput)
-	if err != nil {
-		return
-	}
-
-	err = utils.CopyFiles(home, compiledOutput, false)
-	if err != nil {
-		return
-	}
+func File(distro, release, compiledOutput, home string) (*pack.Pack, error) { // nolint:gocognit
+	home, err := filepath.Abs(home)
 
 	path := filepath.Join(compiledOutput, "PKGBUILD")
 
-	pac = &pack.Pack{
+	pac := &pack.Pack{
 		Distro:     distro,
 		Release:    release,
 		Root:       compiledOutput,
@@ -48,11 +32,28 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 		PackageDir: filepath.Join(compiledOutput, "pkg"),
 	}
 
+	if err != nil {
+		fmt.Printf("parse: Failed to get root directory from '%s'\n",
+			home)
+
+		return pac, err
+	}
+
+	err = utils.ExistsMakeDir(compiledOutput)
+	if err != nil {
+		return pac, err
+	}
+
+	err = utils.CopyFiles(home, compiledOutput, false)
+	if err != nil {
+		return pac, err
+	}
+
 	pac.Init()
 
 	file, err := utils.Open(path)
 	if err != nil {
-		return
+		return pac, err
 	}
 	defer file.Close()
 
@@ -80,7 +81,7 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 				err = pac.AddItem(blockKey, blockItems, num, line)
 
 				if err != nil {
-					return
+					return pac, err
 				}
 
 				blockType = 0
@@ -96,7 +97,7 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 			if line == "}" {
 				err = pac.AddItem(blockKey, blockItems, num, line)
 				if err != nil {
-					return
+					return pac, err
 				}
 				blockType = 0
 				blockKey = ""
@@ -116,7 +117,7 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 					fmt.Printf("parse: Line missing '=' (%d: %s)",
 						num, line)
 
-					return
+					return pac, err
 				}
 
 				key := parts[0]
@@ -126,13 +127,13 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 					fmt.Printf("parse: Extra space padding (%d: %s)",
 						num, line)
 
-					return
+					return pac, err
 				} else if key[len(key)-1:] == " " {
 					fmt.Printf(
 						"parse: Extra space before '=' (%d: %s)",
 						num, line)
 
-					return
+					return pac, err
 				}
 
 				valLen := len(val)
@@ -143,12 +144,12 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 							"expected '%s' (%d: %s)",
 							val[valLen-1:], val[:1], num, line)
 
-						return
+						return pac, err
 					}
 
 					err = pac.AddItem(key, val[1:valLen-1], num, line)
 					if err != nil {
-						return
+						return pac, err
 					}
 				case "(":
 					if val[valLen-1:] == ")" {
@@ -157,7 +158,7 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 								"expected '\"' or '`' (%d: %s)",
 								val[1:2], num, line)
 
-							return
+							return pac, err
 						}
 
 						if val[valLen-2:valLen-1] != val[1:2] {
@@ -166,13 +167,13 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 								val[valLen-2:valLen-1], val[1:2],
 								num, line)
 
-							return
+							return pac, err
 						}
 
 						val = val[2 : len(val)-2]
 						err = pac.AddItem(key, []string{val}, num, line)
 						if err != nil {
-							return
+							return pac, err
 						}
 					} else {
 						blockType = blockList
@@ -183,13 +184,13 @@ func File(distro, release, compiledOutput, home string) (pac *pack.Pack, err err
 						"parse: Extra space after '=' (%d: %s)",
 						num, line)
 
-					return
+					return pac, err
 				default:
 					fmt.Printf(
 						"parse: Unexpected char '%s' expected "+
 							"'\"' or '`' (%d: %s)", val[:1], num, line)
 
-					return
+					return pac, err
 				}
 			}
 		}

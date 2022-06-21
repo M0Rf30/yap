@@ -7,8 +7,9 @@ type Set struct {
 }
 
 func NewSet() *Set {
-	s := &Set{}
-	s.m = make(map[string]struct{})
+	s := &Set{
+		m: make(map[string]struct{}),
+	}
 
 	return s
 }
