@@ -17,7 +17,7 @@ pkgdesclong=(
   "distributions with a consistent package spec format"
 )
 maintainer="Example <example@yap.org>"
-arch="all"
+arch="amd64"
 license=("GPLv3")
 section="utils"
 priority="optional"
