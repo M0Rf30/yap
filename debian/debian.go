@@ -104,22 +104,22 @@ func (d *Debian) createControl() error {
 
 	if len(d.Pack.Depends) > 0 {
 		data += fmt.Sprintf("Depends: %s\n",
-			strings.Join(d.Pack.Depends, ", "))
+			strings.Join(ShieldVersions(d.Pack.Depends), ", "))
 	}
 
 	if len(d.Pack.Conflicts) > 0 {
 		data += fmt.Sprintf("Conflicts: %s\n",
-			strings.Join(d.Pack.Conflicts, ", "))
+			strings.Join(ShieldVersions(d.Pack.Conflicts), ", "))
 	}
 
 	if len(d.Pack.OptDepends) > 0 {
 		data += fmt.Sprintf("Recommends: %s\n",
-			strings.Join(d.Pack.OptDepends, ", "))
+			strings.Join(ShieldVersions(d.Pack.OptDepends), ", "))
 	}
 
 	if len(d.Pack.Provides) > 0 {
 		data += fmt.Sprintf("Provides: %s\n",
-			strings.Join(d.Pack.Provides, ", "))
+			strings.Join(ShieldVersions(d.Pack.Provides), ", "))
 	}
 
 	data += fmt.Sprintf("Section: %s\n", d.Pack.Section)
@@ -280,6 +280,30 @@ func (d *Debian) Prep() error {
 	}
 
 	return err
+}
+
+// ShieldVersions calls `ShieldVersion` for element and returns the resulting list.
+func ShieldVersions(packages []string) []string {
+	shieldedPackages := []string{}
+	for _, pkg := range packages {
+		shieldedPackages = append(shieldedPackages, ShieldVersion(pkg))
+	}
+
+	return shieldedPackages
+}
+
+// ShieldVersion this function convert from the syntax 'name > version' to 'name (>version)'.
+func ShieldVersion(pkg string) string {
+	var shieldedPackage string
+
+	if strings.ContainsAny(pkg, ">=<") {
+		index := strings.IndexAny(pkg, ">=<")
+		shieldedPackage = fmt.Sprintf("%s (%s)", strings.TrimSpace(pkg[:index]), strings.ReplaceAll(pkg[index:], " ", ""))
+	} else {
+		shieldedPackage = pkg
+	}
+
+	return shieldedPackage
 }
 
 func (d *Debian) Update() error {
