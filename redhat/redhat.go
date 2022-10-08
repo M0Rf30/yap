@@ -2,12 +2,13 @@ package redhat
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
-	"github.com/packagefoundation/yap/constants"
 	"github.com/packagefoundation/yap/pack"
 	"github.com/packagefoundation/yap/set"
 	"github.com/packagefoundation/yap/utils"
@@ -22,6 +23,7 @@ type Redhat struct {
 	sourcesDir   string
 	specsDir     string
 	srpmsDir     string
+	Files        []string
 }
 
 func (r *Redhat) getDepends() error {
@@ -45,8 +47,7 @@ func (r *Redhat) getDepends() error {
 	return err
 }
 
-func (r *Redhat) getFiles() ([]string, error) {
-	files := make([]string, 0)
+func (r *Redhat) getFiles() error {
 	backup := set.NewSet()
 	paths := set.NewSet()
 
@@ -60,7 +61,7 @@ func (r *Redhat) getFiles() ([]string, error) {
 
 	output, err := utils.ExecOutput(r.Pack.PackageDir, "find", ".", "-printf", "%P\n")
 	if err != nil {
-		return files, err
+		return err
 	}
 
 	for _, path := range strings.Split(output, "\n") {
@@ -81,127 +82,50 @@ func (r *Redhat) getFiles() ([]string, error) {
 			path = `"/` + path + `"`
 		}
 
-		files = append(files, path)
+		r.Files = append(r.Files, path)
 	}
 
-	return files, err
+	return err
 }
 
-func (r *Redhat) createSpec(files []string) error {
+func (r *Redhat) createSpec() error {
 	path := filepath.Join(r.specsDir, r.Pack.PkgName+".spec")
+	file, err := os.Create(path)
 
-	release := "%{?dist}"
-
-	switch {
-	case r.Pack.Distro == "amazon":
-		release = ".amzn" + r.Pack.Release
-	case r.Pack.Distro == "centos":
-		release = ".el" + r.Pack.Release
-	case r.Pack.Distro == "oracle":
-		release = ".ol" + r.Pack.Release
-	case r.Pack.Distro == "rocky":
-		release = ".el" + r.Pack.Release
-	}
-
-	data := ""
-	data += fmt.Sprintf("Name: %s\n", r.Pack.PkgName)
-	data += fmt.Sprintf("Summary: %s\n", r.Pack.PkgDesc)
-	data += fmt.Sprintf("Version: %s\n", r.Pack.PkgVer)
-	data += fmt.Sprintf("Release: %s%s\n", r.Pack.PkgRel, release)
-	data += fmt.Sprintf("Group: %s\n", ConvertSection(r.Pack.Section))
-	data += fmt.Sprintf("URL: %s\n", r.Pack.URL)
-	data += fmt.Sprintf("License: %s\n", r.Pack.License)
-	data += fmt.Sprintf("Packager: %s\n", r.Pack.Maintainer)
-
-	if r.Pack.Arch == "all" {
-		data += "BuildArch: noarch\n"
-	}
-
-	for _, pkg := range r.Pack.Provides {
-		data += fmt.Sprintf("Provides: %s\n", pkg)
-	}
-
-	for _, pkg := range r.Pack.Conflicts {
-		data += fmt.Sprintf("Conflicts: %s\n", pkg)
-	}
-
-	for _, pkg := range r.Pack.Depends {
-		data += fmt.Sprintf("Requires: %s\n", pkg)
-	}
-
-	for _, pkg := range r.Pack.MakeDepends {
-		data += fmt.Sprintf("BuildRequires: %s\n", pkg)
-	}
-
-	data += "\n"
-	data += "%global _build_id_links none\n"
-	data += "%global _python_bytecompile_extra 0\n"
-	data += "%global _python_bytecompile_errors_terminate_build 0\n"
-	data += "%undefine __brp_python_bytecompile"
-	data += "\n"
-
-	if len(r.Pack.PkgDescLong) > 0 {
-		data += "%description\n"
-		for _, line := range r.Pack.PkgDescLong {
-			data += line + "\n"
-		}
-
-		data += "\n"
-	}
-
-	data += "%install\n"
-	data += fmt.Sprintf("rsync -a -A %s/ $RPM_BUILD_ROOT/\n",
-		r.Pack.PackageDir)
-	data += "\n"
-	data += "%files\n"
-
-	for _, line := range files {
-		data += line + "\n"
-	}
-
-	data += "\n"
-
-	if len(r.Pack.PreInst) > 0 {
-		data += "%pre\n"
-		for _, line := range r.Pack.PreInst {
-			data += line + "\n"
-		}
-
-		data += "\n"
-	}
-
-	if len(r.Pack.PostInst) > 0 {
-		data += "%post\n"
-		for _, line := range r.Pack.PostInst {
-			data += line + "\n"
-		}
-
-		data += "\n"
-	}
-
-	if len(r.Pack.PreRm) > 0 {
-		data += "%preun\n"
-		data += "if [[ \"$1\" -ne 0 ]]; then exit 0; fi\n"
-
-		for _, line := range r.Pack.PreRm {
-			data += line + "\n"
-		}
-
-		data += "\n"
-	}
-
-	if len(r.Pack.PostRm) > 0 {
-		data += "%postun\n"
-		data += "if [[ \"$1\" -ne 0 ]]; then exit 0; fi\n"
-
-		for _, line := range r.Pack.PostRm {
-			data += line + "\n"
-		}
-	}
-
-	err := utils.CreateWrite(path, data)
 	if err != nil {
-		return err
+		log.Fatal(err)
+	}
+	// remember to close the file
+	defer file.Close()
+	// create new buffer
+	writer := io.Writer(file)
+
+	tmpl := template.New("specfile")
+	tmpl.Funcs(template.FuncMap{
+		"join": func(strs []string) string {
+			return strings.Trim(strings.Join(strs, ", "), " ")
+		},
+		"multiline": func(strs string) string {
+			ret := strings.ReplaceAll(strs, "\n", "\n ")
+
+			return strings.Trim(ret, " \n")
+		},
+	})
+
+	template.Must(tmpl.Parse(specFile))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = tmpl.Execute(os.Stdout, r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = tmpl.Execute(writer, r)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	return err
@@ -261,37 +185,9 @@ func (r *Redhat) makeDirs() error {
 	return err
 }
 
-func (r *Redhat) clean() error {
-	var err error
-	if !constants.CleanPrevious {
-		return err
-	}
-
-	pkgPaths, err := utils.FindExt(r.Pack.Home, ".rpm")
-	if err != nil {
-		return err
-	}
-
-	match, ok := constants.ReleasesMatch[r.Pack.FullRelease]
-	if !ok {
-		fmt.Printf("redhat: Failed to find match for '%s'\n",
-			r.Pack.FullRelease)
-
-		return err
-	}
-
-	for _, pkgPath := range pkgPaths {
-		if strings.Contains(filepath.Base(pkgPath), match) {
-			_ = utils.Remove(pkgPath)
-		}
-	}
-
-	return err
-}
-
 func (r *Redhat) copy() error {
 	var err error
-	archs, err := ioutil.ReadDir(r.rpmsDir)
+	archs, err := os.ReadDir(r.rpmsDir)
 
 	if err != nil {
 		fmt.Printf("redhat: Failed to find rpms from '%s'\n",
@@ -313,34 +209,28 @@ func (r *Redhat) copy() error {
 	return err
 }
 
-func (r *Redhat) remDirs() {
-	os.RemoveAll(r.redhatDir)
-}
-
 func (r *Redhat) Build() ([]string, error) {
-	err := r.makeDirs()
+	err := utils.RemoveAll(r.redhatDir)
 	if err != nil {
 		return nil, err
 	}
 
-	defer r.remDirs()
-
-	files, err := r.getFiles()
+	err = r.makeDirs()
 	if err != nil {
 		return nil, err
 	}
 
-	err = r.createSpec(files)
+	err = r.getFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.createSpec()
 	if err != nil {
 		return nil, err
 	}
 
 	err = r.rpmBuild()
-	if err != nil {
-		return nil, err
-	}
-
-	err = r.clean()
 	if err != nil {
 		return nil, err
 	}
@@ -351,13 +241,6 @@ func (r *Redhat) Build() ([]string, error) {
 	}
 
 	pkgs, err := utils.FindExt(r.Pack.Home, ".rpm")
-	if err != nil {
-		return nil, err
-	}
-
-	r.remDirs()
-	err = r.makeDirs()
-
 	if err != nil {
 		return nil, err
 	}

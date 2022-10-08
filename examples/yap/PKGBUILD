@@ -1,27 +1,20 @@
-targets=(
-  "arch"
-  "centos"
-  "debian"
-  "ubuntu"
-)
-pkgname="yap"
-pkgver="1.0"
-pkgrel="1"
+pkgname=yap
+pkgver=1.0
+pkgrel=1
 pkgdesc="Package software with ease"
-pkgdesc:centos="Package software with ease for CentOS"
-pkgdesc:debian="Package software with ease for Debian"
-pkgdesc:fedora="Package software with ease for Fedora"
-pkgdesc:ubuntu="Package software with ease for Ubuntu"
-pkgdesclong=(
-  "Yap allows building packages for multiple GNU/Linux"
-  "distributions with a consistent package spec format"
-)
+pkgdesc_centos="Package software with ease for CentOS"
+pkgdesc_debian="Package software with ease for Debian"
+pkgdesc_fedora="Package software with ease for Fedora"
+pkgdesc_ubuntu="Package software with ease for Ubuntu"
 maintainer="Example <example@yap.org>"
-arch="amd64"
-license=("GPLv3")
-section="utils"
-priority="optional"
+arch=('amd64')
+license=('GPLv3')
+section=utils
+priority=optional
 url="https://github.com/PackageFoundation/${pkgname}"
+depends=('glibc')
+depends__apt=('libc6')
+dependes__rpm=('glibc')
 sources=(
   "${url}/archive/main.tar.gz"
 )
@@ -31,22 +24,28 @@ hashsums=(
 
 build() {
   cd "${srcdir}/${pkgname}-main"
-  go build
-
-  ./"${pkgname}" completion bash >"${srcdir}/${pkgname}.bash"
-  ./"${pkgname}" completion fish >"${srcdir}/${pkgname}.fish"
-
+  export CGO_LDFLAGS="$LDFLAGS"
+  export CGO_CFLAGS="$CFLAGS"
+  export CGO_CPPFLAGS="$CPPFLAGS"
+  export CGO_CXXFLAGS="$CXXFLAGS"
+  export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+  go build -ldflags="-w -s -buildid='' -linkmode=external -X main.version=${pkgver}" .
 }
 
 package() {
   cd "${srcdir}/${pkgname}-main"
+
   install -Dm 755 "${pkgname}" \
     "${pkgdir}/usr/bin/${pkgname}"
 
-  install -Dm644 "../${pkgname}.bash" \
-    "${pkgdir}/usr/share/bash-completion/completions/${pkgname}"
-  install -Dm644 "../${pkgname}.fish" \
-    "${pkgdir}/usr/share/fish/completions/${pkgname}.fish"
-  install -Dm644 -t "${pkgdir}/usr/share/licenses/${pkgname}/GPL3" LICENSE
-  install -Dm644 -t "${pkgdir}/usr/share/doc/${pkgname}" README.md
+  mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
+  mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
+  mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
+
+  ./"${pkgname}" completion bash >"${pkgdir}/usr/share/bash-completion/completions/${pkgname}"
+  ./"${pkgname}" completion zsh >"${pkgdir}/usr/share/zsh/site-functions/_${pkgname}"
+  ./"${pkgname}" completion fish >"${pkgdir}/usr/share/fish/vendor_completions.d/${pkgname}.fish"
+
+  install -Dm 644 -t "${pkgdir}/usr/share/licenses/${pkgname}/GPL3" LICENSE
+  install -Dm 644 -t "${pkgdir}/usr/share/doc/${pkgname}" README.md
 }

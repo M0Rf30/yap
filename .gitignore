@@ -1,6 +1,7 @@
 *.deb
 *.egg
 *.egg-info
+*.orig
 *.pyc
 *.rpm
 *.tar.*

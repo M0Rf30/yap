@@ -3,7 +3,7 @@ package project
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -53,16 +53,31 @@ type MultipleProject struct {
 	buildDir string
 }
 
-func (m *MultipleProject) NoCache() error {
-	return os.RemoveAll(m.buildDir)
-}
+func (m *MultipleProject) Clean(cleanFlag bool) error {
+	var err error
 
-func (m *MultipleProject) Close() error {
-	for _, p := range m.project {
-		os.RemoveAll(p.Builder.Pack.PackageDir)
+	if cleanFlag {
+		for _, project := range m.project {
+			err = utils.RemoveAll(project.Builder.Pack.SourceDir)
+			if err != nil {
+				return err
+			}
+
+			err = utils.RemoveAll(project.Builder.Pack.PackageDir)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
-	return nil
+	for _, project := range m.project {
+		err = utils.RemoveAll(project.Builder.Pack.PackageDir)
+		if err != nil {
+			return err
+		}
+	}
+
+	return err
 }
 
 func MultiProject(distro string, release string, path string) (*MultipleProject, error) {
@@ -79,7 +94,7 @@ func MultiProject(distro string, release string, path string) (*MultipleProject,
 		}
 	}
 
-	prjBsContent, err := ioutil.ReadAll(file)
+	prjBsContent, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
@@ -124,9 +139,7 @@ func MultiProject(distro string, release string, path string) (*MultipleProject,
 			return nil, err
 		}
 
-		if err := pac.Compile(); err != nil {
-			return nil, err
-		}
+		pac.Validate()
 
 		pcker := packer.GetPacker(pac, distro, release)
 

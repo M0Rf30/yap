@@ -2,7 +2,7 @@ package utils
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,7 +13,7 @@ import (
 )
 
 func ReadFile(path string) ([]byte, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read file '%s'%s\n",
 			string(constants.ColorBlue),
@@ -27,8 +27,8 @@ func ReadFile(path string) ([]byte, error) {
 	return data, err
 }
 
-func ReadDir(path string) ([]os.FileInfo, error) {
-	items, err := ioutil.ReadDir(path)
+func ReadDir(path string) ([]fs.DirEntry, error) {
+	items, err := os.ReadDir(path)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
 			string(constants.ColorBlue),
@@ -149,8 +149,6 @@ func Create(path string) (*os.File, error) {
 			string(constants.ColorYellow),
 			path,
 			string(constants.ColorWhite))
-
-		return file, err
 	}
 
 	return file, err
@@ -185,8 +183,6 @@ func Open(path string) (*os.File, error) {
 			string(constants.ColorYellow),
 			path,
 			string(constants.ColorWhite))
-
-		return file, err
 	}
 
 	return file, err
@@ -237,7 +233,7 @@ func CopyFile(dir, source, dest string, presv bool) error {
 }
 
 func CopyFiles(source, dest string, presv bool) error {
-	files, err := ioutil.ReadDir(source)
+	files, err := os.ReadDir(source)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
 			string(constants.ColorBlue),
@@ -265,7 +261,7 @@ func CopyFiles(source, dest string, presv bool) error {
 func FindExt(path, ext string) ([]string, error) {
 	var matches []string
 
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
@@ -293,7 +289,7 @@ func FindExt(path, ext string) ([]string, error) {
 func FindMatch(path, match string) ([]string, error) {
 	var matches []string
 
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",

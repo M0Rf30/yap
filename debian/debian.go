@@ -2,12 +2,13 @@ package debian
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
-	"github.com/packagefoundation/yap/constants"
 	"github.com/packagefoundation/yap/pack"
 	"github.com/packagefoundation/yap/utils"
 )
@@ -92,50 +93,40 @@ func (d *Debian) createConfFiles() error {
 
 func (d *Debian) createControl() error {
 	path := filepath.Join(d.debDir, "control")
+	file, err := os.Create(path)
 
-	data := ""
+	if err != nil {
+		log.Fatal(err)
+	}
+	// remember to close the file
+	defer file.Close()
+	// create new buffer
+	writer := io.Writer(file)
 
-	data += fmt.Sprintf("Package: %s\n", d.Pack.PkgName)
-	data += fmt.Sprintf("Version: %s-%s%s1~%s\n",
-		d.Pack.PkgVer, d.Pack.PkgRel, d.Pack.Distro, d.Pack.Release)
-	data += fmt.Sprintf("Architecture: %s\n", d.Pack.Arch)
-	data += fmt.Sprintf("Maintainer: %s\n", d.Pack.Maintainer)
-	data += fmt.Sprintf("Installed-Size: %d\n", d.InstalledSize)
+	tmpl := template.New("control")
+	tmpl.Funcs(template.FuncMap{
+		"join": func(strs []string) string {
+			return strings.Trim(strings.Join(strs, ", "), " ")
+		},
+		"multiline": func(strs string) string {
+			ret := strings.ReplaceAll(strs, "\n", "\n ")
 
-	if len(d.Pack.Depends) > 0 {
-		data += fmt.Sprintf("Depends: %s\n",
-			strings.Join(d.Pack.Depends, ", "))
+			return strings.Trim(ret, " \n")
+		},
+	})
+
+	template.Must(tmpl.Parse(specFile))
+
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	if len(d.Pack.Conflicts) > 0 {
-		data += fmt.Sprintf("Conflicts: %s\n",
-			strings.Join(d.Pack.Conflicts, ", "))
+	err = tmpl.Execute(os.Stdout, d)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	if len(d.Pack.OptDepends) > 0 {
-		data += fmt.Sprintf("Recommends: %s\n",
-			strings.Join(d.Pack.OptDepends, ", "))
-	}
-
-	if len(d.Pack.Provides) > 0 {
-		data += fmt.Sprintf("Provides: %s\n",
-			strings.Join(d.Pack.Provides, ", "))
-	}
-
-	data += fmt.Sprintf("Section: %s\n", d.Pack.Section)
-	data += fmt.Sprintf("Priority: %s\n", d.Pack.Priority)
-	data += fmt.Sprintf("Homepage: %s\n", d.Pack.URL)
-	data += fmt.Sprintf("Description: %s\n", d.Pack.PkgDesc)
-
-	for _, line := range d.Pack.PkgDescLong {
-		if line == "" {
-			line = "."
-		}
-
-		data += fmt.Sprintf("  %s\n", line)
-	}
-
-	err := utils.CreateWrite(path, data)
+	err = tmpl.Execute(writer, d)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -191,7 +182,7 @@ func (d *Debian) createDebconfConfig() error {
 func (d *Debian) createScripts() error {
 	var err error
 
-	scripts := map[string][]string{
+	scripts := map[string]string{
 		"preinst":  d.Pack.PreInst,
 		"postinst": d.Pack.PostInst,
 		"prerm":    d.Pack.PreRm,
@@ -203,7 +194,7 @@ func (d *Debian) createScripts() error {
 			continue
 		}
 
-		data := strings.Join(script, "\n")
+		data := script + "\n"
 		if name == "prerm" || name == "postrm" {
 			data = removeHeader + data
 		}
@@ -224,44 +215,24 @@ func (d *Debian) createScripts() error {
 	return err
 }
 
-func (d *Debian) clean() error {
-	var err error
-	if !constants.CleanPrevious {
-		return err
-	}
-
-	pkgPaths, err := utils.FindExt(d.Pack.Home, ".deb")
-	if err != nil {
-		return err
-	}
-
-	match, ok := constants.ReleasesMatch[d.Pack.FullRelease]
-	if !ok {
-		fmt.Printf("debian: Failed to find match for '%s'\n",
-			d.Pack.FullRelease)
-	}
-
-	for _, pkgPath := range pkgPaths {
-		if strings.Contains(filepath.Base(pkgPath), match) {
-			_ = utils.Remove(pkgPath)
-		}
-	}
-
-	return err
-}
-
 func (d *Debian) dpkgDeb() (string, error) {
+	var newPath string
+
 	err := utils.Exec("", "dpkg-deb", "-b", d.Pack.PackageDir)
+
 	if err != nil {
 		return "", err
 	}
 
 	_, dir := filepath.Split(filepath.Clean(d.Pack.PackageDir))
 	path := filepath.Join(d.Pack.Root, dir+".deb")
-	newPath := filepath.Join(d.Pack.Home,
-		fmt.Sprintf("%s_%s-%s%s_%s.deb",
-			d.Pack.PkgName, d.Pack.PkgVer, d.Pack.PkgRel, d.Pack.Release,
-			d.Pack.Arch))
+
+	for _, arch := range d.Pack.Arch {
+		newPath = filepath.Join(d.Pack.Home,
+			fmt.Sprintf("%s_%s-%s%s_%s.deb",
+				d.Pack.PkgName, d.Pack.PkgVer, d.Pack.PkgRel, d.Pack.Release,
+				arch))
+	}
 
 	os.Remove(newPath)
 
@@ -299,6 +270,11 @@ func (d *Debian) Build() ([]string, error) {
 		return nil, err
 	}
 
+	err = utils.RemoveAll(d.debDir)
+	if err != nil {
+		return nil, err
+	}
+
 	err = d.getSums()
 	if err != nil {
 		return nil, err
@@ -310,8 +286,6 @@ func (d *Debian) Build() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	defer os.RemoveAll(d.debDir)
 
 	err = d.createConfFiles()
 	if err != nil {
@@ -339,11 +313,6 @@ func (d *Debian) Build() ([]string, error) {
 	}
 
 	err = d.createDebconfConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.clean()
 	if err != nil {
 		return nil, err
 	}

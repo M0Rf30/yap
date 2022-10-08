@@ -6,47 +6,50 @@ import (
 	"strings"
 
 	"github.com/packagefoundation/yap/constants"
-	"github.com/packagefoundation/yap/resolver"
 )
 
 type Pack struct {
-	priorities  map[string]int
-	Targets     []string
-	Distro      string
-	Release     string
-	FullRelease string
-	Root        string
-	Home        string
-	SourceDir   string
-	PackageDir  string
-	PkgName     string
-	PkgVer      string
-	PkgRel      string
-	PkgDesc     string
-	PkgDescLong []string
-	Maintainer  string
-	Arch        string
-	License     []string
-	Section     string
-	Priority    string
-	URL         string
-	Depends     []string
-	DebTemplate string
-	DebConfig   string
-	OptDepends  []string
-	MakeDepends []string
-	Provides    []string
-	Conflicts   []string
-	Sources     []string
-	HashSums    []string
+	Arch        []string
 	Backup      []string
-	Build       []string
-	Package     []string
-	PreInst     []string
-	PostInst    []string
-	PreRm       []string
-	PostRm      []string
+	Build       string
+	Conflicts   []string
+	DebConfig   string
+	DebTemplate string
+	Depends     []string
+	Distro      string
+	Epoch       string
+	FullRelease string
+	Functions   map[string]string
+	HashSums    []string
+	Home        string
+	Install     string
+	License     []string
+	Maintainer  string
+	MakeDepends []string
+	OptDepends  []string
+	Options     []string
+	Package     string
+	PackageDir  string
+	PkgDesc     string
+	PkgName     string
+	PkgRel      string
+	PkgVer      string
+	PostInst    string
+	PostRm      string
+	PreInst     string
+	PreRelease  string
+	PreRm       string
+	Prepare     string
+	Priority    string
+	Provides    []string
+	Release     string
+	Root        string
+	Section     string
+	SourceDir   string
+	Sources     []string
+	URL         string
 	Variables   map[string]string
+	priorities  map[string]int
 }
 
 func (p *Pack) Init() {
@@ -59,12 +62,12 @@ func (p *Pack) Init() {
 }
 
 func (p *Pack) parseDirective(input string) (string, int, error) {
+	split := strings.Split(input, "__")
+	key := split[0]
+
 	var err error
 
 	var pry int
-
-	split := strings.Split(input, ":")
-	key := split[0]
 
 	numElem := 2
 
@@ -74,9 +77,7 @@ func (p *Pack) parseDirective(input string) (string, int, error) {
 
 		return key, pry, err
 	case len(split) != numElem:
-		fmt.Printf("pack: Invalid use of ':' directive in '%s'\n", input)
-
-		return key, pry, err
+		return key, pry, fmt.Errorf("pack: Invalid use of '__' directive in '%w'", err)
 	default:
 		pry = -1
 	}
@@ -86,9 +87,7 @@ func (p *Pack) parseDirective(input string) (string, int, error) {
 	}
 
 	if key == "pkgver" || key == "pkgrel" {
-		fmt.Printf("pack: Cannot use directive for '%s'\n", key)
-
-		return key, pry, err
+		return key, pry, fmt.Errorf("pack: Cannot use directive for '%w'", err)
 	}
 
 	dirc := split[1]
@@ -117,61 +116,10 @@ func (p *Pack) parseDirective(input string) (string, int, error) {
 		return key, pry, err
 	}
 
-	fmt.Printf("pack: Unknown directive '%s'\n", dirc)
-
 	return key, pry, err
 }
 
-func (p *Pack) Resolve() error {
-	reslv := resolver.New()
-
-	reslv.AddList("targets", p.Targets)
-	reslv.Add("root", &p.Root)
-	reslv.Add("srcdir", &p.SourceDir)
-	reslv.Add("pkgdir", &p.PackageDir)
-	reslv.Add("pkgname", &p.PkgName)
-	reslv.Add("pkgver", &p.PkgVer)
-	reslv.Add("pkgrel", &p.PkgRel)
-	reslv.Add("pkgdesc", &p.PkgDesc)
-	reslv.AddList("pkgdesclong", p.PkgDescLong)
-	reslv.Add("maintainer", &p.Maintainer)
-	reslv.Add("arch", &p.Arch)
-	reslv.AddList("license", p.License)
-	reslv.Add("section", &p.Section)
-	reslv.Add("priority", &p.Priority)
-	reslv.Add("url", &p.URL)
-	reslv.AddList("depends", p.Depends)
-	reslv.AddList("optdepends", p.OptDepends)
-	reslv.AddList("makedepends", p.MakeDepends)
-	reslv.AddList("provides", p.Provides)
-	reslv.AddList("conflicts", p.Conflicts)
-	reslv.AddList("sources", p.Sources)
-	reslv.Add("debconf_template", &p.DebTemplate)
-	reslv.Add("debconf_config", &p.DebConfig)
-	reslv.AddList("hashsums", p.HashSums)
-	reslv.AddList("backup", p.Backup)
-	reslv.AddList("build", p.Build)
-	reslv.AddList("package", p.Package)
-	reslv.AddList("preinst", p.PreInst)
-	reslv.AddList("postinst", p.PostInst)
-	reslv.AddList("prerm", p.PreRm)
-	reslv.AddList("postrm", p.PostRm)
-
-	if p.Variables != nil {
-		for key, val := range p.Variables {
-			reslv.Add(key, &val) //nolint:gosec
-		}
-	}
-
-	err := reslv.Resolve()
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (p *Pack) AddItem(key string, data interface{}, n int, line string) error {
+func (p *Pack) AddItem(key string, data interface{}) error {
 	key, priority, err := p.parseDirective(key)
 	if err != nil {
 		return err
@@ -188,8 +136,6 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) error {
 	p.priorities[key] = priority
 
 	switch key {
-	case "targets":
-		p.Targets = data.([]string)
 	case "pkgname":
 		p.PkgName = data.(string)
 	case "pkgver":
@@ -198,12 +144,10 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) error {
 		p.PkgRel = data.(string)
 	case "pkgdesc":
 		p.PkgDesc = data.(string)
-	case "pkgdesclong":
-		p.PkgDescLong = data.([]string)
 	case "maintainer":
 		p.Maintainer = data.(string)
 	case "arch":
-		p.Arch = data.(string)
+		p.Arch = data.([]string)
 	case "license":
 		p.License = data.([]string)
 	case "section":
@@ -214,6 +158,8 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) error {
 		p.URL = data.(string)
 	case "depends":
 		p.Depends = data.([]string)
+	case "options":
+		p.Options = data.([]string)
 	case "optdepends":
 		p.OptDepends = data.([]string)
 	case "makedepends":
@@ -222,6 +168,8 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) error {
 		p.Provides = data.([]string)
 	case "conflicts":
 		p.Conflicts = data.([]string)
+	case "source":
+		p.Sources = data.([]string)
 	case "sources":
 		p.Sources = data.([]string)
 	case "debconf_template":
@@ -230,26 +178,40 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) error {
 		p.DebConfig = data.(string)
 	case "hashsums":
 		p.HashSums = data.([]string)
+	case "sha256sums":
+		p.HashSums = data.([]string)
+	case "sha512sums":
+		p.HashSums = data.([]string)
 	case "backup":
 		p.Backup = data.([]string)
+	case "install":
+		p.Install = data.(string)
 	case "build":
-		p.Build = data.([]string)
+		p.Build = data.(string)
 	case "package":
-		p.Package = data.([]string)
+		p.Package = data.(string)
 	case "preinst":
-		p.PreInst = data.([]string)
+		p.PreInst = data.(string)
+	case "prepare":
+		p.Prepare = data.(string)
 	case "postinst":
-		p.PostInst = data.([]string)
+		p.PostInst = data.(string)
 	case "prerm":
-		p.PreRm = data.([]string)
+		p.PreRm = data.(string)
 	case "postrm":
-		p.PostRm = data.([]string)
+		p.PostRm = data.(string)
 	default:
-		if p.Variables == nil {
-			p.Variables = map[string]string{}
+		if p.Variables != nil {
+			p.Variables[key] = data.(string)
+		} else {
+			return err
 		}
 
-		p.Variables[key] = data.(string)
+		if p.Functions != nil {
+			p.Functions[key] = data.(string)
+		} else {
+			return err
+		}
 	}
 
 	return err
@@ -257,18 +219,10 @@ func (p *Pack) AddItem(key string, data interface{}, n int, line string) error {
 
 func (p *Pack) Validate() {
 	if len(p.Sources) != len(p.HashSums) {
-		fmt.Printf("pack: Different number of sources and relative hashsums")
+		fmt.Printf("%s❌ :: %snumber of sources and hashes differs%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite))
 		os.Exit(1)
 	}
-}
-
-func (p *Pack) Compile() error {
-	p.Validate()
-
-	err := p.Resolve()
-	if err != nil {
-		return err
-	}
-
-	return err
 }

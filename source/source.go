@@ -152,7 +152,7 @@ func (s *Source) validate() error {
 
 	hexSum := fmt.Sprintf("%x", sum)
 
-	if hexSum != s.Hash {
+	if hexSum != s.Source {
 		fmt.Printf("source: Hash verification failed for '%s'\n", s.Source)
 	}
 

@@ -1,25 +1,25 @@
 package builder
 
 import (
-	"github.com/packagefoundation/yap/utils"
+	"context"
+	"os"
+	"strings"
+
+	"mvdan.cc/sh/v3/expand"
+	"mvdan.cc/sh/v3/interp"
+	"mvdan.cc/sh/v3/syntax"
 )
 
-func createScript(path string, cmds []string) error {
-	data := "set -e\n"
-	for _, cmd := range cmds {
-		data += cmd + "\n"
-	}
+func runScript(cmds string) error {
+	buildScript, _ := syntax.NewParser().Parse(strings.NewReader(cmds), "")
 
-	err := utils.CreateWrite(path, data)
-	if err != nil {
-		return err
-	}
+	runner, _ := interp.New(
+		interp.Env(expand.ListEnviron(os.Environ()...,
+		)),
+		interp.StdIO(nil, os.Stdout, os.Stdout),
+	)
 
-	return err
-}
-
-func runScript(path, dir string) error {
-	err := utils.Exec(dir, "sh", path)
+	err := runner.Run(context.TODO(), buildScript)
 	if err != nil {
 		return err
 	}

@@ -39,14 +39,11 @@ var buildCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 		if noCache {
-			if err := multiplePrj.NoCache(); err != nil {
-				log.Fatal(err)
-			}
-		} else {
-			if err := multiplePrj.Close(); err != nil {
+			if err := multiplePrj.Clean(noCache); err != nil {
 				log.Fatal(err)
 			}
 		}
+
 		if err := multiplePrj.BuildAll(); err != nil {
 			log.Fatal(err)
 		}
