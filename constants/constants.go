@@ -15,6 +15,7 @@ const (
 
 var (
 	Releases = [...]string{
+		"alpine",
 		"arch",
 		"astra",
 		"amazon-1",
@@ -30,6 +31,7 @@ var (
 	}
 	ReleasesMatch = map[string]string{
 		"arch":           "",
+		"alpine":         "",
 		"astra":          "astra",
 		"amazo-1":        ".amzn1.",
 		"amazon-2":       ".amzn2.",
@@ -43,6 +45,7 @@ var (
 		"ubuntu-focal":   "focal",
 	}
 	DistroPack = map[string]string{
+		"alpine": "alpine",
 		"arch":   "pacman",
 		"astra":  "debian",
 		"amazon": "redhat",
@@ -54,6 +57,7 @@ var (
 		"ubuntu": "debian",
 	}
 	Packagers = [...]string{
+		"apk",
 		"apt",
 		"pacman",
 		"yum",
@@ -79,6 +83,8 @@ func init() {
 
 	for _, distro := range Distros {
 		switch DistroPack[distro] {
+		case "alpine":
+			packager = "apk"
 		case "debian":
 			packager = "apt"
 		case "pacman":

@@ -2,10 +2,12 @@ pkgname=yap
 pkgver=1.0
 pkgrel=1
 pkgdesc="Package software with ease"
-pkgdesc_centos="Package software with ease for CentOS"
-pkgdesc_debian="Package software with ease for Debian"
-pkgdesc_fedora="Package software with ease for Fedora"
-pkgdesc_ubuntu="Package software with ease for Ubuntu"
+pkgdesc__alpine="Package software with ease for Alpine"
+pkgdesc__arch="Package software with ease for Arch"
+pkgdesc__centos="Package software with ease for CentOS"
+pkgdesc__debian="Package software with ease for Debian"
+pkgdesc__fedora="Package software with ease for Fedora"
+pkgdesc__ubuntu="Package software with ease for Ubuntu"
 maintainer="Example <example@yap.org>"
 arch=('amd64')
 license=('GPLv3')
@@ -13,8 +15,9 @@ section=utils
 priority=optional
 url="https://github.com/PackageFoundation/${pkgname}"
 depends=('glibc')
+depends__apk=('musl')
 depends__apt=('libc6')
-dependes__rpm=('glibc')
+depends__rpm=('glibc')
 sources=(
   "${url}/archive/main.tar.gz"
 )
@@ -28,8 +31,16 @@ build() {
   export CGO_CFLAGS="$CFLAGS"
   export CGO_CPPFLAGS="$CPPFLAGS"
   export CGO_CXXFLAGS="$CXXFLAGS"
-  export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
-  go build -ldflags="-w -s -buildid='' -linkmode=external -X main.version=${pkgver}" .
+  export GOFLAGS="-buildmode=pie \
+  -trimpath \
+  -mod=readonly \
+  -modcacherw"
+
+  go build -ldflags="-w -s \
+  -buildid='' \
+  -linkmode=external \
+  -X main.version=${pkgver}" \
+    .
 }
 
 package() {

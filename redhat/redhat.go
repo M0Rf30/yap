@@ -255,12 +255,7 @@ func (r *Redhat) Install() error {
 	}
 
 	for _, pkg := range pkgs {
-		absPath, err := filepath.Abs(pkg)
-		if err != nil {
-			return err
-		}
-
-		if err := utils.Exec("", "yum", "install", "-y", absPath); err != nil {
+		if err := utils.Exec("", "yum", "install", "-y", pkg); err != nil {
 			return err
 		}
 	}

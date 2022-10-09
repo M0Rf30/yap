@@ -1,4 +1,4 @@
-package pacman
+package apk
 
 import (
 	"io"
@@ -12,37 +12,36 @@ import (
 	"github.com/packagefoundation/yap/utils"
 )
 
-type Pacman struct {
-	Pack      *pack.Pack
-	pacmanDir string
+type Apk struct {
+	Pack   *pack.Pack
+	apkDir string
 }
 
-func (p *Pacman) convertPacman() {
-	for index, arch := range p.Pack.Arch {
+func (a *Apk) convertApk() {
+	for index, arch := range a.Pack.Arch {
 		switch arch {
 		case "all":
-			p.Pack.Arch[index] = "any"
+			a.Pack.Arch[index] = "any"
 		case "amd64":
-			p.Pack.Arch[index] = "x86_64"
+			a.Pack.Arch[index] = "x86_64"
 		default:
-			p.Pack.Arch[index] = arch
+			a.Pack.Arch[index] = arch
 		}
 	}
 }
 
-func (p *Pacman) getDepends() error {
+func (a *Apk) getDepends() error {
 	var err error
-	if len(p.Pack.MakeDepends) == 0 {
+	if len(a.Pack.MakeDepends) == 0 {
 		return err
 	}
 
 	args := []string{
-		"-S",
-		"--noconfirm",
+		"add",
 	}
-	args = append(args, p.Pack.MakeDepends...)
+	args = append(args, a.Pack.MakeDepends...)
 
-	err = utils.Exec("", "pacman", args...)
+	err = utils.Exec("", "apk", args...)
 	if err != nil {
 		return err
 	}
@@ -50,8 +49,8 @@ func (p *Pacman) getDepends() error {
 	return err
 }
 
-func (p *Pacman) getUpdates() error {
-	err := utils.Exec("", "pacman", "-Sy")
+func (a *Apk) getUpdates() error {
+	err := utils.Exec("", "apk", "update")
 	if err != nil {
 		return err
 	}
@@ -59,8 +58,8 @@ func (p *Pacman) getUpdates() error {
 	return err
 }
 
-func (p *Pacman) createInstall() error {
-	path := filepath.Join(p.pacmanDir, p.Pack.PkgName+".install")
+func (a *Apk) createInstall() error {
+	path := filepath.Join(a.apkDir, a.Pack.PkgName+".install")
 
 	file, err := os.Create(path)
 
@@ -92,12 +91,12 @@ func (p *Pacman) createInstall() error {
 		log.Fatal(err)
 	}
 
-	err = tmpl.Execute(os.Stdout, p)
+	err = tmpl.Execute(os.Stdout, a)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = tmpl.Execute(writer, p)
+	err = tmpl.Execute(writer, a)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -105,8 +104,8 @@ func (p *Pacman) createInstall() error {
 	return err
 }
 
-func (p *Pacman) createMake() error {
-	path := filepath.Join(p.pacmanDir, "PKGBUILD")
+func (a *Apk) createMake() error {
+	path := filepath.Join(a.apkDir, "APKBUILD")
 	file, err := os.Create(path)
 
 	if err != nil {
@@ -119,10 +118,10 @@ func (p *Pacman) createMake() error {
 	// create new buffer
 	writer := io.Writer(file)
 
-	tmpl := template.New("pkgbuild")
+	tmpl := template.New("apkbuild")
 	tmpl.Funcs(template.FuncMap{
 		"join": func(strs []string) string {
-			return strings.Trim(strings.Join(strs, " "), "\n")
+			return strings.Trim(strings.Join(strs, ", "), " ")
 		},
 		"multiline": func(strs string) string {
 			ret := strings.ReplaceAll(strs, "\n", "\n ")
@@ -137,12 +136,12 @@ func (p *Pacman) createMake() error {
 		log.Fatal(err)
 	}
 
-	err = tmpl.Execute(os.Stdout, p)
+	err = tmpl.Execute(os.Stdout, a)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = tmpl.Execute(writer, p)
+	err = tmpl.Execute(writer, a)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -150,27 +149,23 @@ func (p *Pacman) createMake() error {
 	return err
 }
 
-func (p *Pacman) pacmanBuild() error {
-	err := utils.ChownR(p.pacmanDir, "nobody", "nobody")
+func (a *Apk) apkBuild() error {
+	err := utils.ChownR(a.apkDir, "nobody", "nobody")
 	if err != nil {
 		return err
 	}
 
-	err = utils.ChownR(p.Pack.PackageDir, "nobody", "nobody")
+	err = utils.ChownR(a.Pack.PackageDir, "nobody", "nobody")
 	if err != nil {
 		return err
 	}
 
-	err = utils.Exec(p.pacmanDir, "sudo", "-u", "nobody", "makepkg", "-f")
+	err = utils.Exec(a.apkDir, "sudo", "-u", "root", "abuild-keygen", "-n", "-i", "-a")
 	if err != nil {
 		return err
 	}
 
-	return err
-}
-
-func (p *Pacman) Prep() error {
-	err := p.getDepends()
+	err = utils.Exec(a.apkDir, "sudo", "-u", "root", "abuild", "-F", "-K")
 	if err != nil {
 		return err
 	}
@@ -178,8 +173,8 @@ func (p *Pacman) Prep() error {
 	return err
 }
 
-func (p *Pacman) Update() error {
-	err := p.getUpdates()
+func (a *Apk) Prep() error {
+	err := a.getDepends()
 	if err != nil {
 		return err
 	}
@@ -187,8 +182,8 @@ func (p *Pacman) Update() error {
 	return err
 }
 
-func (p *Pacman) makePackerDir() error {
-	err := utils.ExistsMakeDir(p.pacmanDir)
+func (a *Apk) Update() error {
+	err := a.getUpdates()
 	if err != nil {
 		return err
 	}
@@ -196,37 +191,52 @@ func (p *Pacman) makePackerDir() error {
 	return err
 }
 
-func (p *Pacman) Build() ([]string, error) {
-	p.pacmanDir = filepath.Join(p.Pack.Root, "pacman")
+func (a *Apk) makePackerDir() error {
+	err := utils.ExistsMakeDir(a.apkDir)
+	if err != nil {
+		return err
+	}
 
-	err := utils.RemoveAll(p.pacmanDir)
+	err = utils.ExistsMakeDir(a.apkDir + "/pkg/" + a.Pack.PkgName)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (a *Apk) Build() ([]string, error) {
+	a.apkDir = filepath.Join(a.Pack.Root, "apk")
+
+	err := utils.RemoveAll(a.apkDir)
 	if err != nil {
 		return nil, err
 	}
 
-	err = p.makePackerDir()
+	err = a.makePackerDir()
 	if err != nil {
 		return nil, err
 	}
 
-	p.convertPacman()
+	a.convertApk()
 
-	err = p.createMake()
+	err = a.createMake()
 	if err != nil {
 		return nil, err
 	}
 
-	err = p.createInstall()
+	err = a.createInstall()
 	if err != nil {
 		return nil, err
 	}
 
-	err = p.pacmanBuild()
+	err = a.apkBuild()
 	if err != nil {
 		return nil, err
 	}
 
-	pkgs, err := utils.FindExt(p.pacmanDir, ".zst")
+	pkgs, err := utils.FindExt("/root/packages", ".apk")
+
 	if err != nil {
 		return nil, err
 	}
@@ -234,14 +244,14 @@ func (p *Pacman) Build() ([]string, error) {
 	return pkgs, nil
 }
 
-func (p *Pacman) Install() error {
-	pkgs, err := utils.FindExt(p.pacmanDir, ".zst")
+func (a *Apk) Install() error {
+	pkgs, err := utils.FindExt("/root/packages", ".apk")
 	if err != nil {
 		return err
 	}
 
 	for _, pkg := range pkgs {
-		if err := utils.Exec("", "sudo", "-u", "root", "pacman -U --noconfirm", pkg); err != nil {
+		if err := utils.Exec("", "sudo", "-u", "root", "apk", "add", "--allow-untrusted", pkg); err != nil {
 			return err
 		}
 	}

@@ -258,32 +258,28 @@ func CopyFiles(source, dest string, presv bool) error {
 	return err
 }
 
-func FindExt(path, ext string) ([]string, error) {
-	var matches []string
+func FindExt(path string, extension string) ([]string, error) {
+	var files []string
 
-	files, err := os.ReadDir(path)
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Println(err)
+
+			return err
+		}
+
+		if !info.IsDir() && filepath.Ext(path) == extension {
+			files = append(files, path)
+		}
+
+		return nil
+	})
 
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
-
-		return matches, err
+		fmt.Println(err)
 	}
 
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		if strings.HasSuffix(file.Name(), ext) {
-			matches = append(matches, filepath.Join(path, file.Name()))
-		}
-	}
-
-	return matches, err
+	return files, err
 }
 
 func FindMatch(path, match string) ([]string, error) {

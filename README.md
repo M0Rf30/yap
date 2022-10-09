@@ -6,8 +6,7 @@
 [![View examples](https://img.shields.io/badge/learn%20by-examples-0077b3.svg?style=flat-square)](https://github.com/packagefoundation/yap/tree/main/examples)
 
 Yap allows building packages for multiple GNU/Linux distributions with a
-consistent package spec format. Currently `deb`, `rpm` and `pacman` packages are
-available for several distributions.
+consistent package spec format.
 
 Builds are done on Docker containers without needing to setup any virtual
 machines or install any software other than Docker.
@@ -91,6 +90,7 @@ key__ubuntu="this will apply only to Ubuntu  builds"
 
 | target           | value                     |
 | ---------------- | ------------------------- |
+| `alpine`         | all Alpine Linux releases |
 | `arch`           | all Arch Linux releases   |
 | `astra`          | all Astra Linux releases  |
 | `amazon`         | all Amazon Linux releases |
@@ -118,15 +118,17 @@ build targets.
 All variables can use directives including user defined variables.
 
 To use directives include the directive after a variable separated by a colon
-such as `pkgdesc:ubuntu="This description will only apply to Ubuntu packages"`.
+such as `pkgdesc__ubuntu="This description will only apply to Ubuntu packages"`.
 
 The directives above are sorted from lowest to the highest priority.
 
 | directive        | value                     |
 | ---------------- | ------------------------- |
+| `apk`            | all apk packages          |
 | `apt`            | all deb packages          |
 | `pacman`         | all pkg packages          |
-| `yum`            | all rpm packages          |
+| `yum`            | all yum rpm packages      |
+| `alpine`         | all Alpine Linux packages |
 | `arch`           | all Arch Linux releases   |
 | `amazon`         | all Amazon Linux releases |
 | `centos`         | all CentOS releases       |

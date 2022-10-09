@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/packagefoundation/yap/apk"
 	"github.com/packagefoundation/yap/constants"
 	"github.com/packagefoundation/yap/debian"
 	"github.com/packagefoundation/yap/pack"
@@ -22,6 +23,10 @@ func GetPacker(pac *pack.Pack, distro, release string) Packer {
 	var pcker Packer
 
 	switch constants.DistroPack[distro] {
+	case "alpine":
+		pcker = &apk.Apk{
+			Pack: pac,
+		}
 	case "pacman":
 		pcker = &pacman.Pacman{
 			Pack: pac,

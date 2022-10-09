@@ -5,7 +5,8 @@
   "output": "artifacts",
   "projects": [
     {
-      "name": "yap"
+      "name": "yap",
+      "install": true
     }
   ]
 }

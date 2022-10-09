@@ -125,8 +125,13 @@ func MultiProject(distro string, release string, path string) (*MultipleProject,
 
 	pcker := packer.GetPacker(pac, distro, release)
 
-	if err != nil {
-		return nil, err
+	for _, child := range mpc.Projects {
+		pac, err := parse.File(distro, release, filepath.Join(buildDir, child.Name), filepath.Join(path, child.Name))
+		if err != nil {
+			return nil, err
+		}
+
+		pac.Validate()
 	}
 
 	if err := pcker.Update(); err != nil {
@@ -138,8 +143,6 @@ func MultiProject(distro string, release string, path string) (*MultipleProject,
 		if err != nil {
 			return nil, err
 		}
-
-		pac.Validate()
 
 		pcker := packer.GetPacker(pac, distro, release)
 

@@ -2,7 +2,6 @@ package pack
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/packagefoundation/yap/constants"
@@ -219,10 +218,18 @@ func (p *Pack) AddItem(key string, data interface{}) error {
 
 func (p *Pack) Validate() {
 	if len(p.Sources) != len(p.HashSums) {
-		fmt.Printf("%s❌ :: %snumber of sources and hashes differs%s\n",
+		fmt.Printf("%s%s ❌ :: %snumber of sources and hashes differs%s\n",
+			p.PkgName,
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
-		os.Exit(1)
+	}
+
+	if len(p.Package) == 0 {
+		fmt.Printf("%s%s ❌ :: %smissing package() function%s\n",
+			p.PkgName,
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite))
 	}
 }
