@@ -241,7 +241,7 @@ func (p *Pacman) Install() error {
 	}
 
 	for _, pkg := range pkgs {
-		if err := utils.Exec("", "sudo", "-u", "root", "pacman -U --noconfirm", pkg); err != nil {
+		if err := utils.Exec("", "sudo", "-u", "root", "pacman", "-U", "--noconfirm", pkg); err != nil {
 			return err
 		}
 	}
