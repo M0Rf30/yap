@@ -39,7 +39,7 @@ options=("emptydirs")
 install={{.Pack.PkgName}}.install
 
 package() {
-  rsync -a -A {{.Pack.PackageDir}} ${pkgdir}/
+  rsync -a -A {{.Pack.PackageDir}}/ ${pkgdir}/
 }
 `
 const postInstall = `

@@ -1,9 +1,9 @@
 module github.com/packagefoundation/yap
 
-go 1.18
+go 1.19
 
 require (
-	github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra v1.5.0
 	mvdan.cc/sh/v3 v3.5.1
 )
 
