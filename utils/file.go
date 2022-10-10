@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,36 +10,6 @@ import (
 
 	"github.com/packagefoundation/yap/constants"
 )
-
-func ReadFile(path string) ([]byte, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read file '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
-
-		return data, err
-	}
-
-	return data, err
-}
-
-func ReadDir(path string) ([]fs.DirEntry, error) {
-	items, err := os.ReadDir(path)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
-
-		return items, err
-	}
-
-	return items, err
-}
 
 func MkdirAll(path string) error {
 	err := os.MkdirAll(path, 0o755)
@@ -188,16 +157,6 @@ func Open(path string) (*os.File, error) {
 	return file, err
 }
 
-func Move(source, dest string) error {
-	err := Exec("", "mv", source, dest)
-
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func Copy(dir, source, dest string, presv bool) error {
 	args := []string{"-r", "-T", "-f"}
 
@@ -280,34 +239,6 @@ func FindExt(path string, extension string) ([]string, error) {
 	}
 
 	return files, err
-}
-
-func FindMatch(path, match string) ([]string, error) {
-	var matches []string
-
-	files, err := os.ReadDir(path)
-
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
-
-		return matches, err
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		if strings.Contains(file.Name(), match) {
-			matches = append(matches, filepath.Join(path, file.Name()))
-		}
-	}
-
-	return matches, err
 }
 
 func Filename(path string) string {

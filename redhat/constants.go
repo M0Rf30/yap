@@ -11,7 +11,9 @@ Group: {{.Pack.Section}}
 URL: {{.Pack.URL}}
 {{- end }}
 {{- if .Pack.License}}
+{{- with .Pack.License}}
 License: {{join .}}
+{{- end }}
 {{- else }}
 License: CUSTOM
 {{- end }}
