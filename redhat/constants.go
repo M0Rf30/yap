@@ -10,8 +10,10 @@ Group: {{.Pack.Section}}
 {{- if .Pack.URL}}
 URL: {{.Pack.URL}}
 {{- end }}
-{{- with .Pack.License}}
+{{- if .Pack.License}}
 License: {{join .}}
+{{- else }}
+License: CUSTOM
 {{- end }}
 {{- if .Pack.Maintainer}}
 Packager: {{.Pack.Maintainer}}

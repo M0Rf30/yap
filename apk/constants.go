@@ -25,7 +25,7 @@ install={{.Pack.PkgName}}.install
 {{- if .Pack.License}}
 license={{.Pack.License}}
 {{- else }}
-license="MIT"
+license="CUSTOM"
 {{- end }}
 
 options="!check !fhs"
