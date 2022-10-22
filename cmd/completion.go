@@ -44,7 +44,7 @@ $ yap completion zsh > "${fpath[1]}/_yap"
 `,
 	DisableFlagsInUseLine: true,
 	ValidArgs:             []string{"bash", "fish", "zsh"},
-	Args:                  cobra.ExactValidArgs(1),
+	Args:                  cobra.MatchAll(cobra.MinimumNArgs(1), cobra.OnlyValidArgs),
 	Run: func(cmd *cobra.Command, args []string) {
 		switch args[0] {
 		case "bash":

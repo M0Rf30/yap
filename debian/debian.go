@@ -121,10 +121,11 @@ func (d *Debian) createControl() error {
 		log.Fatal(err)
 	}
 
-	err = tmpl.Execute(os.Stdout, d)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// DEBUG
+	// err = tmpl.Execute(os.Stdout, d)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	err = tmpl.Execute(writer, d)
 	if err != nil {

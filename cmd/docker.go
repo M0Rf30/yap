@@ -9,10 +9,11 @@ import (
 
 // dockerCmd represents the docker command.
 var dockerCmd = &cobra.Command{
-	Use:   "docker",
+	Use:   "docker [target]",
 	Short: "Pull the built images",
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := utils.PullContainers()
+		err := utils.PullContainers(args[0])
 		log.Fatal(err)
 	},
 }

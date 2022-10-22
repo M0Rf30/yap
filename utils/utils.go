@@ -52,13 +52,19 @@ func RandStr(n int) string {
 	return str
 }
 
-func PullContainers() error {
+func PullContainers(target string) error {
+	containerApp := "/usr/bin/docker"
+
 	var err error
-	for _, release := range constants.Releases {
-		err = Exec("", "podman", "pull", constants.DockerOrg+release)
-		if err != nil {
-			return err
-		}
+
+	if _, err = os.Stat(containerApp); err == nil {
+		err = Exec("", containerApp, "pull", constants.DockerOrg+target)
+	} else {
+		err = Exec("", "podman", "pull", constants.DockerOrg+target)
+	}
+
+	if err != nil {
+		return err
 	}
 
 	return err

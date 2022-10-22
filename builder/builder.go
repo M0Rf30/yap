@@ -11,7 +11,7 @@ import (
 	"github.com/packagefoundation/yap/utils"
 )
 
-const IDLenght = 12
+const IDLength = 12
 
 type Builder struct {
 	id   string
@@ -80,7 +80,7 @@ func (b *Builder) Package() error {
 }
 
 func (b *Builder) Build() error {
-	b.id = utils.RandStr(IDLenght)
+	b.id = utils.RandStr(IDLength)
 
 	err := b.initDirs()
 	if err != nil {
