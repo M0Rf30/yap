@@ -38,7 +38,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -49,7 +49,7 @@ jobs:
           file: docker/amazon-1/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -60,7 +60,7 @@ jobs:
           file: docker/amazon-2/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -71,7 +71,7 @@ jobs:
           file: docker/alpine/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -82,7 +82,7 @@ jobs:
           file: docker/arch/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -93,7 +93,7 @@ jobs:
           file: docker/debian-buster/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -104,7 +104,7 @@ jobs:
           file: docker/debian-jessie/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -115,7 +115,7 @@ jobs:
           file: docker/debian-stretch/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -126,7 +126,7 @@ jobs:
           file: docker/fedora-35/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -137,7 +137,7 @@ jobs:
           file: docker/opensuse-tubleweed/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -148,7 +148,7 @@ jobs:
           file: docker/oracle-8/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -159,7 +159,7 @@ jobs:
           file: docker/rocky-8/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -170,7 +170,7 @@ jobs:
           file: docker/ubuntu-bionic/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
