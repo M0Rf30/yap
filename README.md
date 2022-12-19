@@ -2,8 +2,8 @@
 
 ![yap-logo](https://raw.githubusercontent.com/M0Rf30/yap/main/images/yap.png)
 
-[![report card](https://img.shields.io/badge/report%20card-a%2B-ff3333.svg?style=flat-square)](http://goreportcard.com/report/packagefoundation/yap)
-[![View examples](https://img.shields.io/badge/learn%20by-examples-0077b3.svg?style=flat-square)](https://github.com/packagefoundation/yap/tree/main/examples)
+[![report card](https://img.shields.io/badge/report%20card-a%2B-ff3333.svg?style=flat-square)](http://goreportcard.com/report/M0Rf30/yap)
+[![View examples](https://img.shields.io/badge/learn%20by-examples-0077b3.svg?style=flat-square)](https://github.com/M0Rf30/yap/tree/main/examples)
 
 Yap allows building packages for multiple GNU/Linux distributions with a
 consistent package spec format.
@@ -29,7 +29,7 @@ this. Always run the `clean.sh` script to clear any existing yap images.
 Building the images can take several hours.
 
 ```sh
-cd ~/go/src/github.com/packagefoundation/yap/docker
+cd ~/go/src/github.com/M0Rf30/yap/docker
 sh clean.sh
 sh build.sh
 ```

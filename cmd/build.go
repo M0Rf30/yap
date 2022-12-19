@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/packagefoundation/yap/project"
+	"github.com/M0Rf30/yap/project"
 	"github.com/spf13/cobra"
 )
 

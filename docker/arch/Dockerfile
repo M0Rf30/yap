@@ -1,10 +1,11 @@
 FROM archlinux:base
-LABEL maintainer="Yap <contact@packagefoundation.org>"
+LABEL org.opencontainers.image.title="yap"
+LABEL org.opencontainers.image.description="Package software with ease 📦"
+LABEL org.opencontainers.image.vendor="M0Rf30"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN \
-  pacman -Syu --noconfirm; \
-  pacman -S --noconfirm base-devel bash-completion git go rsync sudo tar zip; \
+  pacman -Syu --noconfirm base-devel bash-completion git go rsync sudo tar zip; \
   rm -rf /var/cache/pacman/*
 
 COPY . /project

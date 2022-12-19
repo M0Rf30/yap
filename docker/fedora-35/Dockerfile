@@ -1,5 +1,7 @@
 FROM fedora:35
-LABEL maintainer="Yap <contact@packagefoundation.org>"
+LABEL org.opencontainers.image.title="yap"
+LABEL org.opencontainers.image.description="Package software with ease 📦"
+LABEL org.opencontainers.image.vendor="M0Rf30"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN \

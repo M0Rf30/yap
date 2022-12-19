@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/packagefoundation/yap/constants"
+	"github.com/M0Rf30/yap/constants"
 )
 
 func Exec(dir, name string, arg ...string) error {

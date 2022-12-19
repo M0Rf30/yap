@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/packagefoundation/yap/apk"
-	"github.com/packagefoundation/yap/constants"
-	"github.com/packagefoundation/yap/debian"
-	"github.com/packagefoundation/yap/pack"
-	"github.com/packagefoundation/yap/pacman"
-	"github.com/packagefoundation/yap/redhat"
+	"github.com/M0Rf30/yap/apk"
+	"github.com/M0Rf30/yap/constants"
+	"github.com/M0Rf30/yap/debian"
+	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/pacman"
+	"github.com/M0Rf30/yap/redhat"
 )
 
 type Packer interface {

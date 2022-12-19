@@ -3,7 +3,7 @@ package cmd
 import (
 	"log"
 
-	"github.com/packagefoundation/yap/utils"
+	"github.com/M0Rf30/yap/utils"
 	"github.com/spf13/cobra"
 )
 

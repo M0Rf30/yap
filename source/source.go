@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/packagefoundation/yap/constants"
-	"github.com/packagefoundation/yap/utils"
+	"github.com/M0Rf30/yap/constants"
+	"github.com/M0Rf30/yap/utils"
 )
 
 const (

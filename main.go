@@ -1,6 +1,6 @@
 package main
 
-import "github.com/packagefoundation/yap/cmd"
+import "github.com/M0Rf30/yap/cmd"
 
 func main() {
 	cmd.Execute()

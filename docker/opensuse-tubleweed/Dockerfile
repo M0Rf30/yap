@@ -1,5 +1,7 @@
 FROM opensuse/tumbleweed:latest
-LABEL maintainer="Yap <contact@packagefoundation.org>"
+LABEL org.opencontainers.image.title="yap"
+LABEL org.opencontainers.image.description="Package software with ease 📦"
+LABEL org.opencontainers.image.vendor="M0Rf30"
 
 RUN \
   zypper -n install -y automake bash-completion expect gcc git make rpm-build rsync tar unzip zip; \
