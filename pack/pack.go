@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/packagefoundation/yap/constants"
+	"github.com/M0Rf30/yap/constants"
 )
 
 type Pack struct {

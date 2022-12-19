@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/packagefoundation/yap/constants"
+	"github.com/M0Rf30/yap/constants"
 	"github.com/spf13/cobra"
 )
 

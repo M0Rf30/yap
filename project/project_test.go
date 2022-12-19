@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/packagefoundation/yap/project"
+	"github.com/M0Rf30/yap/project"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -3,11 +3,11 @@ package constants
 import (
 	"strings"
 
-	"github.com/packagefoundation/yap/set"
+	"github.com/M0Rf30/yap/set"
 )
 
 const (
-	DockerOrg   = "packagefoundation/yap-"
+	DockerOrg   = "m0rf30/yap-"
 	ColorYellow = "\033[33m"
 	ColorBlue   = "\033[34m"
 	ColorWhite  = "\033[37m"

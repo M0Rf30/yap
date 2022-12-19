@@ -8,8 +8,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/packagefoundation/yap/pack"
-	"github.com/packagefoundation/yap/utils"
+	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/utils"
 )
 
 type Apk struct {

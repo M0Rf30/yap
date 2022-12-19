@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/packagefoundation/yap/constants"
-	"github.com/packagefoundation/yap/pack"
-	"github.com/packagefoundation/yap/source"
-	"github.com/packagefoundation/yap/utils"
+	"github.com/M0Rf30/yap/constants"
+	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/source"
+	"github.com/M0Rf30/yap/utils"
 )
 
 const IDLength = 12

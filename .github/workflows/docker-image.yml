@@ -28,12 +28,13 @@ jobs:
         uses: docker/metadata-action@v4
         id: meta
         with:
-          images: packagefoundation/yap*
+          images: m0rf30/yap*
           labels: |
             maintainer=Yap
+            org.opencontainers.image.authors=M0Rf30
             org.opencontainers.image.title=yap
             org.opencontainers.image.description=Package software with ease 📦
-            org.opencontainers.image.vendor=PackageFoundation
+            org.opencontainers.image.vendor=M0Rf30
           tags: |
             type=raw,value=latest
 
@@ -44,30 +45,8 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
-            packagefoundation/yap-amazon-1:latest
-            ghcr.io/packagefoundation/yap-amazon-1:latest
-          file: docker/amazon-1/Dockerfile
-
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            packagefoundation/yap-amazon-2:latest
-            ghcr.io/packagefoundation/yap-amazon-2:latest
-          file: docker/amazon-2/Dockerfile
-
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            packagefoundation/yap-alpine:latest
-            ghcr.io/packagefoundation/yap-alpine:latest
+            m0rf30/yap-alpine:latest
+            ghcr.io/m0rf30/yap-alpine:latest
           file: docker/alpine/Dockerfile
 
       - name: Build and push
@@ -77,8 +56,8 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
-            packagefoundation/yap-arch:latest
-            ghcr.io/packagefoundation/yap-arch:latest
+            m0rf30/yap-arch:latest
+            ghcr.io/m0rf30/yap-arch:latest
           file: docker/arch/Dockerfile
 
       - name: Build and push
@@ -88,52 +67,8 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
-            packagefoundation/yap-debian-buster:latest
-            ghcr.io/packagefoundation/yap-debian-buster:latest
-          file: docker/debian-buster/Dockerfile
-
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            packagefoundation/yap-debian-jessie:latest
-            ghcr.io/packagefoundation/yap-debian-jessie:latest
-          file: docker/debian-jessie/Dockerfile
-
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            packagefoundation/yap-debian-stretch:latest
-            ghcr.io/packagefoundation/yap-debian-stretch:latest
-          file: docker/debian-stretch/Dockerfile
-
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            packagefoundation/yap-fedora-35:latest
-            ghcr.io/packagefoundation/yap-fedora-35:latest
-          file: docker/fedora-35/Dockerfile
-
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            packagefoundation/yap-opensuse-tubleweed:latest
-            ghcr.io/packagefoundation/yap-opensuse-tubleweed:latest
+            m0rf30/yap-opensuse-tubleweed:latest
+            ghcr.io/m0rf30/yap-opensuse-tubleweed:latest
           file: docker/opensuse-tubleweed/Dockerfile
 
       - name: Build and push
@@ -143,19 +78,8 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
-            packagefoundation/yap-oracle-8:latest
-            ghcr.io/packagefoundation/yap-oracle-8:latest
-          file: docker/oracle-8/Dockerfile
-
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            packagefoundation/yap-rocky-8:latest
-            ghcr.io/packagefoundation/yap-rocky-8:latest
+            m0rf30/yap-rocky-8:latest
+            ghcr.io/m0rf30/yap-rocky-8:latest
           file: docker/rocky-8/Dockerfile
 
       - name: Build and push
@@ -165,102 +89,42 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
-            packagefoundation/yap-ubuntu-bionic:latest
-            ghcr.io/packagefoundation/yap-ubuntu-bionic:latest
-          file: docker/ubuntu-bionic/Dockerfile
-
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            packagefoundation/yap-ubuntu-focal:latest
-            ghcr.io/packagefoundation/yap-ubuntu-focal:latest
+            m0rf30/yap-ubuntu-focal:latest
+            ghcr.io/m0rf30/yap-ubuntu-focal:latest
           file: docker/ubuntu-focal/Dockerfile
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "packagefoundation/yap-amazon-1:latest"
+          image-ref: "m0rf30/yap-alpine:latest"
           format: "sarif"
           output: "trivy-results.sarif"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "packagefoundation/yap-amazon-2:latest"
+          image-ref: "m0rf30/yap-arch:latest"
           format: "sarif"
           output: "trivy-results.sarif"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "packagefoundation/yap-arch:latest"
+          image-ref: "m0rf30/yap-opensuse-tubleweed:latest"
           format: "sarif"
           output: "trivy-results.sarif"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "packagefoundation/yap-debian-buster:latest"
+          image-ref: "m0rf30/yap-rocky-8:latest"
           format: "sarif"
           output: "trivy-results.sarif"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "packagefoundation/yap-debian-jessie:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "packagefoundation/yap-debian-stretch:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "packagefoundation/yap-fedora-35:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "packagefoundation/yap-opensuse-tubleweed:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "packagefoundation/yap-oracle-8:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "packagefoundation/yap-rocky-8:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "packagefoundation/yap-ubuntu-bionic:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "packagefoundation/yap-ubuntu-focal:latest"
+          image-ref: "m0rf30/yap-ubuntu-focal:latest"
           format: "sarif"
           output: "trivy-results.sarif"
 

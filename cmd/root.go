@@ -12,7 +12,7 @@ var rootCmd = &cobra.Command{
 consistent package spec format.
 
 Complete documentation is available at
-🌐 https://github.com/packagefoundation/yap`,
+🌐 https://github.com/M0Rf30/yap`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
