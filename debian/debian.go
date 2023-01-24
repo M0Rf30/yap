@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pack"
 	"github.com/M0Rf30/yap/utils"
 )
@@ -19,6 +20,12 @@ type Debian struct {
 	InstalledSize int
 	sums          string
 	debOutput     string
+}
+
+func (d *Debian) convertArch() {
+	for index, arch := range d.Pack.Arch {
+		d.Pack.Arch[index] = constants.ArchToDebian[arch]
+	}
 }
 
 func (d *Debian) getDepends() error {
@@ -265,11 +272,14 @@ func (d *Debian) Update() error {
 
 func (d *Debian) Build() ([]string, error) {
 	var err error
+
 	d.InstalledSize, err = utils.GetDirSize(d.Pack.PackageDir)
 
 	if err != nil {
 		return nil, err
 	}
+
+	d.convertArch()
 
 	err = utils.RemoveAll(d.debDir)
 	if err != nil {
@@ -324,6 +334,11 @@ func (d *Debian) Build() ([]string, error) {
 	}
 
 	d.debOutput = dpkgDeb
+
+	err = utils.RemoveAll(d.Pack.PackageDir)
+	if err != nil {
+		return nil, err
+	}
 
 	return []string{dpkgDeb}, nil
 }
