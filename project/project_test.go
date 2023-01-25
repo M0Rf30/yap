@@ -17,17 +17,17 @@ pkgdesc_centos="Http file server written with Go for CentOS"
 pkgdesc_debian="Http file server written with Go for Debian"
 pkgdesc_fedora="Http file server written with Go for Fedora"
 pkgdesc_ubuntu="Http file server written with Go for Ubuntu"
-maintainer="Example <example@pacur.org>"
+maintainer="Example <example@yap.org>"
 arch=("all")
 license=("GPLv3")
 section="utils"
 priority="optional"
-url="https://github.com/packagefoundation/${pkgname}"
-sources=(
+url="https://github.com/M0Rf30/${pkgname}"
+source=(
     "${url}/archive/${pkgver}.tar.gz"
 )
-hashsums=(
-    "3548e1263a931b27970e190f04b74623"
+sha256sums=(
+    "SKIP"
 )
 
 build() {
@@ -107,6 +107,6 @@ func TestBuildMultipleProjectFromJSON(t *testing.T) {
 
 	defer os.Remove(prj2)
 
-	_, err = project.MultiProject("ubuntu", "", testDir)
+	_, err = project.MultiProject("ubuntu", "", testDir, true)
 	assert.NoError(t, err)
 }

@@ -2,6 +2,7 @@ package pack
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/M0Rf30/yap/constants"
@@ -45,7 +46,7 @@ type Pack struct {
 	Root        string
 	Section     string
 	SourceDir   string
-	Sources     []string
+	Source      []string
 	URL         string
 	Variables   map[string]string
 	priorities  map[string]int
@@ -168,15 +169,11 @@ func (p *Pack) AddItem(key string, data interface{}) error {
 	case "conflicts":
 		p.Conflicts = data.([]string)
 	case "source":
-		p.Sources = data.([]string)
-	case "sources":
-		p.Sources = data.([]string)
+		p.Source = data.([]string)
 	case "debconf_template":
 		p.DebTemplate = data.(string)
 	case "debconf_config":
 		p.DebConfig = data.(string)
-	case "hashsums":
-		p.HashSums = data.([]string)
 	case "sha256sums":
 		p.HashSums = data.([]string)
 	case "sha512sums":
@@ -217,12 +214,13 @@ func (p *Pack) AddItem(key string, data interface{}) error {
 }
 
 func (p *Pack) Validate() {
-	if len(p.Sources) != len(p.HashSums) {
-		fmt.Printf("%s%s ❌ :: %snumber of sources and hashes differs%s\n",
+	if len(p.Source) != len(p.HashSums) {
+		fmt.Printf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
 			p.PkgName,
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
+		os.Exit(1)
 	}
 
 	if len(p.Package) == 0 {
@@ -231,5 +229,6 @@ func (p *Pack) Validate() {
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
+		os.Exit(1)
 	}
 }

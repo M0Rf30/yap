@@ -80,18 +80,15 @@ func (m *MultipleProject) Clean(cleanFlag bool) error {
 	return err
 }
 
-func MultiProject(distro string, release string, path string) (*MultipleProject, error) {
+func MultiProject(distro string, release string, path string, skipSyncFlag bool) (*MultipleProject, error) {
 	file, err := os.Open(filepath.Join(path, "yap.json"))
 	if err != nil {
-		file, err = os.Open(filepath.Join(path, "pacur.json"))
-		if err != nil {
-			fmt.Printf("%s❌ :: %sfailed to open yap.json (pacur.json) file within '%s'%s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow),
-				path,
-				string(constants.ColorWhite))
-			os.Exit(1)
-		}
+		fmt.Printf("%s❌ :: %sfailed to open yap.json file within '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+		os.Exit(1)
 	}
 
 	prjBsContent, err := io.ReadAll(file)
@@ -134,8 +131,10 @@ func MultiProject(distro string, release string, path string) (*MultipleProject,
 		pac.Validate()
 	}
 
-	if err := pcker.Update(); err != nil {
-		return nil, err
+	if !skipSyncFlag {
+		if err := pcker.Update(); err != nil {
+			return nil, err
+		}
 	}
 
 	for _, child := range mpc.Projects {

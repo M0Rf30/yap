@@ -17,4 +17,7 @@ Icon?
 Thumbs.db
 artifacts
 ehthumbs.db
+examples/yap/pkg
+examples/yap/src
+examples/yap/yap
 .vscode

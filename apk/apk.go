@@ -17,19 +17,6 @@ type Apk struct {
 	apkDir string
 }
 
-func (a *Apk) convertApk() {
-	for index, arch := range a.Pack.Arch {
-		switch arch {
-		case "all":
-			a.Pack.Arch[index] = "any"
-		case "amd64":
-			a.Pack.Arch[index] = "x86_64"
-		default:
-			a.Pack.Arch[index] = arch
-		}
-	}
-}
-
 func (a *Apk) getDepends() error {
 	var err error
 	if len(a.Pack.MakeDepends) == 0 {
@@ -219,8 +206,6 @@ func (a *Apk) Build() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	a.convertApk()
 
 	err = a.createMake()
 	if err != nil {

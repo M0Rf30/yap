@@ -14,6 +14,20 @@ const (
 )
 
 var (
+	ArchToDebian = map[string]string{
+		"any":     "all",
+		"x86_64":  "amd64",
+		"i686":    "386",
+		"aarch64": "arm64",
+		"armv7h":  "arm7",
+		"armv6h":  "arm6",
+		"arm":     "arm5",
+	}
+
+	ArchToRPM = map[string]string{
+		"any": "noarch",
+	}
+
 	Releases = [...]string{
 		"alpine",
 		"arch",
@@ -29,9 +43,10 @@ var (
 		"ubuntu-bionic",
 		"ubuntu-focal",
 	}
+
 	ReleasesMatch = map[string]string{
-		"arch":           "",
 		"alpine":         "",
+		"arch":           "",
 		"astra":          "astra",
 		"amazo-1":        ".amzn1.",
 		"amazon-2":       ".amzn2.",
@@ -44,6 +59,7 @@ var (
 		"ubuntu-bionic":  "bionic",
 		"ubuntu-focal":   "focal",
 	}
+
 	DistroPack = map[string]string{
 		"alpine": "alpine",
 		"arch":   "pacman",

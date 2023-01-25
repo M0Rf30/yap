@@ -16,11 +16,7 @@ import (
 )
 
 const (
-	file  = "file"
-	http  = "http"
-	https = "https"
-	ftp   = "ftp"
-	git   = "git"
+	git = "git"
 )
 
 type Source struct {
@@ -32,19 +28,23 @@ type Source struct {
 }
 
 func (s *Source) getType() string {
-	if strings.HasPrefix(s.Source, "http") {
-		return http
+	if strings.HasPrefix(s.Source, "http://") {
+		return "http"
 	}
 
-	if strings.HasPrefix(s.Source, "ftp") {
-		return ftp
+	if strings.HasPrefix(s.Source, "https://") {
+		return "https"
 	}
 
-	if strings.HasPrefix(s.Source, "git") {
+	if strings.HasPrefix(s.Source, "ftp://") {
+		return "ftp"
+	}
+
+	if strings.HasPrefix(s.Source, git+"+https://") {
 		return git
 	}
 
-	return file
+	return "file"
 }
 
 func (s *Source) parsePath() {
@@ -58,7 +58,17 @@ func (s *Source) getURL(protocol string) error {
 	}
 
 	if !exists {
-		err = utils.HTTPGet(s.Source, s.Path, protocol)
+		if protocol != git {
+			err = utils.HTTPGet(s.Source, s.Path, protocol)
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if protocol == git {
+			err = utils.Exec("", git, "clone", strings.Trim(s.Source, "git+"), s.Path)
+		}
 
 		if err != nil {
 			return err
@@ -117,10 +127,6 @@ func (s *Source) extract() error {
 func (s *Source) validate() error {
 	var err error
 
-	if strings.ToLower(s.Hash) == "skip" {
-		return err
-	}
-
 	file, err := os.Open(s.Path)
 	if err != nil {
 		fmt.Printf("source: Failed to open file for hash")
@@ -132,14 +138,20 @@ func (s *Source) validate() error {
 
 	var hash hash.Hash
 
+	if s.Hash == "SKIP" {
+		fmt.Printf("\t\t%s:: %sSkip integrity check for %s%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite),
+			s.Source)
+	}
+
 	switch len(s.Hash) {
 	case 64:
 		hash = sha256.New()
 	case 128:
 		hash = sha512.New()
 	default:
-		fmt.Printf("source: Unknown hash type for hash '%s'\n", s.Hash)
-
 		return err
 	}
 
@@ -165,15 +177,15 @@ func (s *Source) Get() error {
 	var err error
 
 	switch s.getType() {
-	case http:
-		err = s.getURL(http)
-	case https:
-		err = s.getURL(https)
-	case ftp:
-		err = s.getURL(ftp)
-	case git:
-		err = s.getURL(git)
-	case file:
+	case "http":
+		err = s.getURL("http")
+	case "https":
+		err = s.getURL("https")
+	case "ftp":
+		err = s.getURL("ftp")
+	case "git":
+		err = s.getURL("git")
+	case "file":
 		err = s.getPath()
 	default:
 		panic("utils: Unknown type")

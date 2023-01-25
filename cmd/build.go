@@ -12,6 +12,7 @@ import (
 const argLenght = 2
 
 var noCache bool
+var skipSyncFlag bool
 
 // buildCmd represents the command to build the entire project.
 var buildCmd = &cobra.Command{
@@ -34,10 +35,11 @@ var buildCmd = &cobra.Command{
 			release = split[1]
 		}
 
-		multiplePrj, err := project.MultiProject(distro, release, path)
+		multiplePrj, err := project.MultiProject(distro, release, path, skipSyncFlag)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		if noCache {
 			if err := multiplePrj.Clean(noCache); err != nil {
 				log.Fatal(err)
@@ -53,4 +55,5 @@ var buildCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.Flags().BoolVarP(&noCache, "no-cache", "c", false, "Do not use cache when building the project")
+	buildCmd.Flags().BoolVarP(&skipSyncFlag, "skip-sync", "s", false, "Skip sync with remotes for package managers")
 }

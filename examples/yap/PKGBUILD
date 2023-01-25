@@ -9,24 +9,24 @@ pkgdesc__debian="Package software with ease for Debian"
 pkgdesc__fedora="Package software with ease for Fedora"
 pkgdesc__ubuntu="Package software with ease for Ubuntu"
 maintainer="Example <example@yap.org>"
-arch=('amd64')
+arch=('x86_64')
 license=('GPLv3')
 section=utils
 priority=optional
-url="https://github.com/PackageFoundation/${pkgname}"
+url="https://github.com/M0Rf30/${pkgname}"
 depends=('glibc')
 depends__apk=('musl')
 depends__apt=('libc6')
 depends__rpm=('glibc')
-sources=(
-  "${url}/archive/main.tar.gz"
+source=(
+  "git+${url}"
 )
-hashsums=(
+sha256sums=(
   "SKIP"
 )
 
 build() {
-  cd "${srcdir}/${pkgname}-main"
+  cd "${srcdir}/${pkgname}"
   export CGO_LDFLAGS="$LDFLAGS"
   export CGO_CFLAGS="$CFLAGS"
   export CGO_CPPFLAGS="$CPPFLAGS"
@@ -36,15 +36,15 @@ build() {
   -mod=readonly \
   -modcacherw"
 
-  go build -ldflags="-w -s \
-  -buildid='' \
-  -linkmode=external \
+  go build \
+    -buildvcs=false \
+    -ldflags="-w -s -linkmode=external \
   -X main.version=${pkgver}" \
     .
 }
 
 package() {
-  cd "${srcdir}/${pkgname}-main"
+  cd "${srcdir}/${pkgname}"
 
   install -Dm 755 "${pkgname}" \
     "${pkgdir}/usr/bin/${pkgname}"
@@ -53,10 +53,15 @@ package() {
   mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
   mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
 
-  ./"${pkgname}" completion bash >"${pkgdir}/usr/share/bash-completion/completions/${pkgname}"
-  ./"${pkgname}" completion zsh >"${pkgdir}/usr/share/zsh/site-functions/_${pkgname}"
-  ./"${pkgname}" completion fish >"${pkgdir}/usr/share/fish/vendor_completions.d/${pkgname}.fish"
+  ./"${pkgname}" completion bash > \
+    "${pkgdir}/usr/share/bash-completion/completions/${pkgname}"
+  ./"${pkgname}" completion zsh > \
+    "${pkgdir}/usr/share/zsh/site-functions/_${pkgname}"
+  ./"${pkgname}" completion fish > \
+    "${pkgdir}/usr/share/fish/vendor_completions.d/${pkgname}.fish"
 
-  install -Dm 644 -t "${pkgdir}/usr/share/licenses/${pkgname}/GPL3" LICENSE
-  install -Dm 644 -t "${pkgdir}/usr/share/doc/${pkgname}" README.md
+  install -Dm 644 -t \
+    "${pkgdir}/usr/share/licenses/${pkgname}/GPL3" LICENSE.md
+  install -Dm 644 -t \
+    "${pkgdir}/usr/share/doc/${pkgname}" README.md
 }

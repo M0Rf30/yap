@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pack"
 	"github.com/M0Rf30/yap/set"
 	"github.com/M0Rf30/yap/utils"
@@ -24,6 +25,12 @@ type Redhat struct {
 	specsDir     string
 	srpmsDir     string
 	Files        []string
+}
+
+func (r *Redhat) convertArch() {
+	for index, arch := range r.Pack.Arch {
+		r.Pack.Arch[index] = constants.ArchToRPM[arch]
+	}
 }
 
 func (r *Redhat) getDepends() error {
@@ -211,6 +218,8 @@ func (r *Redhat) copy() error {
 }
 
 func (r *Redhat) Build() ([]string, error) {
+	r.convertArch()
+
 	err := utils.RemoveAll(r.redhatDir)
 	if err != nil {
 		return nil, err
