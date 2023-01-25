@@ -18,6 +18,8 @@ func HTTPGet(url, output string, protocol string) error {
 	switch protocol {
 	case "http":
 		cmd = exec.Command("curl", "-gqb", "\"\"", "-fLC", "-", "-o", output, url)
+	case "https":
+		cmd = exec.Command("curl", "-gqb", "\"\"", "-fLC", "-", "-o", output, url)
 	case "ftp":
 		cmd = exec.Command("curl", "-gqfC", "-", "--ftp-pasv", "-o", output, url)
 	case "git":

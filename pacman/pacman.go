@@ -17,19 +17,6 @@ type Pacman struct {
 	pacmanDir string
 }
 
-func (p *Pacman) convertPacman() {
-	for index, arch := range p.Pack.Arch {
-		switch arch {
-		case "all":
-			p.Pack.Arch[index] = "any"
-		case "amd64":
-			p.Pack.Arch[index] = "x86_64"
-		default:
-			p.Pack.Arch[index] = arch
-		}
-	}
-}
-
 func (p *Pacman) getDepends() error {
 	var err error
 	if len(p.Pack.MakeDepends) == 0 {
@@ -153,17 +140,7 @@ func (p *Pacman) createMake() error {
 }
 
 func (p *Pacman) pacmanBuild() error {
-	err := utils.ChownR(p.pacmanDir, "nobody", "nobody")
-	if err != nil {
-		return err
-	}
-
-	err = utils.ChownR(p.Pack.PackageDir, "nobody", "nobody")
-	if err != nil {
-		return err
-	}
-
-	err = utils.Exec(p.pacmanDir, "sudo", "-u", "nobody", "makepkg", "-f")
+	err := utils.Exec(p.pacmanDir, "makepkg", "-f")
 	if err != nil {
 		return err
 	}
@@ -211,8 +188,6 @@ func (p *Pacman) Build() ([]string, error) {
 		return nil, err
 	}
 
-	p.convertPacman()
-
 	err = p.createMake()
 	if err != nil {
 		return nil, err
@@ -243,7 +218,7 @@ func (p *Pacman) Install() error {
 	}
 
 	for _, pkg := range pkgs {
-		if err := utils.Exec("", "sudo", "-u", "root", "pacman", "-U", "--noconfirm", pkg); err != nil {
+		if err := utils.Exec("", "sudo", "pacman", "-U", "--noconfirm", pkg); err != nil {
 			return err
 		}
 	}
