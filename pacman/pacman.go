@@ -38,7 +38,7 @@ func (p *Pacman) getDepends() error {
 }
 
 func (p *Pacman) getUpdates() error {
-	err := utils.Exec("", "sudo", "pacman", "-Sy")
+	err := utils.Exec("", "pacman", "-Sy")
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func (p *Pacman) Install() error {
 	}
 
 	for _, pkg := range pkgs {
-		if err := utils.Exec("", "sudo", "pacman", "-U", "--noconfirm", pkg); err != nil {
+		if err := utils.Exec("", "pacman", "-U", "--noconfirm", pkg); err != nil {
 			return err
 		}
 	}

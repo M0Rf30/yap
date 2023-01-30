@@ -141,22 +141,12 @@ func (a *Apk) createMake() error {
 }
 
 func (a *Apk) apkBuild() error {
-	err := utils.ChownR(a.apkDir, "nobody", "nobody")
+	err := utils.Exec(a.apkDir, "abuild-keygen", "-n", "-i", "-a")
 	if err != nil {
 		return err
 	}
 
-	err = utils.ChownR(a.Pack.PackageDir, "nobody", "nobody")
-	if err != nil {
-		return err
-	}
-
-	err = utils.Exec(a.apkDir, "sudo", "-u", "root", "abuild-keygen", "-n", "-i", "-a")
-	if err != nil {
-		return err
-	}
-
-	err = utils.Exec(a.apkDir, "sudo", "-u", "root", "abuild", "-F", "-K")
+	err = utils.Exec(a.apkDir, "abuild", "-F", "-K")
 	if err != nil {
 		return err
 	}
@@ -240,7 +230,7 @@ func (a *Apk) Install() error {
 	}
 
 	for _, pkg := range pkgs {
-		if err := utils.Exec("", "sudo", "-u", "root", "apk", "add", "--allow-untrusted", pkg); err != nil {
+		if err := utils.Exec("", "apk", "add", "--allow-untrusted", pkg); err != nil {
 			return err
 		}
 	}
