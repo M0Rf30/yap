@@ -5,19 +5,19 @@ import (
 	"os"
 	"strings"
 
+	"github.com/M0Rf30/yap/pack"
 	"github.com/M0Rf30/yap/project"
 	"github.com/spf13/cobra"
 )
 
 const argLenght = 2
 
-var noCache bool
-var skipSyncFlag bool
+var NoCache bool
 
 // buildCmd represents the command to build the entire project.
 var buildCmd = &cobra.Command{
 	Use:   "build [target] [path]",
-	Short: "Build multiple PKGBUILD definitions within a yap.json or pacur.json project",
+	Short: "Build multiple PKGBUILD definitions within a yap.json project",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		path, err := os.Getwd()
@@ -35,13 +35,13 @@ var buildCmd = &cobra.Command{
 			release = split[1]
 		}
 
-		multiplePrj, err := project.MultiProject(distro, release, path, skipSyncFlag)
+		multiplePrj, err := project.MultiProject(distro, release, path)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		if noCache {
-			if err := multiplePrj.Clean(noCache); err != nil {
+		if NoCache {
+			if err := multiplePrj.Clean(NoCache); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -54,6 +54,10 @@ var buildCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(buildCmd)
-	buildCmd.Flags().BoolVarP(&noCache, "no-cache", "c", false, "Do not use cache when building the project")
-	buildCmd.Flags().BoolVarP(&skipSyncFlag, "skip-sync", "s", false, "Skip sync with remotes for package managers")
+	buildCmd.Flags().BoolVarP(&NoCache,
+		"no-cache", "c", false, "Do not use cache when building the project")
+	buildCmd.Flags().BoolVarP(&project.SkipSyncFlag,
+		"skip-sync", "s", false, "Skip sync with remotes for package managers")
+	buildCmd.PersistentFlags().BoolVarP(&pack.Verbose,
+		"verbose", "v", false, "verbose output")
 }

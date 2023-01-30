@@ -125,11 +125,12 @@ func (r *Redhat) createSpec() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, r)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pack.Verbose {
+		err = tmpl.Execute(os.Stdout, r)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, r)
 	if err != nil {

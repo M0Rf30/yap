@@ -38,7 +38,7 @@ func (p *Pacman) getDepends() error {
 }
 
 func (p *Pacman) getUpdates() error {
-	err := utils.Exec("", "pacman", "-Sy")
+	err := utils.Exec("", "sudo", "pacman", "-Sy")
 	if err != nil {
 		return err
 	}
@@ -79,11 +79,12 @@ func (p *Pacman) createInstall() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, p)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pack.Verbose {
+		err = tmpl.Execute(os.Stdout, p)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, p)
 	if err != nil {
@@ -125,11 +126,12 @@ func (p *Pacman) createMake() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, p)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pack.Verbose {
+		err = tmpl.Execute(os.Stdout, p)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, p)
 	if err != nil {

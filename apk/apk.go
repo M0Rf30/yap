@@ -78,11 +78,12 @@ func (a *Apk) createInstall() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, a)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pack.Verbose {
+		err = tmpl.Execute(os.Stdout, a)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, a)
 	if err != nil {
@@ -124,11 +125,12 @@ func (a *Apk) createMake() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, a)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pack.Verbose {
+		err = tmpl.Execute(os.Stdout, a)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, a)
 	if err != nil {

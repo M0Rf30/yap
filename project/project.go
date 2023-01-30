@@ -14,6 +14,8 @@ import (
 	"github.com/M0Rf30/yap/utils"
 )
 
+var SkipSyncFlag bool
+
 type DistroProject interface {
 	Prep() error
 	Create() error
@@ -62,11 +64,6 @@ func (m *MultipleProject) Clean(cleanFlag bool) error {
 			if err != nil {
 				return err
 			}
-
-			err = utils.RemoveAll(project.Builder.Pack.PackageDir)
-			if err != nil {
-				return err
-			}
 		}
 	}
 
@@ -80,7 +77,7 @@ func (m *MultipleProject) Clean(cleanFlag bool) error {
 	return err
 }
 
-func MultiProject(distro string, release string, path string, skipSyncFlag bool) (*MultipleProject, error) {
+func MultiProject(distro string, release string, path string) (*MultipleProject, error) {
 	file, err := os.Open(filepath.Join(path, "yap.json"))
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to open yap.json file within '%s'%s\n",
@@ -131,7 +128,7 @@ func MultiProject(distro string, release string, path string, skipSyncFlag bool)
 		pac.Validate()
 	}
 
-	if !skipSyncFlag {
+	if !SkipSyncFlag {
 		if err := pcker.Update(); err != nil {
 			return nil, err
 		}

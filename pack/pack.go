@@ -8,6 +8,8 @@ import (
 	"github.com/M0Rf30/yap/constants"
 )
 
+var Verbose bool
+
 type Pack struct {
 	Arch        []string
 	Backup      []string
