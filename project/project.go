@@ -55,6 +55,25 @@ type MultipleProject struct {
 	buildDir string
 }
 
+func readProject(path string) ([]byte, error) {
+	file, err := os.Open(filepath.Join(path, "yap.json"))
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to open yap.json file within '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+		os.Exit(1)
+	}
+
+	prjBsContent, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return prjBsContent, err
+}
+
 func (m *MultipleProject) Clean(cleanFlag bool) error {
 	var err error
 
@@ -78,24 +97,14 @@ func (m *MultipleProject) Clean(cleanFlag bool) error {
 }
 
 func MultiProject(distro string, release string, path string) (*MultipleProject, error) {
-	file, err := os.Open(filepath.Join(path, "yap.json"))
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open yap.json file within '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
-		os.Exit(1)
-	}
-
-	prjBsContent, err := io.ReadAll(file)
+	prjContent, err := readProject(path)
 	if err != nil {
 		return nil, err
 	}
 
 	mpc := multipleProjectConf{}
 
-	if err := json.Unmarshal(prjBsContent, &mpc); err != nil {
+	if err := json.Unmarshal(prjContent, &mpc); err != nil {
 		return nil, err
 	}
 
