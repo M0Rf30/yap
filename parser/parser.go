@@ -1,21 +1,21 @@
-package parse
+package parser
 
 import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 )
 
-func File(distro, release, compiledOutput, home string) (*pack.Pack, error) {
+func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
 
 	path := filepath.Join(compiledOutput, "PKGBUILD")
 
-	pac := &pack.Pack{
+	pac := &pkgbuild.PKGBUILD{
 		Distro:     distro,
 		Release:    release,
 		Root:       compiledOutput,

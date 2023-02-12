@@ -20,6 +20,7 @@ func StringifyArray(node *syntax.Assign) []string {
 	return fields
 }
 
+// Generates a string from a *syntax,Assign of a variable.
 func StringifyAssign(node *syntax.Assign) string {
 	out := &strings.Builder{}
 	syntax.NewPrinter().Print(out, node.Value)
@@ -27,6 +28,7 @@ func StringifyAssign(node *syntax.Assign) string {
 	return strings.Trim(out.String(), "\"")
 }
 
+// Generates strings from a *syntax,Assign of a function declaration.
 func StringifyFuncDecl(node *syntax.FuncDecl) []string {
 	var fields []string
 

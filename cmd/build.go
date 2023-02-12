@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/project"
 	"github.com/spf13/cobra"
 )
@@ -35,18 +35,19 @@ var buildCmd = &cobra.Command{
 			release = split[1]
 		}
 
-		multiplePrj, err := project.MultiProject(distro, release, path)
+		mpc := project.MultipleProject{}
+		err = mpc.MultiProject(distro, release, path)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		if NoCache {
-			if err := multiplePrj.Clean(NoCache); err != nil {
+			if err := mpc.Clean(NoCache); err != nil {
 				log.Fatal(err)
 			}
 		}
 
-		if err := multiplePrj.BuildAll(); err != nil {
+		if err := mpc.BuildAll(); err != nil {
 			log.Fatal(err)
 		}
 	},
@@ -58,6 +59,6 @@ func init() {
 		"no-cache", "c", false, "Do not use cache when building the project")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncFlag,
 		"skip-sync", "s", false, "Skip sync with remotes for package managers")
-	buildCmd.PersistentFlags().BoolVarP(&pack.Verbose,
+	buildCmd.PersistentFlags().BoolVarP(&pkgbuild.Verbose,
 		"verbose", "v", false, "verbose output")
 }

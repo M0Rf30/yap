@@ -2,80 +2,80 @@ package pacman
 
 const specFile = `
 {{- /* Mandatory fields */ -}}
-# Maintainer: {{.Pack.Maintainer}}
-pkgname={{.Pack.PkgName}}
-{{- with .Pack.Epoch}}
-epoch={{.Pack.Epoch}}
+# Maintainer: {{.PKGBUILD.Maintainer}}
+pkgname={{.PKGBUILD.PkgName}}
+{{- with .PKGBUILD.Epoch}}
+epoch={{.PKGBUILD.Epoch}}
 {{- end }}
-pkgver={{.Pack.PkgVer}}
-pkgrel={{.Pack.PkgRel}}
-pkgdesc="{{.Pack.PkgDesc}}"
-{{- with .Pack.Arch}}
+pkgver={{.PKGBUILD.PkgVer}}
+pkgrel={{.PKGBUILD.PkgRel}}
+pkgdesc="{{.PKGBUILD.PkgDesc}}"
+{{- with .PKGBUILD.Arch}}
 arch=({{join .}})
 {{- end }}
-{{- with .Pack.Depends}}
+{{- with .PKGBUILD.Depends}}
 depends=({{join .}})
 {{- end }}
-{{- with .Pack.OptDepends}}
+{{- with .PKGBUILD.OptDepends}}
 optdepends=({{join .}})
 {{- end }}
 {{- /* Optional fields */ -}}
-{{- with .Pack.Provides}}
+{{- with .PKGBUILD.Provides}}
 provides=({{join .}})
 {{- end }}
-{{- with .Pack.Conflicts}}
+{{- with .PKGBUILD.Conflicts}}
 conflicts=({{join .}})
 {{- end }}
-{{- if .Pack.URL}}
-url="{{.Pack.URL}}"
+{{- if .PKGBUILD.URL}}
+url="{{.PKGBUILD.URL}}"
 {{- end }}
-{{- if .Pack.Backup}}
+{{- if .PKGBUILD.Backup}}
 backup=("{{join .}}")
 {{- end }}
-{{- with .Pack.License}}
+{{- with .PKGBUILD.License}}
 license=({{join .}})
 {{- end }}
 options=("emptydirs")
-install={{.Pack.PkgName}}.install
+install={{.PKGBUILD.PkgName}}.install
 
 package() {
-  rsync -a -A {{.Pack.PackageDir}}/ ${pkgdir}/
+  rsync -a -A {{.PKGBUILD.PackageDir}}/ ${pkgdir}/
 }
 `
 const postInstall = `
-{{- if .Pack.PreInst}}
+{{- if .PKGBUILD.PreInst}}
 pre_install() {
-  {{.Pack.PreInst}}"
+  {{.PKGBUILD.PreInst}}"
 }
 {{- end }}
 
-{{- if .Pack.PostInst}}
+{{- if .PKGBUILD.PostInst}}
 post_install() {
-  {{.Pack.PostInst}}"
+  {{.PKGBUILD.PostInst}}"
 }
 {{- end }}
 
-{{- if .Pack.PreInst}}
+{{- if .PKGBUILD.PreInst}}
 pre_upgrade() {
-  {{.Pack.PreInst}}"
+  {{.PKGBUILD.PreInst}}"
 }
 {{- end }}
 
-{{- if .Pack.PostInst}}
+{{- if .PKGBUILD.PostInst}}
 post_upgrade() {
-  {{.Pack.PostInst}}"
+  {{.PKGBUILD.PostInst}}"
 }
 {{- end }}
 
-{{- if .Pack.PreRm}}
+{{- if .PKGBUILD.PreRm}}
 pre_remove() {
-  {{.Pack.PreRm}}"
+  {{.PKGBUILD.PreRm}}"
 }
 {{- end }}
 
-{{- if .Pack.PostRm}}
+{{- if .PKGBUILD.PostRm}}
 post_remove() {
-  {{.Pack.PostRm}}"
+  {{.PKGBUILD.PostRm}}"
 }
 {{- end }}
 `

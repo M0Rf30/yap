@@ -7,8 +7,8 @@ import (
 	"github.com/M0Rf30/yap/apk"
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/debian"
-	"github.com/M0Rf30/yap/pack"
 	"github.com/M0Rf30/yap/pacman"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/redhat"
 )
 
@@ -19,35 +19,35 @@ type Packer interface {
 	Update() error
 }
 
-func GetPacker(pac *pack.Pack, distro, release string) Packer {
-	var pcker Packer
+func GetPackageManager(pkgbuild *pkgbuild.PKGBUILD, distro, codeName string) Packer {
+	var packageManager Packer
 
-	switch constants.DistroPack[distro] {
+	switch constants.DistroToPackageManager[distro] {
 	case "alpine":
-		pcker = &apk.Apk{
-			Pack: pac,
+		packageManager = &apk.Apk{
+			PKGBUILD: pkgbuild,
 		}
 	case "pacman":
-		pcker = &pacman.Pacman{
-			Pack: pac,
+		packageManager = &pacman.Pacman{
+			PKGBUILD: pkgbuild,
 		}
 	case "debian":
-		pcker = &debian.Debian{
-			Pack: pac,
+		packageManager = &debian.Debian{
+			PKGBUILD: pkgbuild,
 		}
 	case "redhat":
-		pcker = &redhat.Redhat{
-			Pack: pac,
+		packageManager = &redhat.Redhat{
+			PKGBUILD: pkgbuild,
 		}
 	default:
 		system := distro
-		if release != "" {
-			system += "-" + release
+		if codeName != "" {
+			system += "-" + codeName
 		}
 
 		fmt.Printf("packer: Unknown system %s\n", system)
 		os.Exit(1)
 	}
 
-	return pcker
+	return packageManager
 }

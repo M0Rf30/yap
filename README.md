@@ -107,8 +107,10 @@ key__ubuntu="this will apply only to Ubuntu  builds"
 | `fedora-35`      | Fedora 35                 |
 | `oracle-8`       | Oracle Linux 8            |
 | `rocky-8`        | Rocky Linux 8             |
+| `rocky-9`        | Rocky Linux 9             |
 | `ubuntu-bionic`  | Ubuntu Bionic             |
 | `ubuntu-focal`   | Ubuntu Focal              |
+| `ubuntu-jammy`   | Ubuntu Jammy              |
 
 ### Directives
 
@@ -144,8 +146,10 @@ The directives above are sorted from lowest to the highest priority.
 | `fedora-35`      | Fedora 35                 |
 | `oracle-8`       | Oracle Linux 8            |
 | `rocky-8`        | Rocky Linux 8             |
+| `rocky-9`        | Rocky Linux 9             |
 | `ubuntu-bionic`  | Ubuntu Bionic             |
 | `ubuntu-focal`   | Ubuntu Focal              |
+| `ubuntu-jammy`   | Ubuntu Jammy              |
 
 ## Examples
 
