@@ -10,12 +10,12 @@ import (
 	"text/template"
 
 	"github.com/M0Rf30/yap/constants"
-	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
 )
 
 type Debian struct {
-	Pack          *pack.Pack
+	PKGBUILD      *pkgbuild.PKGBUILD
 	debDir        string
 	InstalledSize int
 	sums          string
@@ -23,14 +23,14 @@ type Debian struct {
 }
 
 func (d *Debian) convertArch() {
-	for index, arch := range d.Pack.Arch {
-		d.Pack.Arch[index] = constants.ArchToDebian[arch]
+	for index, arch := range d.PKGBUILD.Arch {
+		d.PKGBUILD.Arch[index] = constants.ArchToDebian[arch]
 	}
 }
 
 func (d *Debian) getDepends() error {
 	var err error
-	if len(d.Pack.MakeDepends) == 0 {
+	if len(d.PKGBUILD.MakeDepends) == 0 {
 		return err
 	}
 
@@ -38,7 +38,7 @@ func (d *Debian) getDepends() error {
 		"--assume-yes",
 		"install",
 	}
-	args = append(args, d.Pack.MakeDepends...)
+	args = append(args, d.PKGBUILD.MakeDepends...)
 
 	err = utils.Exec("", "apt-get", args...)
 	if err != nil {
@@ -58,7 +58,7 @@ func (d *Debian) getUpdates() error {
 }
 
 func (d *Debian) getSums() error {
-	output, err := utils.ExecOutput(d.Pack.PackageDir, "find", ".",
+	output, err := utils.ExecOutput(d.PKGBUILD.PackageDir, "find", ".",
 		"-type", "f", "-exec", "md5sum", "{}", ";")
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func (d *Debian) getSums() error {
 
 func (d *Debian) createConfFiles() error {
 	var err error
-	if len(d.Pack.Backup) == 0 {
+	if len(d.PKGBUILD.Backup) == 0 {
 		return err
 	}
 
@@ -82,7 +82,7 @@ func (d *Debian) createConfFiles() error {
 
 	data := ""
 
-	for _, name := range d.Pack.Backup {
+	for _, name := range d.PKGBUILD.Backup {
 		if !strings.HasPrefix(name, "/") {
 			name = "/" + name
 		}
@@ -128,11 +128,12 @@ func (d *Debian) createControl() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, d)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pkgbuild.Verbose {
+		err = tmpl.Execute(os.Stdout, d)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, d)
 	if err != nil {
@@ -155,11 +156,11 @@ func (d *Debian) createMd5Sums() error {
 
 func (d *Debian) createDebconfTemplate() error {
 	var err error
-	if len(d.Pack.DebTemplate) == 0 {
+	if len(d.PKGBUILD.DebTemplate) == 0 {
 		return err
 	}
 
-	template := filepath.Join(d.Pack.Home, d.Pack.DebTemplate)
+	template := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebTemplate)
 	path := filepath.Join(d.debDir, "templates")
 
 	err = utils.CopyFile("", template, path, false)
@@ -172,11 +173,11 @@ func (d *Debian) createDebconfTemplate() error {
 
 func (d *Debian) createDebconfConfig() error {
 	var err error
-	if len(d.Pack.DebConfig) == 0 {
+	if len(d.PKGBUILD.DebConfig) == 0 {
 		return err
 	}
 
-	config := filepath.Join(d.Pack.Home, d.Pack.DebConfig)
+	config := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebConfig)
 	path := filepath.Join(d.debDir, "config")
 
 	err = utils.CopyFile("", config, path, false)
@@ -191,10 +192,10 @@ func (d *Debian) createScripts() error {
 	var err error
 
 	scripts := map[string]string{
-		"preinst":  d.Pack.PreInst,
-		"postinst": d.Pack.PostInst,
-		"prerm":    d.Pack.PreRm,
-		"postrm":   d.Pack.PostRm,
+		"preinst":  d.PKGBUILD.PreInst,
+		"postinst": d.PKGBUILD.PostInst,
+		"prerm":    d.PKGBUILD.PreRm,
+		"postrm":   d.PKGBUILD.PostRm,
 	}
 
 	for name, script := range scripts {
@@ -226,19 +227,19 @@ func (d *Debian) createScripts() error {
 func (d *Debian) dpkgDeb() (string, error) {
 	var newPath string
 
-	err := utils.Exec("", "dpkg-deb", "-b", d.Pack.PackageDir)
+	err := utils.Exec("", "dpkg-deb", "-b", d.PKGBUILD.PackageDir)
 
 	if err != nil {
 		return "", err
 	}
 
-	_, dir := filepath.Split(filepath.Clean(d.Pack.PackageDir))
-	path := filepath.Join(d.Pack.Root, dir+".deb")
+	_, dir := filepath.Split(filepath.Clean(d.PKGBUILD.PackageDir))
+	path := filepath.Join(d.PKGBUILD.Root, dir+".deb")
 
-	for _, arch := range d.Pack.Arch {
-		newPath = filepath.Join(d.Pack.Home,
+	for _, arch := range d.PKGBUILD.Arch {
+		newPath = filepath.Join(d.PKGBUILD.Home,
 			fmt.Sprintf("%s_%s-%s%s_%s.deb",
-				d.Pack.PkgName, d.Pack.PkgVer, d.Pack.PkgRel, d.Pack.Release,
+				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.Release,
 				arch))
 	}
 
@@ -273,7 +274,7 @@ func (d *Debian) Update() error {
 func (d *Debian) Build() ([]string, error) {
 	var err error
 
-	d.InstalledSize, err = utils.GetDirSize(d.Pack.PackageDir)
+	d.InstalledSize, err = utils.GetDirSize(d.PKGBUILD.PackageDir)
 
 	if err != nil {
 		return nil, err
@@ -291,7 +292,7 @@ func (d *Debian) Build() ([]string, error) {
 		return nil, err
 	}
 
-	d.debDir = filepath.Join(d.Pack.PackageDir, "DEBIAN")
+	d.debDir = filepath.Join(d.PKGBUILD.PackageDir, "DEBIAN")
 	err = utils.ExistsMakeDir(d.debDir)
 
 	if err != nil {
@@ -335,7 +336,7 @@ func (d *Debian) Build() ([]string, error) {
 
 	d.debOutput = dpkgDeb
 
-	err = utils.RemoveAll(d.Pack.PackageDir)
+	err = utils.RemoveAll(d.PKGBUILD.PackageDir)
 	if err != nil {
 		return nil, err
 	}

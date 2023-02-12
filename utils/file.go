@@ -222,7 +222,7 @@ func FindExt(path string, extension string) ([]string, error) {
 
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			fmt.Println(err)
+			log.Fatal(err)
 
 			return err
 		}
@@ -235,7 +235,7 @@ func FindExt(path string, extension string) ([]string, error) {
 	})
 
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 
 	return files, err

@@ -107,6 +107,9 @@ func TestBuildMultipleProjectFromJSON(t *testing.T) {
 
 	defer os.Remove(prj2)
 
-	_, err = project.MultiProject("ubuntu", "", testDir, true)
+	project.SkipSyncFlag = true
+
+	var mpc = project.MultipleProject{}
+	err = mpc.MultiProject("ubuntu", "", testDir)
 	assert.NoError(t, err)
 }

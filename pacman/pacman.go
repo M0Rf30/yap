@@ -8,18 +8,18 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
 )
 
 type Pacman struct {
-	Pack      *pack.Pack
+	PKGBUILD  *pkgbuild.PKGBUILD
 	pacmanDir string
 }
 
 func (p *Pacman) getDepends() error {
 	var err error
-	if len(p.Pack.MakeDepends) == 0 {
+	if len(p.PKGBUILD.MakeDepends) == 0 {
 		return err
 	}
 
@@ -27,7 +27,7 @@ func (p *Pacman) getDepends() error {
 		"-S",
 		"--noconfirm",
 	}
-	args = append(args, p.Pack.MakeDepends...)
+	args = append(args, p.PKGBUILD.MakeDepends...)
 
 	err = utils.Exec("", "pacman", args...)
 	if err != nil {
@@ -47,7 +47,7 @@ func (p *Pacman) getUpdates() error {
 }
 
 func (p *Pacman) createInstall() error {
-	path := filepath.Join(p.pacmanDir, p.Pack.PkgName+".install")
+	path := filepath.Join(p.pacmanDir, p.PKGBUILD.PkgName+".install")
 
 	file, err := os.Create(path)
 
@@ -79,11 +79,12 @@ func (p *Pacman) createInstall() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, p)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pkgbuild.Verbose {
+		err = tmpl.Execute(os.Stdout, p)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, p)
 	if err != nil {
@@ -125,11 +126,12 @@ func (p *Pacman) createMake() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, p)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pkgbuild.Verbose {
+		err = tmpl.Execute(os.Stdout, p)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, p)
 	if err != nil {
@@ -176,7 +178,7 @@ func (p *Pacman) makePackerDir() error {
 }
 
 func (p *Pacman) Build() ([]string, error) {
-	p.pacmanDir = filepath.Join(p.Pack.Root, "pacman")
+	p.pacmanDir = filepath.Join(p.PKGBUILD.Root, "pacman")
 
 	err := utils.RemoveAll(p.pacmanDir)
 	if err != nil {
@@ -218,7 +220,7 @@ func (p *Pacman) Install() error {
 	}
 
 	for _, pkg := range pkgs {
-		if err := utils.Exec("", "sudo", "pacman", "-U", "--noconfirm", pkg); err != nil {
+		if err := utils.Exec("", "pacman", "-U", "--noconfirm", pkg); err != nil {
 			return err
 		}
 	}
