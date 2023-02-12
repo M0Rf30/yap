@@ -1,4 +1,4 @@
-FROM ubuntu:focal
+FROM ubuntu:jammy
 LABEL org.opencontainers.image.title="yap"
 LABEL org.opencontainers.image.description="Package software with ease 📦"
 LABEL org.opencontainers.image.vendor="M0Rf30"
