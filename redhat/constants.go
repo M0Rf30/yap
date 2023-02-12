@@ -2,34 +2,34 @@ package redhat
 
 const specFile = `
 {{- /* Mandatory fields */ -}}
-Name: {{.Pack.PkgName}}
-Summary: {{.Pack.PkgDesc}}
-Version: {{.Pack.PkgVer}}
-Release: {{.Pack.PkgRel}}
-Group: {{.Pack.Section}}
-{{- if .Pack.URL}}
-URL: {{.Pack.URL}}
+Name: {{.PKGBUILD.PkgName}}
+Summary: {{.PKGBUILD.PkgDesc}}
+Version: {{.PKGBUILD.PkgVer}}
+Release: {{.PKGBUILD.PkgRel}}
+Group: {{.PKGBUILD.Section}}
+{{- if .PKGBUILD.URL}}
+URL: {{.PKGBUILD.URL}}
 {{- end }}
-{{- if .Pack.License}}
-{{- with .Pack.License}}
+{{- if .PKGBUILD.License}}
+{{- with .PKGBUILD.License}}
 License: {{join .}}
 {{- end }}
 {{- else }}
 License: CUSTOM
 {{- end }}
-{{- if .Pack.Maintainer}}
-Packager: {{.Pack.Maintainer}}
+{{- if .PKGBUILD.Maintainer}}
+Packager: {{.PKGBUILD.Maintainer}}
 {{- end }}
-{{- with .Pack.Provides}}
+{{- with .PKGBUILD.Provides}}
 Provides: {{join .}}
 {{- end }}
-{{- with .Pack.Conflicts}}
+{{- with .PKGBUILD.Conflicts}}
 Conflicts: {{join .}}
 {{- end }}
-{{- with .Pack.Depends}}
+{{- with .PKGBUILD.Depends}}
 Requires: {{join .}}
 {{- end }}
-{{- with .Pack.MakeDepends}}
+{{- with .PKGBUILD.MakeDepends}}
 BuildRequires: {{join .}}
 {{- end }}
 
@@ -39,10 +39,10 @@ BuildRequires: {{join .}}
 %undefine __brp_python_bytecompile
 
 %description
-{{.Pack.PkgDesc}}
+{{.PKGBUILD.PkgDesc}}
 
 %install
-rsync -a -A {{.Pack.PackageDir}}/ $RPM_BUILD_ROOT/
+rsync -a -A {{.PKGBUILD.PackageDir}}/ $RPM_BUILD_ROOT/
 
 %files
 {{- range $key, $value := .Files }}
@@ -51,26 +51,26 @@ rsync -a -A {{.Pack.PackageDir}}/ $RPM_BUILD_ROOT/
 {{- end }}
 {{- end }}
 
-{{- with .Pack.PreInst}}
+{{- with .PKGBUILD.PreInst}}
 %pre
-{{.Pack.PreInst}}
+{{.PKGBUILD.PreInst}}
 {{- end }}
 
-{{- with .Pack.PostInst}}
+{{- with .PKGBUILD.PostInst}}
 %post
-{{.Pack.PostRm}}
+{{.PKGBUILD.PostRm}}
 {{- end }}
 
-{{- with .Pack.PreRm}}
+{{- with .PKGBUILD.PreRm}}
 %preun
 if [[ "$1" -ne 0 ]]; then exit 0; fi
-{{.Pack.PreRm}}
+{{.PKGBUILD.PreRm}}
 {{- end }}
 
-{{- with .Pack.PostRm}}
+{{- with .PKGBUILD.PostRm}}
 %postun
 if [[ "$1" -ne 0 ]]; then exit 0; fi
-{{.Pack.PostRm}}
+{{.PKGBUILD.PostRm}}
 {{- end }}
 `
 const (

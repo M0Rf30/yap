@@ -1,54 +1,21 @@
-package parse
+package parser
 
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
-	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 )
 
-func stringifyArray(node *syntax.Assign) []string {
-	fields := make([]string, 0)
-
-	out := &strings.Builder{}
-
-	for index := range node.Array.Elems {
-		syntax.NewPrinter().Print(out, node.Array.Elems[index].Value)
-		out.WriteString(" ")
-		fields = append(fields, out.String())
-	}
-
-	return fields
-}
-
-func stringifyAssign(node *syntax.Assign) string {
-	out := &strings.Builder{}
-	syntax.NewPrinter().Print(out, node.Value)
-
-	return strings.Trim(out.String(), "\"")
-}
-
-func stringifyFuncDecl(node *syntax.FuncDecl) []string {
-	var fields []string
-
-	out := &strings.Builder{}
-	syntax.NewPrinter().Print(out, node.Body)
-
-	fields = append(fields, out.String())
-
-	return fields
-}
-
-func File(distro, release, compiledOutput, home string) (*pack.Pack, error) {
+func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
 
 	path := filepath.Join(compiledOutput, "PKGBUILD")
 
-	pac := &pack.Pack{
+	pac := &pkgbuild.PKGBUILD{
 		Distro:     distro,
 		Release:    release,
 		Root:       compiledOutput,
@@ -118,12 +85,12 @@ func File(distro, release, compiledOutput, home string) (*pack.Pack, error) {
 		switch nodeType := node.(type) {
 		case *syntax.Assign:
 			if nodeType.Array != nil {
-				for _, line := range stringifyArray(nodeType) {
+				for _, line := range utils.StringifyArray(nodeType) {
 					arrayDecl, _ = shell.Fields(line, env)
 				}
 				err = pac.AddItem(nodeType.Name.Value, arrayDecl)
 			} else {
-				varDecl, _ = shell.Expand(stringifyAssign(nodeType), env)
+				varDecl, _ = shell.Expand(utils.StringifyAssign(nodeType), env)
 				err = pac.AddItem(nodeType.Name.Value, varDecl)
 			}
 
@@ -132,7 +99,7 @@ func File(distro, release, compiledOutput, home string) (*pack.Pack, error) {
 			}
 
 		case *syntax.FuncDecl:
-			for _, line := range stringifyFuncDecl(nodeType) {
+			for _, line := range utils.StringifyFuncDecl(nodeType) {
 				funcDecl, _ = shell.Expand(line, env)
 			}
 			err = pac.AddItem(nodeType.Name.Value, funcDecl)

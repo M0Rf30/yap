@@ -22,8 +22,6 @@ func HTTPGet(url, output string, protocol string) error {
 		cmd = exec.Command("curl", "-gqb", "\"\"", "-fLC", "-", "-o", output, url)
 	case "ftp":
 		cmd = exec.Command("curl", "-gqfC", "-", "--ftp-pasv", "-o", output, url)
-	case "git":
-		cmd = exec.Command("git", "clone", "--mirror", url, output)
 	}
 
 	cmd.Stdout = os.Stdout
@@ -56,13 +54,17 @@ func RandStr(n int) string {
 
 func PullContainers(target string) error {
 	containerApp := "/usr/bin/docker"
+	args := []string{
+		"pull",
+		constants.DockerOrg + target,
+	}
 
 	var err error
 
 	if _, err = os.Stat(containerApp); err == nil {
-		err = Exec("", containerApp, "pull", constants.DockerOrg+target)
+		err = Exec("", containerApp, args...)
 	} else {
-		err = Exec("", "podman", "pull", constants.DockerOrg+target)
+		err = Exec("", "podman", args...)
 	}
 
 	if err != nil {

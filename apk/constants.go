@@ -2,28 +2,28 @@ package apk
 
 const specFile = `
 {{- /* Mandatory fields */ -}}
-pkgname={{.Pack.PkgName}}
-{{- with .Pack.Epoch}}
-epoch={{.Pack.Epoch}}
+pkgname={{.PKGBUILD.PkgName}}
+{{- with .PKGBUILD.Epoch}}
+epoch={{.PKGBUILD.Epoch}}
 {{- end }}
-pkgver={{.Pack.PkgVer}}
-pkgrel={{.Pack.PkgRel}}
-pkgdesc="{{.Pack.PkgDesc}}"
+pkgver={{.PKGBUILD.PkgVer}}
+pkgrel={{.PKGBUILD.PkgRel}}
+pkgdesc="{{.PKGBUILD.PkgDesc}}"
 arch="all"
-{{- with .Pack.Depends}}
+{{- with .PKGBUILD.Depends}}
 depends="{{join .}}"
 {{- end }}
-{{- with .Pack.Conflicts}}
+{{- with .PKGBUILD.Conflicts}}
 conflicts=({{join .}})
 {{- end }}
-{{- if .Pack.URL}}
-url="{{.Pack.URL}}"
+{{- if .PKGBUILD.URL}}
+url="{{.PKGBUILD.URL}}"
 {{- end }}
-{{- if .Pack.Install}}
-install={{.Pack.PkgName}}.install
+{{- if .PKGBUILD.Install}}
+install={{.PKGBUILD.PkgName}}.install
 {{- end }}
-{{- if .Pack.License}}
-license={{.Pack.License}}
+{{- if .PKGBUILD.License}}
+license={{.PKGBUILD.License}}
 {{- else }}
 license="CUSTOM"
 {{- end }}
@@ -31,43 +31,43 @@ license="CUSTOM"
 options="!check !fhs"
 
 package() {
-  rsync -a -A {{.Pack.PackageDir}}/ ${pkgdir}
+  rsync -a -A {{.PKGBUILD.PackageDir}}/ ${pkgdir}
 }
 `
 const postInstall = `
-{{- if .Pack.PreInst}}
+{{- if .PKGBUILD.PreInst}}
 pre_install() {
-  {{.Pack.PreInst}}"
+  {{.PKGBUILD.PreInst}}"
 }
 {{- end }}
 
-{{- if .Pack.PostInst}}
+{{- if .PKGBUILD.PostInst}}
 post_install() {
-  {{.Pack.PostInst}}"
+  {{.PKGBUILD.PostInst}}"
 }
 {{- end }}
 
-{{- if .Pack.PreInst}}
+{{- if .PKGBUILD.PreInst}}
 pre_upgrade() {
-  {{.Pack.PreInst}}"
+  {{.PKGBUILD.PreInst}}"
 }
 {{- end }}
 
-{{- if .Pack.PostInst}}
+{{- if .PKGBUILD.PostInst}}
 post_upgrade() {
-  {{.Pack.PostInst}}"
+  {{.PKGBUILD.PostInst}}"
 }
 {{- end }}
 
-{{- if .Pack.PreRm}}
+{{- if .PKGBUILD.PreRm}}
 pre_remove() {
-  {{.Pack.PreRm}}"
+  {{.PKGBUILD.PreRm}}"
 }
 {{- end }}
 
-{{- if .Pack.PostRm}}
+{{- if .PKGBUILD.PostRm}}
 post_remove() {
-  {{.Pack.PostRm}}"
+  {{.PKGBUILD.PostRm}}"
 }
 {{- end }}
 `

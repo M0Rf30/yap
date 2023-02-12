@@ -49,27 +49,27 @@ jobs:
             ghcr.io/m0rf30/yap-alpine:latest
           file: docker/alpine/Dockerfile
 
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            m0rf30/yap-arch:latest
-            ghcr.io/m0rf30/yap-arch:latest
-          file: docker/arch/Dockerfile
+      # - name: Build and push
+      #   uses: docker/build-push-action@v4
+      #   with:
+      #     context: .
+      #     push: true
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     tags: |
+      #       m0rf30/yap-arch:latest
+      #       ghcr.io/m0rf30/yap-arch:latest
+      #     file: docker/arch/Dockerfile
 
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: |
-            m0rf30/yap-opensuse-tubleweed:latest
-            ghcr.io/m0rf30/yap-opensuse-tubleweed:latest
-          file: docker/opensuse-tubleweed/Dockerfile
+      # - name: Build and push
+      #   uses: docker/build-push-action@v4
+      #   with:
+      #     context: .
+      #     push: true
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     tags: |
+      #       m0rf30/yap-opensuse-tubleweed:latest
+      #       ghcr.io/m0rf30/yap-opensuse-tubleweed:latest
+      #     file: docker/opensuse-tubleweed/Dockerfile
 
       - name: Build and push
         uses: docker/build-push-action@v4
@@ -89,42 +89,64 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
+            m0rf30/yap-rocky-9:latest
+            ghcr.io/m0rf30/yap-rocky-9:latest
+          file: docker/rocky-9/Dockerfile
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
             m0rf30/yap-ubuntu-focal:latest
             ghcr.io/m0rf30/yap-ubuntu-focal:latest
           file: docker/ubuntu-focal/Dockerfile
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+      - name: Build and push
+        uses: docker/build-push-action@v4
         with:
-          image-ref: "m0rf30/yap-alpine:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
+          context: .
+          push: true
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            m0rf30/yap-ubuntu-jammy:latest
+            ghcr.io/m0rf30/yap-ubuntu-jammy:latest
+          file: docker/ubuntu-jammy/Dockerfile
+
+      # - name: Run Trivy vulnerability scanner
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: "m0rf30/yap-alpine:latest"
+      #     format: "sarif"
+      #     output: "trivy-results.sarif"
+
+      # - name: Run Trivy vulnerability scanner
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: "m0rf30/yap-arch:latest"
+      #     format: "sarif"
+      #     output: "trivy-results.sarif"
+
+      # - name: Run Trivy vulnerability scanner
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: "m0rf30/yap-opensuse-tubleweed:latest"
+      #     format: "sarif"
+      #     output: "trivy-results.sarif"
+
+      # - name: Run Trivy vulnerability scanner
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: "m0rf30/yap-rocky-8:latest"
+      #     format: "sarif"
+      #     output: "trivy-results.sarif"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "m0rf30/yap-arch:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "m0rf30/yap-opensuse-tubleweed:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "m0rf30/yap-rocky-8:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "m0rf30/yap-ubuntu-focal:latest"
+          image-ref: "m0rf30/yap-ubuntu-jammy:latest"
           format: "sarif"
           output: "trivy-results.sarif"
 

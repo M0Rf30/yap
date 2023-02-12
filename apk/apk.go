@@ -8,25 +8,25 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
 )
 
 type Apk struct {
-	Pack   *pack.Pack
-	apkDir string
+	PKGBUILD *pkgbuild.PKGBUILD
+	apkDir   string
 }
 
 func (a *Apk) getDepends() error {
 	var err error
-	if len(a.Pack.MakeDepends) == 0 {
+	if len(a.PKGBUILD.MakeDepends) == 0 {
 		return err
 	}
 
 	args := []string{
 		"add",
 	}
-	args = append(args, a.Pack.MakeDepends...)
+	args = append(args, a.PKGBUILD.MakeDepends...)
 
 	err = utils.Exec("", "apk", args...)
 	if err != nil {
@@ -46,7 +46,7 @@ func (a *Apk) getUpdates() error {
 }
 
 func (a *Apk) createInstall() error {
-	path := filepath.Join(a.apkDir, a.Pack.PkgName+".install")
+	path := filepath.Join(a.apkDir, a.PKGBUILD.PkgName+".install")
 
 	file, err := os.Create(path)
 
@@ -78,11 +78,12 @@ func (a *Apk) createInstall() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, a)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pkgbuild.Verbose {
+		err = tmpl.Execute(os.Stdout, a)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, a)
 	if err != nil {
@@ -124,11 +125,12 @@ func (a *Apk) createMake() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, a)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pkgbuild.Verbose {
+		err = tmpl.Execute(os.Stdout, a)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, a)
 	if err != nil {
@@ -139,22 +141,12 @@ func (a *Apk) createMake() error {
 }
 
 func (a *Apk) apkBuild() error {
-	err := utils.ChownR(a.apkDir, "nobody", "nobody")
+	err := utils.Exec(a.apkDir, "abuild-keygen", "-n", "-i", "-a")
 	if err != nil {
 		return err
 	}
 
-	err = utils.ChownR(a.Pack.PackageDir, "nobody", "nobody")
-	if err != nil {
-		return err
-	}
-
-	err = utils.Exec(a.apkDir, "sudo", "-u", "root", "abuild-keygen", "-n", "-i", "-a")
-	if err != nil {
-		return err
-	}
-
-	err = utils.Exec(a.apkDir, "sudo", "-u", "root", "abuild", "-F", "-K")
+	err = utils.Exec(a.apkDir, "abuild", "-F", "-K")
 	if err != nil {
 		return err
 	}
@@ -186,7 +178,7 @@ func (a *Apk) makePackerDir() error {
 		return err
 	}
 
-	err = utils.ExistsMakeDir(a.apkDir + "/pkg/" + a.Pack.PkgName)
+	err = utils.ExistsMakeDir(a.apkDir + "/pkg/" + a.PKGBUILD.PkgName)
 	if err != nil {
 		return err
 	}
@@ -195,7 +187,7 @@ func (a *Apk) makePackerDir() error {
 }
 
 func (a *Apk) Build() ([]string, error) {
-	a.apkDir = filepath.Join(a.Pack.Root, "apk")
+	a.apkDir = filepath.Join(a.PKGBUILD.Root, "apk")
 
 	err := utils.RemoveAll(a.apkDir)
 	if err != nil {
@@ -238,7 +230,7 @@ func (a *Apk) Install() error {
 	}
 
 	for _, pkg := range pkgs {
-		if err := utils.Exec("", "sudo", "-u", "root", "apk", "add", "--allow-untrusted", pkg); err != nil {
+		if err := utils.Exec("", "apk", "add", "--allow-untrusted", pkg); err != nil {
 			return err
 		}
 	}

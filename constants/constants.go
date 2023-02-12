@@ -40,8 +40,10 @@ var (
 		"debian-buster",
 		"oracle-8",
 		"rocky-8",
+		"rocky-9",
 		"ubuntu-bionic",
 		"ubuntu-focal",
+		"ubuntu-jammy",
 	}
 
 	ReleasesMatch = map[string]string{
@@ -56,11 +58,13 @@ var (
 		"debian-buster":  "buster",
 		"oracle-8":       ".ol8.",
 		"rocky-8":        ".el8.",
+		"rocky-9":        ".el9.",
 		"ubuntu-bionic":  "bionic",
 		"ubuntu-focal":   "focal",
+		"ubuntu-jammy":   "jammy",
 	}
 
-	DistroPack = map[string]string{
+	DistroToPackageManager = map[string]string{
 		"alpine": "alpine",
 		"arch":   "pacman",
 		"astra":  "debian",
@@ -72,23 +76,23 @@ var (
 		"rocky":  "redhat",
 		"ubuntu": "debian",
 	}
-	Packagers = [...]string{
+	PackageManagers = [...]string{
 		"apk",
 		"apt",
 		"pacman",
 		"yum",
 	}
 
-	ReleasesSet    = set.NewSet()
-	Distros        = []string{}
-	DistrosSet     = set.NewSet()
-	DistroPackager = map[string]string{}
-	PackagersSet   = set.NewSet()
-	CleanPrevious  = false
+	ReleasesSet          = set.NewSet()
+	Distros              = []string{}
+	DistrosSet           = set.NewSet()
+	DistroPackageManager = map[string]string{}
+	PackagersSet         = set.NewSet()
+	CleanPrevious        = false
 )
 
 func init() {
-	var packager string
+	var packageManager string
 
 	for _, release := range Releases {
 		ReleasesSet.Add(release)
@@ -98,23 +102,23 @@ func init() {
 	}
 
 	for _, distro := range Distros {
-		switch DistroPack[distro] {
+		switch DistroToPackageManager[distro] {
 		case "alpine":
-			packager = "apk"
+			packageManager = "apk"
 		case "debian":
-			packager = "apt"
+			packageManager = "apt"
 		case "pacman":
-			packager = "pacman"
+			packageManager = "pacman"
 		case "redhat":
-			packager = "yum"
+			packageManager = "yum"
 		default:
-			panic("Failed to find packager for distro")
+			panic("Failed to find packageManager for distro")
 		}
 
-		DistroPackager[distro] = packager
+		DistroPackageManager[distro] = packageManager
 	}
 
-	for _, packager := range Packagers {
-		PackagersSet.Add(packager)
+	for _, packageManager := range PackageManagers {
+		PackagersSet.Add(packageManager)
 	}
 }

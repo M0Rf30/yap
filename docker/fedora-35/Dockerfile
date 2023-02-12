@@ -11,8 +11,8 @@ RUN \
   dnf -y groupinstall 'Development Tools'; \
   dnf -y install \
   automake bash-completion createrepo expect gcc git make openssl rpm-build rpm-sign rsync sudo tar zip; \
-  curl -sL https://dl.google.com/go/go1.19.2.linux-amd64.tar.gz --output go.tar.gz; \
-  echo "5e8c5a74fe6470dd7e055a461acda8bb4050ead8c2df70f227e3ff7d8eb7eeb6 go.tar.gz" | sha256sum -c - ; \
+  curl -sL https://dl.google.com/go/go1.20.linux-amd64.tar.gz --output go.tar.gz; \
+  echo "5a9ebcc65c1cce56e0d2dc616aff4c4cedcfbda8cc6f0288cc08cda3b18dcbf1 go.tar.gz" | sha256sum -c - ; \
   tar -C /usr/lib -xf go.tar.gz; \
   rm -f go.tar.gz; \
   ln -sf /usr/lib/go/bin/go /usr/bin/go; \

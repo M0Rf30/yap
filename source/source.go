@@ -62,16 +62,8 @@ func (s *Source) getURL(protocol string) error {
 			err = utils.HTTPGet(s.Source, s.Path, protocol)
 		}
 
-		if err != nil {
-			return err
-		}
-
 		if protocol == git {
 			err = utils.Exec("", git, "clone", strings.Trim(s.Source, "git+"), s.Path)
-		}
-
-		if err != nil {
-			return err
 		}
 	}
 

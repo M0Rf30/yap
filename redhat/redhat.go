@@ -10,13 +10,13 @@ import (
 	"text/template"
 
 	"github.com/M0Rf30/yap/constants"
-	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/set"
 	"github.com/M0Rf30/yap/utils"
 )
 
 type Redhat struct {
-	Pack         *pack.Pack
+	PKGBUILD     *pkgbuild.PKGBUILD
 	redhatDir    string
 	buildDir     string
 	buildRootDir string
@@ -28,14 +28,14 @@ type Redhat struct {
 }
 
 func (r *Redhat) convertArch() {
-	for index, arch := range r.Pack.Arch {
-		r.Pack.Arch[index] = constants.ArchToRPM[arch]
+	for index, arch := range r.PKGBUILD.Arch {
+		r.PKGBUILD.Arch[index] = constants.ArchToRPM[arch]
 	}
 }
 
 func (r *Redhat) getDepends() error {
 	var err error
-	if len(r.Pack.MakeDepends) == 0 {
+	if len(r.PKGBUILD.MakeDepends) == 0 {
 		return err
 	}
 
@@ -43,7 +43,7 @@ func (r *Redhat) getDepends() error {
 		"-y",
 		"install",
 	}
-	args = append(args, r.Pack.MakeDepends...)
+	args = append(args, r.PKGBUILD.MakeDepends...)
 
 	err = utils.Exec("", "yum", args...)
 
@@ -58,7 +58,7 @@ func (r *Redhat) getFiles() error {
 	backup := set.NewSet()
 	paths := set.NewSet()
 
-	for _, path := range r.Pack.Backup {
+	for _, path := range r.PKGBUILD.Backup {
 		if !strings.HasPrefix(path, "/") {
 			path = "/" + path
 		}
@@ -66,7 +66,7 @@ func (r *Redhat) getFiles() error {
 		backup.Add(path)
 	}
 
-	output, err := utils.ExecOutput(r.Pack.PackageDir, "find", ".", "-printf", "%P\n")
+	output, err := utils.ExecOutput(r.PKGBUILD.PackageDir, "find", ".", "-printf", "%P\n")
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (r *Redhat) getFiles() error {
 }
 
 func (r *Redhat) createSpec() error {
-	path := filepath.Join(r.specsDir, r.Pack.PkgName+".spec")
+	path := filepath.Join(r.specsDir, r.PKGBUILD.PkgName+".spec")
 	file, err := os.Create(path)
 
 	if err != nil {
@@ -125,11 +125,12 @@ func (r *Redhat) createSpec() error {
 		log.Fatal(err)
 	}
 
-	// DEBUG
-	// err = tmpl.Execute(os.Stdout, r)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if pkgbuild.Verbose {
+		err = tmpl.Execute(os.Stdout, r)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	err = tmpl.Execute(writer, r)
 	if err != nil {
@@ -141,7 +142,7 @@ func (r *Redhat) createSpec() error {
 
 func (r *Redhat) rpmBuild() error {
 	err := utils.Exec(r.specsDir, "rpmbuild", "--define",
-		"_topdir "+r.redhatDir, "-bb", r.Pack.PkgName+".spec")
+		"_topdir "+r.redhatDir, "-bb", r.PKGBUILD.PkgName+".spec")
 	if err != nil {
 		return err
 	}
@@ -167,7 +168,7 @@ func (r *Redhat) Update() error {
 func (r *Redhat) makeDirs() error {
 	var err error
 
-	r.redhatDir = filepath.Join(r.Pack.Root, "redhat")
+	r.redhatDir = filepath.Join(r.PKGBUILD.Root, "redhat")
 	r.buildDir = filepath.Join(r.redhatDir, "BUILD")
 	r.buildRootDir = filepath.Join(r.redhatDir, "BUILDROOT")
 	r.rpmsDir = filepath.Join(r.redhatDir, "RPMS")
@@ -208,7 +209,7 @@ func (r *Redhat) copy() error {
 		err = utils.CopyFiles(filepath.Join(
 			r.rpmsDir,
 			arch.Name(),
-		), r.Pack.Home, false)
+		), r.PKGBUILD.Home, false)
 		if err != nil {
 			return err
 		}
@@ -250,7 +251,7 @@ func (r *Redhat) Build() ([]string, error) {
 		return nil, err
 	}
 
-	pkgs, err := utils.FindExt(r.Pack.Home, ".rpm")
+	pkgs, err := utils.FindExt(r.PKGBUILD.Home, ".rpm")
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +260,7 @@ func (r *Redhat) Build() ([]string, error) {
 }
 
 func (r *Redhat) Install() error {
-	pkgs, err := utils.FindExt(r.Pack.Home, ".rpm")
+	pkgs, err := utils.FindExt(r.PKGBUILD.Home, ".rpm")
 	if err != nil {
 		return err
 	}
