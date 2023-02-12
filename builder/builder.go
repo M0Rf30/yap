@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/M0Rf30/yap/constants"
-	"github.com/M0Rf30/yap/pack"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/source"
 	"github.com/M0Rf30/yap/utils"
 )
@@ -14,17 +14,17 @@ import (
 const IDLength = 12
 
 type Builder struct {
-	id   string
-	Pack *pack.Pack
+	id       string
+	PKGBUILD *pkgbuild.PKGBUILD
 }
 
-func (b *Builder) initDirs() error {
-	err := utils.ExistsMakeDir(b.Pack.SourceDir)
+func (builder *Builder) initDirs() error {
+	err := utils.ExistsMakeDir(builder.PKGBUILD.SourceDir)
 	if err != nil {
 		return err
 	}
 
-	err = utils.ExistsMakeDir(b.Pack.PackageDir)
+	err = utils.ExistsMakeDir(builder.PKGBUILD.PackageDir)
 	if err != nil {
 		return err
 	}
@@ -32,15 +32,15 @@ func (b *Builder) initDirs() error {
 	return err
 }
 
-func (b *Builder) getSources() error {
+func (builder *Builder) getSources() error {
 	var err error
 
-	for index, path := range b.Pack.Source {
+	for index, path := range builder.PKGBUILD.Source {
 		source := source.Source{
-			Root:   b.Pack.Root,
-			Hash:   b.Pack.HashSums[index],
+			Root:   builder.PKGBUILD.Root,
+			Hash:   builder.PKGBUILD.HashSums[index],
 			Source: path,
-			Output: b.Pack.SourceDir,
+			Output: builder.PKGBUILD.SourceDir,
 			Path:   "",
 		}
 		err = source.Get()
@@ -53,12 +53,12 @@ func (b *Builder) getSources() error {
 	return err
 }
 
-func (b *Builder) build() error {
+func (builder *Builder) build() error {
 	path := filepath.Join(string(os.PathSeparator), "tmp",
-		fmt.Sprintf("yap_%s_build", b.id))
+		fmt.Sprintf("yap_%s_build", builder.id))
 	defer os.Remove(path)
 
-	err := runScript(b.Pack.Build)
+	err := runScript(builder.PKGBUILD.Build)
 	if err != nil {
 		return err
 	}
@@ -66,12 +66,12 @@ func (b *Builder) build() error {
 	return err
 }
 
-func (b *Builder) Package() error {
+func (builder *Builder) Package() error {
 	path := filepath.Join(string(os.PathSeparator), "tmp",
-		fmt.Sprintf("yap_%s_package", b.id))
+		fmt.Sprintf("yap_%s_package", builder.id))
 	defer os.Remove(path)
 
-	err := runScript(b.Pack.Package)
+	err := runScript(builder.PKGBUILD.Package)
 	if err != nil {
 		return err
 	}
@@ -79,10 +79,10 @@ func (b *Builder) Package() error {
 	return err
 }
 
-func (b *Builder) Build() error {
-	b.id = utils.RandStr(IDLength)
+func (builder *Builder) Build() error {
+	builder.id = utils.RandStr(IDLength)
 
-	err := b.initDirs()
+	err := builder.initDirs()
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (b *Builder) Build() error {
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
 
-	err = b.getSources()
+	err = builder.getSources()
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (b *Builder) Build() error {
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
 
-	err = b.build()
+	err = builder.build()
 
 	if err != nil {
 		return err
@@ -113,7 +113,7 @@ func (b *Builder) Build() error {
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
 
-	err = b.Package()
+	err = builder.Package()
 	if err != nil {
 		return err
 	}

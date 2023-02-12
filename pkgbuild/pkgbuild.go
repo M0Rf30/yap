@@ -1,4 +1,4 @@
-package pack
+package pkgbuild
 
 import (
 	"fmt"
@@ -8,7 +8,9 @@ import (
 	"github.com/M0Rf30/yap/constants"
 )
 
-type Pack struct {
+var Verbose bool
+
+type PKGBUILD struct {
 	Arch        []string
 	Backup      []string
 	Build       string
@@ -52,7 +54,7 @@ type Pack struct {
 	priorities  map[string]int
 }
 
-func (p *Pack) Init() {
+func (p *PKGBUILD) Init() {
 	p.priorities = map[string]int{}
 
 	p.FullRelease = p.Distro
@@ -61,7 +63,7 @@ func (p *Pack) Init() {
 	}
 }
 
-func (p *Pack) parseDirective(input string) (string, int, error) {
+func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 	split := strings.Split(input, "__")
 	key := split[0]
 
@@ -109,7 +111,7 @@ func (p *Pack) parseDirective(input string) (string, int, error) {
 	}
 
 	if constants.PackagersSet.Contains(dirc) {
-		if dirc == constants.DistroPackager[p.Distro] {
+		if dirc == constants.DistroPackageManager[p.Distro] {
 			pry = 1
 		}
 
@@ -119,7 +121,7 @@ func (p *Pack) parseDirective(input string) (string, int, error) {
 	return key, pry, err
 }
 
-func (p *Pack) AddItem(key string, data interface{}) error {
+func (p *PKGBUILD) AddItem(key string, data interface{}) error {
 	key, priority, err := p.parseDirective(key)
 	if err != nil {
 		return err
@@ -213,7 +215,7 @@ func (p *Pack) AddItem(key string, data interface{}) error {
 	return err
 }
 
-func (p *Pack) Validate() {
+func (p *PKGBUILD) Validate() {
 	if len(p.Source) != len(p.HashSums) {
 		fmt.Printf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
 			p.PkgName,
