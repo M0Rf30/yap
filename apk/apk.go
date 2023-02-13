@@ -141,7 +141,7 @@ func (a *Apk) createMake() error {
 }
 
 func (a *Apk) apkBuild() error {
-	err := utils.Exec(a.apkDir, "abuild-keygen", "-n", "-i", "-a")
+	err := utils.Exec(a.apkDir, "abuild-keygen", "-n", "-a")
 	if err != nil {
 		return err
 	}
