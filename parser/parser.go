@@ -16,12 +16,12 @@ func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, err
 	path := filepath.Join(compiledOutput, "PKGBUILD")
 
 	pac := &pkgbuild.PKGBUILD{
-		Distro:     distro,
-		Release:    release,
-		Root:       compiledOutput,
-		Home:       home,
-		SourceDir:  filepath.Join(compiledOutput, "src"),
-		PackageDir: filepath.Join(compiledOutput, "pkg"),
+		Distro:         distro,
+		FullDistroName: release,
+		Root:           compiledOutput,
+		Home:           home,
+		SourceDir:      filepath.Join(compiledOutput, "src"),
+		PackageDir:     filepath.Join(compiledOutput, "pkg"),
 	}
 
 	if err != nil {

@@ -239,7 +239,7 @@ func (d *Debian) dpkgDeb() (string, error) {
 	for _, arch := range d.PKGBUILD.Arch {
 		newPath = filepath.Join(d.PKGBUILD.Home,
 			fmt.Sprintf("%s_%s-%s%s_%s.deb",
-				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.Release,
+				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.CodeName,
 				arch))
 	}
 
