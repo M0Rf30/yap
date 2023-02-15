@@ -1,6 +1,6 @@
 package redhat
 
-func ConvertSection(section string) string {
+func ConvertSection(section string) string { //nolint:cyclop
 	var converted string
 
 	switch section {

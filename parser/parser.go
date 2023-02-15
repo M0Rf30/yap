@@ -10,42 +10,12 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, error) {
-	home, err := filepath.Abs(home)
-
+func getPKGBUILDSyntax(compiledOutput, home string) (*syntax.File, error) {
 	path := filepath.Join(compiledOutput, "PKGBUILD")
-
-	pkgbuild := &pkgbuild.PKGBUILD{
-		Distro:     distro,
-		CodeName:   release,
-		Root:       compiledOutput,
-		Home:       home,
-		SourceDir:  filepath.Join(compiledOutput, "src"),
-		PackageDir: filepath.Join(compiledOutput, "pkg"),
-	}
-
-	if err != nil {
-		fmt.Printf("parse: Failed to get root directory from '%s'\n",
-			home)
-
-		return pkgbuild, err
-	}
-
-	err = utils.ExistsMakeDir(compiledOutput)
-	if err != nil {
-		return pkgbuild, err
-	}
-
-	err = utils.CopyFiles(home, compiledOutput, false)
-	if err != nil {
-		return pkgbuild, err
-	}
-
-	pkgbuild.Init()
 
 	file, err := utils.Open(path)
 	if err != nil {
-		return pkgbuild, err
+		return nil, err
 	}
 	defer file.Close()
 
@@ -56,6 +26,45 @@ func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, err
 		return nil, err
 	}
 
+	return pkgbuildSyntax, err
+}
+
+func manageAssignment(env func(string) string, nodeType *syntax.Assign, pkgbuild *pkgbuild.PKGBUILD) {
+	var arrayDecl []string
+
+	var varDecl string
+
+	if nodeType.Array != nil {
+		for _, line := range utils.StringifyArray(nodeType) {
+			arrayDecl, _ = shell.Fields(line, env)
+		}
+
+		pkgbuild.AddAssignments(nodeType.Name.Value, arrayDecl)
+		pkgbuild.AddDependencies(nodeType.Name.Value, arrayDecl)
+		pkgbuild.AddSources(nodeType.Name.Value, arrayDecl)
+		pkgbuild.AddCustomAssignments(nodeType.Name.Value, arrayDecl)
+		pkgbuild.AddNonMandatoryItems(nodeType.Name.Value, varDecl)
+	} else {
+		varDecl, _ = shell.Expand(utils.StringifyAssign(nodeType), env)
+		pkgbuild.AddAssignments(nodeType.Name.Value, varDecl)
+		pkgbuild.AddCustomAssignments(nodeType.Name.Value, varDecl)
+		pkgbuild.AddNonMandatoryItems(nodeType.Name.Value, varDecl)
+	}
+}
+
+func manageFunctionDeclaration(env func(string) string,
+	nodeType *syntax.FuncDecl,
+	pkgbuild *pkgbuild.PKGBUILD) {
+	var funcDecl string
+
+	for _, line := range utils.StringifyFuncDecl(nodeType) {
+		funcDecl, _ = shell.Expand(line, env)
+	}
+
+	pkgbuild.AddFunctions(nodeType.Name.Value, funcDecl)
+}
+
+func parseSyntax(pkgbuild *pkgbuild.PKGBUILD, pkgbuildSyntax *syntax.File) {
 	env := func(name string) string {
 		switch name {
 		case "pkgname":
@@ -75,52 +84,54 @@ func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, err
 		}
 	}
 
-	var arrayDecl []string
-
-	var funcDecl string
-
-	var varDecl string
-
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
 		switch nodeType := node.(type) {
 		case *syntax.Assign:
-			if nodeType.Array != nil {
-				for _, line := range utils.StringifyArray(nodeType) {
-					arrayDecl, _ = shell.Fields(line, env)
-				}
-				err = pkgbuild.AddItem(nodeType.Name.Value, arrayDecl)
-				err = pkgbuild.AddDependencies(nodeType.Name.Value, arrayDecl)
-				err = pkgbuild.AddSources(nodeType.Name.Value, arrayDecl)
-				err = pkgbuild.AddCustomAssignment(nodeType.Name.Value, arrayDecl)
-				err = pkgbuild.AddNonMandatoryItem(nodeType.Name.Value, varDecl)
-			} else {
-				varDecl, _ = shell.Expand(utils.StringifyAssign(nodeType), env)
-				err = pkgbuild.AddItem(nodeType.Name.Value, varDecl)
-				err = pkgbuild.AddCustomAssignment(nodeType.Name.Value, varDecl)
-				err = pkgbuild.AddNonMandatoryItem(nodeType.Name.Value, varDecl)
-			}
-
-			if err != nil {
-				return true
-			}
-
+			manageAssignment(env, nodeType, pkgbuild)
 		case *syntax.FuncDecl:
-			for _, line := range utils.StringifyFuncDecl(nodeType) {
-				funcDecl, _ = shell.Expand(line, env)
-			}
-			err = pkgbuild.AddFunctions(nodeType.Name.Value, funcDecl)
-
-			if err != nil {
-				return true
-			}
+			manageFunctionDeclaration(env, nodeType, pkgbuild)
 		}
 
 		return true
 	})
+}
 
-	if err != nil {
-		fmt.Print(err)
+func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, error) {
+	pkgbuild := &pkgbuild.PKGBUILD{
+		Distro:     distro,
+		CodeName:   release,
+		Root:       compiledOutput,
+		Home:       home,
+		SourceDir:  filepath.Join(compiledOutput, "src"),
+		PackageDir: filepath.Join(compiledOutput, "pkg"),
 	}
+
+	pkgbuild.Init()
+
+	home, err := filepath.Abs(home)
+	if err != nil {
+		fmt.Printf("parse: Failed to get root directory from '%s'\n",
+			home)
+
+		return pkgbuild, err
+	}
+
+	err = utils.ExistsMakeDir(compiledOutput)
+	if err != nil {
+		return pkgbuild, err
+	}
+
+	err = utils.CopyFiles(home, compiledOutput, false)
+	if err != nil {
+		return pkgbuild, err
+	}
+
+	pkgbuildSyntax, err := getPKGBUILDSyntax(compiledOutput, home)
+	if err != nil {
+		return pkgbuild, err
+	}
+
+	parseSyntax(pkgbuild, pkgbuildSyntax)
 
 	return pkgbuild, err
 }

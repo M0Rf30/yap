@@ -151,7 +151,7 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 }
 
 func (mpc *MultipleProject) getPackageManger(distro string, release string, path string) error {
-	pkgbuild, err := parser.File(distro, release,
+	pkgbuild, err := parser.ParseFile(distro, release,
 		filepath.Join(mpc.BuildDir, mpc.Projects[0].Name),
 		filepath.Join(path, mpc.Projects[0].Name))
 
@@ -170,7 +170,9 @@ func (mpc *MultipleProject) populateProjects(distro string, release string, path
 	var projects = make([]*Project, 0)
 
 	for _, child := range mpc.Projects {
-		pkgbuild, err := parser.File(distro, release, filepath.Join(mpc.BuildDir, child.Name),
+		pkgbuild, err := parser.ParseFile(distro,
+			release,
+			filepath.Join(mpc.BuildDir, child.Name),
 			filepath.Join(path, child.Name))
 		if err != nil {
 			return err
@@ -224,7 +226,10 @@ func (mpc *MultipleProject) readProject(path string) error {
 func (mpc *MultipleProject) validateAllProject(distro string, release string, path string) error {
 	var err error
 	for _, child := range mpc.Projects {
-		pac, err := parser.File(distro, release, filepath.Join(mpc.BuildDir, child.Name), filepath.Join(path, child.Name))
+		pac, err := parser.ParseFile(distro,
+			release,
+			filepath.Join(mpc.BuildDir, child.Name),
+			filepath.Join(path, child.Name))
 		if err != nil {
 			return err
 		}

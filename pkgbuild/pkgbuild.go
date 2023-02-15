@@ -119,31 +119,27 @@ func (p *PKGBUILD) lookForDistroAssignments(input string) (string, int, error) {
 	return key, priority, err
 }
 
-func (p *PKGBUILD) checkAssignment(key string) (string, int, error) {
+func (p *PKGBUILD) getPriority(key string) (string, int) {
 	key, priority, err := p.lookForDistroAssignments(key)
 	if err != nil {
-		return key, priority, err
+		return key, priority
 	}
 
 	priority = p.checkDistroAssignments()
 
-	if key == "pkgver" || key == "pkgrel" {
-		return key, priority, fmt.Errorf("pack: Cannot use directive for '%w'", err)
-	}
-
 	if priority == -1 {
-		return key, priority, err
+		return key, priority
 	}
 
 	if priority < p.priorities[key] {
-		return key, priority, err
+		return key, priority
 	}
 
-	return key, priority, err
+	return key, priority
 }
 
-func (p *PKGBUILD) AddCustomAssignment(key string, data interface{}) error {
-	key, priority, err := p.checkAssignment(key)
+func (p *PKGBUILD) AddCustomAssignments(key string, data interface{}) {
+	key, priority := p.getPriority(key)
 
 	p.priorities[key] = priority
 
@@ -159,26 +155,19 @@ func (p *PKGBUILD) AddCustomAssignment(key string, data interface{}) error {
 	case "debconf_config":
 		p.DebConfig = data.(string)
 	default:
-		return err
 	}
 
 	if p.Variables != nil {
 		p.Variables[key] = data.(string)
-	} else {
-		return err
 	}
 
 	if p.Functions != nil {
 		p.Functions[key] = data.(string)
-	} else {
-		return err
 	}
-
-	return err
 }
 
-func (p *PKGBUILD) AddDependencies(key string, data interface{}) error {
-	key, priority, err := p.checkAssignment(key)
+func (p *PKGBUILD) AddDependencies(key string, data interface{}) {
+	key, priority := p.getPriority(key)
 
 	p.priorities[key] = priority
 
@@ -194,14 +183,11 @@ func (p *PKGBUILD) AddDependencies(key string, data interface{}) error {
 	case "conflicts":
 		p.Conflicts = data.([]string)
 	default:
-		return err
 	}
-
-	return err
 }
 
-func (p *PKGBUILD) AddSources(key string, data interface{}) error {
-	key, priority, err := p.checkAssignment(key)
+func (p *PKGBUILD) AddSources(key string, data interface{}) {
+	key, priority := p.getPriority(key)
 
 	p.priorities[key] = priority
 
@@ -213,14 +199,11 @@ func (p *PKGBUILD) AddSources(key string, data interface{}) error {
 	case "sha512sums":
 		p.HashSums = data.([]string)
 	default:
-		return err
 	}
-
-	return err
 }
 
-func (p *PKGBUILD) AddFunctions(key string, data interface{}) error {
-	key, priority, err := p.checkAssignment(key)
+func (p *PKGBUILD) AddFunctions(key string, data interface{}) {
+	key, priority := p.getPriority(key)
 
 	p.priorities[key] = priority
 
@@ -241,12 +224,10 @@ func (p *PKGBUILD) AddFunctions(key string, data interface{}) error {
 		p.PostRm = data.(string)
 	default:
 	}
-
-	return err
 }
 
-func (p *PKGBUILD) AddNonMandatoryItem(key string, data interface{}) error {
-	key, priority, err := p.checkAssignment(key)
+func (p *PKGBUILD) AddNonMandatoryItems(key string, data interface{}) {
+	key, priority := p.getPriority(key)
 
 	p.priorities[key] = priority
 
@@ -258,14 +239,11 @@ func (p *PKGBUILD) AddNonMandatoryItem(key string, data interface{}) error {
 	case "backup":
 		p.Backup = data.([]string)
 	default:
-		return err
 	}
-
-	return err
 }
 
-func (p *PKGBUILD) AddItem(key string, data interface{}) error {
-	key, priority, err := p.checkAssignment(key)
+func (p *PKGBUILD) AddAssignments(key string, data interface{}) {
+	key, priority := p.getPriority(key)
 
 	p.priorities[key] = priority
 
@@ -285,10 +263,7 @@ func (p *PKGBUILD) AddItem(key string, data interface{}) error {
 	case "url":
 		p.URL = data.(string)
 	default:
-		return err
 	}
-
-	return err
 }
 
 func (p *PKGBUILD) Validate() {
