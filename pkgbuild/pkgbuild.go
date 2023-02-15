@@ -11,55 +11,55 @@ import (
 var Verbose bool
 
 type PKGBUILD struct {
-	Arch        []string
-	Backup      []string
-	Build       string
-	Conflicts   []string
-	DebConfig   string
-	DebTemplate string
-	Depends     []string
-	Distro      string
-	Epoch       string
-	FullRelease string
-	Functions   map[string]string
-	HashSums    []string
-	Home        string
-	Install     string
-	License     []string
-	Maintainer  string
-	MakeDepends []string
-	OptDepends  []string
-	Options     []string
-	Package     string
-	PackageDir  string
-	PkgDesc     string
-	PkgName     string
-	PkgRel      string
-	PkgVer      string
-	PostInst    string
-	PostRm      string
-	PreInst     string
-	PreRelease  string
-	PreRm       string
-	Prepare     string
-	Priority    string
-	Provides    []string
-	Release     string
-	Root        string
-	Section     string
-	SourceDir   string
-	Source      []string
-	URL         string
-	Variables   map[string]string
-	priorities  map[string]int
+	Arch           []string
+	Backup         []string
+	Build          string
+	Conflicts      []string
+	DebConfig      string
+	DebTemplate    string
+	Depends        []string
+	Distro         string
+	Epoch          string
+	FullDistroName string
+	Functions      map[string]string
+	HashSums       []string
+	Home           string
+	Install        string
+	License        []string
+	Maintainer     string
+	MakeDepends    []string
+	OptDepends     []string
+	Options        []string
+	Package        string
+	PackageDir     string
+	PkgDesc        string
+	PkgName        string
+	PkgRel         string
+	PkgVer         string
+	PostInst       string
+	PostRm         string
+	PreInst        string
+	PreRelease     string
+	PreRm          string
+	Prepare        string
+	Priority       string
+	Provides       []string
+	CodeName       string
+	Root           string
+	Section        string
+	SourceDir      string
+	Source         []string
+	URL            string
+	Variables      map[string]string
+	priorities     map[string]int
 }
 
 func (p *PKGBUILD) Init() {
 	p.priorities = map[string]int{}
 
-	p.FullRelease = p.Distro
-	if p.Release != "" {
-		p.FullRelease += "-" + p.Release
+	p.FullDistroName = p.Distro
+	if p.CodeName != "" {
+		p.FullDistroName += "-" + p.CodeName
 	}
 }
 
@@ -95,7 +95,7 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 	dirc := split[1]
 
 	if constants.ReleasesSet.Contains(dirc) {
-		if dirc == p.FullRelease {
+		if dirc == p.FullDistroName {
 			pry = 3
 		}
 

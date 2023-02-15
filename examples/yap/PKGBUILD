@@ -14,10 +14,7 @@ license=('GPLv3')
 section=utils
 priority=optional
 url="https://github.com/M0Rf30/${pkgname}"
-depends=('glibc')
-depends__apk=('musl')
-depends__apt=('libc6')
-depends__rpm=('glibc')
+
 source=(
   "git+${url}"
 )

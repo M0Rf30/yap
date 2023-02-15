@@ -15,7 +15,7 @@ linters:
     - scopelint
     # here some custom dropped checks temporary disabled
     # they will be enabled
-    - cyclop
+    # - cyclop
     - exhaustruct
     - forbidigo
     - forcetypeassert

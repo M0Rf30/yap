@@ -239,7 +239,7 @@ func (d *Debian) dpkgDeb() (string, error) {
 	for _, arch := range d.PKGBUILD.Arch {
 		newPath = filepath.Join(d.PKGBUILD.Home,
 			fmt.Sprintf("%s_%s-%s%s_%s.deb",
-				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.Release,
+				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.CodeName,
 				arch))
 	}
 
@@ -271,6 +271,52 @@ func (d *Debian) Update() error {
 	return err
 }
 
+func (d *Debian) createDebResources() error {
+	err := d.getSums()
+	if err != nil {
+		return err
+	}
+
+	d.debDir = filepath.Join(d.PKGBUILD.PackageDir, "DEBIAN")
+	err = utils.ExistsMakeDir(d.debDir)
+
+	if err != nil {
+		return err
+	}
+
+	err = d.createConfFiles()
+	if err != nil {
+		return err
+	}
+
+	err = d.createControl()
+	if err != nil {
+		return err
+	}
+
+	err = d.createMd5Sums()
+	if err != nil {
+		return err
+	}
+
+	err = d.createScripts()
+	if err != nil {
+		return err
+	}
+
+	err = d.createDebconfTemplate()
+	if err != nil {
+		return err
+	}
+
+	err = d.createDebconfConfig()
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
 func (d *Debian) Build() ([]string, error) {
 	var err error
 
@@ -287,44 +333,7 @@ func (d *Debian) Build() ([]string, error) {
 		return nil, err
 	}
 
-	err = d.getSums()
-	if err != nil {
-		return nil, err
-	}
-
-	d.debDir = filepath.Join(d.PKGBUILD.PackageDir, "DEBIAN")
-	err = utils.ExistsMakeDir(d.debDir)
-
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.createConfFiles()
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.createControl()
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.createMd5Sums()
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.createScripts()
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.createDebconfTemplate()
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.createDebconfConfig()
+	err = d.createDebResources()
 	if err != nil {
 		return nil, err
 	}

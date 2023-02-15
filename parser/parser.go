@@ -10,14 +10,14 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, error) {
+func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
 
 	path := filepath.Join(compiledOutput, "PKGBUILD")
 
-	pac := &pkgbuild.PKGBUILD{
+	pkgbuild := &pkgbuild.PKGBUILD{
 		Distro:     distro,
-		Release:    release,
+		CodeName:   release,
 		Root:       compiledOutput,
 		Home:       home,
 		SourceDir:  filepath.Join(compiledOutput, "src"),
@@ -28,24 +28,24 @@ func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, err
 		fmt.Printf("parse: Failed to get root directory from '%s'\n",
 			home)
 
-		return pac, err
+		return pkgbuild, err
 	}
 
 	err = utils.ExistsMakeDir(compiledOutput)
 	if err != nil {
-		return pac, err
+		return pkgbuild, err
 	}
 
 	err = utils.CopyFiles(home, compiledOutput, false)
 	if err != nil {
-		return pac, err
+		return pkgbuild, err
 	}
 
-	pac.Init()
+	pkgbuild.Init()
 
 	file, err := utils.Open(path)
 	if err != nil {
-		return pac, err
+		return pkgbuild, err
 	}
 	defer file.Close()
 
@@ -59,19 +59,19 @@ func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, err
 	env := func(name string) string {
 		switch name {
 		case "pkgname":
-			return pac.PkgName
+			return pkgbuild.PkgName
 		case "pkgver":
-			return pac.PkgVer
+			return pkgbuild.PkgVer
 		case "pkgrel":
-			return pac.PkgVer
+			return pkgbuild.PkgVer
 		case "pkgdir":
-			return pac.PackageDir
+			return pkgbuild.PackageDir
 		case "srcdir":
-			return pac.SourceDir
+			return pkgbuild.SourceDir
 		case "url":
-			return pac.URL
+			return pkgbuild.URL
 		default:
-			return pac.Variables[name]
+			return pkgbuild.Variables[name]
 		}
 	}
 
@@ -88,10 +88,10 @@ func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, err
 				for _, line := range utils.StringifyArray(nodeType) {
 					arrayDecl, _ = shell.Fields(line, env)
 				}
-				err = pac.AddItem(nodeType.Name.Value, arrayDecl)
+				err = pkgbuild.AddItem(nodeType.Name.Value, arrayDecl)
 			} else {
 				varDecl, _ = shell.Expand(utils.StringifyAssign(nodeType), env)
-				err = pac.AddItem(nodeType.Name.Value, varDecl)
+				err = pkgbuild.AddItem(nodeType.Name.Value, varDecl)
 			}
 
 			if err != nil {
@@ -102,7 +102,7 @@ func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, err
 			for _, line := range utils.StringifyFuncDecl(nodeType) {
 				funcDecl, _ = shell.Expand(line, env)
 			}
-			err = pac.AddItem(nodeType.Name.Value, funcDecl)
+			err = pkgbuild.AddItem(nodeType.Name.Value, funcDecl)
 
 			if err != nil {
 				return true
@@ -116,5 +116,5 @@ func File(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, err
 		fmt.Print(err)
 	}
 
-	return pac, err
+	return pkgbuild, err
 }
