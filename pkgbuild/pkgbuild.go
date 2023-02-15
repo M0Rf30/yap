@@ -69,56 +69,56 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 
 	var err error
 
-	var pry int
+	var priority int
 
 	numElem := 2
 
 	switch {
 	case len(split) == 1:
-		pry = 0
+		priority = 0
 
-		return key, pry, err
+		return key, priority, err
 	case len(split) != numElem:
-		return key, pry, fmt.Errorf("pack: Invalid use of '__' directive in '%w'", err)
+		return key, priority, fmt.Errorf("pack: Invalid use of '__' directive in '%w'", err)
 	default:
-		pry = -1
+		priority = -1
 	}
 
 	if p.Distro == "" {
-		return key, pry, err
+		return key, priority, err
 	}
 
 	if key == "pkgver" || key == "pkgrel" {
-		return key, pry, fmt.Errorf("pack: Cannot use directive for '%w'", err)
+		return key, priority, fmt.Errorf("pack: Cannot use directive for '%w'", err)
 	}
 
 	dirc := split[1]
 
 	if constants.ReleasesSet.Contains(dirc) {
 		if dirc == p.FullDistroName {
-			pry = 3
+			priority = 3
 		}
 
-		return key, pry, err
+		return key, priority, err
 	}
 
 	if constants.DistrosSet.Contains(dirc) {
 		if dirc == p.Distro {
-			pry = 2
+			priority = 2
 		}
 
-		return key, pry, err
+		return key, priority, err
 	}
 
 	if constants.PackagersSet.Contains(dirc) {
 		if dirc == constants.DistroPackageManager[p.Distro] {
-			pry = 1
+			priority = 1
 		}
 
-		return key, pry, err
+		return key, priority, err
 	}
 
-	return key, pry, err
+	return key, priority, err
 }
 
 func (p *PKGBUILD) AddItem(key string, data interface{}) error {

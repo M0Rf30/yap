@@ -94,19 +94,19 @@ func (mpc *MultipleProject) BuildAll() error {
 func (mpc *MultipleProject) Clean(cleanFlag bool) error {
 	var err error
 
+	for _, project := range mpc.Projects {
+		err = utils.RemoveAll(project.Builder.PKGBUILD.PackageDir)
+		if err != nil {
+			return err
+		}
+	}
+
 	if cleanFlag {
 		for _, project := range mpc.Projects {
 			err = utils.RemoveAll(project.Builder.PKGBUILD.SourceDir)
 			if err != nil {
 				return err
 			}
-		}
-	}
-
-	for _, project := range mpc.Projects {
-		err = utils.RemoveAll(project.Builder.PKGBUILD.PackageDir)
-		if err != nil {
-			return err
 		}
 	}
 
@@ -224,7 +224,10 @@ func (mpc *MultipleProject) readProject(path string) error {
 func (mpc *MultipleProject) validateAllProject(distro string, release string, path string) error {
 	var err error
 	for _, child := range mpc.Projects {
-		pkgbuild, err := parser.ParseFile(distro, release, filepath.Join(mpc.BuildDir, child.Name), filepath.Join(path, child.Name))
+		pkgbuild, err := parser.ParseFile(distro,
+			release,
+			filepath.Join(mpc.BuildDir, child.Name),
+			filepath.Join(path, child.Name))
 		if err != nil {
 			return err
 		}
