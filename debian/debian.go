@@ -9,7 +9,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
 )
@@ -22,9 +21,9 @@ type Debian struct {
 	debOutput     string
 }
 
-func (d *Debian) convertArch() {
+func (d *Debian) getArch() {
 	for index, arch := range d.PKGBUILD.Arch {
-		d.PKGBUILD.Arch[index] = constants.ArchToDebian[arch]
+		d.PKGBUILD.Arch[index] = ArchToDebian[arch]
 	}
 }
 
@@ -326,7 +325,7 @@ func (d *Debian) Build() ([]string, error) {
 		return nil, err
 	}
 
-	d.convertArch()
+	d.getArch()
 
 	err = utils.RemoveAll(d.debDir)
 	if err != nil {

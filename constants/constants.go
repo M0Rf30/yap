@@ -14,20 +14,6 @@ const (
 )
 
 var (
-	ArchToDebian = map[string]string{
-		"any":     "all",
-		"x86_64":  "amd64",
-		"i686":    "386",
-		"aarch64": "arm64",
-		"armv7h":  "arm7",
-		"armv6h":  "arm6",
-		"arm":     "arm5",
-	}
-
-	ArchToRPM = map[string]string{
-		"any": "noarch",
-	}
-
 	Releases = [...]string{
 		"alpine",
 		"arch",
