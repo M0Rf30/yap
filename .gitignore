@@ -21,3 +21,4 @@ examples/yap/pkg
 examples/yap/src
 examples/yap/yap
 .vscode
+.idea/

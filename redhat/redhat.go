@@ -83,10 +83,14 @@ func (r *Redhat) getFiles() error {
 	for pathInf := range paths.Iter() {
 		path := pathInf.(string)
 
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+
 		if backup.Contains(path) {
-			path = `%config "/` + path + `"`
+			path = `%config "` + path + `"`
 		} else {
-			path = `"/` + path + `"`
+			path = `"` + path + `"`
 		}
 
 		r.Files = append(r.Files, path)
