@@ -11,7 +11,7 @@ pkgdesc__ubuntu="Package software with ease for Ubuntu"
 maintainer="Example <example@yap.org>"
 arch=('x86_64')
 license=('GPLv3')
-section=utils
+section=misc
 priority=optional
 url="https://github.com/M0Rf30/${pkgname}"
 
