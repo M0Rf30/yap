@@ -9,7 +9,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/set"
 	"github.com/M0Rf30/yap/utils"
@@ -27,10 +26,14 @@ type Redhat struct {
 	Files        []string
 }
 
-func (r *Redhat) convertArch() {
+func (r *Redhat) getArch() {
 	for index, arch := range r.PKGBUILD.Arch {
-		r.PKGBUILD.Arch[index] = constants.ArchToRPM[arch]
+		r.PKGBUILD.Arch[index] = ArchToRPM[arch]
 	}
+}
+
+func (r *Redhat) getRPMGroup() {
+	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
 }
 
 func (r *Redhat) getDepends() error {
@@ -223,7 +226,8 @@ func (r *Redhat) copy() error {
 }
 
 func (r *Redhat) Build() ([]string, error) {
-	r.convertArch()
+	r.getArch()
+	r.getRPMGroup()
 
 	err := utils.RemoveAll(r.redhatDir)
 	if err != nil {
