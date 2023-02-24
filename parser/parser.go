@@ -10,42 +10,10 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, error) {
-	home, err := filepath.Abs(home)
-
-	path := filepath.Join(compiledOutput, "PKGBUILD")
-
-	pkgbuild := &pkgbuild.PKGBUILD{
-		Distro:     distro,
-		CodeName:   release,
-		Root:       compiledOutput,
-		Home:       home,
-		SourceDir:  filepath.Join(compiledOutput, "src"),
-		PackageDir: filepath.Join(compiledOutput, "pkg"),
-	}
-
+func getSyntaxFile(compiledOutput, home string) (*syntax.File, error) {
+	file, err := utils.Open(filepath.Join(compiledOutput, "PKGBUILD"))
 	if err != nil {
-		fmt.Printf("parse: Failed to get root directory from '%s'\n",
-			home)
-
-		return pkgbuild, err
-	}
-
-	err = utils.ExistsMakeDir(compiledOutput)
-	if err != nil {
-		return pkgbuild, err
-	}
-
-	err = utils.CopyFiles(home, compiledOutput, false)
-	if err != nil {
-		return pkgbuild, err
-	}
-
-	pkgbuild.Init()
-
-	file, err := utils.Open(path)
-	if err != nil {
-		return pkgbuild, err
+		return nil, err
 	}
 	defer file.Close()
 
@@ -55,6 +23,18 @@ func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD
 	if err != nil {
 		return nil, err
 	}
+
+	return pkgbuildSyntax, err
+}
+
+func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) error {
+	var err error
+
+	var arrayDecl []string
+
+	var funcDecl string
+
+	var varDecl string
 
 	env := func(name string) string {
 		switch name {
@@ -75,12 +55,6 @@ func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD
 		}
 	}
 
-	var arrayDecl []string
-
-	var funcDecl string
-
-	var varDecl string
-
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
 		switch nodeType := node.(type) {
 		case *syntax.Assign:
@@ -93,27 +67,62 @@ func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD
 				varDecl, _ = shell.Expand(utils.StringifyAssign(nodeType), env)
 				err = pkgbuild.AddItem(nodeType.Name.Value, varDecl)
 			}
-
-			if err != nil {
-				return true
-			}
-
 		case *syntax.FuncDecl:
 			for _, line := range utils.StringifyFuncDecl(nodeType) {
 				funcDecl, _ = shell.Expand(line, env)
 			}
 			err = pkgbuild.AddItem(nodeType.Name.Value, funcDecl)
-
-			if err != nil {
-				return true
-			}
 		}
 
 		return true
 	})
 
 	if err != nil {
-		fmt.Print(err)
+		return err
+	}
+
+	return err
+}
+
+func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, error) {
+	home, err := filepath.Abs(home)
+
+	if err != nil {
+		fmt.Printf("parse: Failed to get root directory from '%s'\n",
+			home)
+
+		return nil, err
+	}
+
+	pkgbuild := &pkgbuild.PKGBUILD{
+		Distro:     distro,
+		CodeName:   release,
+		Root:       compiledOutput,
+		Home:       home,
+		SourceDir:  filepath.Join(compiledOutput, "src"),
+		PackageDir: filepath.Join(compiledOutput, "pkg"),
+	}
+
+	err = utils.ExistsMakeDir(compiledOutput)
+	if err != nil {
+		return pkgbuild, err
+	}
+
+	err = utils.CopyFiles(home, compiledOutput, false)
+	if err != nil {
+		return pkgbuild, err
+	}
+
+	pkgbuild.Init()
+
+	pkgbuildSyntax, err := getSyntaxFile(compiledOutput, home)
+	if err != nil {
+		return nil, err
+	}
+
+	err = parseSyntaxFile(pkgbuildSyntax, pkgbuild)
+	if err != nil {
+		return nil, err
 	}
 
 	return pkgbuild, err
