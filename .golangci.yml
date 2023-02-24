@@ -8,24 +8,33 @@ linters:
   disable:
     # here some dropped deprecated checks
     # reduce warning messages
+    - deadcode
     - exhaustivestruct
     - golint
+    - gocritic
+    - ifshort
     - interfacer
     - maligned
+    - nosnakecase
+    - rowserrcheck
     - scopelint
+    - structcheck
+    - varcheck
+    - wastedassign
     # here some custom dropped checks temporary disabled
     # they will be enabled
-    # - cyclop
     - exhaustruct
     - forbidigo
     - forcetypeassert
     - funlen
     - gochecknoglobals
     - gochecknoinits
-    - gocritic
-    - gocyclo
     - gofumpt
     - gomnd
     - ireturn
     - typecheck
     - wrapcheck
+
+linters-settings:
+  cyclop:
+    max-complexity: 15

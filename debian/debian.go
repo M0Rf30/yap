@@ -102,7 +102,7 @@ func (d *Debian) createControl() error {
 	file, err := os.Create(path)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	// remember to close the file
 	defer file.Close()
@@ -124,19 +124,19 @@ func (d *Debian) createControl() error {
 	template.Must(tmpl.Parse(specFile))
 
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
 	if pkgbuild.Verbose {
 		err = tmpl.Execute(os.Stdout, d)
 		if err != nil {
-			log.Fatal(err)
+			log.Panic(err)
 		}
 	}
 
 	err = tmpl.Execute(writer, d)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
 	return err
