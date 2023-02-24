@@ -54,6 +54,84 @@ type PKGBUILD struct {
 	priorities     map[string]int
 }
 
+func (p *PKGBUILD) mapArrays(key string, data interface{}) {
+	switch key {
+	case "arch":
+		p.Arch = data.([]string)
+	case "license":
+		p.License = data.([]string)
+	case "depends":
+		p.Depends = data.([]string)
+	case "options":
+		p.Options = data.([]string)
+	case "optdepends":
+		p.OptDepends = data.([]string)
+	case "makedepends":
+		p.MakeDepends = data.([]string)
+	case "provides":
+		p.Provides = data.([]string)
+	case "conflicts":
+		p.Conflicts = data.([]string)
+	case "source":
+		p.Source = data.([]string)
+	case "sha256sums":
+		p.HashSums = data.([]string)
+	case "sha512sums":
+		p.HashSums = data.([]string)
+	case "backup":
+		p.Backup = data.([]string)
+	default:
+	}
+}
+
+func (p *PKGBUILD) mapFunctions(key string, data interface{}) {
+	switch key {
+	case "build":
+		p.Build = data.(string)
+	case "package":
+		p.Package = data.(string)
+	case "preinst":
+		p.PreInst = data.(string)
+	case "prepare":
+		p.Prepare = data.(string)
+	case "postinst":
+		p.PostInst = data.(string)
+	case "prerm":
+		p.PreRm = data.(string)
+	case "postrm":
+		p.PostRm = data.(string)
+	default:
+	}
+}
+
+func (p *PKGBUILD) mapVariables(key string, data interface{}) {
+	switch key {
+	case "pkgname":
+		p.PkgName = data.(string)
+	case "pkgver":
+		p.PkgVer = data.(string)
+	case "pkgrel":
+		p.PkgRel = data.(string)
+	case "pkgdesc":
+		p.PkgDesc = data.(string)
+	case "maintainer":
+		p.Maintainer = data.(string)
+	case "section":
+		p.Section = data.(string)
+	case "priority":
+		p.Priority = data.(string)
+	case "url":
+		p.URL = data.(string)
+	case "debconf_template":
+		p.DebTemplate = data.(string)
+	case "debconf_config":
+		p.DebConfig = data.(string)
+	case "install":
+		p.Install = data.(string)
+	default:
+	}
+}
+
 func (p *PKGBUILD) Init() {
 	p.priorities = map[string]int{}
 
@@ -137,79 +215,20 @@ func (p *PKGBUILD) AddItem(key string, data interface{}) error {
 
 	p.priorities[key] = priority
 
-	switch key {
-	case "pkgname":
-		p.PkgName = data.(string)
-	case "pkgver":
-		p.PkgVer = data.(string)
-	case "pkgrel":
-		p.PkgRel = data.(string)
-	case "pkgdesc":
-		p.PkgDesc = data.(string)
-	case "maintainer":
-		p.Maintainer = data.(string)
-	case "arch":
-		p.Arch = data.([]string)
-	case "license":
-		p.License = data.([]string)
-	case "section":
-		p.Section = data.(string)
-	case "priority":
-		p.Priority = data.(string)
-	case "url":
-		p.URL = data.(string)
-	case "depends":
-		p.Depends = data.([]string)
-	case "options":
-		p.Options = data.([]string)
-	case "optdepends":
-		p.OptDepends = data.([]string)
-	case "makedepends":
-		p.MakeDepends = data.([]string)
-	case "provides":
-		p.Provides = data.([]string)
-	case "conflicts":
-		p.Conflicts = data.([]string)
-	case "source":
-		p.Source = data.([]string)
-	case "debconf_template":
-		p.DebTemplate = data.(string)
-	case "debconf_config":
-		p.DebConfig = data.(string)
-	case "sha256sums":
-		p.HashSums = data.([]string)
-	case "sha512sums":
-		p.HashSums = data.([]string)
-	case "backup":
-		p.Backup = data.([]string)
-	case "install":
-		p.Install = data.(string)
-	case "build":
-		p.Build = data.(string)
-	case "package":
-		p.Package = data.(string)
-	case "preinst":
-		p.PreInst = data.(string)
-	case "prepare":
-		p.Prepare = data.(string)
-	case "postinst":
-		p.PostInst = data.(string)
-	case "prerm":
-		p.PreRm = data.(string)
-	case "postrm":
-		p.PostRm = data.(string)
-	default:
-		if p.Variables != nil {
-			p.Variables[key] = data.(string)
-		} else {
-			return err
-		}
+	p.mapVariables(key, data)
+	p.mapArrays(key, data)
+	p.mapFunctions(key, data)
 
-		if p.Functions != nil {
-			p.Functions[key] = data.(string)
-		} else {
-			return err
-		}
+	if p.Variables != nil {
+		p.Variables[key] = data.(string)
+	} else {
+		return err
+	}
+
+	if p.Functions != nil {
+		p.Functions[key] = data.(string)
+	} else {
+		return err
 	}
 
 	return err
