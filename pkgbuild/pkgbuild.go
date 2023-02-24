@@ -21,7 +21,6 @@ type PKGBUILD struct {
 	Distro         string
 	Epoch          string
 	FullDistroName string
-	Functions      map[string]string
 	HashSums       []string
 	Home           string
 	Install        string
@@ -50,7 +49,6 @@ type PKGBUILD struct {
 	SourceDir      string
 	Source         []string
 	URL            string
-	Variables      map[string]string
 	priorities     map[string]int
 }
 
@@ -218,18 +216,6 @@ func (p *PKGBUILD) AddItem(key string, data interface{}) error {
 	p.mapVariables(key, data)
 	p.mapArrays(key, data)
 	p.mapFunctions(key, data)
-
-	if p.Variables != nil {
-		p.Variables[key] = data.(string)
-	} else {
-		return err
-	}
-
-	if p.Functions != nil {
-		p.Functions[key] = data.(string)
-	} else {
-		return err
-	}
 
 	return err
 }

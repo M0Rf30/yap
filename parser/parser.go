@@ -51,7 +51,7 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 		case "url":
 			return pkgbuild.URL
 		default:
-			return pkgbuild.Variables[name]
+			return ""
 		}
 	}
 
