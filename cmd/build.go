@@ -7,6 +7,7 @@ import (
 
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/project"
+	"github.com/M0Rf30/yap/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +25,13 @@ var buildCmd = &cobra.Command{
 		if len(args) == argLenght {
 			path = args[1]
 		}
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var osRelease = *&utils.OSRelease{}
+		osRelease.ParseOSRelease()
+
 		if err != nil {
 			log.Fatal(err)
 		}
