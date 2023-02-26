@@ -80,7 +80,7 @@ func (builder *Builder) Package() error {
 }
 
 func (builder *Builder) Build() error {
-	builder.id = utils.RandStr(IDLength)
+	builder.id = utils.GenerateRandomString(IDLength)
 
 	err := builder.initDirs()
 	if err != nil {
