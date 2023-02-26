@@ -7,7 +7,6 @@ import (
 	"hash"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -80,30 +79,21 @@ func (s *Source) getPath() error {
 }
 
 func (s *Source) extract() error {
-	var cmd *exec.Cmd
-
 	var err error
 
 	switch {
 	case strings.HasSuffix(s.Path, ".tar"):
-		cmd = exec.Command("tar", "--no-same-owner", "-xf", s.Path) //nolint:gosec
-	case strings.HasSuffix(s.Path, ".tgz"):
-		cmd = exec.Command("tar", "--no-same-owner", "-xf", s.Path) //nolint:gosec
+		err = utils.Exec("tar", "--no-same-owner", "-xf", s.Path)
 	case strings.HasSuffix(s.Path, ".zip"):
-		cmd = exec.Command("unzip", s.Path) //nolint:gosec
+		err = utils.Exec("", "unzip", s.Path)
 	default:
 		split := strings.Split(s.Path, ".")
 		if len(split) > 2 && split[len(split)-2] == "tar" {
-			cmd = exec.Command("tar", "--no-same-owner", "-xf", s.Path) //nolint:gosec
+			err = utils.Exec("tar", "--no-same-owner", "-xf", s.Path)
 		} else {
 			return err
 		}
 	}
-
-	cmd.Dir = s.Output
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
 
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to extract source %s\n",
