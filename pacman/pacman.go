@@ -46,9 +46,7 @@ func (p *Pacman) getUpdates() error {
 	return err
 }
 
-func (p *Pacman) createInstall() error {
-	path := filepath.Join(p.pacmanDir, p.PKGBUILD.PkgName+".install")
-
+func (p *Pacman) createPackResources(path string, data string) error {
 	file, err := os.Create(path)
 
 	if err != nil {
@@ -73,54 +71,7 @@ func (p *Pacman) createInstall() error {
 		},
 	})
 
-	template.Must(tmpl.Parse(postInstall))
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if pkgbuild.Verbose {
-		err = tmpl.Execute(os.Stdout, p)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	err = tmpl.Execute(writer, p)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return err
-}
-
-func (p *Pacman) createMake() error {
-	path := filepath.Join(p.pacmanDir, "PKGBUILD")
-	file, err := os.Create(path)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// remember to close the file
-	defer file.Close()
-
-	// create new buffer
-	writer := io.Writer(file)
-
-	tmpl := template.New("pkgbuild")
-	tmpl.Funcs(template.FuncMap{
-		"join": func(strs []string) string {
-			return strings.Trim(strings.Join(strs, " "), "\n")
-		},
-		"multiline": func(strs string) string {
-			ret := strings.ReplaceAll(strs, "\n", "\n ")
-
-			return strings.Trim(ret, " \n")
-		},
-	})
-
-	template.Must(tmpl.Parse(specFile))
+	template.Must(tmpl.Parse(data))
 
 	if err != nil {
 		log.Fatal(err)
@@ -190,12 +141,16 @@ func (p *Pacman) Build() ([]string, error) {
 		return nil, err
 	}
 
-	err = p.createMake()
+	err = p.createPackResources(filepath.Join(p.pacmanDir,
+		"PKGBUILD"),
+		specFile)
 	if err != nil {
 		return nil, err
 	}
 
-	err = p.createInstall()
+	err = p.createPackResources(filepath.Join(p.pacmanDir,
+		p.PKGBUILD.PkgName+".install"),
+		postInstall)
 	if err != nil {
 		return nil, err
 	}
