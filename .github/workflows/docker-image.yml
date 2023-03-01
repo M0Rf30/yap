@@ -17,13 +17,6 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Login to GHCR
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Docker meta
         uses: docker/metadata-action@v4
         id: meta
@@ -46,7 +39,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-alpine:latest
-            ghcr.io/m0rf30/yap-alpine:latest
           file: docker/alpine/Dockerfile
 
       # - name: Build and push
@@ -79,7 +71,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-rocky-8:latest
-            ghcr.io/m0rf30/yap-rocky-8:latest
           file: docker/rocky-8/Dockerfile
 
       - name: Build and push
@@ -90,7 +81,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-rocky-9:latest
-            ghcr.io/m0rf30/yap-rocky-9:latest
           file: docker/rocky-9/Dockerfile
 
       - name: Build and push
@@ -101,7 +91,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-ubuntu-focal:latest
-            ghcr.io/m0rf30/yap-ubuntu-focal:latest
           file: docker/ubuntu-focal/Dockerfile
 
       - name: Build and push
@@ -112,46 +101,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-ubuntu-jammy:latest
-            ghcr.io/m0rf30/yap-ubuntu-jammy:latest
           file: docker/ubuntu-jammy/Dockerfile
-
-      # - name: Run Trivy vulnerability scanner
-      #   uses: aquasecurity/trivy-action@master
-      #   with:
-      #     image-ref: "m0rf30/yap-alpine:latest"
-      #     format: "sarif"
-      #     output: "trivy-results.sarif"
-
-      # - name: Run Trivy vulnerability scanner
-      #   uses: aquasecurity/trivy-action@master
-      #   with:
-      #     image-ref: "m0rf30/yap-arch:latest"
-      #     format: "sarif"
-      #     output: "trivy-results.sarif"
-
-      # - name: Run Trivy vulnerability scanner
-      #   uses: aquasecurity/trivy-action@master
-      #   with:
-      #     image-ref: "m0rf30/yap-opensuse-tubleweed:latest"
-      #     format: "sarif"
-      #     output: "trivy-results.sarif"
-
-      # - name: Run Trivy vulnerability scanner
-      #   uses: aquasecurity/trivy-action@master
-      #   with:
-      #     image-ref: "m0rf30/yap-rocky-8:latest"
-      #     format: "sarif"
-      #     output: "trivy-results.sarif"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "m0rf30/yap-ubuntu-jammy:latest"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
-        with:
-          sarif_file: "trivy-results.sarif"

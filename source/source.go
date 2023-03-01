@@ -83,13 +83,13 @@ func (s *Source) extract() error {
 
 	switch {
 	case strings.HasSuffix(s.Path, ".tar"):
-		err = utils.Exec("tar", "--no-same-owner", "-xf", s.Path)
+		err = utils.Exec("", "tar", "xf", s.Path, "-C", s.Output, "--overwrite")
 	case strings.HasSuffix(s.Path, ".zip"):
 		err = utils.Exec("", "unzip", s.Path)
 	default:
 		split := strings.Split(s.Path, ".")
 		if len(split) > 2 && split[len(split)-2] == "tar" {
-			err = utils.Exec("tar", "--no-same-owner", "-xf", s.Path)
+			err = utils.Exec("", "tar", "xf", s.Path, "-C", s.Output, "--overwrite")
 		} else {
 			return err
 		}
