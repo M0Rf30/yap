@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.vendor="M0Rf30"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN \
-  pacman -Syu --noconfirm base-devel bash-completion git go rsync sudo tar zip; \
+  pacman -Syu --noconfirm bash-completion go sudo; \
   rm -rf /var/cache/pacman/*
 
 COPY . /project

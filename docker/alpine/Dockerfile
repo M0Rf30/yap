@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.vendor="M0Rf30"
 
 RUN \
   apk add --no-cache  \
-  alpine-sdk bash bash-completion git go rsync sudo tar zip;
+  bash bash-completion go sudo;
 
 COPY . /project
 WORKDIR /project
