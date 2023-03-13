@@ -8,6 +8,17 @@ const (
 	Tools          = "Development/Tools"
 )
 
+var buildEnvironmentDeps = []string{
+	"automake",
+	"createrepo",
+	"expect",
+	"gcc",
+	"make",
+	"openssl",
+	"rpm-build",
+	"rpm-sign",
+}
+
 var (
 	RPMGroups = map[string]string{
 		"admin":        "Applications/System",
@@ -91,9 +102,6 @@ BuildRequires: {{join .}}
 
 %description
 {{.PKGBUILD.PkgDesc}}
-
-%install
-rsync -a -A {{.PKGBUILD.PackageDir}}/ $RPM_BUILD_ROOT/
 
 %files
 {{- range $key, $value := .Files }}

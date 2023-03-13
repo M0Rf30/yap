@@ -108,7 +108,7 @@ func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD
 		return pkgbuild, err
 	}
 
-	err = utils.CopyFiles(home, compiledOutput, false)
+	err = utils.CopyDir(home, compiledOutput)
 	if err != nil {
 		return pkgbuild, err
 	}

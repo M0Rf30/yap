@@ -14,11 +14,14 @@ import (
 	"github.com/M0Rf30/yap/utils"
 )
 
-var SkipSyncFlag bool
+var (
+	SkipSyncFlag                 bool
+	SkipSyncbuildEnvironmentDeps bool
+)
 
 type DistroProject interface {
 	Create() error
-	Prep() error
+	Prepare() error
 }
 
 type Project struct {
@@ -69,7 +72,7 @@ func (mpc *MultipleProject) BuildAll() error {
 
 			for _, ap := range artefactPaths {
 				filename := filepath.Base(ap)
-				if err := utils.Copy("", ap, filepath.Join(mpc.Output, filename), false); err != nil {
+				if err := utils.CopyFile(ap, filepath.Join(mpc.Output, filename)); err != nil {
 					return err
 				}
 			}
@@ -119,17 +122,12 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 		return err
 	}
 
-	err = mpc.getPackageManger(distro, release, path)
+	err = mpc.validateAllProject(distro, release, path)
 	if err != nil {
 		return err
 	}
 
 	err = utils.ExistsMakeDir(mpc.BuildDir)
-	if err != nil {
-		return err
-	}
-
-	err = mpc.validateAllProject(distro, release, path)
 	if err != nil {
 		return err
 	}
@@ -150,20 +148,6 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 	return err
 }
 
-func (mpc *MultipleProject) getPackageManger(distro string, release string, path string) error {
-	pkgbuild, err := parser.ParseFile(distro, release,
-		filepath.Join(mpc.BuildDir, mpc.Projects[0].Name),
-		filepath.Join(path, mpc.Projects[0].Name))
-
-	if err != nil {
-		return err
-	}
-
-	mpc.packageManager = packer.GetPackageManager(pkgbuild, distro, release)
-
-	return err
-}
-
 func (mpc *MultipleProject) populateProjects(distro string, release string, path string) error {
 	var err error
 
@@ -176,12 +160,12 @@ func (mpc *MultipleProject) populateProjects(distro string, release string, path
 			return err
 		}
 
-		if err != nil {
-			return err
-		}
+		mpc.packageManager = packer.GetPackageManager(pkgbuild, distro, release)
 
-		if err = mpc.packageManager.Prep(); err != nil {
-			return err
+		if !SkipSyncbuildEnvironmentDeps {
+			if err = mpc.packageManager.Prepare(); err != nil {
+				return err
+			}
 		}
 
 		proj := &Project{

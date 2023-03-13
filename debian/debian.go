@@ -17,8 +17,8 @@ type Debian struct {
 	PKGBUILD      *pkgbuild.PKGBUILD
 	debDir        string
 	InstalledSize int
-	sums          string
-	debOutput     string
+	// sums          string
+	debOutput string
 }
 
 func (d *Debian) getArch() {
@@ -56,20 +56,38 @@ func (d *Debian) getUpdates() error {
 	return err
 }
 
-func (d *Debian) getSums() error {
-	output, err := utils.ExecOutput(d.PKGBUILD.PackageDir, "find", ".",
-		"-type", "f", "-exec", "md5sum", "{}", ";")
-	if err != nil {
-		return err
-	}
+// func (d *Debian) getSums() error {
+// 	paths := set.NewSet()
 
-	d.sums = ""
-	for _, line := range strings.Split(output, "\n") {
-		d.sums += strings.Replace(line, "./", "", 1) + "\n"
-	}
+// 	files := map[string]string{}
 
-	return err
-}
+// 	err := filepath.Walk(d.PKGBUILD.PackageDir,
+// 		func(path string,
+// 			info os.FileInfo,
+// 			err error) error {
+// 			if !info.IsDir() {
+// 				hash, _ := utils.HashFileMD5(path)
+// 				files[hash] = strings.TrimLeft(path, d.PKGBUILD.PackageDir)
+// 			}
+
+// 			return err
+// 		})
+
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	for hash, filePath := range files {
+// 		if len(filePath) < 1 || strings.Contains(filePath, ".build-id") {
+// 			continue
+// 		}
+
+// 		paths.Add(strings.TrimLeft(filePath, d.PKGBUILD.PackageDir))
+// 		d.sums += hash + " " + filePath + "\n"
+// 	}
+
+// 	return err
+// }
 
 func (d *Debian) createConfFiles() error {
 	var err error
@@ -123,10 +141,6 @@ func (d *Debian) createControl() error {
 
 	template.Must(tmpl.Parse(specFile))
 
-	if err != nil {
-		log.Panic(err)
-	}
-
 	if pkgbuild.Verbose {
 		err = tmpl.Execute(os.Stdout, d)
 		if err != nil {
@@ -142,16 +156,16 @@ func (d *Debian) createControl() error {
 	return err
 }
 
-func (d *Debian) createMd5Sums() error {
-	path := filepath.Join(d.debDir, "md5sums")
+// func (d *Debian) createMd5Sums() error {
+// 	path := filepath.Join(d.debDir, "md5sums")
 
-	err := utils.CreateWrite(path, d.sums)
-	if err != nil {
-		return err
-	}
+// 	err := utils.CreateWrite(path, d.sums)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	return err
-}
+// 	return err
+// }
 
 func (d *Debian) createDebconfTemplate() error {
 	var err error
@@ -162,7 +176,7 @@ func (d *Debian) createDebconfTemplate() error {
 	template := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebTemplate)
 	path := filepath.Join(d.debDir, "templates")
 
-	err = utils.CopyFile("", template, path, false)
+	err = utils.CopyFile(template, path)
 	if err != nil {
 		return err
 	}
@@ -179,7 +193,7 @@ func (d *Debian) createDebconfConfig() error {
 	config := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebConfig)
 	path := filepath.Join(d.debDir, "config")
 
-	err = utils.CopyFile("", config, path, false)
+	err = utils.CopyFile(config, path)
 	if err != nil {
 		return err
 	}
@@ -244,7 +258,7 @@ func (d *Debian) dpkgDeb() (string, error) {
 
 	os.Remove(newPath)
 
-	err = utils.CopyFile("", path, newPath, false)
+	err = utils.CopyFile(path, newPath)
 	if err != nil {
 		return "", err
 	}
@@ -252,7 +266,7 @@ func (d *Debian) dpkgDeb() (string, error) {
 	return newPath, nil
 }
 
-func (d *Debian) Prep() error {
+func (d *Debian) Prepare() error {
 	err := d.getDepends()
 	if err != nil {
 		return err
@@ -271,13 +285,12 @@ func (d *Debian) Update() error {
 }
 
 func (d *Debian) createDebResources() error {
-	err := d.getSums()
-	if err != nil {
-		return err
-	}
-
+	// err := d.getSums()
+	// if err != nil {
+	// 	return err
+	// }
 	d.debDir = filepath.Join(d.PKGBUILD.PackageDir, "DEBIAN")
-	err = utils.ExistsMakeDir(d.debDir)
+	err := utils.ExistsMakeDir(d.debDir)
 
 	if err != nil {
 		return err
@@ -288,15 +301,17 @@ func (d *Debian) createDebResources() error {
 		return err
 	}
 
+	d.InstalledSize = utils.GetDirSize(d.PKGBUILD.PackageDir)
+
 	err = d.createControl()
 	if err != nil {
 		return err
 	}
 
-	err = d.createMd5Sums()
-	if err != nil {
-		return err
-	}
+	// err = d.createMd5Sums()
+	// if err != nil {
+	// 	return err
+	// }
 
 	err = d.createScripts()
 	if err != nil {
@@ -318,12 +333,6 @@ func (d *Debian) createDebResources() error {
 
 func (d *Debian) Build() ([]string, error) {
 	var err error
-
-	d.InstalledSize, err = utils.GetDirSize(d.PKGBUILD.PackageDir)
-
-	if err != nil {
-		return nil, err
-	}
 
 	d.getArch()
 
@@ -359,4 +368,21 @@ func (d *Debian) Install() error {
 	}
 
 	return utils.Exec("", "apt-get", "install", "-y", absPath)
+}
+
+func (d *Debian) PrepareEnvironment() error {
+	var err error
+
+	args := []string{
+		"--assume-yes",
+		"install",
+	}
+	args = append(args, buildEnvironmentDeps...)
+
+	err = utils.Exec("", "apt-get", args...)
+	if err != nil {
+		return err
+	}
+
+	return err
 }

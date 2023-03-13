@@ -1,17 +1,22 @@
 package source
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
 	"hash"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/utils"
+	"github.com/cavaliergopher/grab/v3"
+	ggit "github.com/go-git/go-git/v5"
+	"github.com/mholt/archiver/v4"
 )
 
 const (
@@ -26,28 +31,28 @@ type Source struct {
 	Path   string
 }
 
-func (s *Source) getType() string {
-	if strings.HasPrefix(s.Source, "http://") {
+func (source *Source) getType() string {
+	if strings.HasPrefix(source.Source, "http://") {
 		return "http"
 	}
 
-	if strings.HasPrefix(s.Source, "https://") {
+	if strings.HasPrefix(source.Source, "https://") {
 		return "https"
 	}
 
-	if strings.HasPrefix(s.Source, "ftp://") {
+	if strings.HasPrefix(source.Source, "ftp://") {
 		return "ftp"
 	}
 
-	if strings.HasPrefix(s.Source, git+"+https://") {
+	if strings.HasPrefix(source.Source, git+"+https://") {
 		return git
 	}
 
 	return "file"
 }
 
-func (s *Source) parsePath() {
-	s.Path = filepath.Join(s.Output, utils.Filename(s.Source))
+func (source *Source) parsePath() {
+	source.Path = filepath.Join(source.Output, utils.Filename(source.Source))
 }
 
 func (s *Source) getURL(protocol string) error {
@@ -58,19 +63,37 @@ func (s *Source) getURL(protocol string) error {
 
 	if !exists {
 		if protocol != git {
-			err = utils.HTTPGet(s.Source, s.Path, protocol)
+			// create client
+			client := grab.NewClient()
+			req, _ := grab.NewRequest(s.Path, s.Source)
+
+			// start download
+			fmt.Printf("Downloading %v...\n", req.URL())
+			resp := client.Do(req)
+			fmt.Printf("  %v\n", resp.HTTPResponse.Status)
+
+			// check for errors
+			if err := resp.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "Download failed: %v\n", err)
+				os.Exit(1)
+			}
+
+			fmt.Printf("Download saved to ./%v \n", resp.Filename)
 		}
 
 		if protocol == git {
-			err = utils.Exec("", git, "clone", strings.Trim(s.Source, "git+"), s.Path)
+			_, err = ggit.PlainClone(s.Path, false, &ggit.CloneOptions{
+				URL:      strings.Trim(s.Source, "git+"),
+				Progress: os.Stdout,
+			})
 		}
 	}
 
 	return err
 }
 
-func (s *Source) getPath() error {
-	err := utils.Copy(s.Root, s.Source, s.Path, true)
+func (source *Source) getPath() error {
+	err := utils.CopyFile(filepath.Join(source.Root, source.Source), source.Path)
 	if err != nil {
 		return err
 	}
@@ -78,40 +101,110 @@ func (s *Source) getPath() error {
 	return err
 }
 
-func (s *Source) extract() error {
-	var err error
+func (source *Source) Unarchive(input io.Reader, dir string) error {
+	format, input, _ := archiver.Identify("", input)
+	// the list of files we want out of the archive; any
+	// directories will include all their contents unless
+	// we return fs.SkipDir from our handler
+	// (leave this nil to walk ALL files from the archive)
+	dirMap := map[string]bool{}
 
-	switch {
-	case strings.HasSuffix(s.Path, ".tar"):
-		err = utils.Exec("", "tar", "xf", s.Path, "-C", s.Output, "--overwrite")
-	case strings.HasSuffix(s.Path, ".zip"):
-		err = utils.Exec("", "unzip", s.Path)
-	default:
-		split := strings.Split(s.Path, ".")
-		if len(split) > 2 && split[len(split)-2] == "tar" {
-			err = utils.Exec("", "tar", "xf", s.Path, "-C", s.Output, "--overwrite")
+	// not sure if this should be a syncmap, or if a map is ok?
+	// not sure if the handler itself is invoked serially or if it
+	// is concurrent?
+	handler := func(ctx context.Context, archiveFile archiver.File) error {
+		fileName := archiveFile.NameInArchive
+		newPath := filepath.Join(dir, fileName)
+
+		var err error
+
+		if archiveFile.IsDir() {
+			dirMap[newPath] = true
+
+			return os.MkdirAll(newPath, archiveFile.Mode())
 		} else {
+			// check if we've seen the dir before, if not, we'll attempt to create
+			// it in case its not there. This needs to be done as archive formats
+			// do not necessarily always have the directory in order/present
+			// eg zip dirs for quarto definitely are missing seemingly random dirs
+			// when talking with charles about it, we were both unsure what might
+			// be the reason, and assume its probably the powershell compress-archive
+			// encantation, so rather than trying to go down that rabbit hole too far,
+			// some additional checking here
+			fileDir := filepath.Dir(newPath)
+			_, seenDir := dirMap[fileDir]
+
+			if !seenDir {
+				dirMap[fileDir] = true
+				// linux default for new directories is 777 and let the umask handle
+				// if should have other controls
+				err = os.MkdirAll(fileDir, 0777)
+			}
+		}
+
+		if err != nil {
 			return err
 		}
+
+		newFile, err := os.OpenFile(newPath, os.O_CREATE|os.O_WRONLY, archiveFile.Mode())
+		if err != nil {
+			return err
+		}
+
+		defer newFile.Close()
+
+		// copy file data into tar writer
+		archiveFileTemp, err := archiveFile.Open()
+		if err != nil {
+			return err
+		}
+
+		defer archiveFileTemp.Close()
+
+		if _, err := io.Copy(newFile, archiveFileTemp); err != nil {
+			return err
+		}
+
+		return err
 	}
 
+	// make sure the format is capable of extracting
+	ex, ok := format.(archiver.Extractor)
+	if !ok {
+		return nil
+	}
+
+	return ex.Extract(context.Background(), input, nil, handler)
+}
+
+func (source *Source) extract() error {
+	dlFile, err := os.Open(source.Path)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to open source %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), source.Source)
+
+		return err
+	}
+
+	err = source.Unarchive(dlFile, source.Output)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to extract source %s\n",
 			string(constants.ColorBlue),
-			string(constants.ColorYellow), s.Source)
+			string(constants.ColorYellow), source.Path)
 
-		return err
+		log.Panic(err)
 	}
 
 	return err
 }
 
-func (s *Source) validate() error {
+func (source *Source) validate() error {
 	var err error
 
-	file, err := os.Open(s.Path)
+	file, err := os.Open(source.Path)
 	if err != nil {
-		fmt.Printf("source: Failed to open file for hash")
+		fmt.Printf("source: Failed to open file for hash\n")
 
 		return err
 	}
@@ -120,15 +213,15 @@ func (s *Source) validate() error {
 
 	var hash hash.Hash
 
-	if s.Hash == "SKIP" {
-		fmt.Printf("\t\t%s:: %sSkip integrity check for %s%s\n",
+	if source.Hash == "SKIP" {
+		fmt.Printf("%s:: %sSkip integrity check for %s%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),
-			s.Source)
+			source.Source)
 	}
 
-	switch len(s.Hash) {
+	switch len(source.Hash) {
 	case 64:
 		hash = sha256.New()
 	case 128:
@@ -146,29 +239,29 @@ func (s *Source) validate() error {
 
 	hexSum := fmt.Sprintf("%x", sum)
 
-	if hexSum != s.Source {
-		fmt.Printf("source: Hash verification failed for '%s'\n", s.Source)
+	if hexSum != source.Source {
+		fmt.Printf("source: Hash verification failed for '%s'\n", source.Source)
 	}
 
 	return err
 }
 
-func (s *Source) Get() error {
-	s.parsePath()
+func (source *Source) Get() error {
+	source.parsePath()
 
 	var err error
 
-	switch s.getType() {
+	switch source.getType() {
 	case "http":
-		err = s.getURL("http")
+		err = source.getURL("http")
 	case "https":
-		err = s.getURL("https")
+		err = source.getURL("https")
 	case "ftp":
-		err = s.getURL("ftp")
+		err = source.getURL("ftp")
 	case "git":
-		err = s.getURL("git")
+		err = source.getURL("git")
 	case "file":
-		err = s.getPath()
+		err = source.getPath()
 	default:
 		panic("utils: Unknown type")
 	}
@@ -177,12 +270,13 @@ func (s *Source) Get() error {
 		return err
 	}
 
-	err = s.validate()
+	err = source.validate()
 	if err != nil {
 		return err
 	}
 
-	err = s.extract()
+	err = source.extract()
+
 	if err != nil {
 		return err
 	}
