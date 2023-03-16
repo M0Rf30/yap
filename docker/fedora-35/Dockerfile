@@ -27,13 +27,7 @@ FROM fedora:35
 COPY . /project
 WORKDIR /project
 COPY --from=builder /usr/bin/yap /usr/bin/yap
-COPY --from=builder go.tar.gz .
 RUN \
-  tar -C /usr/lib -xf go.tar.gz; \
-  rm go.tar.gz; \
-  ln -sf /usr/lib/go/bin/go /usr/bin/go; \
-  ln -sf /usr/lib/go/bin/gofmt /usr/bin/gofmt; \
-  ln -sf /usr/share/doc/go /usr/lib/go/doc; \
   dnf -y install bash-completion sudo; \
   yap completion bash > /etc/bash_completion.d/yap; \
   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \
