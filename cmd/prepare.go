@@ -21,12 +21,8 @@ var prepareCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		split := strings.Split(args[0], "-")
 		distro := split[0]
-		codeName := ""
-		if len(split) > 1 {
-			codeName = split[1]
-		}
 
-		packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, codeName)
+		packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
 
 		err := packageManager.PrepareEnvironment(GoLang)
 		if err != nil {
