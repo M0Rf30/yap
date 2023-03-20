@@ -13,9 +13,10 @@ import (
 )
 
 type Packer interface {
-	Prep() error
+	Prepare() error
 	Build() ([]string, error)
 	Install() error
+	PrepareEnvironment(bool) error
 	Update() error
 }
 
@@ -40,12 +41,10 @@ func GetPackageManager(pkgbuild *pkgbuild.PKGBUILD, distro, codeName string) Pac
 			PKGBUILD: pkgbuild,
 		}
 	default:
-		system := distro
-		if codeName != "" {
-			system += "-" + codeName
-		}
-
-		fmt.Printf("packer: Unknown system %s\n", system)
+		fmt.Printf("%s%s ❌ :: unknown unsupported system.%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite))
 		os.Exit(1)
 	}
 

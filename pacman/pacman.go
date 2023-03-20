@@ -75,10 +75,6 @@ func (p *Pacman) createInstall() error {
 
 	template.Must(tmpl.Parse(postInstall))
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if pkgbuild.Verbose {
 		err = tmpl.Execute(os.Stdout, p)
 		if err != nil {
@@ -122,10 +118,6 @@ func (p *Pacman) createMake() error {
 
 	template.Must(tmpl.Parse(specFile))
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if pkgbuild.Verbose {
 		err = tmpl.Execute(os.Stdout, p)
 		if err != nil {
@@ -150,7 +142,7 @@ func (p *Pacman) pacmanBuild() error {
 	return err
 }
 
-func (p *Pacman) Prep() error {
+func (p *Pacman) Prepare() error {
 	err := p.getDepends()
 	if err != nil {
 		return err
@@ -179,6 +171,7 @@ func (p *Pacman) makePackerDir() error {
 
 func (p *Pacman) Build() ([]string, error) {
 	p.pacmanDir = filepath.Join(p.PKGBUILD.Root, "pacman")
+	stagingDir := filepath.Join(p.pacmanDir, "staging", p.PKGBUILD.PkgName)
 
 	err := utils.RemoveAll(p.pacmanDir)
 	if err != nil {
@@ -196,6 +189,11 @@ func (p *Pacman) Build() ([]string, error) {
 	}
 
 	err = p.createInstall()
+	if err != nil {
+		return nil, err
+	}
+
+	err = utils.CopyDir(p.PKGBUILD.PackageDir, stagingDir)
 	if err != nil {
 		return nil, err
 	}
@@ -226,4 +224,27 @@ func (p *Pacman) Install() error {
 	}
 
 	return nil
+}
+
+func (p *Pacman) PrepareEnvironment(golang bool) error {
+	var err error
+
+	args := []string{
+		"-S",
+		"--noconfirm",
+	}
+	args = append(args, buildEnvironmentDeps...)
+
+	if golang {
+		utils.CheckGO()
+
+		args = append(args, "go")
+	}
+
+	err = utils.Exec("", "pacman", args...)
+	if err != nil {
+		return err
+	}
+
+	return err
 }
