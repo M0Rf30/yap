@@ -74,10 +74,6 @@ func (a *Apk) createInstall() error {
 
 	template.Must(tmpl.Parse(postInstall))
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if pkgbuild.Verbose {
 		err = tmpl.Execute(os.Stdout, a)
 		if err != nil {
@@ -121,10 +117,6 @@ func (a *Apk) createMake() error {
 
 	template.Must(tmpl.Parse(specFile))
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if pkgbuild.Verbose {
 		err = tmpl.Execute(os.Stdout, a)
 		if err != nil {
@@ -154,7 +146,7 @@ func (a *Apk) apkBuild() error {
 	return err
 }
 
-func (a *Apk) Prep() error {
+func (a *Apk) Prepare() error {
 	err := a.getDepends()
 	if err != nil {
 		return err
@@ -188,6 +180,7 @@ func (a *Apk) makePackerDir() error {
 
 func (a *Apk) Build() ([]string, error) {
 	a.apkDir = filepath.Join(a.PKGBUILD.Root, "apk")
+	stagingDir := filepath.Join(a.apkDir, "staging", a.PKGBUILD.PkgName)
 
 	err := utils.RemoveAll(a.apkDir)
 	if err != nil {
@@ -205,6 +198,11 @@ func (a *Apk) Build() ([]string, error) {
 	}
 
 	err = a.createInstall()
+	if err != nil {
+		return nil, err
+	}
+
+	err = utils.CopyDir(a.PKGBUILD.PackageDir, stagingDir)
 	if err != nil {
 		return nil, err
 	}
@@ -236,4 +234,26 @@ func (a *Apk) Install() error {
 	}
 
 	return nil
+}
+
+func (a *Apk) PrepareEnvironment(golang bool) error {
+	var err error
+
+	args := []string{
+		"add",
+	}
+	args = append(args, buildEnvironmentDeps...)
+
+	if golang {
+		utils.CheckGO()
+
+		args = append(args, "go")
+	}
+
+	err = utils.Exec("", "apk", args...)
+	if err != nil {
+		return err
+	}
+
+	return err
 }

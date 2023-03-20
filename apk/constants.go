@@ -1,5 +1,9 @@
 package apk
 
+var buildEnvironmentDeps = []string{
+	"alpine-sdk",
+}
+
 const specFile = `
 {{- /* Mandatory fields */ -}}
 pkgname={{.PKGBUILD.PkgName}}
@@ -31,7 +35,7 @@ license="CUSTOM"
 options="!check !fhs"
 
 package() {
-  rsync -a -A {{.PKGBUILD.PackageDir}}/ ${pkgdir}
+  mv -f "${startdir}/staging/${pkgname}" "${pkgdir}"
 }
 `
 const postInstall = `

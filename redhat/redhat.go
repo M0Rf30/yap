@@ -69,18 +69,27 @@ func (r *Redhat) getFiles() error {
 		backup.Add(path)
 	}
 
-	output, err := utils.ExecOutput(r.PKGBUILD.PackageDir, "find", ".", "-printf", "%P\n")
+	var files []string
+
+	err := filepath.Walk(r.PKGBUILD.PackageDir, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+
+		return err
+	})
+
 	if err != nil {
 		return err
 	}
 
-	for _, path := range strings.Split(output, "\n") {
-		if len(path) < 1 || strings.Contains(path, ".build-id") {
+	for _, filePath := range files {
+		if len(filePath) < 1 || strings.Contains(filePath, ".build-id") {
 			continue
 		}
 
-		paths.Remove(filepath.Dir(path))
-		paths.Add(path)
+		paths.Remove(filepath.Dir(filePath))
+		paths.Add(strings.TrimLeft(filePath, r.PKGBUILD.PackageDir))
 	}
 
 	for pathInf := range paths.Iter() {
@@ -128,10 +137,6 @@ func (r *Redhat) createSpec() error {
 
 	template.Must(tmpl.Parse(specFile))
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if pkgbuild.Verbose {
 		err = tmpl.Execute(os.Stdout, r)
 		if err != nil {
@@ -157,7 +162,7 @@ func (r *Redhat) rpmBuild() error {
 	return err
 }
 
-func (r *Redhat) Prep() error {
+func (r *Redhat) Prepare() error {
 	err := r.getDepends()
 	if err != nil {
 		return err
@@ -213,10 +218,10 @@ func (r *Redhat) copy() error {
 	}
 
 	for _, arch := range archs {
-		err = utils.CopyFiles(filepath.Join(
+		err = utils.CopyDir(filepath.Join(
 			r.rpmsDir,
 			arch.Name(),
-		), r.PKGBUILD.Home, false)
+		), r.PKGBUILD.Home)
 		if err != nil {
 			return err
 		}
@@ -240,6 +245,20 @@ func (r *Redhat) Build() ([]string, error) {
 	}
 
 	err = r.getFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	buildRootPackageDir := fmt.Sprintf("%s/%s-%s-%s.%s",
+		r.buildRootDir,
+		r.PKGBUILD.PkgName,
+		r.PKGBUILD.PkgVer,
+		r.PKGBUILD.PkgRel,
+		"x86_64")
+
+	fmt.Println(buildRootPackageDir)
+	err = utils.CopyDir(r.PKGBUILD.PackageDir, buildRootPackageDir)
+
 	if err != nil {
 		return nil, err
 	}
@@ -280,4 +299,26 @@ func (r *Redhat) Install() error {
 	}
 
 	return nil
+}
+
+func (r *Redhat) PrepareEnvironment(golang bool) error {
+	var err error
+
+	args := []string{
+		"-y",
+		"install",
+	}
+	args = append(args, buildEnvironmentDeps...)
+
+	err = utils.Exec("", "yum", args...)
+
+	if err != nil {
+		return err
+	}
+
+	if golang {
+		utils.GOSetup()
+	}
+
+	return err
 }
