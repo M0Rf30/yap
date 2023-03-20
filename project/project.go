@@ -160,7 +160,7 @@ func (mpc *MultipleProject) populateProjects(distro string, release string, path
 			return err
 		}
 
-		mpc.packageManager = packer.GetPackageManager(pkgbuild, distro, release)
+		mpc.packageManager = packer.GetPackageManager(pkgbuild, distro)
 
 		if !SkipSyncBuildEnvironmentDeps {
 			if err = mpc.packageManager.Prepare(); err != nil {
