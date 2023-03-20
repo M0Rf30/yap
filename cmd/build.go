@@ -10,8 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const argLenght = 2
-
 var NoCache bool
 
 // buildCmd represents the command to build the entire project.
@@ -21,7 +19,7 @@ var buildCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		path, err := os.Getwd()
-		if len(args) == argLenght {
+		if len(args) == 2 {
 			path = args[1]
 		}
 		if err != nil {
@@ -57,6 +55,8 @@ func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.Flags().BoolVarP(&NoCache,
 		"no-cache", "c", false, "Do not use cache when building the project")
+	buildCmd.Flags().BoolVarP(&project.SkipSyncBuildEnvironmentDeps,
+		"ignore-makedeps", "d", false, "Ignore make dependencies resolution")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncFlag,
 		"skip-sync", "s", false, "Skip sync with remotes for package managers")
 	buildCmd.PersistentFlags().BoolVarP(&pkgbuild.Verbose,

@@ -1,5 +1,9 @@
 package pacman
 
+var buildEnvironmentDeps = []string{
+	"base-devel",
+}
+
 const specFile = `
 {{- /* Mandatory fields */ -}}
 # Maintainer: {{.PKGBUILD.Maintainer}}
@@ -39,7 +43,7 @@ options=("emptydirs")
 install={{.PKGBUILD.PkgName}}.install
 
 package() {
-  rsync -a -A {{.PKGBUILD.PackageDir}}/ ${pkgdir}/
+  mv -f "${startdir}/staging/${pkgname}" "${pkgdir}"
 }
 `
 const postInstall = `

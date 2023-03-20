@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -157,42 +158,75 @@ func Open(path string) (*os.File, error) {
 	return file, err
 }
 
-func Copy(dir, source, dest string, presv bool) error {
-	args := []string{"-r", "-T", "-f"}
+// CopyFile copies the contents of the file named source to the file named
+// by dest. The file will be created if it does not already exist. If the
+// destination file exists, all it's contents will be replaced by the contents
+// of the source file. The file mode will be copied from the source and
+// the copied data is synced/flushed to stable storage.
+func CopyFile(source, dest string) (err error) {
+	file, err := os.Open(source)
+	if err != nil {
+		return
+	}
+	defer file.Close()
 
-	if presv {
-		args = append(args, "-p")
+	out, err := os.Create(dest)
+	if err != nil {
+		return
 	}
 
-	args = append(args, source, dest)
+	defer func() {
+		if e := out.Close(); e != nil {
+			err = e
+		}
+	}()
 
-	err := Exec(dir, "cp", args...)
+	_, err = io.Copy(out, file)
 	if err != nil {
-		return err
+		return
+	}
+
+	err = out.Sync()
+	if err != nil {
+		return
+	}
+
+	si, err := os.Stat(source)
+	if err != nil {
+		return
+	}
+
+	err = os.Chmod(dest, si.Mode())
+	if err != nil {
+		return
 	}
 
 	return err
 }
 
-func CopyFile(dir, source, dest string, presv bool) error {
-	args := []string{"-f"}
+// CopyDir recursively copies a directory tree, attempting to preserve permissions.
+// Source directory must exist, destination directory must *not* exist.
+// Symlinks are ignored and skipped.
+func CopyDir(source string, dest string) error {
+	source = filepath.Clean(source)
+	dest = filepath.Clean(dest)
 
-	if presv {
-		args = append(args, "-p")
-	}
-
-	args = append(args, source, dest)
-
-	err := Exec(dir, "cp", args...)
+	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		return err
 	}
 
-	return err
-}
+	_, err = os.Stat(dest)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
 
-func CopyFiles(source, dest string, presv bool) error {
-	files, err := os.ReadDir(source)
+	err = os.MkdirAll(dest, sourceInfo.Mode())
+	if err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(source)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
 			string(constants.ColorBlue),
@@ -203,14 +237,20 @@ func CopyFiles(source, dest string, presv bool) error {
 		return err
 	}
 
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
+	for _, entry := range entries {
+		sourcePath := filepath.Join(source, entry.Name())
+		destPath := filepath.Join(dest, entry.Name())
 
-		err = CopyFile("", filepath.Join(source, file.Name()), dest, presv)
-		if err != nil {
-			return err
+		if entry.IsDir() {
+			err = CopyDir(sourcePath, destPath)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = CopyFile(sourcePath, destPath)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -250,7 +290,7 @@ func Filename(path string) string {
 	return path[n+1:]
 }
 
-func GetDirSize(path string) (int, error) {
+func GetDirSize(path string) int {
 	output, err := ExecOutput("", "du", "-c", "-s", path)
 	if err != nil {
 		os.Exit(1)
@@ -266,10 +306,10 @@ func GetDirSize(path string) (int, error) {
 			path,
 			string(constants.ColorWhite))
 
-		return size, err
+		return size
 	}
 
-	return size, err
+	return size
 }
 
 func Exists(path string) (bool, error) {
