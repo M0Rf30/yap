@@ -20,7 +20,7 @@ type Packer interface {
 	Update() error
 }
 
-func GetPackageManager(pkgbuild *pkgbuild.PKGBUILD, distro, codeName string) Packer {
+func GetPackageManager(pkgbuild *pkgbuild.PKGBUILD, distro string) Packer {
 	var packageManager Packer
 
 	switch constants.DistroToPackageManager[distro] {
