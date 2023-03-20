@@ -50,11 +50,12 @@ type MultipleProject struct {
 
 func (mpc *MultipleProject) BuildAll() error {
 	for _, proj := range mpc.Projects {
-		fmt.Printf("%s🚀 :: %s%s: launching build for project ...%s\n",
+		fmt.Printf("%s🚀 :: %sLaunching build for project: %s%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
+			string(constants.ColorWhite),
 			proj.Name,
-			string(constants.ColorWhite))
+		)
 
 		if err := proj.Builder.Build(); err != nil {
 			return err

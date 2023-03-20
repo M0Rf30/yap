@@ -87,7 +87,7 @@ func (builder *Builder) Build() error {
 		return err
 	}
 
-	fmt.Printf("%s🖧  :: %sgetting sources ...%s\n",
+	fmt.Printf("%s🖧  :: %sGetting sources ...%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
@@ -97,7 +97,7 @@ func (builder *Builder) Build() error {
 		return err
 	}
 
-	fmt.Printf("%s🏗️  :: %sbuilding ...%s\n",
+	fmt.Printf("%s🏗️ :: %sBuilding ...%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
@@ -108,7 +108,7 @@ func (builder *Builder) Build() error {
 		return err
 	}
 
-	fmt.Printf("%s📦 :: %sgenerating package ...%s\n",
+	fmt.Printf("%s📦 :: %sGenerating package ...%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
