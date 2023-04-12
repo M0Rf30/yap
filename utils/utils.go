@@ -131,7 +131,7 @@ Loop:
 		os.Exit(1)
 	}
 
-	fmt.Printf("%s📥 :: %sDownload saved: %s\t%v\n",
+	fmt.Printf("\n%s📥 :: %sDownload saved: %s\t%v\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite),

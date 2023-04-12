@@ -15,8 +15,10 @@ import (
 )
 
 var (
+	NoCache                      bool
 	SkipSyncFlag                 bool
 	SkipSyncBuildEnvironmentDeps bool
+	UntilPkgName                 string
 )
 
 type DistroProject interface {
@@ -48,36 +50,61 @@ type MultipleProject struct {
 	Projects       []*Project `json:"projects"`
 }
 
-func (mpc *MultipleProject) BuildAll() error {
+func (mpc *MultipleProject) findPackageInProjects() {
+	var matchFound bool
+
 	for _, proj := range mpc.Projects {
-		fmt.Printf("%s🚀 :: %sLaunching build for project: %s%s\n",
+		if UntilPkgName == proj.Builder.PKGBUILD.PkgName {
+			matchFound = true
+		}
+	}
+
+	if !matchFound {
+		fmt.Printf("%s❌ :: %sPackage not found: %s%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),
-			proj.Name,
+			UntilPkgName,
+		)
+
+		os.Exit(1)
+	}
+}
+
+func (mpc *MultipleProject) BuildAll() error {
+	if UntilPkgName != "" {
+		mpc.findPackageInProjects()
+	}
+
+	for _, proj := range mpc.Projects {
+		fmt.Printf("%s🚀 :: %sLaunching build for package: %s%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite),
+			proj.Builder.PKGBUILD.PkgName,
 		)
 
 		if err := proj.Builder.Build(); err != nil {
 			return err
 		}
 
-		artefactPaths, err := proj.PackageManager.Build()
-		if err != nil {
-			return err
-		}
+		// artefactPaths, err := proj.PackageManager.Build()
+		// if err != nil {
+		// 	return err
+		// }
 
-		if mpc.Output != "" {
-			if err := utils.ExistsMakeDir(mpc.Output); err != nil {
-				return err
-			}
+		// if mpc.Output != "" {
+		// 	if err := utils.ExistsMakeDir(mpc.Output); err != nil {
+		// 		return err
+		// 	}
 
-			for _, ap := range artefactPaths {
-				filename := filepath.Base(ap)
-				if err := utils.CopyFile(ap, filepath.Join(mpc.Output, filename)); err != nil {
-					return err
-				}
-			}
-		}
+		// 	for _, ap := range artefactPaths {
+		// 		filename := filepath.Base(ap)
+		// 		if err := utils.CopyFile(ap, filepath.Join(mpc.Output, filename)); err != nil {
+		// 			return err
+		// 		}
+		// 	}
+		// }
 
 		if proj.HasToInstall {
 			fmt.Printf("%s🤓 :: %s%s: installing package ...%s\n",
@@ -90,12 +117,16 @@ func (mpc *MultipleProject) BuildAll() error {
 				return err
 			}
 		}
+
+		if UntilPkgName != "" && proj.Builder.PKGBUILD.PkgName == UntilPkgName {
+			return nil
+		}
 	}
 
 	return nil
 }
 
-func (mpc *MultipleProject) Clean(cleanFlag bool) error {
+func (mpc *MultipleProject) Clean() error {
 	var err error
 
 	for _, project := range mpc.Projects {
@@ -105,7 +136,7 @@ func (mpc *MultipleProject) Clean(cleanFlag bool) error {
 		}
 	}
 
-	if cleanFlag {
+	if NoCache {
 		for _, project := range mpc.Projects {
 			err = utils.RemoveAll(project.Builder.PKGBUILD.SourceDir)
 			if err != nil {

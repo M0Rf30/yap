@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"log"
-	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/M0Rf30/yap/pkgbuild"
@@ -16,31 +16,26 @@ var NoCache bool
 var buildCmd = &cobra.Command{
 	Use:   "build [target] [path]",
 	Short: "Build multiple PKGBUILD definitions within a yap.json project",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		path, err := os.Getwd()
-		if len(args) == 2 {
-			path = args[1]
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
+		fullJSONPath, _ := filepath.Abs(args[1])
 
 		split := strings.Split(args[0], "-")
 		distro := split[0]
 		release := ""
+
 		if len(split) > 1 {
 			release = split[1]
 		}
 
 		mpc := project.MultipleProject{}
-		err = mpc.MultiProject(distro, release, path)
+		err := mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		if NoCache {
-			if err := mpc.Clean(NoCache); err != nil {
+		if project.NoCache {
+			if err := mpc.Clean(); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -53,12 +48,14 @@ var buildCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(buildCmd)
-	buildCmd.Flags().BoolVarP(&NoCache,
-		"no-cache", "c", false, "Do not use cache when building the project")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncBuildEnvironmentDeps,
 		"ignore-makedeps", "d", false, "Ignore make dependencies resolution")
+	buildCmd.Flags().BoolVarP(&project.NoCache,
+		"no-cache", "c", false, "Do not use cache when building the project")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncFlag,
 		"skip-sync", "s", false, "Skip sync with remotes for package managers")
+	buildCmd.Flags().StringVarP(&project.UntilPkgName,
+		"until", "u", "", "Build until a defined package name")
 	buildCmd.PersistentFlags().BoolVarP(&pkgbuild.Verbose,
 		"verbose", "v", false, "verbose output")
 }
