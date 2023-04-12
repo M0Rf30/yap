@@ -97,7 +97,7 @@ func (builder *Builder) Build() error {
 		return err
 	}
 
-	fmt.Printf("%s🏗️ :: %sBuilding ...%s\n",
+	fmt.Printf("%s🏗️  :: %sBuilding ...%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
