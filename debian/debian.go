@@ -1,6 +1,7 @@
 package debian
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -9,6 +10,9 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/M0Rf30/yap/builder"
+	"github.com/M0Rf30/yap/constants"
+	"github.com/M0Rf30/yap/options"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
 )
@@ -231,6 +235,35 @@ func (d *Debian) Prepare() error {
 	return err
 }
 
+func (d *Debian) Strip() error {
+	var err error
+
+	var tmplBytesBuffer bytes.Buffer
+
+	fmt.Printf("%s🧹 :: %sStripping binaries ...%s\n",
+		string(constants.ColorBlue),
+		string(constants.ColorYellow),
+		string(constants.ColorWhite))
+
+	tmpl := template.New("strip")
+
+	template.Must(tmpl.Parse(options.StripScript))
+
+	if pkgbuild.Verbose {
+		err = tmpl.Execute(&tmplBytesBuffer, d.PKGBUILD)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	err = builder.RunScript(tmplBytesBuffer.String())
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
 func (d *Debian) Update() error {
 	err := d.getUpdates()
 	if err != nil {
@@ -294,6 +327,11 @@ func (d *Debian) Build() ([]string, error) {
 	}
 
 	err = d.createDebResources()
+	if err != nil {
+		return nil, err
+	}
+
+	err = d.Strip()
 	if err != nil {
 		return nil, err
 	}

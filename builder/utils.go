@@ -10,8 +10,8 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-func runScript(cmds string) error {
-	buildScript, _ := syntax.NewParser().Parse(strings.NewReader(cmds), "")
+func RunScript(cmds string) error {
+	script, _ := syntax.NewParser().Parse(strings.NewReader(cmds), "")
 
 	runner, _ := interp.New(
 		interp.Env(expand.ListEnviron(os.Environ()...,
@@ -19,7 +19,7 @@ func runScript(cmds string) error {
 		interp.StdIO(nil, os.Stdout, os.Stdout),
 	)
 
-	err := runner.Run(context.TODO(), buildScript)
+	err := runner.Run(context.TODO(), script)
 	if err != nil {
 		return err
 	}

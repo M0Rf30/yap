@@ -2,8 +2,6 @@ package builder
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pkgbuild"
@@ -11,10 +9,7 @@ import (
 	"github.com/M0Rf30/yap/utils"
 )
 
-const IDLength = 12
-
 type Builder struct {
-	id       string
 	PKGBUILD *pkgbuild.PKGBUILD
 }
 
@@ -54,11 +49,7 @@ func (builder *Builder) getSources() error {
 }
 
 func (builder *Builder) build() error {
-	path := filepath.Join(string(os.PathSeparator), "tmp",
-		fmt.Sprintf("yap_%s_build", builder.id))
-	defer os.Remove(path)
-
-	err := runScript(builder.PKGBUILD.Build)
+	err := RunScript(builder.PKGBUILD.Build)
 	if err != nil {
 		return err
 	}
@@ -67,11 +58,7 @@ func (builder *Builder) build() error {
 }
 
 func (builder *Builder) Package() error {
-	path := filepath.Join(string(os.PathSeparator), "tmp",
-		fmt.Sprintf("yap_%s_package", builder.id))
-	defer os.Remove(path)
-
-	err := runScript(builder.PKGBUILD.Package)
+	err := RunScript(builder.PKGBUILD.Package)
 	if err != nil {
 		return err
 	}
@@ -80,8 +67,6 @@ func (builder *Builder) Package() error {
 }
 
 func (builder *Builder) Build() error {
-	builder.id = utils.GenerateRandomString(IDLength)
-
 	err := builder.initDirs()
 	if err != nil {
 		return err
@@ -103,7 +88,6 @@ func (builder *Builder) Build() error {
 		string(constants.ColorWhite))
 
 	err = builder.build()
-
 	if err != nil {
 		return err
 	}

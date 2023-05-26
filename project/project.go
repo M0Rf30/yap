@@ -88,23 +88,23 @@ func (mpc *MultipleProject) BuildAll() error {
 			return err
 		}
 
-		// artefactPaths, err := proj.PackageManager.Build()
-		// if err != nil {
-		// 	return err
-		// }
+		artefactPaths, err := proj.PackageManager.Build()
+		if err != nil {
+			return err
+		}
 
-		// if mpc.Output != "" {
-		// 	if err := utils.ExistsMakeDir(mpc.Output); err != nil {
-		// 		return err
-		// 	}
+		if mpc.Output != "" {
+			if err := utils.ExistsMakeDir(mpc.Output); err != nil {
+				return err
+			}
 
-		// 	for _, ap := range artefactPaths {
-		// 		filename := filepath.Base(ap)
-		// 		if err := utils.CopyFile(ap, filepath.Join(mpc.Output, filename)); err != nil {
-		// 			return err
-		// 		}
-		// 	}
-		// }
+			for _, ap := range artefactPaths {
+				filename := filepath.Base(ap)
+				if err := utils.CopyFile(ap, filepath.Join(mpc.Output, filename)); err != nil {
+					return err
+				}
+			}
+		}
 
 		if proj.HasToInstall {
 			fmt.Printf("%s🤓 :: %s%s: installing package ...%s\n",

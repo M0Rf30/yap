@@ -23,7 +23,8 @@ type Packer interface {
 func GetPackageManager(pkgbuild *pkgbuild.PKGBUILD, distro string) Packer {
 	var packageManager Packer
 
-	switch constants.DistroToPackageManager[distro] {
+	distroFamily := constants.DistroToPackageManager[distro]
+	switch distroFamily {
 	case "alpine":
 		packageManager = &apk.Apk{
 			PKGBUILD: pkgbuild,
