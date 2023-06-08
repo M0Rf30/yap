@@ -23,6 +23,7 @@ linters:
     - wastedassign
     # here some custom dropped checks temporary disabled
     # they will be enabled
+    - depguard
     - exhaustruct
     - forbidigo
     - forcetypeassert
