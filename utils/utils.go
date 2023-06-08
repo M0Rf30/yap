@@ -61,11 +61,6 @@ func GOSetup() {
 		log.Panic(err)
 	}
 
-	err = os.Symlink("/usr/share/doc/go", "/usr/lib/go/doc")
-	if err != nil {
-		log.Panic(err)
-	}
-
 	fmt.Printf("%s🪛 :: %sGO successfully installed%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
