@@ -20,7 +20,7 @@ import (
 type Debian struct {
 	PKGBUILD      *pkgbuild.PKGBUILD
 	debDir        string
-	InstalledSize int
+	InstalledSize int64
 	// sums          string
 	debOutput string
 }
@@ -286,7 +286,7 @@ func (d *Debian) createDebResources() error {
 		return err
 	}
 
-	d.InstalledSize = utils.GetDirSize(d.PKGBUILD.PackageDir)
+	d.InstalledSize, _ = utils.GetDirSize(d.PKGBUILD.PackageDir)
 
 	err = d.createControl()
 	if err != nil {
