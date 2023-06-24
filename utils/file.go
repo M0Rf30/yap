@@ -41,21 +41,6 @@ func Chmod(path string, perm os.FileMode) error {
 	return err
 }
 
-func ChownR(path string, user, group string) error {
-	err := Exec("",
-		"chown",
-		"-R",
-		fmt.Sprintf("%s:%s", user, group),
-		path,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func Remove(path string) error {
 	err := os.Remove(path)
 	if err != nil {
@@ -165,13 +150,13 @@ func Open(path string) (*os.File, error) {
 func CopyFile(source, dest string) (err error) {
 	file, err := os.Open(source)
 	if err != nil {
-		return
+		return err
 	}
 	defer file.Close()
 
 	out, err := os.Create(dest)
 	if err != nil {
-		return
+		return err
 	}
 
 	defer func() {
@@ -182,22 +167,22 @@ func CopyFile(source, dest string) (err error) {
 
 	_, err = io.Copy(out, file)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = out.Sync()
 	if err != nil {
-		return
+		return err
 	}
 
 	si, err := os.Stat(source)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = os.Chmod(dest, si.Mode())
 	if err != nil {
-		return
+		return err
 	}
 
 	return err
