@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/M0Rf30/yap/constants"
@@ -290,26 +289,29 @@ func Filename(path string) string {
 	return path[n+1:]
 }
 
-func GetDirSize(path string) int {
-	output, err := ExecOutput("", "du", "-c", "-s", path)
-	if err != nil {
-		os.Exit(1)
-	}
+func GetDirSize(path string) (int64, error) {
+	var size int64
 
-	split := strings.Fields(output)
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Printf("%s❌ :: %sfailed to get dir size '%s'%s\n",
+				string(constants.ColorBlue),
+				string(constants.ColorYellow),
+				path,
+				string(constants.ColorWhite))
 
-	size, err := strconv.Atoi(split[len(split)-2])
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to get dir size '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
+			os.Exit(1)
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
 
-		return size
-	}
+		return err
+	})
 
-	return size
+	size = size / 1024
+
+	return size, err
 }
 
 func Exists(path string) (bool, error) {
