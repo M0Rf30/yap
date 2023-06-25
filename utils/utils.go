@@ -130,7 +130,7 @@ Loop:
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite),
-		resp.Filename,
+		destination,
 	)
 }
 
