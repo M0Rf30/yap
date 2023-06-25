@@ -44,10 +44,10 @@ type PKGBUILD struct {
 	Priority       string
 	Provides       []string
 	CodeName       string
-	Root           string
+	StartDir       string
 	Section        string
 	SourceDir      string
-	Source         []string
+	SourceURI      []string
 	URL            string
 	priorities     map[string]int
 }
@@ -71,7 +71,7 @@ func (p *PKGBUILD) mapArrays(key string, data interface{}) {
 	case "conflicts":
 		p.Conflicts = data.([]string)
 	case "source":
-		p.Source = data.([]string)
+		p.SourceURI = data.([]string)
 	case "sha256sums":
 		p.HashSums = data.([]string)
 	case "sha512sums":
@@ -221,7 +221,7 @@ func (p *PKGBUILD) AddItem(key string, data interface{}) error {
 }
 
 func (p *PKGBUILD) Validate() {
-	if len(p.Source) != len(p.HashSums) {
+	if len(p.SourceURI) != len(p.HashSums) {
 		fmt.Printf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
 			p.PkgName,
 			string(constants.ColorBlue),

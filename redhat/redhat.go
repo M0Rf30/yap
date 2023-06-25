@@ -12,6 +12,7 @@ import (
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/set"
 	"github.com/M0Rf30/yap/utils"
+	"github.com/otiai10/copy"
 )
 
 type Redhat struct {
@@ -89,7 +90,7 @@ func (r *Redhat) getFiles() error {
 		}
 
 		paths.Remove(filepath.Dir(filePath))
-		paths.Add(strings.TrimLeft(filePath, r.PKGBUILD.PackageDir))
+		paths.Add(strings.TrimPrefix(filePath, r.PKGBUILD.PackageDir))
 	}
 
 	for pathInf := range paths.Iter() {
@@ -180,7 +181,7 @@ func (r *Redhat) Update() error {
 func (r *Redhat) makeDirs() error {
 	var err error
 
-	r.redhatDir = filepath.Join(r.PKGBUILD.Root, "redhat")
+	r.redhatDir = filepath.Join(r.PKGBUILD.StartDir, "redhat")
 	r.buildDir = filepath.Join(r.redhatDir, "BUILD")
 	r.buildRootDir = filepath.Join(r.redhatDir, "BUILDROOT")
 	r.rpmsDir = filepath.Join(r.redhatDir, "RPMS")
@@ -206,7 +207,7 @@ func (r *Redhat) makeDirs() error {
 	return err
 }
 
-func (r *Redhat) copy() error {
+func (r *Redhat) copyArtifacts() error {
 	var err error
 	archs, err := os.ReadDir(r.rpmsDir)
 
@@ -218,7 +219,7 @@ func (r *Redhat) copy() error {
 	}
 
 	for _, arch := range archs {
-		err = utils.CopyDir(filepath.Join(
+		err = copy.Copy(filepath.Join(
 			r.rpmsDir,
 			arch.Name(),
 		), r.PKGBUILD.Home)
@@ -256,9 +257,7 @@ func (r *Redhat) Build() ([]string, error) {
 		r.PKGBUILD.PkgRel,
 		"x86_64")
 
-	fmt.Println(buildRootPackageDir)
-	err = utils.CopyDir(r.PKGBUILD.PackageDir, buildRootPackageDir)
-
+	err = copy.Copy(r.PKGBUILD.PackageDir, buildRootPackageDir)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +272,7 @@ func (r *Redhat) Build() ([]string, error) {
 		return nil, err
 	}
 
-	err = r.copy()
+	err = r.copyArtifacts()
 	if err != nil {
 		return nil, err
 	}

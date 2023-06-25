@@ -30,13 +30,13 @@ func (builder *Builder) initDirs() error {
 func (builder *Builder) getSources() error {
 	var err error
 
-	for index, path := range builder.PKGBUILD.Source {
+	for index, sourceURI := range builder.PKGBUILD.SourceURI {
 		source := source.Source{
-			Root:   builder.PKGBUILD.Root,
-			Hash:   builder.PKGBUILD.HashSums[index],
-			Source: path,
-			Output: builder.PKGBUILD.SourceDir,
-			Path:   "",
+			StartDir:       builder.PKGBUILD.StartDir,
+			Hash:           builder.PKGBUILD.HashSums[index],
+			SourceItemURI:  sourceURI,
+			SrcDir:         builder.PKGBUILD.SourceDir,
+			SourceItemPath: "",
 		}
 		err = source.Get()
 

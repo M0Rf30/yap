@@ -6,12 +6,13 @@ import (
 
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
+	"github.com/otiai10/copy"
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 )
 
-func getSyntaxFile(compiledOutput, home string) (*syntax.File, error) {
-	file, err := utils.Open(filepath.Join(compiledOutput, "PKGBUILD"))
+func getSyntaxFile(startDir, home string) (*syntax.File, error) {
+	file, err := utils.Open(filepath.Join(startDir, "PKGBUILD"))
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +85,7 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 	return err
 }
 
-func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD, error) {
+func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
 
 	if err != nil {
@@ -97,25 +98,25 @@ func ParseFile(distro, release, compiledOutput, home string) (*pkgbuild.PKGBUILD
 	pkgbuild := &pkgbuild.PKGBUILD{
 		Distro:     distro,
 		CodeName:   release,
-		Root:       compiledOutput,
+		StartDir:   startDir,
 		Home:       home,
-		SourceDir:  filepath.Join(compiledOutput, "src"),
-		PackageDir: filepath.Join(compiledOutput, "pkg"),
+		SourceDir:  filepath.Join(startDir, "src"),
+		PackageDir: filepath.Join(startDir, "pkg"),
 	}
 
-	err = utils.ExistsMakeDir(compiledOutput)
+	err = utils.ExistsMakeDir(startDir)
 	if err != nil {
 		return pkgbuild, err
 	}
 
-	err = utils.CopyDir(home, compiledOutput)
+	err = copy.Copy(home, startDir)
 	if err != nil {
 		return pkgbuild, err
 	}
 
 	pkgbuild.Init()
 
-	pkgbuildSyntax, err := getSyntaxFile(compiledOutput, home)
+	pkgbuildSyntax, err := getSyntaxFile(startDir, home)
 	if err != nil {
 		return nil, err
 	}
