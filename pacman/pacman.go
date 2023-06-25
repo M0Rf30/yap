@@ -10,6 +10,7 @@ import (
 
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
+	"github.com/otiai10/copy"
 )
 
 type Pacman struct {
@@ -170,7 +171,7 @@ func (p *Pacman) makePackerDir() error {
 }
 
 func (p *Pacman) Build() ([]string, error) {
-	p.pacmanDir = filepath.Join(p.PKGBUILD.Root, "pacman")
+	p.pacmanDir = filepath.Join(p.PKGBUILD.StartDir)
 	stagingDir := filepath.Join(p.pacmanDir, "staging", p.PKGBUILD.PkgName)
 
 	err := utils.RemoveAll(p.pacmanDir)
@@ -193,7 +194,7 @@ func (p *Pacman) Build() ([]string, error) {
 		return nil, err
 	}
 
-	err = utils.CopyDir(p.PKGBUILD.PackageDir, stagingDir)
+	err = copy.Copy(p.PKGBUILD.PackageDir, stagingDir)
 	if err != nil {
 		return nil, err
 	}

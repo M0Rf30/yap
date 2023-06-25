@@ -10,6 +10,7 @@ import (
 
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
+	"github.com/otiai10/copy"
 )
 
 type Apk struct {
@@ -179,7 +180,7 @@ func (a *Apk) makePackerDir() error {
 }
 
 func (a *Apk) Build() ([]string, error) {
-	a.apkDir = filepath.Join(a.PKGBUILD.Root, "apk")
+	a.apkDir = filepath.Join(a.PKGBUILD.StartDir, "apk")
 	stagingDir := filepath.Join(a.apkDir, "staging", a.PKGBUILD.PkgName)
 
 	err := utils.RemoveAll(a.apkDir)
@@ -202,7 +203,7 @@ func (a *Apk) Build() ([]string, error) {
 		return nil, err
 	}
 
-	err = utils.CopyDir(a.PKGBUILD.PackageDir, stagingDir)
+	err = copy.Copy(a.PKGBUILD.PackageDir, stagingDir)
 	if err != nil {
 		return nil, err
 	}

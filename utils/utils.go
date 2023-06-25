@@ -156,8 +156,8 @@ func PullContainers(target string) error {
 	return err
 }
 
-func Unarchive(input io.Reader, dir string) error {
-	format, input, _ := archiver.Identify("", input)
+func Unarchive(archiveReader io.Reader, destination string) error {
+	format, archiveReader, _ := archiver.Identify("", archiveReader)
 	// the list of files we want out of the archive; any
 	// directories will include all their contents unless
 	// we return fs.SkipDir from our handler
@@ -169,7 +169,7 @@ func Unarchive(input io.Reader, dir string) error {
 	// is concurrent?
 	handler := func(ctx context.Context, archiveFile archiver.File) error {
 		fileName := archiveFile.NameInArchive
-		newPath := filepath.Join(dir, fileName)
+		newPath := filepath.Join(destination, fileName)
 
 		var err error
 
@@ -229,5 +229,5 @@ func Unarchive(input io.Reader, dir string) error {
 		return nil
 	}
 
-	return ex.Extract(context.Background(), input, nil, handler)
+	return ex.Extract(context.Background(), archiveReader, nil, handler)
 }
