@@ -15,6 +15,7 @@ import (
 	"github.com/M0Rf30/yap/options"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
+	"github.com/otiai10/copy"
 )
 
 type Debian struct {
@@ -136,7 +137,7 @@ func (d *Debian) createDebconfTemplate() error {
 	template := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebTemplate)
 	path := filepath.Join(d.debDir, "templates")
 
-	err = utils.CopyFile(template, path)
+	err = copy.Copy(template, path)
 	if err != nil {
 		return err
 	}
@@ -153,7 +154,7 @@ func (d *Debian) createDebconfConfig() error {
 	config := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebConfig)
 	path := filepath.Join(d.debDir, "config")
 
-	err = utils.CopyFile(config, path)
+	err = copy.Copy(config, path)
 	if err != nil {
 		return err
 	}
@@ -207,7 +208,7 @@ func (d *Debian) dpkgDeb() (string, error) {
 	}
 
 	_, dir := filepath.Split(filepath.Clean(d.PKGBUILD.PackageDir))
-	path := filepath.Join(d.PKGBUILD.Root, dir+".deb")
+	path := filepath.Join(d.PKGBUILD.StartDir, dir+".deb")
 
 	for _, arch := range d.PKGBUILD.Arch {
 		newPath = filepath.Join(d.PKGBUILD.Home,
@@ -218,7 +219,7 @@ func (d *Debian) dpkgDeb() (string, error) {
 
 	os.Remove(newPath)
 
-	err = utils.CopyFile(path, newPath)
+	err = copy.Copy(path, newPath)
 	if err != nil {
 		return "", err
 	}

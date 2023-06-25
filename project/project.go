@@ -12,6 +12,7 @@ import (
 	"github.com/M0Rf30/yap/packer"
 	"github.com/M0Rf30/yap/parser"
 	"github.com/M0Rf30/yap/utils"
+	"github.com/otiai10/copy"
 )
 
 var (
@@ -100,7 +101,7 @@ func (mpc *MultipleProject) BuildAll() error {
 
 			for _, ap := range artefactPaths {
 				filename := filepath.Base(ap)
-				if err := utils.CopyFile(ap, filepath.Join(mpc.Output, filename)); err != nil {
+				if err := copy.Copy(ap, filepath.Join(mpc.Output, filename)); err != nil {
 					return err
 				}
 			}
