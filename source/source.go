@@ -21,27 +21,27 @@ const (
 )
 
 type Source struct {
-	Root   string
-	Hash   string
-	Source string
-	Output string
-	Path   string
+	StartDir       string
+	Hash           string
+	SourceItemURI  string
+	SrcDir         string
+	SourceItemPath string
 }
 
 func (src *Source) getType() string {
-	if strings.HasPrefix(src.Source, "http://") {
+	if strings.HasPrefix(src.SourceItemURI, "http://") {
 		return "http"
 	}
 
-	if strings.HasPrefix(src.Source, "https://") {
+	if strings.HasPrefix(src.SourceItemURI, "https://") {
 		return "https"
 	}
 
-	if strings.HasPrefix(src.Source, "ftp://") {
+	if strings.HasPrefix(src.SourceItemURI, "ftp://") {
 		return "ftp"
 	}
 
-	if strings.HasPrefix(src.Source, git+"+https://") {
+	if strings.HasPrefix(src.SourceItemURI, git+"+https://") {
 		return git
 	}
 
@@ -49,55 +49,50 @@ func (src *Source) getType() string {
 }
 
 func (src *Source) parsePath() {
-	src.Path = filepath.Join(src.Output, utils.Filename(src.Source))
+	src.SourceItemPath = utils.Filename(src.SourceItemURI)
 }
 
-func (src *Source) getURL(protocol string) error {
-	exists, err := utils.Exists(src.Path)
-	if err != nil {
-		return err
-	}
+func (src *Source) getURL(protocol string) {
+	exists := utils.Exists(filepath.Join(src.StartDir, src.SourceItemPath))
 
 	if !exists {
 		if protocol != git {
-			utils.Download(src.Path, src.Source)
+			utils.Download(src.StartDir, src.SourceItemURI)
 		}
 
 		if protocol == git {
-			_, err = ggit.PlainClone(src.Path, false, &ggit.CloneOptions{
-				URL:      strings.Trim(src.Source, "git+"),
-				Progress: os.Stdout,
-			})
+			repoPath := filepath.Join(src.StartDir, src.SourceItemPath)
+			_, err := ggit.PlainClone(repoPath,
+				false, &ggit.CloneOptions{
+					URL:      strings.Trim(src.SourceItemURI, "git+"),
+					Progress: os.Stdout,
+				})
+
+			if err != nil && err.Error() == "repository already exists" {
+				_, _ = ggit.PlainOpenWithOptions(repoPath, &ggit.PlainOpenOptions{
+					DetectDotGit:          true,
+					EnableDotGitCommonDir: true,
+				})
+			}
 		}
 	}
-
-	return err
-}
-
-func (src *Source) getPath() error {
-	err := utils.CopyFile(filepath.Join(src.Root, src.Source), src.Path)
-	if err != nil {
-		return err
-	}
-
-	return err
 }
 
 func (src *Source) extract() error {
-	dlFile, err := os.Open(src.Path)
+	dlFile, err := os.Open(filepath.Join(src.StartDir, src.SourceItemPath))
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to open source %s\n",
 			string(constants.ColorBlue),
-			string(constants.ColorYellow), src.Source)
+			string(constants.ColorYellow), src.SourceItemURI)
 
 		return err
 	}
 
-	err = utils.Unarchive(dlFile, src.Output)
+	err = utils.Unarchive(dlFile, src.SrcDir)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to extract source %s\n",
 			string(constants.ColorBlue),
-			string(constants.ColorYellow), src.Path)
+			string(constants.ColorYellow), src.SourceItemPath)
 
 		log.Panic(err)
 	}
@@ -106,9 +101,7 @@ func (src *Source) extract() error {
 }
 
 func (src *Source) validate() error {
-	var err error
-
-	file, err := os.Open(src.Path)
+	info, err := os.Stat(filepath.Join(src.StartDir, src.SourceItemPath))
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to open file for hash\n",
 			string(constants.ColorBlue),
@@ -117,16 +110,14 @@ func (src *Source) validate() error {
 		return err
 	}
 
-	defer file.Close()
-
 	var hash hash.Hash
 
-	if src.Hash == "SKIP" {
+	if src.Hash == "SKIP" || info.IsDir() {
 		fmt.Printf("%s:: %sSkip integrity check for %s%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),
-			src.Source)
+			src.SourceItemURI)
 	}
 
 	switch len(src.Hash) {
@@ -137,6 +128,8 @@ func (src *Source) validate() error {
 	default:
 		return err
 	}
+
+	file, _ := os.Open(filepath.Join(src.StartDir, src.SourceItemPath))
 
 	_, err = io.Copy(hash, file)
 	if err != nil {
@@ -150,7 +143,7 @@ func (src *Source) validate() error {
 	if hexSum != src.Hash {
 		fmt.Printf("%s❌ :: %sHash verification failed for %s\n",
 			string(constants.ColorBlue),
-			string(constants.ColorYellow), src.Source)
+			string(constants.ColorYellow), src.SourceItemURI)
 	}
 
 	return err
@@ -163,15 +156,14 @@ func (src *Source) Get() error {
 
 	switch src.getType() {
 	case "http":
-		err = src.getURL("http")
+		src.getURL("http")
 	case "https":
-		err = src.getURL("https")
+		src.getURL("https")
 	case "ftp":
-		err = src.getURL("ftp")
+		src.getURL("ftp")
 	case "git":
-		err = src.getURL("git")
+		src.getURL("git")
 	case "file":
-		err = src.getPath()
 	default:
 		panic("utils: Unknown type")
 	}
@@ -185,10 +177,29 @@ func (src *Source) Get() error {
 		return err
 	}
 
+	err = src.symlinkSources()
+	if err != nil {
+		return err
+	}
+
 	err = src.extract()
 
 	if err != nil {
 		return err
+	}
+
+	return err
+}
+
+func (src *Source) symlinkSources() error {
+	var err error
+
+	symlinkSource := filepath.Join(src.StartDir, src.SourceItemPath)
+
+	symLinkTarget := filepath.Join(src.SrcDir, src.SourceItemPath)
+
+	if !utils.Exists(symLinkTarget) {
+		err = os.Symlink(symlinkSource, symLinkTarget)
 	}
 
 	return err

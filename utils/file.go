@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -142,105 +141,6 @@ func Open(path string) (*os.File, error) {
 	return file, err
 }
 
-// CopyFile copies the contents of the file named source to the file named
-// by dest. The file will be created if it does not already exist. If the
-// destination file exists, all it's contents will be replaced by the contents
-// of the source file. The file mode will be copied from the source and
-// the copied data is synced/flushed to stable storage.
-func CopyFile(source, dest string) (err error) {
-	file, err := os.Open(source)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	out, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if e := out.Close(); e != nil {
-			err = e
-		}
-	}()
-
-	_, err = io.Copy(out, file)
-	if err != nil {
-		return err
-	}
-
-	err = out.Sync()
-	if err != nil {
-		return err
-	}
-
-	si, err := os.Stat(source)
-	if err != nil {
-		return err
-	}
-
-	err = os.Chmod(dest, si.Mode())
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-// CopyDir recursively copies a directory tree, attempting to preserve permissions.
-// Source directory must exist, destination directory must *not* exist.
-// Symlinks are ignored and skipped.
-func CopyDir(source string, dest string) error {
-	source = filepath.Clean(source)
-	dest = filepath.Clean(dest)
-
-	sourceInfo, err := os.Stat(source)
-	if err != nil {
-		return err
-	}
-
-	_, err = os.Stat(dest)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	err = os.MkdirAll(dest, sourceInfo.Mode())
-	if err != nil {
-		return err
-	}
-
-	entries, err := os.ReadDir(source)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to read dir '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			source,
-			string(constants.ColorWhite))
-
-		return err
-	}
-
-	for _, entry := range entries {
-		sourcePath := filepath.Join(source, entry.Name())
-		destPath := filepath.Join(dest, entry.Name())
-
-		if entry.IsDir() {
-			err = CopyDir(sourcePath, destPath)
-			if err != nil {
-				return err
-			}
-		} else {
-			err = CopyFile(sourcePath, destPath)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return err
-}
-
 func FindExt(path string, extension string) ([]string, error) {
 	var files []string
 
@@ -299,22 +199,8 @@ func GetDirSize(path string) (int64, error) {
 	return size, err
 }
 
-func Exists(path string) (bool, error) {
-	exists := false
-	_, err := os.Stat(path)
+func Exists(filename string) bool {
+	_, err := os.Stat(filename)
 
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = nil
-		} else {
-			fmt.Printf("utils: Exists check error for '%s'\n", path)
-			log.Fatal(err)
-
-			return exists, err
-		}
-	} else {
-		exists = true
-	}
-
-	return exists, err
+	return !os.IsNotExist(err)
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/M0Rf30/yap/packer"
 	"github.com/M0Rf30/yap/parser"
 	"github.com/M0Rf30/yap/utils"
+	"github.com/otiai10/copy"
 )
 
 var (
@@ -100,7 +101,7 @@ func (mpc *MultipleProject) BuildAll() error {
 
 			for _, ap := range artefactPaths {
 				filename := filepath.Base(ap)
-				if err := utils.CopyFile(ap, filepath.Join(mpc.Output, filename)); err != nil {
+				if err := copy.Copy(ap, filepath.Join(mpc.Output, filename)); err != nil {
 					return err
 				}
 			}
@@ -164,15 +165,15 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 		return err
 	}
 
-	err = mpc.populateProjects(distro, release, path)
-	if err != nil {
-		return err
-	}
-
 	if !SkipSyncFlag {
 		if err := mpc.packageManager.Update(); err != nil {
 			return err
 		}
+	}
+
+	err = mpc.populateProjects(distro, release, path)
+	if err != nil {
+		return err
 	}
 
 	mpc.root = path
