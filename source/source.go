@@ -53,15 +53,17 @@ func (src *Source) parsePath() {
 }
 
 func (src *Source) getURL(protocol string) {
+	dloadFilePath := filepath.Join(src.StartDir, src.SourceItemPath)
+
 	exists := utils.Exists(filepath.Join(src.StartDir, src.SourceItemPath))
 
 	if !exists {
 		if protocol != git {
-			utils.Download(src.StartDir, src.SourceItemURI)
+			utils.Download(dloadFilePath, src.SourceItemURI)
 		}
 
 		if protocol == git {
-			repoPath := filepath.Join(src.StartDir, src.SourceItemPath)
+			repoPath := dloadFilePath
 			_, err := ggit.PlainClone(repoPath,
 				false, &ggit.CloneOptions{
 					URL:      strings.Trim(src.SourceItemURI, "git+"),
