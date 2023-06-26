@@ -90,22 +90,9 @@ func (mpc *MultipleProject) BuildAll() error {
 			return err
 		}
 
-		artefactPaths, err := proj.PackageManager.Build()
+		err := mpc.moveArtifacts(proj)
 		if err != nil {
 			return err
-		}
-
-		if mpc.Output != "" {
-			if err := utils.ExistsMakeDir(mpc.Output); err != nil {
-				return err
-			}
-
-			for _, ap := range artefactPaths {
-				filename := filepath.Base(ap)
-				if err := copy.Copy(ap, filepath.Join(mpc.Output, filename)); err != nil {
-					return err
-				}
-			}
 		}
 
 		if proj.HasToInstall {
@@ -183,6 +170,28 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 	return err
 }
 
+func (mpc *MultipleProject) moveArtifacts(proj *Project) error {
+	artefactPaths, err := proj.PackageManager.Build()
+	if err != nil {
+		return err
+	}
+
+	if mpc.Output != "" {
+		if err := utils.ExistsMakeDir(mpc.Output); err != nil {
+			return err
+		}
+
+		for _, ap := range artefactPaths {
+			filename := filepath.Base(ap)
+			if err := copy.Copy(ap, filepath.Join(mpc.Output, filename)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return err
+}
+
 func (mpc *MultipleProject) populateProjects(distro string, release string, path string) error {
 	var err error
 
@@ -196,7 +205,6 @@ func (mpc *MultipleProject) populateProjects(distro string, release string, path
 		}
 
 		mpc.packageManager = packer.GetPackageManager(pkgbuild, distro)
-
 		if !SkipSyncBuildEnvironmentDeps {
 			if err = mpc.packageManager.Prepare(); err != nil {
 				return err
