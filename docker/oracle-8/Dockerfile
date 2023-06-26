@@ -1,4 +1,4 @@
-FROM oraclelinux:8 AS builder
+FROM docker.io/oraclelinux:8 AS builder
 LABEL org.opencontainers.image.title="yap"
 LABEL org.opencontainers.image.description="Package software with ease 📦"
 LABEL org.opencontainers.image.vendor="M0Rf30"
@@ -24,9 +24,7 @@ WORKDIR /project
 RUN \
   go build -ldflags "-w -s" -trimpath -mod=readonly -modcacherw -o /usr/bin/;
 
-FROM oraclelinux:8
-COPY . /project
-WORKDIR /project
+FROM docker.io/oraclelinux:8
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
   dnf -y install bash-completion sudo; \

@@ -1,4 +1,4 @@
-FROM opensuse/tumbleweed:latest
+FROM docker.io/opensuse/tumbleweed:latest AS builder
 LABEL org.opencontainers.image.title="yap"
 LABEL org.opencontainers.image.description="Package software with ease 📦"
 LABEL org.opencontainers.image.vendor="M0Rf30"
@@ -10,8 +10,12 @@ COPY . /project
 WORKDIR /project
 RUN \
   go build -ldflags "-w -s" -trimpath -mod=readonly -modcacherw -o /usr/bin/; \
+
+FROM docker.io/opensuse/tumbleweed:latest
+COPY --from=builder /usr/bin/yap /usr/bin/yap
+RUN \
+  zypper -n install -y bash-completion sudo; \
   yap completion bash > /usr/share/bash-completion/completions/yap; \
-  echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \
-  rm -rf /project
+  echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc;
 
 ENTRYPOINT ["yap"]
