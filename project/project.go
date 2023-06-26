@@ -11,6 +11,7 @@ import (
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/packer"
 	"github.com/M0Rf30/yap/parser"
+	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
 	"github.com/otiai10/copy"
 )
@@ -165,8 +166,9 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 		return err
 	}
 
+	mpc.packageManager = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
 	if !SkipSyncFlag {
-		if err := mpc.packageManager.Update(); err != nil {
+		if err = mpc.packageManager.Update(); err != nil {
 			return err
 		}
 	}
