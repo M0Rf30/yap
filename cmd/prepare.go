@@ -8,6 +8,7 @@ import (
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/packer"
 	"github.com/M0Rf30/yap/pkgbuild"
+	"github.com/M0Rf30/yap/project"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,11 @@ var prepareCmd = &cobra.Command{
 		distro := split[0]
 
 		packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
+		if !project.SkipSyncFlag {
+			if err := packageManager.Update(); err != nil {
+				log.Fatal(err)
+			}
+		}
 
 		err := packageManager.PrepareEnvironment(GoLang)
 		if err != nil {
@@ -45,6 +51,8 @@ var prepareCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(prepareCmd)
+	prepareCmd.Flags().BoolVarP(&project.SkipSyncFlag,
+		"skip-sync", "s", false, "Skip sync with remotes for package managers")
 	prepareCmd.Flags().BoolVarP(&GoLang,
 		"golang", "g", false, "Additionally install golang")
 }
