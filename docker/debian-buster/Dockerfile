@@ -1,4 +1,4 @@
-FROM debian:buster AS builder
+FROM docker.io/debian:buster AS builder
 LABEL org.opencontainers.image.title="yap"
 LABEL org.opencontainers.image.description="Package software with ease 📦"
 LABEL org.opencontainers.image.vendor="M0Rf30"
@@ -21,9 +21,7 @@ WORKDIR /project
 RUN \
   go build -ldflags "-w -s" -trimpath -mod=readonly -modcacherw -o /usr/bin/;
 
-FROM debian:buster
-COPY . /project
-WORKDIR /project
+FROM docker.io/debian:buster
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
   apt-get update; \

@@ -1,4 +1,4 @@
-FROM archlinux:base AS builder
+FROM docker.io/archlinux:base AS builder
 LABEL org.opencontainers.image.title="yap"
 LABEL org.opencontainers.image.description="Package software with ease 📦"
 LABEL org.opencontainers.image.vendor="M0Rf30"
@@ -14,9 +14,7 @@ RUN \
   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \
   rm -rf /project
 
-FROM archlinux:base
-COPY . /project
-WORKDIR /project
+FROM docker.io/archlinux:base
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
   pacman -Syu --noconfirm bash-completion sudo; \

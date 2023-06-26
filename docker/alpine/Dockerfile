@@ -1,4 +1,4 @@
-FROM alpine:latest AS builder
+FROM docker.io/alpine:latest AS builder
 LABEL org.opencontainers.image.title="yap"
 LABEL org.opencontainers.image.description="Package software with ease 📦"
 LABEL org.opencontainers.image.vendor="M0Rf30"
@@ -12,9 +12,7 @@ RUN \
   go build -buildvcs=false -ldflags "-w -s" -trimpath -mod=readonly -modcacherw -o /usr/bin/;
 
 
-FROM alpine:latest
-COPY . /project
-WORKDIR /project
+FROM docker.io/alpine:latest
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
   apk add --no-cache bash-completion sudo; \
