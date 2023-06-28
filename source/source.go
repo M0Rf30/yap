@@ -55,27 +55,23 @@ func (src *Source) parsePath() {
 func (src *Source) getURL(protocol string) {
 	dloadFilePath := filepath.Join(src.StartDir, src.SourceItemPath)
 
-	exists := utils.Exists(filepath.Join(src.StartDir, src.SourceItemPath))
+	if protocol != git {
+		utils.Download(dloadFilePath, src.SourceItemURI)
+	}
 
-	if !exists {
-		if protocol != git {
-			utils.Download(dloadFilePath, src.SourceItemURI)
-		}
+	if protocol == git {
+		repoPath := dloadFilePath
+		_, err := ggit.PlainClone(repoPath,
+			false, &ggit.CloneOptions{
+				URL:      strings.Trim(src.SourceItemURI, "git+"),
+				Progress: os.Stdout,
+			})
 
-		if protocol == git {
-			repoPath := dloadFilePath
-			_, err := ggit.PlainClone(repoPath,
-				false, &ggit.CloneOptions{
-					URL:      strings.Trim(src.SourceItemURI, "git+"),
-					Progress: os.Stdout,
-				})
-
-			if err != nil && err.Error() == "repository already exists" {
-				_, _ = ggit.PlainOpenWithOptions(repoPath, &ggit.PlainOpenOptions{
-					DetectDotGit:          true,
-					EnableDotGitCommonDir: true,
-				})
-			}
+		if err != nil && err.Error() == "repository already exists" {
+			_, _ = ggit.PlainOpenWithOptions(repoPath, &ggit.PlainOpenOptions{
+				DetectDotGit:          true,
+				EnableDotGitCommonDir: true,
+			})
 		}
 	}
 }
