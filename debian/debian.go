@@ -32,35 +32,6 @@ func (d *Debian) getArch() {
 	}
 }
 
-func (d *Debian) getDepends() error {
-	var err error
-	if len(d.PKGBUILD.MakeDepends) == 0 {
-		return err
-	}
-
-	args := []string{
-		"--assume-yes",
-		"install",
-	}
-	args = append(args, d.PKGBUILD.MakeDepends...)
-
-	err = utils.Exec("", "apt-get", args...)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (d *Debian) getUpdates() error {
-	err := utils.Exec("", "apt-get", "--assume-yes", "update")
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func (d *Debian) createConfFiles() error {
 	var err error
 	if len(d.PKGBUILD.Backup) == 0 {
@@ -227,8 +198,13 @@ func (d *Debian) dpkgDeb() (string, error) {
 	return newPath, nil
 }
 
-func (d *Debian) Prepare() error {
-	err := d.getDepends()
+func (d *Debian) Prepare(makeDepends []string) error {
+	args := []string{
+		"--assume-yes",
+		"install",
+	}
+
+	err := d.PKGBUILD.GetDepends("apt-get", args, makeDepends)
 	if err != nil {
 		return err
 	}
@@ -266,7 +242,7 @@ func (d *Debian) Strip() error {
 }
 
 func (d *Debian) Update() error {
-	err := d.getUpdates()
+	err := d.PKGBUILD.GetUpdates("apt-get", "update")
 	if err != nil {
 		return err
 	}

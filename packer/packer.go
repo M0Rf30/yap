@@ -13,7 +13,7 @@ import (
 )
 
 type Packer interface {
-	Prepare() error
+	Prepare([]string) error
 	Build() ([]string, error)
 	Install() error
 	PrepareEnvironment(bool) error

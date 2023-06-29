@@ -31,7 +31,6 @@ type DistroProject interface {
 type Project struct {
 	Builder        *builder.Builder
 	BuildRoot      string
-	DependsOn      []*Project
 	Distro         string
 	MirrorRoot     string
 	PackageManager packer.Packer
@@ -45,9 +44,10 @@ type Project struct {
 type MultipleProject struct {
 	packageManager packer.Packer
 	root           string
-	BuildDir       string     `json:"buildDir"`
-	Description    string     `json:"description"`
-	Name           string     `json:"name"`
+	BuildDir       string `json:"buildDir"`
+	Description    string `json:"description"`
+	Name           string `json:"name"`
+	makeDepends    []string
 	Output         string     `json:"output"`
 	Projects       []*Project `json:"projects"`
 }
@@ -165,6 +165,14 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 		return err
 	}
 
+	if !SkipSyncBuildEnvironmentDeps {
+		mpc.getMakeDeps()
+
+		if err = mpc.packageManager.Prepare(mpc.makeDepends); err != nil {
+			return err
+		}
+	}
+
 	mpc.root = path
 
 	return err
@@ -205,15 +213,9 @@ func (mpc *MultipleProject) populateProjects(distro string, release string, path
 		}
 
 		mpc.packageManager = packer.GetPackageManager(pkgbuild, distro)
-		if !SkipSyncBuildEnvironmentDeps {
-			if err = mpc.packageManager.Prepare(); err != nil {
-				return err
-			}
-		}
 
 		proj := &Project{
 			Name:           child.Name,
-			DependsOn:      nil,
 			Builder:        &builder.Builder{PKGBUILD: pkgbuild},
 			PackageManager: mpc.packageManager,
 			HasToInstall:   child.HasToInstall,
@@ -225,6 +227,16 @@ func (mpc *MultipleProject) populateProjects(distro string, release string, path
 	mpc.Projects = projects
 
 	return err
+}
+
+func (mpc *MultipleProject) getMakeDeps() {
+	var makeDepends []string
+
+	for _, child := range mpc.Projects {
+		makeDepends = append(makeDepends, child.Builder.PKGBUILD.MakeDepends...)
+	}
+
+	mpc.makeDepends = makeDepends
 }
 
 func (mpc *MultipleProject) readProject(path string) error {

@@ -37,27 +37,6 @@ func (r *Redhat) getRPMGroup() {
 	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
 }
 
-func (r *Redhat) getDepends() error {
-	var err error
-	if len(r.PKGBUILD.MakeDepends) == 0 {
-		return err
-	}
-
-	args := []string{
-		"-y",
-		"install",
-	}
-	args = append(args, r.PKGBUILD.MakeDepends...)
-
-	err = utils.Exec("", "yum", args...)
-
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func (r *Redhat) getFiles() error {
 	backup := set.NewSet()
 	paths := set.NewSet()
@@ -163,8 +142,13 @@ func (r *Redhat) rpmBuild() error {
 	return err
 }
 
-func (r *Redhat) Prepare() error {
-	err := r.getDepends()
+func (r *Redhat) Prepare(makeDepends []string) error {
+	args := []string{
+		"-y",
+		"install",
+	}
+
+	err := r.PKGBUILD.GetDepends("dnf", args, makeDepends)
 	if err != nil {
 		return err
 	}

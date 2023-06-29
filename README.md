@@ -18,9 +18,6 @@ Each distribution is different and will still require different build
 instructions, but a consistent build process and format can be used for all
 builds.
 
-Docker only supports 64-bit containers, Yap can't be used to build packages
-32-bit packages.
-
 ## Initialize
 
 It is recommended to build the OCI images locally instead of pulling each image
