@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/constants"
+	"github.com/M0Rf30/yap/utils"
 )
 
 var Verbose bool
@@ -238,4 +239,29 @@ func (p *PKGBUILD) Validate() {
 			string(constants.ColorWhite))
 		os.Exit(1)
 	}
+}
+
+func (p *PKGBUILD) GetDepends(packageManager string, args []string, makeDepends []string) error {
+	var err error
+	if len(makeDepends) == 0 {
+		return err
+	}
+
+	args = append(args, makeDepends...)
+
+	err = utils.Exec("", packageManager, args...)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (p *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
+	err := utils.Exec("", packageManager, args...)
+	if err != nil {
+		return err
+	}
+
+	return err
 }

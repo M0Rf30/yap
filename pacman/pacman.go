@@ -18,35 +18,6 @@ type Pacman struct {
 	pacmanDir string
 }
 
-func (p *Pacman) getDepends() error {
-	var err error
-	if len(p.PKGBUILD.MakeDepends) == 0 {
-		return err
-	}
-
-	args := []string{
-		"-S",
-		"--noconfirm",
-	}
-	args = append(args, p.PKGBUILD.MakeDepends...)
-
-	err = utils.Exec("", "pacman", args...)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (p *Pacman) getUpdates() error {
-	err := utils.Exec("", "pacman", "-Sy")
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func (p *Pacman) createInstall() error {
 	path := filepath.Join(p.pacmanDir, p.PKGBUILD.PkgName+".install")
 
@@ -143,8 +114,13 @@ func (p *Pacman) pacmanBuild() error {
 	return err
 }
 
-func (p *Pacman) Prepare() error {
-	err := p.getDepends()
+func (p *Pacman) Prepare(makeDepends []string) error {
+	args := []string{
+		"-S",
+		"--noconfirm",
+	}
+
+	err := p.PKGBUILD.GetDepends("pacman", args, makeDepends)
 	if err != nil {
 		return err
 	}
@@ -153,7 +129,7 @@ func (p *Pacman) Prepare() error {
 }
 
 func (p *Pacman) Update() error {
-	err := p.getUpdates()
+	err := p.PKGBUILD.GetUpdates("pacman", "-Sy")
 	if err != nil {
 		return err
 	}
