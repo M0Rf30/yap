@@ -18,34 +18,6 @@ type Apk struct {
 	apkDir   string
 }
 
-func (a *Apk) getDepends() error {
-	var err error
-	if len(a.PKGBUILD.MakeDepends) == 0 {
-		return err
-	}
-
-	args := []string{
-		"add",
-	}
-	args = append(args, a.PKGBUILD.MakeDepends...)
-
-	err = utils.Exec("", "apk", args...)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (a *Apk) getUpdates() error {
-	err := utils.Exec("", "apk", "update")
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func (a *Apk) createInstall() error {
 	path := filepath.Join(a.apkDir, a.PKGBUILD.PkgName+".install")
 
@@ -147,8 +119,12 @@ func (a *Apk) apkBuild() error {
 	return err
 }
 
-func (a *Apk) Prepare() error {
-	err := a.getDepends()
+func (a *Apk) Prepare(makeDepends []string) error {
+	args := []string{
+		"add",
+	}
+
+	err := a.PKGBUILD.GetDepends("apk", args, makeDepends)
 	if err != nil {
 		return err
 	}
@@ -157,7 +133,7 @@ func (a *Apk) Prepare() error {
 }
 
 func (a *Apk) Update() error {
-	err := a.getUpdates()
+	err := a.PKGBUILD.GetUpdates("apk", "update")
 	if err != nil {
 		return err
 	}
