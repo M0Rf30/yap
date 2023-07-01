@@ -6,28 +6,28 @@ var buildEnvironmentDeps = []string{
 
 const specFile = `
 {{- /* Mandatory fields */ -}}
-pkgname={{.PKGBUILD.PkgName}}
-{{- with .PKGBUILD.Epoch}}
-epoch={{.PKGBUILD.Epoch}}
+pkgname={{.PkgName}}
+{{- with .Epoch}}
+epoch={{.Epoch}}
 {{- end }}
-pkgver={{.PKGBUILD.PkgVer}}
-pkgrel={{.PKGBUILD.PkgRel}}
-pkgdesc="{{.PKGBUILD.PkgDesc}}"
+pkgver={{.PkgVer}}
+pkgrel={{.PkgRel}}
+pkgdesc="{{.PkgDesc}}"
 arch="all"
-{{- with .PKGBUILD.Depends}}
+{{- with .Depends}}
 depends="{{join .}}"
 {{- end }}
-{{- with .PKGBUILD.Conflicts}}
+{{- with .Conflicts}}
 conflicts=({{join .}})
 {{- end }}
-{{- if .PKGBUILD.URL}}
-url="{{.PKGBUILD.URL}}"
+{{- if .URL}}
+url="{{.URL}}"
 {{- end }}
-{{- if .PKGBUILD.Install}}
-install={{.PKGBUILD.PkgName}}.install
+{{- if .Install}}
+install={{.PkgName}}.install
 {{- end }}
-{{- if .PKGBUILD.License}}
-license={{.PKGBUILD.License}}
+{{- if .License}}
+license={{.License}}
 {{- else }}
 license="CUSTOM"
 {{- end }}
@@ -39,39 +39,39 @@ package() {
 }
 `
 const postInstall = `
-{{- if .PKGBUILD.PreInst}}
+{{- if .PreInst}}
 pre_install() {
-  {{.PKGBUILD.PreInst}}"
+  {{.PreInst}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PostInst}}
+{{- if .PostInst}}
 post_install() {
-  {{.PKGBUILD.PostInst}}"
+  {{.PostInst}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PreInst}}
+{{- if .PreInst}}
 pre_upgrade() {
-  {{.PKGBUILD.PreInst}}"
+  {{.PreInst}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PostInst}}
+{{- if .PostInst}}
 post_upgrade() {
-  {{.PKGBUILD.PostInst}}"
+  {{.PostInst}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PreRm}}
+{{- if .PreRm}}
 pre_remove() {
-  {{.PKGBUILD.PreRm}}"
+  {{.PreRm}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PostRm}}
+{{- if .PostRm}}
 post_remove() {
-  {{.PKGBUILD.PostRm}}"
+  {{.PostRm}}"
 }
 {{- end }}
 `

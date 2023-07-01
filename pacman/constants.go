@@ -6,80 +6,82 @@ var buildEnvironmentDeps = []string{
 
 const specFile = `
 {{- /* Mandatory fields */ -}}
-# Maintainer: {{.PKGBUILD.Maintainer}}
-pkgname={{.PKGBUILD.PkgName}}
-{{- with .PKGBUILD.Epoch}}
-epoch={{.PKGBUILD.Epoch}}
+# Maintainer: {{.Maintainer}}
+pkgname={{.PkgName}}
+{{- with .Epoch}}
+epoch={{.Epoch}}
 {{- end }}
-pkgver={{.PKGBUILD.PkgVer}}
-pkgrel={{.PKGBUILD.PkgRel}}
-pkgdesc="{{.PKGBUILD.PkgDesc}}"
-{{- with .PKGBUILD.Arch}}
+pkgver={{.PkgVer}}
+pkgrel={{.PkgRel}}
+pkgdesc="{{.PkgDesc}}"
+{{- with .Arch}}
 arch=({{join .}})
 {{- end }}
-{{- with .PKGBUILD.Depends}}
+{{- with .Depends}}
 depends=({{join .}})
 {{- end }}
-{{- with .PKGBUILD.OptDepends}}
+{{- with .OptDepends}}
 optdepends=({{join .}})
 {{- end }}
 {{- /* Optional fields */ -}}
-{{- with .PKGBUILD.Provides}}
+{{- with .Provides}}
 provides=({{join .}})
 {{- end }}
-{{- with .PKGBUILD.Conflicts}}
+{{- with .Conflicts}}
 conflicts=({{join .}})
 {{- end }}
-{{- if .PKGBUILD.URL}}
-url="{{.PKGBUILD.URL}}"
+{{- if .URL}}
+url="{{.URL}}"
 {{- end }}
-{{- if .PKGBUILD.Backup}}
+{{- if .Backup}}
 backup=("{{join .}}")
 {{- end }}
-{{- with .PKGBUILD.License}}
+{{- with .License}}
 license=({{join .}})
 {{- end }}
 options=("emptydirs")
-install={{.PKGBUILD.PkgName}}.install
+install={{.PkgName}}.install
 
-package() {
-  mv -f "${startdir}/staging/${pkgname}" "${pkgdir}"
-}
+{{- if .Build}}
+build() {{.Build}}
+{{- end }}
+
+package() {{.Package}}
 `
 const postInstall = `
-{{- if .PKGBUILD.PreInst}}
+{{- if .PreInst}}
 pre_install() {
-  {{.PKGBUILD.PreInst}}"
+  {{.PreInst}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PostInst}}
+{{- if .PostInst}}
 post_install() {
-  {{.PKGBUILD.PostInst}}"
+  {{.PostInst}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PreInst}}
+{{- if .PreInst}}
 pre_upgrade() {
-  {{.PKGBUILD.PreInst}}"
+  {{.PreInst}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PostInst}}
+{{- if .PostInst}}
 post_upgrade() {
-  {{.PKGBUILD.PostInst}}"
+  {{.PostInst}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PreRm}}
+{{- if .PreRm}}
 pre_remove() {
-  {{.PKGBUILD.PreRm}}"
+  {{.PreRm}}"
 }
 {{- end }}
 
-{{- if .PKGBUILD.PostRm}}
+{{- if .PostRm}}
 post_remove() {
-  {{.PKGBUILD.PostRm}}"
+  {{.PostRm}}"
 }
 {{- end }}
 `
