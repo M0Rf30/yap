@@ -60,15 +60,14 @@ func (src *Source) getURL(protocol string) {
 	}
 
 	if protocol == git {
-		repoPath := dloadFilePath
-		_, err := ggit.PlainClone(repoPath,
+		_, err := ggit.PlainClone(dloadFilePath,
 			false, &ggit.CloneOptions{
 				URL:      strings.Trim(src.SourceItemURI, "git+"),
 				Progress: os.Stdout,
 			})
 
 		if err != nil && err.Error() == "repository already exists" {
-			_, _ = ggit.PlainOpenWithOptions(repoPath, &ggit.PlainOpenOptions{
+			_, _ = ggit.PlainOpenWithOptions(dloadFilePath, &ggit.PlainOpenOptions{
 				DetectDotGit:          true,
 				EnableDotGitCommonDir: true,
 			})
@@ -148,11 +147,13 @@ func (src *Source) validate() error {
 }
 
 func (src *Source) Get() error {
-	src.parsePath()
-
 	var err error
 
-	switch src.getType() {
+	src.parsePath()
+
+	sourceType := src.getType()
+
+	switch sourceType {
 	case "http":
 		src.getURL("http")
 	case "https":
@@ -163,7 +164,11 @@ func (src *Source) Get() error {
 		src.getURL("git")
 	case "file":
 	default:
-		panic("utils: Unknown type")
+		fmt.Printf("%s❌ :: %sunknown or unsupported source type: %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), sourceType)
+
+		os.Exit(1)
 	}
 
 	if err != nil {
