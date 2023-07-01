@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
 	"github.com/otiai10/copy"
@@ -89,8 +90,9 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 	home, err := filepath.Abs(home)
 
 	if err != nil {
-		fmt.Printf("parse: Failed to get root directory from '%s'\n",
-			home)
+		fmt.Printf("%s❌ :: %sfailed to get root directory from %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), home)
 
 		return nil, err
 	}

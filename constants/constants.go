@@ -1,6 +1,8 @@
 package constants
 
 import (
+	"fmt"
+	"os"
 	"strings"
 
 	"github.com/M0Rf30/yap/set"
@@ -34,21 +36,21 @@ var (
 	}
 
 	ReleasesMatch = map[string]string{
-		"alpine":         "",
-		"arch":           "",
-		"astra":          "astra",
-		"amazo-1":        ".amzn1.",
-		"amazon-2":       ".amzn2.",
-		"fedora-35":      ".fc35.",
-		"debian-jessie":  "jessie",
-		"debian-stretch": "stretch",
-		"debian-buster":  "buster",
-		"oracle-8":       ".ol8.",
-		"rocky-8":        ".el8.",
-		"rocky-9":        ".el9.",
-		"ubuntu-bionic":  "bionic",
-		"ubuntu-focal":   "focal",
-		"ubuntu-jammy":   "jammy",
+		"alpine":        "",
+		"arch":          "",
+		"astra":         "astra",
+		"amazo-1":       ".amzn1.",
+		"amazon-2":      ".amzn2.",
+		"fedora-35":     ".fc35.",
+		"debian-jessie": "jessie",
+		"A-stretch":     "stretch",
+		"debian-buster": "buster",
+		"oracle-8":      ".ol8.",
+		"rocky-8":       ".el8.",
+		"rocky-9":       ".el9.",
+		"ubuntu-bionic": "bionic",
+		"ubuntu-focal":  "focal",
+		"ubuntu-jammy":  "jammy",
 	}
 
 	DistroToPackageManager = map[string]string{
@@ -99,7 +101,11 @@ func init() {
 		case "redhat":
 			packageManager = "yum"
 		default:
-			panic("Failed to find packageManager for distro")
+			fmt.Printf("%s❌ :: %sfailed to find supported package manager for %s\n",
+				string(ColorBlue),
+				string(ColorYellow), distro)
+
+			os.Exit(1)
 		}
 
 		DistroPackageManager[distro] = packageManager

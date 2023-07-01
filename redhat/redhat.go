@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/set"
 	"github.com/M0Rf30/yap/utils"
@@ -196,8 +197,9 @@ func (r *Redhat) copyArtifacts() error {
 	archs, err := os.ReadDir(r.rpmsDir)
 
 	if err != nil {
-		fmt.Printf("redhat: Failed to find rpms from '%s'\n",
-			r.rpmsDir)
+		fmt.Printf("%s❌ :: %sfailed to find .rpm files in %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), r.rpmsDir)
 
 		return err
 	}
