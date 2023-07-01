@@ -2,8 +2,11 @@ package pkgbuild
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"strings"
+	"text/template"
 
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/utils"
@@ -21,10 +24,12 @@ type PKGBUILD struct {
 	Depends        []string
 	Distro         string
 	Epoch          string
+	Files          []string
 	FullDistroName string
 	HashSums       []string
 	Home           string
 	Install        string
+	InstalledSize  int64
 	License        []string
 	Maintainer     string
 	MakeDepends    []string
@@ -261,6 +266,46 @@ func (p *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
 	err := utils.Exec("", packageManager, args...)
 	if err != nil {
 		return err
+	}
+
+	return err
+}
+
+func (p *PKGBUILD) CreateSpec(filePath string, script string) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	// remember to close the file
+	defer file.Close()
+	// create new buffer
+	writer := io.Writer(file)
+
+	tmpl := template.New("template")
+	tmpl.Funcs(template.FuncMap{
+		"join": func(strs []string) string {
+			return strings.Trim(strings.Join(strs, ", "), " ")
+		},
+		"multiline": func(strs string) string {
+			ret := strings.ReplaceAll(strs, "\n", "\n ")
+
+			return strings.Trim(ret, " \n")
+		},
+	})
+
+	template.Must(tmpl.Parse(script))
+
+	if Verbose {
+		err = tmpl.Execute(os.Stdout, p)
+		if err != nil {
+			log.Panic(err)
+		}
+	}
+
+	err = tmpl.Execute(writer, p)
+	if err != nil {
+		log.Panic(err)
 	}
 
 	return err

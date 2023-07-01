@@ -19,34 +19,34 @@ var ArchToDebian = map[string]string{
 
 const specFile = `
 {{- /* Mandatory fields */ -}}
-Package: {{.PKGBUILD.PkgName}}
-Version: {{ if .PKGBUILD.Epoch}}{{ .PKGBUILD.Epoch }}:{{ end }}{{.PKGBUILD.PkgVer}}
-         {{- if .PKGBUILD.PreRelease}}~{{ .PKGBUILD.PreRelease }}{{- end }}
-         {{- if .PKGBUILD.PkgRel}}-{{ .PKGBUILD.PkgRel }}{{- end }}
-Section: {{.PKGBUILD.Section}}
-Priority: {{.PKGBUILD.Priority}}
-{{- with .PKGBUILD.Arch}}
+Package: {{.PkgName}}
+Version: {{ if .Epoch}}{{ .Epoch }}:{{ end }}{{.PkgVer}}
+         {{- if .PreRelease}}~{{ .PreRelease }}{{- end }}
+         {{- if .PkgRel}}-{{ .PkgRel }}{{- end }}
+Section: {{.Section}}
+Priority: {{.Priority}}
+{{- with .Arch}}
 Architecture: {{join .}}
 {{- end }}
 {{- /* Optional fields */ -}}
-{{- if .PKGBUILD.Maintainer}}
-Maintainer: {{.PKGBUILD.Maintainer}}
+{{- if .Maintainer}}
+Maintainer: {{.Maintainer}}
 {{- end }}
 Installed-Size: {{.InstalledSize}}
-{{- with .PKGBUILD.Provides}}
+{{- with .Provides}}
 Provides: {{join .}}
 {{- end }}
-{{- with .PKGBUILD.Depends}}
+{{- with .Depends}}
 Depends: {{join .}}
 {{- end }}
-{{- with .PKGBUILD.Conflicts}}
+{{- with .Conflicts}}
 Conflicts: {{join .}}
 {{- end }}
-{{- if .PKGBUILD.URL}}
-Homepage: {{.PKGBUILD.URL}}
+{{- if .URL}}
+Homepage: {{.URL}}
 {{- end }}
 {{- /* Mandatory fields */}}
-Description: {{multiline .PKGBUILD.PkgDesc}}
+Description: {{multiline .PkgDesc}}
 `
 
 const removeHeader = `#!/bin/bash

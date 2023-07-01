@@ -47,6 +47,10 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 		case "pkgrel":
 			return pkgbuild.PkgVer
 		case "pkgdir":
+			if pkgbuild.Distro == "arch" {
+				return filepath.Join(pkgbuild.PackageDir, pkgbuild.PkgName)
+			}
+
 			return pkgbuild.PackageDir
 		case "srcdir":
 			return pkgbuild.SourceDir

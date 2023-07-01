@@ -62,36 +62,36 @@ var (
 
 const specFile = `
 {{- /* Mandatory fields */ -}}
-Name: {{.PKGBUILD.PkgName}}
-Summary: {{.PKGBUILD.PkgDesc}}
-Version: {{.PKGBUILD.PkgVer}}
-Release: {{.PKGBUILD.PkgRel}}
-{{- if .PKGBUILD.Section}}
-Group: {{.PKGBUILD.Section}}
+Name: {{.PkgName}}
+Summary: {{.PkgDesc}}
+Version: {{.PkgVer}}
+Release: {{.PkgRel}}
+{{- if .Section}}
+Group: {{.Section}}
 {{- end }}
-{{- if .PKGBUILD.URL}}
-URL: {{.PKGBUILD.URL}}
+{{- if .URL}}
+URL: {{.URL}}
 {{- end }}
-{{- if .PKGBUILD.License}}
-{{- with .PKGBUILD.License}}
+{{- if .License}}
+{{- with .License}}
 License: {{join .}}
 {{- end }}
 {{- else }}
 License: CUSTOM
 {{- end }}
-{{- if .PKGBUILD.Maintainer}}
-Packager: {{.PKGBUILD.Maintainer}}
+{{- if .Maintainer}}
+Packager: {{.Maintainer}}
 {{- end }}
-{{- with .PKGBUILD.Provides}}
+{{- with .Provides}}
 Provides: {{join .}}
 {{- end }}
-{{- with .PKGBUILD.Conflicts}}
+{{- with .Conflicts}}
 Conflicts: {{join .}}
 {{- end }}
-{{- with .PKGBUILD.Depends}}
+{{- with .Depends}}
 Requires: {{join .}}
 {{- end }}
-{{- with .PKGBUILD.MakeDepends}}
+{{- with .MakeDepends}}
 BuildRequires: {{join .}}
 {{- end }}
 
@@ -101,7 +101,7 @@ BuildRequires: {{join .}}
 %undefine __brp_python_bytecompile
 
 %description
-{{.PKGBUILD.PkgDesc}}
+{{.PkgDesc}}
 
 %files
 {{- range $key, $value := .Files }}
@@ -110,25 +110,25 @@ BuildRequires: {{join .}}
 {{- end }}
 {{- end }}
 
-{{- with .PKGBUILD.PreInst}}
+{{- with .PreInst}}
 %pre
-{{.PKGBUILD.PreInst}}
+{{.PreInst}}
 {{- end }}
 
-{{- with .PKGBUILD.PostInst}}
+{{- with .PostInst}}
 %post
-{{.PKGBUILD.PostRm}}
+{{.PostRm}}
 {{- end }}
 
-{{- with .PKGBUILD.PreRm}}
+{{- with .PreRm}}
 %preun
 if [[ "$1" -ne 0 ]]; then exit 0; fi
-{{.PKGBUILD.PreRm}}
+{{.PreRm}}
 {{- end }}
 
-{{- with .PKGBUILD.PostRm}}
+{{- with .PostRm}}
 %postun
 if [[ "$1" -ne 0 ]]; then exit 0; fi
-{{.PKGBUILD.PostRm}}
+{{.PostRm}}
 {{- end }}
 `

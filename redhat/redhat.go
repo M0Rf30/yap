@@ -2,12 +2,9 @@ package redhat
 
 import (
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
-	"text/template"
 
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pkgbuild"
@@ -25,7 +22,6 @@ type Redhat struct {
 	sourcesDir   string
 	specsDir     string
 	srpmsDir     string
-	Files        []string
 }
 
 func (r *Redhat) getArch() {
@@ -86,48 +82,7 @@ func (r *Redhat) getFiles() error {
 			path = `"` + path + `"`
 		}
 
-		r.Files = append(r.Files, path)
-	}
-
-	return err
-}
-
-func (r *Redhat) createSpec() error {
-	path := filepath.Join(r.specsDir, r.PKGBUILD.PkgName+".spec")
-	file, err := os.Create(path)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	// remember to close the file
-	defer file.Close()
-	// create new buffer
-	writer := io.Writer(file)
-
-	tmpl := template.New("specfile")
-	tmpl.Funcs(template.FuncMap{
-		"join": func(strs []string) string {
-			return strings.Trim(strings.Join(strs, ", "), " ")
-		},
-		"multiline": func(strs string) string {
-			ret := strings.ReplaceAll(strs, "\n", "\n ")
-
-			return strings.Trim(ret, " \n")
-		},
-	})
-
-	template.Must(tmpl.Parse(specFile))
-
-	if pkgbuild.Verbose {
-		err = tmpl.Execute(os.Stdout, r)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	err = tmpl.Execute(writer, r)
-	if err != nil {
-		log.Fatal(err)
+		r.PKGBUILD.Files = append(r.PKGBUILD.Files, path)
 	}
 
 	return err
@@ -248,7 +203,7 @@ func (r *Redhat) Build() ([]string, error) {
 		return nil, err
 	}
 
-	err = r.createSpec()
+	err = r.PKGBUILD.CreateSpec(filepath.Join(r.specsDir, r.PKGBUILD.PkgName+".spec"), specFile)
 	if err != nil {
 		return nil, err
 	}

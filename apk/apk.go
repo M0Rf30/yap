@@ -1,12 +1,7 @@
 package apk
 
 import (
-	"io"
-	"log"
-	"os"
 	"path/filepath"
-	"strings"
-	"text/template"
 
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
@@ -16,93 +11,6 @@ import (
 type Apk struct {
 	PKGBUILD *pkgbuild.PKGBUILD
 	apkDir   string
-}
-
-func (a *Apk) createInstall() error {
-	path := filepath.Join(a.apkDir, a.PKGBUILD.PkgName+".install")
-
-	file, err := os.Create(path)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// remember to close the file
-	defer file.Close()
-
-	// create new buffer
-	writer := io.Writer(file)
-
-	tmpl := template.New(".install")
-	tmpl.Funcs(template.FuncMap{
-		"join": func(strs []string) string {
-			return strings.Trim(strings.Join(strs, ", "), " ")
-		},
-		"multiline": func(strs string) string {
-			ret := strings.ReplaceAll(strs, "\n", "\n ")
-
-			return strings.Trim(ret, " \n")
-		},
-	})
-
-	template.Must(tmpl.Parse(postInstall))
-
-	if pkgbuild.Verbose {
-		err = tmpl.Execute(os.Stdout, a)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	err = tmpl.Execute(writer, a)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return err
-}
-
-func (a *Apk) createMake() error {
-	path := filepath.Join(a.apkDir, "APKBUILD")
-	file, err := os.Create(path)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// remember to close the file
-	defer file.Close()
-
-	// create new buffer
-	writer := io.Writer(file)
-
-	tmpl := template.New("apkbuild")
-	tmpl.Funcs(template.FuncMap{
-		"join": func(strs []string) string {
-			return strings.Trim(strings.Join(strs, ", "), " ")
-		},
-		"multiline": func(strs string) string {
-			ret := strings.ReplaceAll(strs, "\n", "\n ")
-
-			return strings.Trim(ret, " \n")
-		},
-	})
-
-	template.Must(tmpl.Parse(specFile))
-
-	if pkgbuild.Verbose {
-		err = tmpl.Execute(os.Stdout, a)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	err = tmpl.Execute(writer, a)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return err
 }
 
 func (a *Apk) apkBuild() error {
@@ -169,12 +77,12 @@ func (a *Apk) Build() ([]string, error) {
 		return nil, err
 	}
 
-	err = a.createMake()
+	err = a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir, "APKBUILD"), specFile)
 	if err != nil {
 		return nil, err
 	}
 
-	err = a.createInstall()
+	err = a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir, a.PKGBUILD.PkgName+".install"), postInstall)
 	if err != nil {
 		return nil, err
 	}

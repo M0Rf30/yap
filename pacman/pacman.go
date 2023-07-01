@@ -1,108 +1,15 @@
 package pacman
 
 import (
-	"io"
-	"log"
-	"os"
 	"path/filepath"
-	"strings"
-	"text/template"
 
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
-	"github.com/otiai10/copy"
 )
 
 type Pacman struct {
 	PKGBUILD  *pkgbuild.PKGBUILD
 	pacmanDir string
-}
-
-func (p *Pacman) createInstall() error {
-	path := filepath.Join(p.pacmanDir, p.PKGBUILD.PkgName+".install")
-
-	file, err := os.Create(path)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// remember to close the file
-	defer file.Close()
-
-	// create new buffer
-	writer := io.Writer(file)
-
-	tmpl := template.New(".install")
-	tmpl.Funcs(template.FuncMap{
-		"join": func(strs []string) string {
-			return strings.Trim(strings.Join(strs, ", "), " ")
-		},
-		"multiline": func(strs string) string {
-			ret := strings.ReplaceAll(strs, "\n", "\n ")
-
-			return strings.Trim(ret, " \n")
-		},
-	})
-
-	template.Must(tmpl.Parse(postInstall))
-
-	if pkgbuild.Verbose {
-		err = tmpl.Execute(os.Stdout, p)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	err = tmpl.Execute(writer, p)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return err
-}
-
-func (p *Pacman) createMake() error {
-	path := filepath.Join(p.pacmanDir, "PKGBUILD")
-	file, err := os.Create(path)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// remember to close the file
-	defer file.Close()
-
-	// create new buffer
-	writer := io.Writer(file)
-
-	tmpl := template.New("pkgbuild")
-	tmpl.Funcs(template.FuncMap{
-		"join": func(strs []string) string {
-			return strings.Trim(strings.Join(strs, " "), "\n")
-		},
-		"multiline": func(strs string) string {
-			ret := strings.ReplaceAll(strs, "\n", "\n ")
-
-			return strings.Trim(ret, " \n")
-		},
-	})
-
-	template.Must(tmpl.Parse(specFile))
-
-	if pkgbuild.Verbose {
-		err = tmpl.Execute(os.Stdout, p)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	err = tmpl.Execute(writer, p)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return err
 }
 
 func (p *Pacman) pacmanBuild() error {
@@ -137,40 +44,15 @@ func (p *Pacman) Update() error {
 	return err
 }
 
-func (p *Pacman) makePackerDir() error {
-	err := utils.ExistsMakeDir(p.pacmanDir)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func (p *Pacman) Build() ([]string, error) {
-	p.pacmanDir = filepath.Join(p.PKGBUILD.StartDir)
-	stagingDir := filepath.Join(p.pacmanDir, "staging", p.PKGBUILD.PkgName)
+	p.pacmanDir = p.PKGBUILD.StartDir
 
-	err := utils.RemoveAll(p.pacmanDir)
+	err := p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir, "PKGBUILD"), specFile)
 	if err != nil {
 		return nil, err
 	}
 
-	err = p.makePackerDir()
-	if err != nil {
-		return nil, err
-	}
-
-	err = p.createMake()
-	if err != nil {
-		return nil, err
-	}
-
-	err = p.createInstall()
-	if err != nil {
-		return nil, err
-	}
-
-	err = copy.Copy(p.PKGBUILD.PackageDir, stagingDir)
+	err = p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir, p.PKGBUILD.PkgName+".install"), postInstall)
 	if err != nil {
 		return nil, err
 	}
