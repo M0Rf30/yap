@@ -5,11 +5,7 @@ LABEL org.opencontainers.image.vendor="M0Rf30"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN \
-  dnf -y install dnf-plugins-core epel-release; \
-  dnf config-manager --set-enabled powertools; \
-  dnf config-manager --set-enabled appstream; \
-  dnf -y groupinstall 'Development Tools'; \
-  dnf -y install tar; \
+  dnf -y install curl tar; \
   curl -sL https://dl.google.com/go/go1.20.linux-amd64.tar.gz --output go.tar.gz; \
   echo "5a9ebcc65c1cce56e0d2dc616aff4c4cedcfbda8cc6f0288cc08cda3b18dcbf1 go.tar.gz" | sha256sum -c - ; \
   tar -C /usr/lib -xf go.tar.gz; \
