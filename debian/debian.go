@@ -3,7 +3,6 @@ package debian
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -19,11 +18,10 @@ import (
 )
 
 type Debian struct {
-	PKGBUILD      *pkgbuild.PKGBUILD
-	debDir        string
-	InstalledSize int64
-	// sums          string
+	debDir    string
 	debOutput string
+	PKGBUILD  *pkgbuild.PKGBUILD
+	// sums          string
 }
 
 func (d *Debian) getArch() {
@@ -53,47 +51,6 @@ func (d *Debian) createConfFiles() error {
 	err = utils.CreateWrite(path, data)
 	if err != nil {
 		return err
-	}
-
-	return err
-}
-
-func (d *Debian) createControl() error {
-	path := filepath.Join(d.debDir, "control")
-	file, err := os.Create(path)
-
-	if err != nil {
-		log.Panic(err)
-	}
-	// remember to close the file
-	defer file.Close()
-	// create new buffer
-	writer := io.Writer(file)
-
-	tmpl := template.New("control")
-	tmpl.Funcs(template.FuncMap{
-		"join": func(strs []string) string {
-			return strings.Trim(strings.Join(strs, ", "), " ")
-		},
-		"multiline": func(strs string) string {
-			ret := strings.ReplaceAll(strs, "\n", "\n ")
-
-			return strings.Trim(ret, " \n")
-		},
-	})
-
-	template.Must(tmpl.Parse(specFile))
-
-	if pkgbuild.Verbose {
-		err = tmpl.Execute(os.Stdout, d)
-		if err != nil {
-			log.Panic(err)
-		}
-	}
-
-	err = tmpl.Execute(writer, d)
-	if err != nil {
-		log.Panic(err)
 	}
 
 	return err
@@ -263,9 +220,9 @@ func (d *Debian) createDebResources() error {
 		return err
 	}
 
-	d.InstalledSize, _ = utils.GetDirSize(d.PKGBUILD.PackageDir)
+	d.PKGBUILD.InstalledSize, _ = utils.GetDirSize(d.PKGBUILD.PackageDir)
 
-	err = d.createControl()
+	err = d.PKGBUILD.CreateSpec(filepath.Join(d.debDir, "control"), specFile)
 	if err != nil {
 		return err
 	}
