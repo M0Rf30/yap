@@ -5,7 +5,6 @@ import (
 
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
-	"github.com/otiai10/copy"
 )
 
 type Apk struct {
@@ -13,13 +12,13 @@ type Apk struct {
 	apkDir   string
 }
 
-func (a *Apk) apkBuild() error {
+func (a *Apk) apkBuild(artifactsPath string) error {
 	err := utils.Exec(a.apkDir, "abuild-keygen", "-n", "-a")
 	if err != nil {
 		return err
 	}
 
-	err = utils.Exec(a.apkDir, "abuild", "-F", "-K")
+	err = utils.Exec(a.apkDir, "abuild", "-F", "-K", "-P", artifactsPath)
 	if err != nil {
 		return err
 	}
@@ -63,51 +62,39 @@ func (a *Apk) makePackerDir() error {
 	return err
 }
 
-func (a *Apk) Build() ([]string, error) {
+func (a *Apk) Build(artifactsPath string) error {
 	a.apkDir = filepath.Join(a.PKGBUILD.StartDir, "apk")
-	stagingDir := filepath.Join(a.apkDir, "staging", a.PKGBUILD.PkgName)
 
 	err := utils.RemoveAll(a.apkDir)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = a.makePackerDir()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir, "APKBUILD"), specFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir, a.PKGBUILD.PkgName+".install"), postInstall)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = copy.Copy(a.PKGBUILD.PackageDir, stagingDir)
+	err = a.apkBuild(artifactsPath)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = a.apkBuild()
-	if err != nil {
-		return nil, err
-	}
-
-	pkgs, err := utils.FindExt("/root/packages", ".apk")
-
-	if err != nil {
-		return nil, err
-	}
-
-	return pkgs, nil
+	return err
 }
 
-func (a *Apk) Install() error {
-	pkgs, err := utils.FindExt("/root/packages", ".apk")
+func (a *Apk) Install(artifactsPath string) error {
+	pkgs, err := utils.FindExt(artifactsPath, ".apk")
 	if err != nil {
 		return err
 	}

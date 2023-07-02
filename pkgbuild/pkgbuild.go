@@ -38,6 +38,7 @@ type PKGBUILD struct {
 	Package        string
 	PackageDir     string
 	PkgDesc        string
+	PkgDest        string
 	PkgName        string
 	PkgRel         string
 	PkgVer         string

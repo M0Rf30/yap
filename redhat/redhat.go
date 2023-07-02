@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/set"
 	"github.com/M0Rf30/yap/utils"
@@ -147,48 +146,24 @@ func (r *Redhat) makeDirs() error {
 	return err
 }
 
-func (r *Redhat) copyArtifacts() error {
-	var err error
-	archs, err := os.ReadDir(r.rpmsDir)
-
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to find .rpm files in %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), r.rpmsDir)
-
-		return err
-	}
-
-	for _, arch := range archs {
-		err = copy.Copy(filepath.Join(
-			r.rpmsDir,
-			arch.Name(),
-		), r.PKGBUILD.Home)
-		if err != nil {
-			return err
-		}
-	}
-
-	return err
-}
-
-func (r *Redhat) Build() ([]string, error) {
+func (r *Redhat) Build(artifactsPath string) error {
 	r.getArch()
 	r.getRPMGroup()
+	r.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 
 	err := utils.RemoveAll(r.redhatDir)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = r.makeDirs()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = r.getFiles()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	buildRootPackageDir := fmt.Sprintf("%s/%s-%s-%s.%s",
@@ -200,34 +175,24 @@ func (r *Redhat) Build() ([]string, error) {
 
 	err = copy.Copy(r.PKGBUILD.PackageDir, buildRootPackageDir)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = r.PKGBUILD.CreateSpec(filepath.Join(r.specsDir, r.PKGBUILD.PkgName+".spec"), specFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = r.rpmBuild()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = r.copyArtifacts()
-	if err != nil {
-		return nil, err
-	}
-
-	pkgs, err := utils.FindExt(r.PKGBUILD.Home, ".rpm")
-	if err != nil {
-		return nil, err
-	}
-
-	return pkgs, err
+	return err
 }
 
-func (r *Redhat) Install() error {
-	pkgs, err := utils.FindExt(r.PKGBUILD.Home, ".rpm")
+func (r *Redhat) Install(artifactsPath string) error {
+	pkgs, err := utils.FindExt(artifactsPath, ".rpm")
 	if err != nil {
 		return err
 	}
