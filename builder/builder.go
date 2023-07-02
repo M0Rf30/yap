@@ -66,7 +66,7 @@ func (builder *Builder) Package() error {
 	return err
 }
 
-func (builder *Builder) Build() error {
+func (builder *Builder) Compile() error {
 	err := builder.initDirs()
 	if err != nil {
 		return err

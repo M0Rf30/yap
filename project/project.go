@@ -13,7 +13,6 @@ import (
 	"github.com/M0Rf30/yap/parser"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
-	"github.com/otiai10/copy"
 )
 
 var (
@@ -86,11 +85,11 @@ func (mpc *MultipleProject) BuildAll() error {
 			proj.Builder.PKGBUILD.PkgName,
 		)
 
-		if err := proj.Builder.Build(); err != nil {
+		if err := proj.Builder.Compile(); err != nil {
 			return err
 		}
 
-		err := mpc.moveArtifacts(proj)
+		err := mpc.createPackages(proj)
 		if err != nil {
 			return err
 		}
@@ -102,7 +101,7 @@ func (mpc *MultipleProject) BuildAll() error {
 				proj.Name,
 				string(constants.ColorWhite))
 
-			if err := proj.PackageManager.Install(); err != nil {
+			if err := proj.PackageManager.Install(mpc.Output); err != nil {
 				return err
 			}
 		}
@@ -178,23 +177,18 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 	return err
 }
 
-func (mpc *MultipleProject) moveArtifacts(proj *Project) error {
-	artefactPaths, err := proj.PackageManager.Build()
-	if err != nil {
+func (mpc *MultipleProject) createPackages(proj *Project) error {
+	if mpc.Output != "" {
+		mpc.Output, _ = filepath.Abs(mpc.Output)
+	}
+
+	if err := utils.ExistsMakeDir(mpc.Output); err != nil {
 		return err
 	}
 
-	if mpc.Output != "" {
-		if err := utils.ExistsMakeDir(mpc.Output); err != nil {
-			return err
-		}
-
-		for _, ap := range artefactPaths {
-			filename := filepath.Base(ap)
-			if err := copy.Copy(ap, filepath.Join(mpc.Output, filename)); err != nil {
-				return err
-			}
-		}
+	err := proj.PackageManager.Build(mpc.Output)
+	if err != nil {
+		return err
 	}
 
 	return err

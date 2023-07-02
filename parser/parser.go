@@ -48,7 +48,7 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 			return pkgbuild.PkgVer
 		case "pkgdir":
 			if pkgbuild.Distro == "arch" {
-				return filepath.Join(pkgbuild.PackageDir, pkgbuild.PkgName)
+				return filepath.Join(pkgbuild.StartDir, "pkg", pkgbuild.PkgName)
 			}
 
 			return pkgbuild.PackageDir
@@ -107,7 +107,7 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 		StartDir:   startDir,
 		Home:       home,
 		SourceDir:  filepath.Join(startDir, "src"),
-		PackageDir: filepath.Join(startDir, "pkg"),
+		PackageDir: filepath.Join(startDir, "pkgdir"),
 	}
 
 	err = utils.ExistsMakeDir(startDir)

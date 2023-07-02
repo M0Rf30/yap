@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -18,9 +17,8 @@ import (
 )
 
 type Debian struct {
-	debDir    string
-	debOutput string
-	PKGBUILD  *pkgbuild.PKGBUILD
+	debDir   string
+	PKGBUILD *pkgbuild.PKGBUILD
 	// sums          string
 }
 
@@ -126,33 +124,23 @@ func (d *Debian) createScripts() error {
 	return err
 }
 
-func (d *Debian) dpkgDeb() (string, error) {
-	var newPath string
-
-	err := utils.Exec("", "dpkg-deb", "-b", d.PKGBUILD.PackageDir)
-
-	if err != nil {
-		return "", err
-	}
-
-	_, dir := filepath.Split(filepath.Clean(d.PKGBUILD.PackageDir))
-	path := filepath.Join(d.PKGBUILD.StartDir, dir+".deb")
+func (d *Debian) dpkgDeb(artifactPath string) error {
+	var err error
 
 	for _, arch := range d.PKGBUILD.Arch {
-		newPath = filepath.Join(d.PKGBUILD.Home,
+		artifactFilePath := filepath.Join(artifactPath,
 			fmt.Sprintf("%s_%s-%s%s_%s.deb",
 				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.CodeName,
 				arch))
+
+		err = utils.Exec("", "dpkg-deb", "-b", d.PKGBUILD.PackageDir, artifactFilePath)
+
+		if err != nil {
+			return err
+		}
 	}
 
-	os.Remove(newPath)
-
-	err = copy.Copy(path, newPath)
-	if err != nil {
-		return "", err
-	}
-
-	return newPath, nil
+	return err
 }
 
 func (d *Debian) Prepare(makeDepends []string) error {
@@ -250,48 +238,56 @@ func (d *Debian) createDebResources() error {
 	return err
 }
 
-func (d *Debian) Build() ([]string, error) {
+func (d *Debian) Build(artifactsPath string) error {
 	var err error
 
 	d.getArch()
 
 	err = utils.RemoveAll(d.debDir)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = d.createDebResources()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = d.Strip()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	dpkgDeb, err := d.dpkgDeb()
-	if err != nil {
-		return nil, err
-	}
-
-	d.debOutput = dpkgDeb
-
-	err = utils.RemoveAll(d.PKGBUILD.PackageDir)
-	if err != nil {
-		return nil, err
-	}
-
-	return []string{dpkgDeb}, nil
-}
-
-func (d *Debian) Install() error {
-	absPath, err := filepath.Abs(d.debOutput)
+	err = d.dpkgDeb(artifactsPath)
 	if err != nil {
 		return err
 	}
 
-	return utils.Exec("", "apt-get", "install", "-y", absPath)
+	err = utils.RemoveAll(d.PKGBUILD.PackageDir)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (d *Debian) Install(artifactsPath string) error {
+	var err error
+
+	for _, arch := range d.PKGBUILD.Arch {
+		artifactFilePath := filepath.Join(artifactsPath,
+			fmt.Sprintf("%s_%s-%s%s_%s.deb",
+				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.CodeName,
+				arch))
+
+		err = utils.Exec("", "apt-get", "install", "-y", artifactFilePath)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return err
 }
 
 func (d *Debian) PrepareEnvironment(golang bool) error {
