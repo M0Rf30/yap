@@ -95,6 +95,10 @@ Requires: {{join .}}
 BuildRequires: {{join .}}
 {{- end }}
 
+{{- if .PkgDest}}
+%define _rpmdir {{.PkgDest}}
+{{- end }}
+
 %global _build_id_links none
 %global _python_bytecompile_extra 0
 %global _python_bytecompile_errors_terminate_build 0

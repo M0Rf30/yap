@@ -7,6 +7,10 @@ var buildEnvironmentDeps = []string{
 const specFile = `
 {{- /* Mandatory fields */ -}}
 # Maintainer: {{.Maintainer}}
+{{- if .PkgDest}}
+PKGDEST="{{.PkgDest}}"
+{{- end }}
+
 pkgname={{.PkgName}}
 {{- with .Epoch}}
 epoch={{.Epoch}}
@@ -41,10 +45,6 @@ license=({{join .}})
 {{- end }}
 options=("emptydirs")
 install={{.PkgName}}.install
-
-{{- if .Build}}
-build() {{.Build}}
-{{- end }}
 
 package() {{.Package}}
 `

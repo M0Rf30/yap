@@ -14,8 +14,8 @@ import (
 
 type Packer interface {
 	Prepare([]string) error
-	Build() ([]string, error)
-	Install() error
+	Build(string) error
+	Install(string) error
 	PrepareEnvironment(bool) error
 	Update() error
 }

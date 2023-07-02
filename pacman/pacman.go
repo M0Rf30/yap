@@ -44,34 +44,33 @@ func (p *Pacman) Update() error {
 	return err
 }
 
-func (p *Pacman) Build() ([]string, error) {
+func (p *Pacman) Build(artifactsPath string) error {
 	p.pacmanDir = p.PKGBUILD.StartDir
 
-	err := p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir, "PKGBUILD"), specFile)
+	p.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
+
+	err := p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir,
+		"PKGBUILD"), specFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir, p.PKGBUILD.PkgName+".install"), postInstall)
+	err = p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir,
+		p.PKGBUILD.PkgName+".install"), postInstall)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = p.pacmanBuild()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	pkgs, err := utils.FindExt(p.pacmanDir, ".zst")
-	if err != nil {
-		return nil, err
-	}
-
-	return pkgs, nil
+	return nil
 }
 
-func (p *Pacman) Install() error {
-	pkgs, err := utils.FindExt(p.pacmanDir, ".zst")
+func (p *Pacman) Install(artifactsPath string) error {
+	pkgs, err := utils.FindExt(artifactsPath, ".zst")
 	if err != nil {
 		return err
 	}
