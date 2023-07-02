@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/project"
 	"github.com/spf13/cobra"
@@ -31,16 +33,25 @@ var buildCmd = &cobra.Command{
 		mpc := project.MultipleProject{}
 		err := mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
+			fmt.Printf("%s❌ :: %serror:\n",
+				string(constants.ColorBlue),
+				string(constants.ColorYellow))
 			log.Fatal(err)
 		}
 
 		if project.NoCache {
 			if err := mpc.Clean(); err != nil {
+				fmt.Printf("%s❌ :: %serror:\n",
+					string(constants.ColorBlue),
+					string(constants.ColorYellow))
 				log.Fatal(err)
 			}
 		}
 
 		if err := mpc.BuildAll(); err != nil {
+			fmt.Printf("%s❌ :: %serror:\n",
+				string(constants.ColorBlue),
+				string(constants.ColorYellow))
 			log.Fatal(err)
 		}
 	},
