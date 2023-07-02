@@ -13,6 +13,7 @@ import (
 	"github.com/M0Rf30/yap/parser"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
+	"github.com/go-playground/validator"
 )
 
 var (
@@ -36,19 +37,19 @@ type Project struct {
 	Path           string
 	Release        string
 	Root           string
-	Name           string `json:"name"`
-	HasToInstall   bool   `json:"install"`
+	Name           string `json:"name"    validate:"required"`
+	HasToInstall   bool   `json:"install" validate:""`
 }
 
 type MultipleProject struct {
+	makeDepends    []string
 	packageManager packer.Packer
 	root           string
-	BuildDir       string `json:"buildDir"`
-	Description    string `json:"description"`
-	Name           string `json:"name"`
-	makeDepends    []string
-	Output         string     `json:"output"`
-	Projects       []*Project `json:"projects"`
+	BuildDir       string     `json:"buildDir"    validate:"required"`
+	Description    string     `json:"description" validate:"required"`
+	Name           string     `json:"name"        validate:"required"`
+	Output         string     `json:"output"      validate:"required"`
+	Projects       []*Project `json:"projects"    validate:"required,dive,required"`
 }
 
 func (mpc *MultipleProject) findPackageInProjects() {
@@ -250,6 +251,14 @@ func (mpc *MultipleProject) readProject(path string) error {
 	}
 
 	err = json.Unmarshal(prjContent, &mpc)
+	if err != nil {
+		return err
+	}
+
+	err = mpc.validateJSON()
+	if err != nil {
+		return err
+	}
 
 	return err
 }
@@ -266,6 +275,18 @@ func (mpc *MultipleProject) validateAllProject(distro string, release string, pa
 		}
 
 		pkgbuild.Validate()
+	}
+
+	return err
+}
+
+func (mpc *MultipleProject) validateJSON() error {
+	validate := validator.New()
+
+	err := validate.Struct(mpc)
+
+	if err != nil {
+		return err
 	}
 
 	return err
