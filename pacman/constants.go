@@ -43,7 +43,9 @@ backup=("{{join .}}")
 {{- with .License}}
 license=({{join .}})
 {{- end }}
-options=("emptydirs")
+{{- with .Options}}
+options=({{join .}})
+{{- end }}
 install={{.PkgName}}.install
 
 package() {{.Package}}
