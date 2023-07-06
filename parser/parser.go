@@ -107,7 +107,7 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 		StartDir:   startDir,
 		Home:       home,
 		SourceDir:  filepath.Join(startDir, "src"),
-		PackageDir: filepath.Join(startDir, "pkgdir"),
+		PackageDir: filepath.Join(startDir, "staging"),
 	}
 
 	err = utils.ExistsMakeDir(startDir)
