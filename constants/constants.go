@@ -13,7 +13,7 @@ const (
 	ColorYellow  = "\033[33m"
 	ColorBlue    = "\033[34m"
 	ColorWhite   = "\033[37m"
-	GoArchiveURL = "https://dl.google.com/go/go1.20.linux-amd64.tar.gz"
+	GoArchiveURL = "https://go.dev/dl/go1.20.5.linux-amd64.tar.gz"
 )
 
 var (
