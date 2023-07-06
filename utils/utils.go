@@ -102,7 +102,7 @@ Loop:
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Printf("\033[2K\r%d.1 of %d.1 MB | %.2f of 100",
+			fmt.Printf("\033[2K\r%d.1 of %d.1 MB | %.2f %%",
 				resp.BytesComplete()/1024/1024,
 				resp.Size()/1024/1024,
 				100*resp.Progress(),

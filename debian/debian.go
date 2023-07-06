@@ -215,11 +215,6 @@ func (d *Debian) createDebResources() error {
 		return err
 	}
 
-	// err = d.createMd5Sums()
-	// if err != nil {
-	// 	return err
-	// }
-
 	err = d.createScripts()
 	if err != nil {
 		return err
