@@ -89,7 +89,6 @@ key__ubuntu="this will apply only to Ubuntu  builds"
 | ---------------- | ------------------------- |
 | `alpine`         | all Alpine Linux releases |
 | `arch`           | all Arch Linux releases   |
-| `astra`          | all Astra Linux releases  |
 | `amazon`         | all Amazon Linux releases |
 | `centos`         | all CentOS releases       |
 | `debian`         | all Debian releases       |
@@ -101,8 +100,7 @@ key__ubuntu="this will apply only to Ubuntu  builds"
 | `debian-jessie`  | Debian Jessie             |
 | `debian-stretch` | Debian Stretch            |
 | `debian-buster`  | Debian Buster             |
-| `fedora-35`      | Fedora 35                 |
-| `oracle-8`       | Oracle Linux 8            |
+| `fedora-38`      | Fedora 38                 |
 | `rocky-8`        | Rocky Linux 8             |
 | `rocky-9`        | Rocky Linux 9             |
 | `ubuntu-bionic`  | Ubuntu Bionic             |
@@ -140,8 +138,7 @@ The directives above are sorted from lowest to the highest priority.
 | `debian-jessie`  | Debian Jessie             |
 | `debian-stretch` | Debian Stretch            |
 | `debian-buster`  | Debian Buster             |
-| `fedora-35`      | Fedora 35                 |
-| `oracle-8`       | Oracle Linux 8            |
+| `fedora-38`      | Fedora 38                 |
 | `rocky-8`        | Rocky Linux 8             |
 | `rocky-9`        | Rocky Linux 9             |
 | `ubuntu-bionic`  | Ubuntu Bionic             |
