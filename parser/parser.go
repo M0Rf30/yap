@@ -12,6 +12,8 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+var OverridePkgver string
+
 func getSyntaxFile(startDir, home string) (*syntax.File, error) {
 	file, err := utils.Open(filepath.Join(startDir, "PKGBUILD"))
 	if err != nil {
@@ -130,6 +132,10 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 	err = parseSyntaxFile(pkgbuildSyntax, pkgbuild)
 	if err != nil {
 		return nil, err
+	}
+
+	if OverridePkgver != "" {
+		pkgbuild.PkgVer = OverridePkgver
 	}
 
 	return pkgbuild, err

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/constants"
+	"github.com/M0Rf30/yap/parser"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/project"
 	"github.com/spf13/cobra"
@@ -59,10 +60,13 @@ var buildCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(buildCmd)
+	buildCmd.AddCommand(listTargetsCmd)
 	buildCmd.Flags().BoolVarP(&project.SkipSyncBuildEnvironmentDeps,
 		"ignore-makedeps", "d", false, "Ignore make dependencies resolution")
 	buildCmd.Flags().BoolVarP(&project.NoCache,
 		"no-cache", "c", false, "Do not use cache when building the project")
+	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgver,
+		"override-pkgver", "p", "", "Override package version (pkgver)")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncFlag,
 		"skip-sync", "s", false, "Skip sync with remotes for package managers")
 	buildCmd.Flags().StringVarP(&project.UntilPkgName,
