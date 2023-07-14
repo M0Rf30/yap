@@ -57,7 +57,13 @@ var (
 	}
 
 	ArchToRPM = map[string]string{
-		"any": "noarch",
+		"x86_64":  "x86_64",
+		"i686":    "i686",
+		"aarch64": "aarch64",
+		"armv7h":  "armv7h",
+		"armv6h":  "armv6h",
+		"arm":     "arm",
+		"any":     "noarch",
 	}
 )
 

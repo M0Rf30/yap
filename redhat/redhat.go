@@ -23,12 +23,6 @@ type Redhat struct {
 	srpmsDir     string
 }
 
-func (r *Redhat) getArch() {
-	for index, arch := range r.PKGBUILD.Arch {
-		r.PKGBUILD.Arch[index] = ArchToRPM[arch]
-	}
-}
-
 func (r *Redhat) getRPMGroup() {
 	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
 }
@@ -147,7 +141,6 @@ func (r *Redhat) makeDirs() error {
 }
 
 func (r *Redhat) Build(artifactsPath string) error {
-	r.getArch()
 	r.getRPMGroup()
 	r.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 
@@ -192,18 +185,25 @@ func (r *Redhat) Build(artifactsPath string) error {
 }
 
 func (r *Redhat) Install(artifactsPath string) error {
-	pkgs, err := utils.FindExt(artifactsPath, ".rpm")
-	if err != nil {
-		return err
-	}
+	var err error
 
-	for _, pkg := range pkgs {
-		if err := utils.Exec("", "yum", "install", "-y", pkg); err != nil {
+	for _, arch := range r.PKGBUILD.Arch {
+		pkgName := r.PKGBUILD.PkgName + "-" +
+			r.PKGBUILD.PkgVer +
+			"-" +
+			r.PKGBUILD.PkgRel +
+			"." +
+			ArchToRPM[arch] +
+			".rpm"
+
+		pkgFilePath := filepath.Join(artifactsPath, ArchToRPM[arch], pkgName)
+
+		if err := utils.Exec("", "yum", "install", "-y", pkgFilePath); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (r *Redhat) PrepareEnvironment(golang bool) error {
