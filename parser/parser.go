@@ -53,6 +53,10 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 				return filepath.Join(pkgbuild.StartDir, "pkg", pkgbuild.PkgName)
 			}
 
+			if pkgbuild.Distro == "alpine" {
+				return filepath.Join(pkgbuild.StartDir, "apk", "pkg", pkgbuild.PkgName)
+			}
+
 			return pkgbuild.PackageDir
 		case "srcdir":
 			return pkgbuild.SourceDir

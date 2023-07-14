@@ -34,9 +34,7 @@ license="CUSTOM"
 
 options="!check !fhs"
 
-package() {
-  mv -f "${startdir}/staging/${pkgname}" "${pkgdir}"
-}
+package() {{.Package}}
 `
 const postInstall = `
 {{- if .PreInst}}
