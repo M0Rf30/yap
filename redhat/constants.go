@@ -13,6 +13,7 @@ var buildEnvironmentDeps = []string{
 	"createrepo",
 	"expect",
 	"gcc",
+	"gcc-c++",
 	"make",
 	"openssl",
 	"rpm-build",
