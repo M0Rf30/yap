@@ -70,18 +70,25 @@ func (p *Pacman) Build(artifactsPath string) error {
 }
 
 func (p *Pacman) Install(artifactsPath string) error {
-	pkgs, err := utils.FindExt(artifactsPath, ".zst")
-	if err != nil {
-		return err
-	}
+	var err error
 
-	for _, pkg := range pkgs {
-		if err := utils.Exec("", "pacman", "-U", "--noconfirm", pkg); err != nil {
+	for _, arch := range p.PKGBUILD.Arch {
+		pkgName := p.PKGBUILD.PkgName + "-" +
+			p.PKGBUILD.PkgVer +
+			"-" +
+			p.PKGBUILD.PkgRel +
+			"-" +
+			arch +
+			".pkg.tar.zst"
+
+		pkgFilePath := filepath.Join(artifactsPath, pkgName)
+
+		if err := utils.Exec("", "pacman", "-U", "--noconfirm", pkgFilePath); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (p *Pacman) PrepareEnvironment(golang bool) error {

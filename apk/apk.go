@@ -94,18 +94,25 @@ func (a *Apk) Build(artifactsPath string) error {
 }
 
 func (a *Apk) Install(artifactsPath string) error {
-	pkgs, err := utils.FindExt(artifactsPath, ".apk")
-	if err != nil {
-		return err
-	}
+	var err error
 
-	for _, pkg := range pkgs {
-		if err := utils.Exec("", "apk", "add", "--allow-untrusted", pkg); err != nil {
+	for _, arch := range a.PKGBUILD.Arch {
+		pkgName := a.PKGBUILD.PkgName + "-" +
+			a.PKGBUILD.PkgVer +
+			"-" +
+			"r" + a.PKGBUILD.PkgRel +
+			"-" +
+			arch +
+			".apk"
+
+		pkgFilePath := filepath.Join(artifactsPath, a.PKGBUILD.PkgName, arch, pkgName)
+
+		if err := utils.Exec("", "apk", "add", "--allow-untrusted", pkgFilePath); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (a *Apk) PrepareEnvironment(golang bool) error {

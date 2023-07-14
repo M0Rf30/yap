@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,30 +138,6 @@ func Open(path string) (*os.File, error) {
 	}
 
 	return file, err
-}
-
-func FindExt(path string, extension string) ([]string, error) {
-	var files []string
-
-	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Fatal(err)
-
-			return err
-		}
-
-		if !info.IsDir() && filepath.Ext(path) == extension {
-			files = append(files, path)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return files, err
 }
 
 func Filename(path string) string {
