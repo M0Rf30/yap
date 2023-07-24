@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/go-git/go-git/v5 v5.7.0
+	github.com/go-git/go-git/v5 v5.8.0
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
 	github.com/otiai10/copy v1.12.0
 	github.com/spf13/cobra v1.7.0
