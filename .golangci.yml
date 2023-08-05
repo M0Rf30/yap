@@ -11,16 +11,13 @@ linters:
     - deadcode
     - exhaustivestruct
     - golint
-    - gocritic
     - ifshort
     - interfacer
     - maligned
     - nosnakecase
-    - rowserrcheck
     - scopelint
     - structcheck
     - varcheck
-    - wastedassign
     # here some custom dropped checks temporary disabled
     # they will be enabled
     - depguard
