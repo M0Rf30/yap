@@ -31,6 +31,7 @@ func getSyntaxFile(startDir, home string) (*syntax.File, error) {
 	return pkgbuildSyntax, err
 }
 
+//nolint:cyclop
 func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) error {
 	var err error
 
