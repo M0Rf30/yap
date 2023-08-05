@@ -67,10 +67,10 @@ func GOSetup() {
 		string(constants.ColorWhite))
 }
 
-func Download(destination string, URL string) {
+func Download(destination string, url string) {
 	// create client
 	client := grab.NewClient()
-	req, _ := grab.NewRequest(destination, URL)
+	req, _ := grab.NewRequest(destination, url)
 
 	// start download
 	fmt.Printf("%s📥 :: %sDownloading %s\t%v\n",
@@ -96,7 +96,6 @@ func Download(destination string, URL string) {
 
 	// start UI loop
 	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
 
 Loop:
 	for {
@@ -125,6 +124,8 @@ Loop:
 
 		os.Exit(1)
 	}
+
+	defer ticker.Stop()
 
 	fmt.Printf("\n%s📥 :: %sDownload saved: %s\t%v\n",
 		string(constants.ColorBlue),

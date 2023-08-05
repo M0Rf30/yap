@@ -169,7 +169,7 @@ func GetDirSize(path string) (int64, error) {
 		return err
 	})
 
-	size = size / 1024
+	size /= 1024
 
 	return size, err
 }
