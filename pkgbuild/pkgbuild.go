@@ -278,9 +278,7 @@ func (p *PKGBUILD) CreateSpec(filePath string, script string) error {
 		log.Panic(err)
 	}
 
-	// remember to close the file
 	defer file.Close()
-	// create new buffer
 	writer := io.Writer(file)
 
 	tmpl := template.New("template")

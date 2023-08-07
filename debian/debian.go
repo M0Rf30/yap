@@ -19,7 +19,6 @@ import (
 type Debian struct {
 	debDir   string
 	PKGBUILD *pkgbuild.PKGBUILD
-	// sums          string
 }
 
 func (d *Debian) getArch() {

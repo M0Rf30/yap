@@ -180,19 +180,12 @@ func Unarchive(archiveReader io.Reader, destination string) error {
 			return os.MkdirAll(newPath, archiveFile.Mode())
 		}
 
-		// check if we've seen the dir before, if not, we'll attempt to create
-		// it in case its not there. This needs to be done as archive formats
-		// do not necessarily always have the directory in order/present
-		// eg zip dirs for quarto definitely are missing seemingly random dirs
-		// when talking with charles about it, we were both unsure what might
-		// be the reason, and assume its probably the powershell compress-archive
-		// encantation, so rather than trying to go down that rabbit hole too far,
-		// some additional checking here
 		fileDir := filepath.Dir(newPath)
 		_, seenDir := dirMap[fileDir]
 
 		if !seenDir {
 			dirMap[fileDir] = true
+
 			// linux default for new directories is 777 and let the umask handle
 			// if should have other controls
 			err = os.MkdirAll(fileDir, 0777)
