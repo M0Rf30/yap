@@ -9,8 +9,8 @@ RUN \
   apt-get update; \
   apt-get upgrade; \
   apt-get install -y --no-install-recommends ca-certificates curl tar; \
-  curl -sL https://go.dev/dl/go1.20.5.linux-amd64.tar.gz --output go.tar.gz; \
-  echo "d7ec48cde0d3d2be2c69203bc3e0a44de8660b9c09a6e85c4732a3f7dc442612 go.tar.gz" | sha256sum -c - ; \
+  curl -sL https://go.dev/dl/go1.21.1.linux-amd64.tar.gz --output go.tar.gz; \
+  echo "b3075ae1ce5dab85f89bc7905d1632de23ca196bd8336afd93fa97434cfa55ae go.tar.gz" | sha256sum -c - ; \
   tar -C /usr/lib -xf go.tar.gz; \
   ln -sf /usr/lib/go/bin/go /usr/bin/go; \
   ln -sf /usr/lib/go/bin/gofmt /usr/bin/gofmt; \
