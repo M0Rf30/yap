@@ -32,7 +32,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
@@ -42,7 +42,7 @@ jobs:
           file: docker/alpine/Dockerfile
 
       # - name: Build and push
-      #   uses: docker/build-push-action@v4
+      #   uses: docker/build-push-action@v5
       #   with:
       #     context: .
       #     push: true
@@ -53,7 +53,7 @@ jobs:
       #     file: docker/arch/Dockerfile
 
       # - name: Build and push
-      #   uses: docker/build-push-action@v4
+      #   uses: docker/build-push-action@v5
       #   with:
       #     context: .
       #     push: true
@@ -64,7 +64,7 @@ jobs:
       #     file: docker/opensuse-tubleweed/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
@@ -74,7 +74,7 @@ jobs:
           file: docker/rocky-8/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
@@ -84,7 +84,7 @@ jobs:
           file: docker/rocky-9/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
@@ -94,7 +94,7 @@ jobs:
           file: docker/ubuntu-focal/Dockerfile
 
       - name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
