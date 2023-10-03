@@ -12,7 +12,7 @@ PKGDEST="{{.PkgDest}}"
 {{- end }}
 
 pkgname={{.PkgName}}
-{{- with .Epoch}}
+{{- if .Epoch}}
 epoch={{.Epoch}}
 {{- end }}
 pkgver={{.PkgVer}}

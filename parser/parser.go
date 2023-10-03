@@ -45,6 +45,8 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 		switch name {
 		case "pkgname":
 			return pkgbuild.PkgName
+		case "epoch":
+			return pkgbuild.Epoch
 		case "pkgver":
 			return pkgbuild.PkgVer
 		case "pkgrel":

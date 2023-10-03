@@ -7,7 +7,7 @@ var buildEnvironmentDeps = []string{
 const specFile = `
 {{- /* Mandatory fields */ -}}
 pkgname={{.PkgName}}
-{{- with .Epoch}}
+{{- if .Epoch}}
 epoch={{.Epoch}}
 {{- end }}
 pkgver={{.PkgVer}}
