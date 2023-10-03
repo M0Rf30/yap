@@ -113,6 +113,8 @@ func (p *PKGBUILD) mapVariables(key string, data interface{}) {
 	switch key {
 	case "pkgname":
 		p.PkgName = data.(string)
+	case "epoch":
+		p.Epoch = data.(string)
 	case "pkgver":
 		p.PkgVer = data.(string)
 	case "pkgrel":

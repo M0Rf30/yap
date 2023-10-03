@@ -71,6 +71,9 @@ const specFile = `
 {{- /* Mandatory fields */ -}}
 Name: {{.PkgName}}
 Summary: {{.PkgDesc}}
+{{- if .Epoch}}
+Epoch: {{.Epoch}}
+{{- end }}
 Version: {{.PkgVer}}
 Release: {{.PkgRel}}
 {{- if .Section}}

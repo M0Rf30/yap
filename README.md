@@ -55,8 +55,9 @@ key__ubuntu="this will apply only to Ubuntu  builds"
 ## Spec file - the PKGBUILD
 
 | key                | type     | value                                                                                                                                                                                                                                                                                                                          |
-| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+|--------------------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `pkgname`          | `string` | Package name                                                                                                                                                                                                                                                                                                                   |
+| `epoch`            | `string` | Package epoch                                                                                                                                                                                                                                                                                                                  |
 | `pkgver`           | `string` | Package version                                                                                                                                                                                                                                                                                                                |
 | `pkgrel`           | `string` | Package release number                                                                                                                                                                                                                                                                                                         |
 | `pkgdesc`          | `string` | Short package description                                                                                                                                                                                                                                                                                                      |
@@ -86,7 +87,7 @@ key__ubuntu="this will apply only to Ubuntu  builds"
 ### Build targets
 
 | target           | value                     |
-| ---------------- | ------------------------- |
+|------------------|---------------------------|
 | `alpine`         | all Alpine Linux releases |
 | `arch`           | all Arch Linux releases   |
 | `amazon`         | all Amazon Linux releases |
@@ -120,7 +121,7 @@ such as `pkgdesc__ubuntu="This description will only apply to Ubuntu packages"`.
 The directives above are sorted from lowest to the highest priority.
 
 | directive        | value                     |
-| ---------------- | ------------------------- |
+|------------------|---------------------------|
 | `apk`            | all apk packages          |
 | `apt`            | all deb packages          |
 | `pacman`         | all pkg packages          |
