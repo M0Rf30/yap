@@ -23,6 +23,12 @@ type Redhat struct {
 	srpmsDir     string
 }
 
+func (r *Redhat) getRPMArch() {
+	for index, arch := range r.PKGBUILD.Arch {
+		r.PKGBUILD.Arch[index] = RPMArchs[arch]
+	}
+}
+
 func (r *Redhat) getRPMGroup() {
 	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
 }
@@ -141,6 +147,7 @@ func (r *Redhat) makeDirs() error {
 }
 
 func (r *Redhat) Build(artifactsPath string) error {
+	r.getRPMArch()
 	r.getRPMGroup()
 	r.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 
@@ -193,10 +200,10 @@ func (r *Redhat) Install(artifactsPath string) error {
 			"-" +
 			r.PKGBUILD.PkgRel +
 			"." +
-			ArchToRPM[arch] +
+			RPMArchs[arch] +
 			".rpm"
 
-		pkgFilePath := filepath.Join(artifactsPath, ArchToRPM[arch], pkgName)
+		pkgFilePath := filepath.Join(artifactsPath, RPMArchs[arch], pkgName)
 
 		if err := utils.Exec("", "yum", "install", "-y", pkgFilePath); err != nil {
 			return err

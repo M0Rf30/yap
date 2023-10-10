@@ -23,7 +23,7 @@ type Debian struct {
 
 func (d *Debian) getArch() {
 	for index, arch := range d.PKGBUILD.Arch {
-		d.PKGBUILD.Arch[index] = ArchToDebian[arch]
+		d.PKGBUILD.Arch[index] = DebianArchs[arch]
 	}
 }
 

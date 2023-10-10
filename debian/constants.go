@@ -7,7 +7,7 @@ var buildEnvironmentDeps = []string{
 	"ca-certificates",
 }
 
-var ArchToDebian = map[string]string{
+var DebianArchs = map[string]string{
 	"any":     "all",
 	"x86_64":  "amd64",
 	"i686":    "386",
