@@ -23,7 +23,7 @@ type Debian struct {
 
 func (d *Debian) getArch() {
 	for index, arch := range d.PKGBUILD.Arch {
-		d.PKGBUILD.Arch[index] = ArchToDebian[arch]
+		d.PKGBUILD.Arch[index] = DebianArchs[arch]
 	}
 }
 
@@ -129,7 +129,7 @@ func (d *Debian) dpkgDeb(artifactPath string) error {
 	for _, arch := range d.PKGBUILD.Arch {
 		artifactFilePath := filepath.Join(artifactPath,
 			fmt.Sprintf("%s_%s-%s%s_%s.deb",
-				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.CodeName,
+				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.Codename,
 				arch))
 
 		err = utils.Exec("", "dpkg-deb", "-b", d.PKGBUILD.PackageDir, artifactFilePath)
@@ -271,7 +271,7 @@ func (d *Debian) Install(artifactsPath string) error {
 	for _, arch := range d.PKGBUILD.Arch {
 		artifactFilePath := filepath.Join(artifactsPath,
 			fmt.Sprintf("%s_%s-%s%s_%s.deb",
-				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.CodeName,
+				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel, d.PKGBUILD.Codename,
 				arch))
 
 		err = utils.Exec("", "apt-get", "install", "-y", artifactFilePath)

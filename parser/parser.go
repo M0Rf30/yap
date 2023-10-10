@@ -112,7 +112,7 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 
 	pkgbuild := &pkgbuild.PKGBUILD{
 		Distro:     distro,
-		CodeName:   release,
+		Codename:   release,
 		StartDir:   startDir,
 		Home:       home,
 		SourceDir:  filepath.Join(startDir, "src"),

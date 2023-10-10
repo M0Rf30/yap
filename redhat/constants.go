@@ -56,7 +56,7 @@ var (
 		"x11":          "User Interface/X",
 	}
 
-	ArchToRPM = map[string]string{
+	RPMArchs = map[string]string{
 		"x86_64":  "x86_64",
 		"i686":    "i686",
 		"aarch64": "aarch64",
@@ -64,6 +64,12 @@ var (
 		"armv6h":  "armv6h",
 		"arm":     "arm",
 		"any":     "noarch",
+	}
+
+	RPMDistros = map[string]string{
+		"amazon": ".amzn",
+		"fedora": ".fc",
+		"rocky":  ".el",
 	}
 )
 
@@ -76,6 +82,9 @@ Epoch: {{.Epoch}}
 {{- end }}
 Version: {{.PkgVer}}
 Release: {{.PkgRel}}
+{{- with .Arch}}
+BuildArch: {{join .}}
+{{- end }}
 {{- if .Section}}
 Group: {{.Section}}
 {{- end }}
@@ -124,23 +133,23 @@ BuildRequires: {{join .}}
 {{- end }}
 {{- end }}
 
-{{- with .PreInst}}
+{{- if .PreInst}}
 %pre
 {{.PreInst}}
 {{- end }}
 
-{{- with .PostInst}}
+{{- if .PostInst}}
 %post
-{{.PostRm}}
+{{.PostInst}}
 {{- end }}
 
-{{- with .PreRm}}
+{{- if .PreRm}}
 %preun
 if [[ "$1" -ne 0 ]]; then exit 0; fi
 {{.PreRm}}
 {{- end }}
 
-{{- with .PostRm}}
+{{- if .PostRm}}
 %postun
 if [[ "$1" -ne 0 ]]; then exit 0; fi
 {{.PostRm}}

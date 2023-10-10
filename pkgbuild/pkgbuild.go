@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -50,7 +51,7 @@ type PKGBUILD struct {
 	Prepare        string
 	Priority       string
 	Provides       []string
-	CodeName       string
+	Codename       string
 	StartDir       string
 	Section        string
 	SourceDir      string
@@ -143,8 +144,8 @@ func (p *PKGBUILD) Init() {
 	p.priorities = map[string]int{}
 
 	p.FullDistroName = p.Distro
-	if p.CodeName != "" {
-		p.FullDistroName += "-" + p.CodeName
+	if p.Codename != "" {
+		p.FullDistroName += "_" + p.Codename
 	}
 }
 
@@ -177,26 +178,26 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 		return key, priority, fmt.Errorf("pack: Cannot use directive for '%w'", err)
 	}
 
-	dirc := split[1]
+	directive := split[1]
 
-	if constants.ReleasesSet.Contains(dirc) {
-		if dirc == p.FullDistroName {
+	if constants.ReleasesSet.Contains(directive) {
+		if directive == p.FullDistroName {
 			priority = 3
 		}
 
 		return key, priority, err
 	}
 
-	if constants.DistrosSet.Contains(dirc) {
-		if dirc == p.Distro {
+	if constants.DistrosSet.Contains(directive) {
+		if directive == p.Distro {
 			priority = 2
 		}
 
 		return key, priority, err
 	}
 
-	if constants.PackagersSet.Contains(dirc) {
-		if dirc == constants.DistroPackageManager[p.Distro] {
+	if constants.PackagersSet.Contains(directive) {
+		if directive == constants.DistroPackageManager[p.Distro] {
 			priority = 1
 		}
 
@@ -275,7 +276,9 @@ func (p *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
 }
 
 func (p *PKGBUILD) CreateSpec(filePath string, script string) error {
-	file, err := os.Create(filePath)
+	cleanFilePath := filepath.Clean(filePath)
+
+	file, err := os.Create(cleanFilePath)
 	if err != nil {
 		log.Panic(err)
 	}
