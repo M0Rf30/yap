@@ -20,33 +20,17 @@ var (
 	Releases = [...]string{
 		"alpine",
 		"arch",
-		"amazon-1",
-		"amazon-2",
-		"fedora-38",
-		"debian-jessie",
-		"debian-stretch",
-		"debian-buster",
-		"rocky-8",
-		"rocky-9",
-		"ubuntu-bionic",
-		"ubuntu-focal",
-		"ubuntu-jammy",
-	}
-
-	ReleasesMatch = map[string]string{
-		"alpine":        "",
-		"arch":          "",
-		"amazo-1":       ".amzn1.",
-		"amazon-2":      ".amzn2.",
-		"fedora-38":     ".fc38.",
-		"debian-jessie": "jessie",
-		"A-stretch":     "stretch",
-		"debian-buster": "buster",
-		"rocky-8":       ".el8.",
-		"rocky-9":       ".el9.",
-		"ubuntu-bionic": "bionic",
-		"ubuntu-focal":  "focal",
-		"ubuntu-jammy":  "jammy",
+		"amazon_1",
+		"amazon_2",
+		"fedora_38",
+		"debian_jessie",
+		"debian_stretch",
+		"debian_buster",
+		"rocky_8",
+		"rocky_9",
+		"ubuntu_bionic",
+		"ubuntu_focal",
+		"ubuntu_jammy",
 	}
 
 	DistroToPackageManager = map[string]string{
@@ -80,7 +64,7 @@ func init() {
 
 	for _, release := range Releases {
 		ReleasesSet.Add(release)
-		distro := strings.Split(release, "-")[0]
+		distro := strings.Split(release, "_")[0]
 		Distros = append(Distros, distro)
 		DistrosSet.Add(distro)
 	}
