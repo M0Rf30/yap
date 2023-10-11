@@ -78,14 +78,14 @@ func TestBuildMultipleProjectFromJSON(t *testing.T) {
 }`), os.FileMode(0755)))
 
 	defer os.Remove(packageRaw)
-	err = os.MkdirAll(filepath.Dir(prj1), os.FileMode(0777))
+	err = os.MkdirAll(filepath.Dir(prj1), os.FileMode(0750))
 
 	if err != nil {
 		t.Error(err)
 	}
 
 	defer os.RemoveAll(filepath.Dir(prj1))
-	err = os.MkdirAll(filepath.Dir(prj2), os.FileMode(0777))
+	err = os.MkdirAll(filepath.Dir(prj2), os.FileMode(0750))
 
 	if err != nil {
 		t.Error(err)
@@ -93,14 +93,14 @@ func TestBuildMultipleProjectFromJSON(t *testing.T) {
 
 	defer os.Remove(filepath.Dir(prj2))
 
-	err = os.WriteFile(prj1, []byte(examplePkgbuild), os.FileMode(0755))
+	err = os.WriteFile(prj1, []byte(examplePkgbuild), os.FileMode(0750))
 	if err != nil {
 		t.Error(err)
 	}
 
 	defer os.Remove(prj1)
 
-	err = os.WriteFile(prj2, []byte(examplePkgbuild), os.FileMode(0755))
+	err = os.WriteFile(prj2, []byte(examplePkgbuild), os.FileMode(0750))
 	if err != nil {
 		t.Error(err)
 	}
