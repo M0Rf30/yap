@@ -188,6 +188,7 @@ func Unarchive(archiveReader io.Reader, destination string) error {
 
 			// linux default for new directories is 777 and let the umask handle
 			// if should have other controls
+			//#nosec
 			err = os.MkdirAll(fileDir, 0777)
 		}
 
@@ -195,7 +196,9 @@ func Unarchive(archiveReader io.Reader, destination string) error {
 			return err
 		}
 
-		newFile, err := os.OpenFile(newPath, os.O_CREATE|os.O_WRONLY, archiveFile.Mode())
+		cleanNewPath := filepath.Clean(newPath)
+
+		newFile, err := os.OpenFile(cleanNewPath, os.O_CREATE|os.O_WRONLY, archiveFile.Mode())
 		if err != nil {
 			return err
 		}

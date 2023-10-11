@@ -235,17 +235,19 @@ func (mpc *MultipleProject) getMakeDeps() {
 }
 
 func (mpc *MultipleProject) readProject(path string) error {
-	file, err := os.Open(filepath.Join(path, "yap.json"))
+	cleanFilePath := filepath.Clean(filepath.Join(path, "yap.json"))
+
+	filePath, err := os.Open(cleanFilePath)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to open yap.json file within '%s'%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
-			path,
+			cleanFilePath,
 			string(constants.ColorWhite))
 		os.Exit(1)
 	}
 
-	prjContent, err := io.ReadAll(file)
+	prjContent, err := io.ReadAll(filePath)
 	if err != nil {
 		return err
 	}
