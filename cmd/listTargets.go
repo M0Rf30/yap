@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/M0Rf30/yap/constants"
 	"github.com/spf13/cobra"
@@ -9,7 +10,7 @@ import (
 
 func ListTargets() {
 	for _, release := range constants.Releases {
-		fmt.Println(release)
+		fmt.Println(strings.ReplaceAll(release, "_", "-"))
 	}
 }
 

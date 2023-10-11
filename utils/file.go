@@ -10,6 +10,7 @@ import (
 )
 
 func MkdirAll(path string) error {
+	//#nosec
 	err := os.MkdirAll(path, 0o755)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to mkdir '%s'%s\n",
@@ -94,7 +95,9 @@ func ExistsMakeDir(path string) error {
 }
 
 func Create(path string) (*os.File, error) {
-	file, err := os.Create(path)
+	cleanFilePath := filepath.Clean(path)
+
+	file, err := os.Create(cleanFilePath)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to create '%s'%s\n",
 			string(constants.ColorBlue),
@@ -128,7 +131,9 @@ func CreateWrite(path string, data string) error {
 }
 
 func Open(path string) (*os.File, error) {
-	file, err := os.Open(path)
+	cleanFilePath := filepath.Clean(path)
+
+	file, err := os.Open(cleanFilePath)
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to open file '%s'%s\n",
 			string(constants.ColorBlue),

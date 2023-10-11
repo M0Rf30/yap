@@ -3,6 +3,7 @@ tag-template: "$RESOLVED_VERSION"
 categories:
   - title: "🚀 Features"
     labels:
+      - "feat"
       - "feature"
       - "enhancement"
   - title: "🐛 Bug Fixes"
