@@ -13,7 +13,7 @@ import (
 	"github.com/M0Rf30/yap/parser"
 	"github.com/M0Rf30/yap/pkgbuild"
 	"github.com/M0Rf30/yap/utils"
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
 )
 
 var (
@@ -37,7 +37,7 @@ type Project struct {
 	Path           string
 	Release        string
 	Root           string
-	Name           string `json:"name"    validate:"required"`
+	Name           string `json:"name"    validate:"required,startsnotwith=.,startsnotwith=./"`
 	HasToInstall   bool   `json:"install" validate:""`
 }
 
