@@ -14,6 +14,7 @@ import (
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/utils"
 	ggit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 const (
@@ -21,11 +22,27 @@ const (
 )
 
 type Source struct {
-	StartDir       string
 	Hash           string
+	RefKey         string
+	RefValue       string
+	SourceItemPath string
 	SourceItemURI  string
 	SrcDir         string
-	SourceItemPath string
+	StartDir       string
+}
+
+func (src *Source) getReferenceType() plumbing.ReferenceName {
+	var referenceName plumbing.ReferenceName
+
+	switch src.RefKey {
+	case "branch":
+		referenceName = plumbing.NewBranchReferenceName(src.RefValue)
+	case "tag":
+		referenceName = plumbing.NewTagReferenceName(src.RefValue)
+	default:
+	}
+
+	return referenceName
 }
 
 func (src *Source) getType() string {
@@ -48,8 +65,23 @@ func (src *Source) getType() string {
 	return "file"
 }
 
-func (src *Source) parsePath() {
+func (src *Source) parseURI() {
 	src.SourceItemPath = utils.Filename(src.SourceItemURI)
+
+	if strings.Contains(src.SourceItemURI, "::") {
+		split := strings.Split(src.SourceItemURI, "::")
+		src.SourceItemPath = split[0]
+		src.SourceItemURI = split[1]
+	}
+
+	if strings.Contains(src.SourceItemURI, "#") {
+		split := strings.Split(src.SourceItemURI, "#")
+		src.SourceItemURI = split[0]
+		fragment := split[1]
+		splitFragment := strings.Split(fragment, "=")
+		src.RefKey = splitFragment[0]
+		src.RefValue = splitFragment[1]
+	}
 }
 
 func (src *Source) getURL(protocol string) {
@@ -62,8 +94,9 @@ func (src *Source) getURL(protocol string) {
 	if protocol == git {
 		_, err := ggit.PlainClone(dloadFilePath,
 			false, &ggit.CloneOptions{
-				URL:      strings.Trim(src.SourceItemURI, "git+"),
-				Progress: os.Stdout,
+				Progress:      os.Stdout,
+				ReferenceName: src.getReferenceType(),
+				URL:           strings.Trim(src.SourceItemURI, "git+"),
 			})
 
 		if err != nil && err.Error() == "repository already exists" {
@@ -149,7 +182,7 @@ func (src *Source) validate() error {
 func (src *Source) Get() error {
 	var err error
 
-	src.parsePath()
+	src.parseURI()
 
 	sourceType := src.getType()
 
@@ -186,7 +219,6 @@ func (src *Source) Get() error {
 	}
 
 	err = src.extract()
-
 	if err != nil {
 		return err
 	}
