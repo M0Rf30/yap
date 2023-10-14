@@ -19,18 +19,13 @@ const (
 var (
 	Releases = [...]string{
 		"alpine",
+		"amazon",
 		"arch",
-		"amazon_1",
-		"amazon_2",
-		"fedora_38",
-		"debian_jessie",
-		"debian_stretch",
-		"debian_buster",
-		"rocky_8",
-		"rocky_9",
-		"ubuntu_bionic",
-		"ubuntu_focal",
-		"ubuntu_jammy",
+		"centos",
+		"debian",
+		"fedora",
+		"rocky",
+		"ubuntu",
 	}
 
 	DistroToPackageManager = map[string]string{
@@ -44,6 +39,7 @@ var (
 		"rocky":  "redhat",
 		"ubuntu": "debian",
 	}
+
 	PackageManagers = [...]string{
 		"apk",
 		"apt",
