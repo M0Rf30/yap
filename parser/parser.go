@@ -43,14 +43,8 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 
 	env := func(name string) string {
 		switch name {
-		case "pkgname":
-			return pkgbuild.PkgName
 		case "epoch":
 			return pkgbuild.Epoch
-		case "pkgver":
-			return pkgbuild.PkgVer
-		case "pkgrel":
-			return pkgbuild.PkgVer
 		case "pkgdir":
 			if pkgbuild.Distro == "arch" {
 				return filepath.Join(pkgbuild.StartDir, "pkg", pkgbuild.PkgName)
@@ -61,6 +55,12 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 			}
 
 			return pkgbuild.PackageDir
+		case "pkgname":
+			return pkgbuild.PkgName
+		case "pkgrel":
+			return pkgbuild.PkgVer
+		case "pkgver":
+			return pkgbuild.PkgVer
 		case "srcdir":
 			return pkgbuild.SourceDir
 		case "url":

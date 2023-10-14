@@ -170,7 +170,7 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 		priority = -1
 	}
 
-	if p.Distro == "" {
+	if p.FullDistroName == "" {
 		return key, priority, err
 	}
 
@@ -180,12 +180,8 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 
 	directive := split[1]
 
-	if constants.ReleasesSet.Contains(directive) {
-		if directive == p.FullDistroName {
-			priority = 3
-		}
-
-		return key, priority, err
+	if directive == p.FullDistroName {
+		priority = 3
 	}
 
 	if constants.DistrosSet.Contains(directive) {
