@@ -26,7 +26,10 @@ COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
   apt-get update; \
   apt-get upgrade; \
-  apt-get install -y --no-install-recommends bash-completion sudo; \
+  apt-get install -y --no-install-recommends \
+    bash-completion \
+    ca-certificates \
+    sudo; \
   yap completion bash > /usr/share/bash-completion/completions/yap; \
   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bash.bashrc; \
   apt-get clean; \

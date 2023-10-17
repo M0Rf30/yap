@@ -15,7 +15,10 @@ RUN \
 FROM docker.io/alpine:latest
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
-  apk add --no-cache bash-completion sudo; \
+  apk add --no-cache \
+    bash-completion \
+    ca-certificates \
+    sudo; \
   yap completion bash > /etc/bash_completion.d/yap; \
   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc;
 
