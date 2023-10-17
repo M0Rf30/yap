@@ -23,135 +23,6 @@ type Redhat struct {
 	srpmsDir     string
 }
 
-func (r *Redhat) getRPMArch() {
-	for index, arch := range r.PKGBUILD.Arch {
-		r.PKGBUILD.Arch[index] = RPMArchs[arch]
-	}
-}
-
-func (r *Redhat) getRPMRelease() {
-	if r.PKGBUILD.Codename != "" {
-		r.PKGBUILD.PkgRel = r.PKGBUILD.PkgRel + RPMDistros[r.PKGBUILD.Distro] + r.PKGBUILD.Codename
-	}
-}
-
-func (r *Redhat) getRPMGroup() {
-	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
-}
-
-func (r *Redhat) getFiles() error {
-	backup := set.NewSet()
-	paths := set.NewSet()
-
-	for _, path := range r.PKGBUILD.Backup {
-		if !strings.HasPrefix(path, "/") {
-			path = "/" + path
-		}
-
-		backup.Add(path)
-	}
-
-	var files []string
-
-	err := filepath.Walk(r.PKGBUILD.PackageDir, func(path string, info os.FileInfo, err error) error {
-		if !info.IsDir() {
-			files = append(files, path)
-		}
-
-		return err
-	})
-
-	if err != nil {
-		return err
-	}
-
-	for _, filePath := range files {
-		if len(filePath) < 1 || strings.Contains(filePath, ".build-id") {
-			continue
-		}
-
-		paths.Remove(filepath.Dir(filePath))
-		paths.Add(strings.TrimPrefix(filePath, r.PKGBUILD.PackageDir))
-	}
-
-	for pathInf := range paths.Iter() {
-		path := pathInf.(string)
-
-		if !strings.HasPrefix(path, "/") {
-			path = "/" + path
-		}
-
-		if backup.Contains(path) {
-			path = `%config "` + path + `"`
-		} else {
-			path = `"` + path + `"`
-		}
-
-		r.PKGBUILD.Files = append(r.PKGBUILD.Files, path)
-	}
-
-	return err
-}
-
-func (r *Redhat) rpmBuild() error {
-	err := utils.Exec(r.specsDir, "rpmbuild", "--define",
-		"_topdir "+r.redhatDir, "-bb", r.PKGBUILD.PkgName+".spec")
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (r *Redhat) Prepare(makeDepends []string) error {
-	args := []string{
-		"-y",
-		"install",
-	}
-
-	err := r.PKGBUILD.GetDepends("dnf", args, makeDepends)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (r *Redhat) Update() error {
-	var err error
-
-	return err
-}
-
-func (r *Redhat) makeDirs() error {
-	var err error
-
-	r.redhatDir = filepath.Join(r.PKGBUILD.StartDir, "redhat")
-	r.buildDir = filepath.Join(r.redhatDir, "BUILD")
-	r.buildRootDir = filepath.Join(r.redhatDir, "BUILDROOT")
-	r.rpmsDir = filepath.Join(r.redhatDir, "RPMS")
-	r.sourcesDir = filepath.Join(r.redhatDir, "SOURCES")
-	r.specsDir = filepath.Join(r.redhatDir, "SPECS")
-	r.srpmsDir = filepath.Join(r.redhatDir, "SRPMS")
-
-	for _, path := range []string{
-		r.redhatDir,
-		r.buildDir,
-		r.buildRootDir,
-		r.rpmsDir,
-		r.sourcesDir,
-		r.specsDir,
-		r.srpmsDir,
-	} {
-		err = utils.ExistsMakeDir(path)
-		if err != nil {
-			return err
-		}
-	}
-
-	return err
-}
-
 func (r *Redhat) Build(artifactsPath string) error {
 	r.getRPMArch()
 	r.getRPMGroup()
@@ -238,6 +109,135 @@ func (r *Redhat) PrepareEnvironment(golang bool) error {
 
 	if golang {
 		utils.GOSetup()
+	}
+
+	return err
+}
+
+func (r *Redhat) Prepare(makeDepends []string) error {
+	args := []string{
+		"-y",
+		"install",
+	}
+
+	err := r.PKGBUILD.GetDepends("dnf", args, makeDepends)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (r *Redhat) Update() error {
+	var err error
+
+	return err
+}
+
+func (r *Redhat) getFiles() error {
+	backup := set.NewSet()
+	paths := set.NewSet()
+
+	for _, path := range r.PKGBUILD.Backup {
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+
+		backup.Add(path)
+	}
+
+	var files []string
+
+	err := filepath.Walk(r.PKGBUILD.PackageDir, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+
+		return err
+	})
+
+	if err != nil {
+		return err
+	}
+
+	for _, filePath := range files {
+		if len(filePath) < 1 || strings.Contains(filePath, ".build-id") {
+			continue
+		}
+
+		paths.Remove(filepath.Dir(filePath))
+		paths.Add(strings.TrimPrefix(filePath, r.PKGBUILD.PackageDir))
+	}
+
+	for pathInf := range paths.Iter() {
+		path := pathInf.(string)
+
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+
+		if backup.Contains(path) {
+			path = `%config "` + path + `"`
+		} else {
+			path = `"` + path + `"`
+		}
+
+		r.PKGBUILD.Files = append(r.PKGBUILD.Files, path)
+	}
+
+	return err
+}
+
+func (r *Redhat) getRPMArch() {
+	for index, arch := range r.PKGBUILD.Arch {
+		r.PKGBUILD.Arch[index] = RPMArchs[arch]
+	}
+}
+
+func (r *Redhat) getRPMGroup() {
+	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
+}
+
+func (r *Redhat) getRPMRelease() {
+	if r.PKGBUILD.Codename != "" {
+		r.PKGBUILD.PkgRel = r.PKGBUILD.PkgRel + RPMDistros[r.PKGBUILD.Distro] + r.PKGBUILD.Codename
+	}
+}
+
+func (r *Redhat) makeDirs() error {
+	var err error
+
+	r.redhatDir = filepath.Join(r.PKGBUILD.StartDir, "redhat")
+	r.buildDir = filepath.Join(r.redhatDir, "BUILD")
+	r.buildRootDir = filepath.Join(r.redhatDir, "BUILDROOT")
+	r.rpmsDir = filepath.Join(r.redhatDir, "RPMS")
+	r.sourcesDir = filepath.Join(r.redhatDir, "SOURCES")
+	r.specsDir = filepath.Join(r.redhatDir, "SPECS")
+	r.srpmsDir = filepath.Join(r.redhatDir, "SRPMS")
+
+	for _, path := range []string{
+		r.redhatDir,
+		r.buildDir,
+		r.buildRootDir,
+		r.rpmsDir,
+		r.sourcesDir,
+		r.specsDir,
+		r.srpmsDir,
+	} {
+		err = utils.ExistsMakeDir(path)
+		if err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
+func (r *Redhat) rpmBuild() error {
+	err := utils.Exec(r.specsDir, "rpmbuild", "--define",
+		"_topdir "+r.redhatDir, "-bb", r.PKGBUILD.PkgName+".spec")
+	if err != nil {
+		return err
 	}
 
 	return err

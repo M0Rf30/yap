@@ -4,38 +4,6 @@ var buildEnvironmentDeps = []string{
 	"alpine-sdk",
 }
 
-const specFile = `
-{{- /* Mandatory fields */ -}}
-pkgname={{.PkgName}}
-{{- if .Epoch}}
-epoch={{.Epoch}}
-{{- end }}
-pkgver={{.PkgVer}}
-pkgrel={{.PkgRel}}
-pkgdesc="{{.PkgDesc}}"
-arch="all"
-{{- with .Depends}}
-depends="{{join .}}"
-{{- end }}
-{{- with .Conflicts}}
-conflicts=({{join .}})
-{{- end }}
-{{- if .URL}}
-url="{{.URL}}"
-{{- end }}
-{{- if .Install}}
-install={{.PkgName}}.install
-{{- end }}
-{{- if .License}}
-license={{.License}}
-{{- else }}
-license="CUSTOM"
-{{- end }}
-
-options="!check !fhs"
-
-package() {{.Package}}
-`
 const postInstall = `
 {{- if .PreInst}}
 pre_install() {
@@ -72,4 +40,37 @@ post_remove() {
   {{.PostRm}}"
 }
 {{- end }}
+`
+
+const specFile = `
+{{- /* Mandatory fields */ -}}
+pkgname={{.PkgName}}
+{{- if .Epoch}}
+epoch={{.Epoch}}
+{{- end }}
+pkgver={{.PkgVer}}
+pkgrel={{.PkgRel}}
+pkgdesc="{{.PkgDesc}}"
+arch="all"
+{{- with .Depends}}
+depends="{{join .}}"
+{{- end }}
+{{- with .Conflicts}}
+conflicts=({{join .}})
+{{- end }}
+{{- if .URL}}
+url="{{.URL}}"
+{{- end }}
+{{- if .Install}}
+install={{.PkgName}}.install
+{{- end }}
+{{- if .License}}
+license={{.License}}
+{{- else }}
+license="CUSTOM"
+{{- end }}
+
+options="!check !fhs"
+
+package() {{.Package}}
 `

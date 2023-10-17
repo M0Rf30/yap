@@ -9,22 +9,6 @@ import (
 	"github.com/M0Rf30/yap/constants"
 )
 
-func MkdirAll(path string) error {
-	//#nosec
-	err := os.MkdirAll(path, 0o755)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to mkdir '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
-
-		return err
-	}
-
-	return err
-}
-
 func Chmod(path string, perm os.FileMode) error {
 	err := os.Chmod(path, perm)
 	if err != nil {
@@ -33,60 +17,6 @@ func Chmod(path string, perm os.FileMode) error {
 			string(constants.ColorYellow),
 			path,
 			string(constants.ColorWhite))
-
-		return err
-	}
-
-	return err
-}
-
-func Remove(path string) error {
-	err := os.Remove(path)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
-
-		return err
-	}
-
-	return err
-}
-
-func RemoveAll(path string) error {
-	err := os.RemoveAll(path)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
-
-		return err
-	}
-
-	return err
-}
-
-func ExistsMakeDir(path string) error {
-	_, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = MkdirAll(path)
-			if err != nil {
-				return err
-			}
-		} else {
-			fmt.Printf("%s❌ :: %sfailed to stat '%s'%s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow),
-				path,
-				string(constants.ColorWhite))
-
-			return err
-		}
 
 		return err
 	}
@@ -130,19 +60,34 @@ func CreateWrite(path string, data string) error {
 	return err
 }
 
-func Open(path string) (*os.File, error) {
-	cleanFilePath := filepath.Clean(path)
+func Exists(filename string) bool {
+	_, err := os.Stat(filename)
 
-	file, err := os.Open(cleanFilePath)
+	return !os.IsNotExist(err)
+}
+
+func ExistsMakeDir(path string) error {
+	_, err := os.Stat(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open file '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
+		if os.IsNotExist(err) {
+			err = MkdirAll(path)
+			if err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("%s❌ :: %sfailed to stat '%s'%s\n",
+				string(constants.ColorBlue),
+				string(constants.ColorYellow),
+				path,
+				string(constants.ColorWhite))
+
+			return err
+		}
+
+		return err
 	}
 
-	return file, err
+	return err
 }
 
 func Filename(path string) string {
@@ -179,8 +124,63 @@ func GetDirSize(path string) (int64, error) {
 	return size, err
 }
 
-func Exists(filename string) bool {
-	_, err := os.Stat(filename)
+func MkdirAll(path string) error {
+	//#nosec
+	err := os.MkdirAll(path, 0o755)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to mkdir '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
 
-	return !os.IsNotExist(err)
+		return err
+	}
+
+	return err
+}
+
+func Open(path string) (*os.File, error) {
+	cleanFilePath := filepath.Clean(path)
+
+	file, err := os.Open(cleanFilePath)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to open file '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+	}
+
+	return file, err
+}
+
+func Remove(path string) error {
+	err := os.Remove(path)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
+		return err
+	}
+
+	return err
+}
+
+func RemoveAll(path string) error {
+	err := os.RemoveAll(path)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			path,
+			string(constants.ColorWhite))
+
+		return err
+	}
+
+	return err
 }

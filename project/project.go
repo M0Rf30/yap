@@ -28,19 +28,6 @@ type DistroProject interface {
 	Prepare() error
 }
 
-type Project struct {
-	Builder        *builder.Builder
-	BuildRoot      string
-	Distro         string
-	MirrorRoot     string
-	PackageManager packer.Packer
-	Path           string
-	Release        string
-	Root           string
-	Name           string `json:"name"    validate:"required,startsnotwith=.,startsnotwith=./"`
-	HasToInstall   bool   `json:"install" validate:""`
-}
-
 type MultipleProject struct {
 	makeDepends    []string
 	packageManager packer.Packer
@@ -52,25 +39,17 @@ type MultipleProject struct {
 	Projects       []*Project `json:"projects"    validate:"required,dive,required"`
 }
 
-func (mpc *MultipleProject) findPackageInProjects() {
-	var matchFound bool
-
-	for _, proj := range mpc.Projects {
-		if UntilPkgName == proj.Builder.PKGBUILD.PkgName {
-			matchFound = true
-		}
-	}
-
-	if !matchFound {
-		fmt.Printf("%s❌ :: %sPackage not found: %s%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite),
-			UntilPkgName,
-		)
-
-		os.Exit(1)
-	}
+type Project struct {
+	Builder        *builder.Builder
+	BuildRoot      string
+	Distro         string
+	MirrorRoot     string
+	PackageManager packer.Packer
+	Path           string
+	Release        string
+	Root           string
+	Name           string `json:"name"    validate:"required,startsnotwith=.,startsnotwith=./"`
+	HasToInstall   bool   `json:"install" validate:""`
 }
 
 func (mpc *MultipleProject) BuildAll() error {
@@ -195,6 +174,37 @@ func (mpc *MultipleProject) createPackages(proj *Project) error {
 	return err
 }
 
+func (mpc *MultipleProject) findPackageInProjects() {
+	var matchFound bool
+
+	for _, proj := range mpc.Projects {
+		if UntilPkgName == proj.Builder.PKGBUILD.PkgName {
+			matchFound = true
+		}
+	}
+
+	if !matchFound {
+		fmt.Printf("%s❌ :: %sPackage not found: %s%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite),
+			UntilPkgName,
+		)
+
+		os.Exit(1)
+	}
+}
+
+func (mpc *MultipleProject) getMakeDeps() {
+	var makeDepends []string
+
+	for _, child := range mpc.Projects {
+		makeDepends = append(makeDepends, child.Builder.PKGBUILD.MakeDepends...)
+	}
+
+	mpc.makeDepends = makeDepends
+}
+
 func (mpc *MultipleProject) populateProjects(distro string, release string, path string) error {
 	var err error
 
@@ -222,16 +232,6 @@ func (mpc *MultipleProject) populateProjects(distro string, release string, path
 	mpc.Projects = projects
 
 	return err
-}
-
-func (mpc *MultipleProject) getMakeDeps() {
-	var makeDepends []string
-
-	for _, child := range mpc.Projects {
-		makeDepends = append(makeDepends, child.Builder.PKGBUILD.MakeDepends...)
-	}
-
-	mpc.makeDepends = makeDepends
 }
 
 func (mpc *MultipleProject) readProject(path string) error {
