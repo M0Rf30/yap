@@ -22,7 +22,10 @@ RUN \
 FROM docker.io/rockylinux/rockylinux:9
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
-  dnf -y install bash-completion sudo; \
+  dnf -y install \
+    bash-completion \
+    ca-certificates \
+    sudo; \
   yap completion bash > /etc/bash_completion.d/yap; \
   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \
   dnf clean all
