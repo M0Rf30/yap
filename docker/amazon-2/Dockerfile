@@ -22,7 +22,10 @@ RUN \
 FROM docker.io/amazonlinux:2
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
-  yum -y install bash-completion sudo; \
+  yum -y install \
+    bash-completion \
+    ca-certificates \
+    sudo; \
   yap completion bash > /etc/bash_completion.d/yap; \
   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \
   yum clean all
