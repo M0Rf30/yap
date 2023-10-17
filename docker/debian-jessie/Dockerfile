@@ -35,6 +35,7 @@ RUN \
   apt-get clean; \
   rm -rf /var/lib/apt/lists/*
 
+ENV DEBIAN_FRONTEND=noninteractive
 ENV GOROOT=/usr/lib/go
 ENV PATH /usr/lib/go/bin:$PATH:/go/bin
 

@@ -14,6 +14,55 @@ import (
 
 var OverridePkgver string
 
+func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
+	home, err := filepath.Abs(home)
+
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to get root directory from %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), home)
+
+		return nil, err
+	}
+
+	pkgbuild := &pkgbuild.PKGBUILD{
+		Distro:     distro,
+		Codename:   release,
+		StartDir:   startDir,
+		Home:       home,
+		SourceDir:  filepath.Join(startDir, "src"),
+		PackageDir: filepath.Join(startDir, "staging"),
+	}
+
+	err = utils.ExistsMakeDir(startDir)
+	if err != nil {
+		return pkgbuild, err
+	}
+
+	err = copy.Copy(home, startDir)
+	if err != nil {
+		return pkgbuild, err
+	}
+
+	pkgbuild.Init()
+
+	pkgbuildSyntax, err := getSyntaxFile(startDir, home)
+	if err != nil {
+		return nil, err
+	}
+
+	err = parseSyntaxFile(pkgbuildSyntax, pkgbuild)
+	if err != nil {
+		return nil, err
+	}
+
+	if OverridePkgver != "" {
+		pkgbuild.PkgVer = OverridePkgver
+	}
+
+	return pkgbuild, err
+}
+
 func getSyntaxFile(startDir, home string) (*syntax.File, error) {
 	file, err := utils.Open(filepath.Join(startDir, "PKGBUILD"))
 	if err != nil {
@@ -97,53 +146,4 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 	}
 
 	return err
-}
-
-func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
-	home, err := filepath.Abs(home)
-
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to get root directory from %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), home)
-
-		return nil, err
-	}
-
-	pkgbuild := &pkgbuild.PKGBUILD{
-		Distro:     distro,
-		Codename:   release,
-		StartDir:   startDir,
-		Home:       home,
-		SourceDir:  filepath.Join(startDir, "src"),
-		PackageDir: filepath.Join(startDir, "staging"),
-	}
-
-	err = utils.ExistsMakeDir(startDir)
-	if err != nil {
-		return pkgbuild, err
-	}
-
-	err = copy.Copy(home, startDir)
-	if err != nil {
-		return pkgbuild, err
-	}
-
-	pkgbuild.Init()
-
-	pkgbuildSyntax, err := getSyntaxFile(startDir, home)
-	if err != nil {
-		return nil, err
-	}
-
-	err = parseSyntaxFile(pkgbuildSyntax, pkgbuild)
-	if err != nil {
-		return nil, err
-	}
-
-	if OverridePkgver != "" {
-		pkgbuild.PkgVer = OverridePkgver
-	}
-
-	return pkgbuild, err
 }

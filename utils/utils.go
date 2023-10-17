@@ -30,43 +30,6 @@ func CheckGO() bool {
 	return false
 }
 
-func GOSetup() {
-	if CheckGO() {
-		return
-	}
-
-	Download(goArchivePath, constants.GoArchiveURL)
-
-	dlFile, err := os.Open(goArchivePath)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), goArchivePath)
-
-		os.Exit(1)
-	}
-
-	err = Unarchive(dlFile, "/usr/lib")
-	if err != nil {
-		log.Panic(err)
-	}
-
-	err = os.Symlink("/usr/lib/go/bin/go", goExecutable)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	err = os.Symlink("/usr/lib/go/bin/gofmt", "/usr/bin/gofmt")
-	if err != nil {
-		log.Panic(err)
-	}
-
-	fmt.Printf("%s🪛 :: %sGO successfully installed%s\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite))
-}
-
 func Download(destination string, url string) {
 	// create client
 	client := grab.NewClient()
@@ -133,6 +96,43 @@ Loop:
 		string(constants.ColorWhite),
 		destination,
 	)
+}
+
+func GOSetup() {
+	if CheckGO() {
+		return
+	}
+
+	Download(goArchivePath, constants.GoArchiveURL)
+
+	dlFile, err := os.Open(goArchivePath)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to open %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), goArchivePath)
+
+		os.Exit(1)
+	}
+
+	err = Unarchive(dlFile, "/usr/lib")
+	if err != nil {
+		log.Panic(err)
+	}
+
+	err = os.Symlink("/usr/lib/go/bin/go", goExecutable)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	err = os.Symlink("/usr/lib/go/bin/gofmt", "/usr/bin/gofmt")
+	if err != nil {
+		log.Panic(err)
+	}
+
+	fmt.Printf("%s🪛 :: %sGO successfully installed%s\n",
+		string(constants.ColorBlue),
+		string(constants.ColorYellow),
+		string(constants.ColorWhite))
 }
 
 func PullContainers(target string) error {

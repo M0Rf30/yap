@@ -31,6 +31,75 @@ type Source struct {
 	StartDir       string
 }
 
+func (src *Source) Get() error {
+	var err error
+
+	src.parseURI()
+
+	sourceType := src.getType()
+
+	switch sourceType {
+	case "http":
+		src.getURL("http")
+	case "https":
+		src.getURL("https")
+	case "ftp":
+		src.getURL("ftp")
+	case "git":
+		src.getURL("git")
+	case "file":
+	default:
+		fmt.Printf("%s❌ :: %sunknown or unsupported source type: %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), sourceType)
+
+		os.Exit(1)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	err = src.validate()
+	if err != nil {
+		return err
+	}
+
+	err = src.symlinkSources()
+	if err != nil {
+		return err
+	}
+
+	err = src.extract()
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (src *Source) extract() error {
+	dlFile, err := os.Open(filepath.Join(src.StartDir, src.SourceItemPath))
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to open source %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), src.SourceItemURI)
+
+		return err
+	}
+
+	err = utils.Unarchive(dlFile, src.SrcDir)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to extract source %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), src.SourceItemPath)
+
+		log.Panic(err)
+	}
+
+	return err
+}
+
 func (src *Source) getReferenceType() plumbing.ReferenceName {
 	var referenceName plumbing.ReferenceName
 
@@ -65,25 +134,6 @@ func (src *Source) getType() string {
 	return "file"
 }
 
-func (src *Source) parseURI() {
-	src.SourceItemPath = utils.Filename(src.SourceItemURI)
-
-	if strings.Contains(src.SourceItemURI, "::") {
-		split := strings.Split(src.SourceItemURI, "::")
-		src.SourceItemPath = split[0]
-		src.SourceItemURI = split[1]
-	}
-
-	if strings.Contains(src.SourceItemURI, "#") {
-		split := strings.Split(src.SourceItemURI, "#")
-		src.SourceItemURI = split[0]
-		fragment := split[1]
-		splitFragment := strings.Split(fragment, "=")
-		src.RefKey = splitFragment[0]
-		src.RefValue = splitFragment[1]
-	}
-}
-
 func (src *Source) getURL(protocol string) {
 	dloadFilePath := filepath.Join(src.StartDir, src.SourceItemPath)
 
@@ -108,23 +158,34 @@ func (src *Source) getURL(protocol string) {
 	}
 }
 
-func (src *Source) extract() error {
-	dlFile, err := os.Open(filepath.Join(src.StartDir, src.SourceItemPath))
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open source %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), src.SourceItemURI)
+func (src *Source) parseURI() {
+	src.SourceItemPath = utils.Filename(src.SourceItemURI)
 
-		return err
+	if strings.Contains(src.SourceItemURI, "::") {
+		split := strings.Split(src.SourceItemURI, "::")
+		src.SourceItemPath = split[0]
+		src.SourceItemURI = split[1]
 	}
 
-	err = utils.Unarchive(dlFile, src.SrcDir)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to extract source %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), src.SourceItemPath)
+	if strings.Contains(src.SourceItemURI, "#") {
+		split := strings.Split(src.SourceItemURI, "#")
+		src.SourceItemURI = split[0]
+		fragment := split[1]
+		splitFragment := strings.Split(fragment, "=")
+		src.RefKey = splitFragment[0]
+		src.RefValue = splitFragment[1]
+	}
+}
 
-		log.Panic(err)
+func (src *Source) symlinkSources() error {
+	var err error
+
+	symlinkSource := filepath.Join(src.StartDir, src.SourceItemPath)
+
+	symLinkTarget := filepath.Join(src.SrcDir, src.SourceItemPath)
+
+	if !utils.Exists(symLinkTarget) {
+		err = os.Symlink(symlinkSource, symLinkTarget)
 	}
 
 	return err
@@ -173,68 +234,7 @@ func (src *Source) validate() error {
 	if hexSum != src.Hash {
 		fmt.Printf("%s❌ :: %sHash verification failed for %s\n",
 			string(constants.ColorBlue),
-			string(constants.ColorYellow), src.SourceItemURI)
-	}
-
-	return err
-}
-
-func (src *Source) Get() error {
-	var err error
-
-	src.parseURI()
-
-	sourceType := src.getType()
-
-	switch sourceType {
-	case "http":
-		src.getURL("http")
-	case "https":
-		src.getURL("https")
-	case "ftp":
-		src.getURL("ftp")
-	case "git":
-		src.getURL("git")
-	case "file":
-	default:
-		fmt.Printf("%s❌ :: %sunknown or unsupported source type: %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), sourceType)
-
-		os.Exit(1)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	err = src.validate()
-	if err != nil {
-		return err
-	}
-
-	err = src.symlinkSources()
-	if err != nil {
-		return err
-	}
-
-	err = src.extract()
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (src *Source) symlinkSources() error {
-	var err error
-
-	symlinkSource := filepath.Join(src.StartDir, src.SourceItemPath)
-
-	symLinkTarget := filepath.Join(src.SrcDir, src.SourceItemPath)
-
-	if !utils.Exists(symLinkTarget) {
-		err = os.Symlink(symlinkSource, symLinkTarget)
+			string(constants.ColorYellow), src.SourceItemPath)
 	}
 
 	return err

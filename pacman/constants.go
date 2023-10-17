@@ -4,6 +4,44 @@ var buildEnvironmentDeps = []string{
 	"base-devel",
 }
 
+const postInstall = `
+{{- if .PreInst}}
+pre_install() {
+  {{.PreInst}}"
+}
+{{- end }}
+
+{{- if .PostInst}}
+post_install() {
+  {{.PostInst}}"
+}
+{{- end }}
+
+{{- if .PreInst}}
+pre_upgrade() {
+  {{.PreInst}}"
+}
+{{- end }}
+
+{{- if .PostInst}}
+post_upgrade() {
+  {{.PostInst}}"
+}
+{{- end }}
+
+{{- if .PreRm}}
+pre_remove() {
+  {{.PreRm}}"
+}
+{{- end }}
+
+{{- if .PostRm}}
+post_remove() {
+  {{.PostRm}}"
+}
+{{- end }}
+`
+
 const specFile = `
 {{- /* Mandatory fields */ -}}
 # Maintainer: {{.Maintainer}}
@@ -49,41 +87,4 @@ options=({{join .}})
 install={{.PkgName}}.install
 
 package() {{.Package}}
-`
-const postInstall = `
-{{- if .PreInst}}
-pre_install() {
-  {{.PreInst}}"
-}
-{{- end }}
-
-{{- if .PostInst}}
-post_install() {
-  {{.PostInst}}"
-}
-{{- end }}
-
-{{- if .PreInst}}
-pre_upgrade() {
-  {{.PreInst}}"
-}
-{{- end }}
-
-{{- if .PostInst}}
-post_upgrade() {
-  {{.PostInst}}"
-}
-{{- end }}
-
-{{- if .PreRm}}
-pre_remove() {
-  {{.PreRm}}"
-}
-{{- end }}
-
-{{- if .PostRm}}
-post_remove() {
-  {{.PostRm}}"
-}
-{{- end }}
 `

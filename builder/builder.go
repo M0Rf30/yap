@@ -13,59 +13,6 @@ type Builder struct {
 	PKGBUILD *pkgbuild.PKGBUILD
 }
 
-func (builder *Builder) initDirs() error {
-	err := utils.ExistsMakeDir(builder.PKGBUILD.SourceDir)
-	if err != nil {
-		return err
-	}
-
-	err = utils.ExistsMakeDir(builder.PKGBUILD.PackageDir)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (builder *Builder) getSources() error {
-	var err error
-
-	for index, sourceURI := range builder.PKGBUILD.SourceURI {
-		source := source.Source{
-			StartDir:       builder.PKGBUILD.StartDir,
-			Hash:           builder.PKGBUILD.HashSums[index],
-			SourceItemURI:  sourceURI,
-			SrcDir:         builder.PKGBUILD.SourceDir,
-			SourceItemPath: "",
-		}
-		err = source.Get()
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return err
-}
-
-func (builder *Builder) build() error {
-	err := RunScript(builder.PKGBUILD.Build)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (builder *Builder) Package() error {
-	err := RunScript(builder.PKGBUILD.Package)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func (builder *Builder) Compile() error {
 	err := builder.initDirs()
 	if err != nil {
@@ -98,6 +45,59 @@ func (builder *Builder) Compile() error {
 		string(constants.ColorWhite))
 
 	err = builder.Package()
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (builder *Builder) Package() error {
+	err := RunScript(builder.PKGBUILD.Package)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (builder *Builder) build() error {
+	err := RunScript(builder.PKGBUILD.Build)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (builder *Builder) getSources() error {
+	var err error
+
+	for index, sourceURI := range builder.PKGBUILD.SourceURI {
+		source := source.Source{
+			StartDir:       builder.PKGBUILD.StartDir,
+			Hash:           builder.PKGBUILD.HashSums[index],
+			SourceItemURI:  sourceURI,
+			SrcDir:         builder.PKGBUILD.SourceDir,
+			SourceItemPath: "",
+		}
+		err = source.Get()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
+func (builder *Builder) initDirs() error {
+	err := utils.ExistsMakeDir(builder.PKGBUILD.SourceDir)
+	if err != nil {
+		return err
+	}
+
+	err = utils.ExistsMakeDir(builder.PKGBUILD.PackageDir)
 	if err != nil {
 		return err
 	}

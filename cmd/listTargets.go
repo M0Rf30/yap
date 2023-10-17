@@ -8,12 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func ListTargets() {
-	for _, release := range constants.Releases {
-		fmt.Println(strings.ReplaceAll(release, "_", "-"))
-	}
-}
-
 // listTargetsCmd represents the listTargets command.
 var listTargetsCmd = &cobra.Command{
 	Use:   "list-targets",
@@ -21,6 +15,12 @@ var listTargetsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ListTargets()
 	},
+}
+
+func ListTargets() {
+	for _, release := range constants.Releases {
+		fmt.Println(strings.ReplaceAll(release, "_", "-"))
+	}
 }
 
 func init() {
