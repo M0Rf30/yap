@@ -12,38 +12,6 @@ type Pacman struct {
 	pacmanDir string
 }
 
-func (p *Pacman) pacmanBuild() error {
-	err := utils.Exec(p.pacmanDir, "makepkg", "-f")
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (p *Pacman) Prepare(makeDepends []string) error {
-	args := []string{
-		"-S",
-		"--noconfirm",
-	}
-
-	err := p.PKGBUILD.GetDepends("pacman", args, makeDepends)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (p *Pacman) Update() error {
-	err := p.PKGBUILD.GetUpdates("pacman", "-Sy")
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func (p *Pacman) Build(artifactsPath string) error {
 	p.pacmanDir = p.PKGBUILD.StartDir
 
@@ -91,6 +59,20 @@ func (p *Pacman) Install(artifactsPath string) error {
 	return err
 }
 
+func (p *Pacman) Prepare(makeDepends []string) error {
+	args := []string{
+		"-S",
+		"--noconfirm",
+	}
+
+	err := p.PKGBUILD.GetDepends("pacman", args, makeDepends)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
 func (p *Pacman) PrepareEnvironment(golang bool) error {
 	var err error
 
@@ -107,6 +89,24 @@ func (p *Pacman) PrepareEnvironment(golang bool) error {
 	}
 
 	err = utils.Exec("", "pacman", args...)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (p *Pacman) Update() error {
+	err := p.PKGBUILD.GetUpdates("pacman", "-Sy")
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (p *Pacman) pacmanBuild() error {
+	err := utils.Exec(p.pacmanDir, "makepkg", "-f")
 	if err != nil {
 		return err
 	}

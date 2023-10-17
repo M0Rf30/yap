@@ -12,56 +12,6 @@ type Apk struct {
 	apkDir   string
 }
 
-func (a *Apk) apkBuild(artifactsPath string) error {
-	err := utils.Exec(a.apkDir, "abuild-keygen", "-n", "-a")
-	if err != nil {
-		return err
-	}
-
-	err = utils.Exec(a.apkDir, "abuild", "-F", "-K", "-P", artifactsPath)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (a *Apk) Prepare(makeDepends []string) error {
-	args := []string{
-		"add",
-	}
-
-	err := a.PKGBUILD.GetDepends("apk", args, makeDepends)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (a *Apk) Update() error {
-	err := a.PKGBUILD.GetUpdates("apk", "update")
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (a *Apk) makePackerDir() error {
-	err := utils.ExistsMakeDir(a.apkDir)
-	if err != nil {
-		return err
-	}
-
-	err = utils.ExistsMakeDir(a.apkDir + "/pkg/" + a.PKGBUILD.PkgName)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 func (a *Apk) Build(artifactsPath string) error {
 	a.apkDir = filepath.Join(a.PKGBUILD.StartDir, "apk")
 
@@ -115,6 +65,19 @@ func (a *Apk) Install(artifactsPath string) error {
 	return err
 }
 
+func (a *Apk) Prepare(makeDepends []string) error {
+	args := []string{
+		"add",
+	}
+
+	err := a.PKGBUILD.GetDepends("apk", args, makeDepends)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
 func (a *Apk) PrepareEnvironment(golang bool) error {
 	var err error
 
@@ -130,6 +93,43 @@ func (a *Apk) PrepareEnvironment(golang bool) error {
 	}
 
 	err = utils.Exec("", "apk", args...)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (a *Apk) Update() error {
+	err := a.PKGBUILD.GetUpdates("apk", "update")
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (a *Apk) apkBuild(artifactsPath string) error {
+	err := utils.Exec(a.apkDir, "abuild-keygen", "-n", "-a")
+	if err != nil {
+		return err
+	}
+
+	err = utils.Exec(a.apkDir, "abuild", "-F", "-K", "-P", artifactsPath)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (a *Apk) makePackerDir() error {
+	err := utils.ExistsMakeDir(a.apkDir)
+	if err != nil {
+		return err
+	}
+
+	err = utils.ExistsMakeDir(a.apkDir + "/pkg/" + a.PKGBUILD.PkgName)
 	if err != nil {
 		return err
 	}

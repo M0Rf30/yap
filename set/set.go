@@ -6,20 +6,8 @@ type Set struct {
 	m map[string]struct{}
 }
 
-func NewSet() *Set {
-	s := &Set{
-		m: make(map[string]struct{}),
-	}
-
-	return s
-}
-
 func (s *Set) Add(value string) {
 	s.m[value] = exists
-}
-
-func (s *Set) Remove(value string) {
-	delete(s.m, value)
 }
 
 func (s *Set) Contains(value string) bool {
@@ -40,4 +28,16 @@ func (s *Set) Iter() <-chan interface{} {
 	}()
 
 	return iter
+}
+
+func NewSet() *Set {
+	s := &Set{
+		m: make(map[string]struct{}),
+	}
+
+	return s
+}
+
+func (s *Set) Remove(value string) {
+	delete(s.m, value)
 }
