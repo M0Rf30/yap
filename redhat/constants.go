@@ -18,6 +18,7 @@ var buildEnvironmentDeps = []string{
 	"openssl",
 	"rpm-build",
 	"rpm-sign",
+	"which",
 }
 
 var (
