@@ -144,7 +144,7 @@ You'll find:
 
 ## License
 
-See [LICENSE](LICENSE) file for details.
+See [LICENSE](LICENSE.md) file for details.
 
 ## Credits
 
