@@ -1,8 +1,5 @@
 # Options for analysis running.
 linters:
-  # Enable specific linter
-  # https://golangci-lint.run/usage/linters/#enabled-by-default-linters
-  enable-all: true
   # Disable specific linter
   # https://golangci-lint.run/usage/linters/#disabled-by-default-linters--e--enable
   disable:
@@ -32,10 +29,40 @@ linters:
     - ireturn
     - typecheck
     - wrapcheck
-
+  # Enable specific linter
+  # https://golangci-lint.run/usage/linters/#enabled-by-default-linters
+  enable-all: true
 linters-settings:
   cyclop:
     max-complexity: 15
-
+  dupl:
+    threshold: 100
+  funlen:
+    lines: -1
+    statements: 50
+  goconst:
+    min-len: 2
+    min-occurrences: 3
+  gocritic:
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - unnamedResult
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+  gocyclo:
+    max-complexity: 15
+  gofmt:
+    rewrite-rules:
+      - pattern: interface{}
+        replacement: any
+  goimports:
+    local-prefixes: github.com/golangci/golangci-lint
 run:
   timeout: 5m

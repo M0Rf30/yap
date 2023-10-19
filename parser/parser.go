@@ -26,7 +26,7 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 		return nil, err
 	}
 
-	pkgbuild := &pkgbuild.PKGBUILD{
+	pkgBuild := &pkgbuild.PKGBUILD{
 		Distro:     distro,
 		Codename:   release,
 		StartDir:   startDir,
@@ -37,31 +37,31 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 
 	err = utils.ExistsMakeDir(startDir)
 	if err != nil {
-		return pkgbuild, err
+		return pkgBuild, err
 	}
 
 	err = copy.Copy(home, startDir)
 	if err != nil {
-		return pkgbuild, err
+		return pkgBuild, err
 	}
 
-	pkgbuild.Init()
+	pkgBuild.Init()
 
 	pkgbuildSyntax, err := getSyntaxFile(startDir, home)
 	if err != nil {
 		return nil, err
 	}
 
-	err = parseSyntaxFile(pkgbuildSyntax, pkgbuild)
+	err = parseSyntaxFile(pkgbuildSyntax, pkgBuild)
 	if err != nil {
 		return nil, err
 	}
 
 	if OverridePkgver != "" {
-		pkgbuild.PkgVer = OverridePkgver
+		pkgBuild.PkgVer = OverridePkgver
 	}
 
-	return pkgbuild, err
+	return pkgBuild, err
 }
 
 func getSyntaxFile(startDir, home string) (*syntax.File, error) {
@@ -81,7 +81,7 @@ func getSyntaxFile(startDir, home string) (*syntax.File, error) {
 	return pkgbuildSyntax, err
 }
 
-func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) error {
+func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) error {
 	var err error
 
 	var arrayDecl []string
@@ -97,14 +97,14 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgbuild *pkgbuild.PKGBUILD) e
 				for _, line := range utils.StringifyArray(nodeType) {
 					arrayDecl, _ = shell.Fields(line, os.Getenv)
 				}
-				err = pkgbuild.AddItem(nodeType.Name.Value, arrayDecl)
+				err = pkgBuild.AddItem(nodeType.Name.Value, arrayDecl)
 			} else {
 				varDecl, _ = shell.Expand(utils.StringifyAssign(nodeType), os.Getenv)
-				err = pkgbuild.AddItem(nodeType.Name.Value, varDecl)
+				err = pkgBuild.AddItem(nodeType.Name.Value, varDecl)
 			}
 		case *syntax.FuncDecl:
 			funcDecl = utils.StringifyFuncDecl(nodeType)
-			err = pkgbuild.AddItem(nodeType.Name.Value, funcDecl)
+			err = pkgBuild.AddItem(nodeType.Name.Value, funcDecl)
 		}
 
 		return true

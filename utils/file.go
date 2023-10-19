@@ -39,7 +39,7 @@ func Create(path string) (*os.File, error) {
 	return file, err
 }
 
-func CreateWrite(path string, data string) error {
+func CreateWrite(path, data string) error {
 	file, err := Create(path)
 	if err != nil {
 		return err

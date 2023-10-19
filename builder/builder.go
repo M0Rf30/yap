@@ -74,7 +74,7 @@ func (builder *Builder) getSources() error {
 	var err error
 
 	for index, sourceURI := range builder.PKGBUILD.SourceURI {
-		source := source.Source{
+		sourceObj := source.Source{
 			StartDir:       builder.PKGBUILD.StartDir,
 			Hash:           builder.PKGBUILD.HashSums[index],
 			SourceItemURI:  sourceURI,
@@ -82,7 +82,7 @@ func (builder *Builder) getSources() error {
 			SourceItemPath: "",
 		}
 
-		err = source.Get()
+		err = sourceObj.Get()
 
 		if err != nil {
 			return err
