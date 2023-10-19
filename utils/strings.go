@@ -35,11 +35,11 @@ func GenerateRandomString(n int) string {
 // Generates a string from a *syntax.Assign of an array declaration.
 func StringifyArray(node *syntax.Assign) []string {
 	fields := make([]string, 0)
-
+	printer := syntax.NewPrinter(syntax.Indent(2))
 	out := &strings.Builder{}
 
 	for index := range node.Array.Elems {
-		err := syntax.NewPrinter().Print(out, node.Array.Elems[index].Value)
+		err := printer.Print(out, node.Array.Elems[index].Value)
 		if err != nil {
 			fmt.Printf("%s❌ :: %sunable to parse variable: %s\n",
 				string(constants.ColorBlue),
@@ -58,7 +58,8 @@ func StringifyArray(node *syntax.Assign) []string {
 // Generates a string from a *syntax.Assign of a variable declaration.
 func StringifyAssign(node *syntax.Assign) string {
 	out := &strings.Builder{}
-	err := syntax.NewPrinter().Print(out, node.Value)
+	printer := syntax.NewPrinter(syntax.Indent(2))
+	err := printer.Print(out, node.Value)
 
 	if err != nil {
 		fmt.Printf("%s❌ :: %sunable to parse variable: %s\n",
@@ -72,11 +73,11 @@ func StringifyAssign(node *syntax.Assign) string {
 }
 
 // Generates strings from a *syntax.Assign of a function declaration.
-func StringifyFuncDecl(node *syntax.FuncDecl) []string {
-	var fields []string
-
+func StringifyFuncDecl(node *syntax.FuncDecl) string {
 	out := &strings.Builder{}
-	err := syntax.NewPrinter().Print(out, node.Body)
+	printer := syntax.NewPrinter(syntax.Indent(2))
+
+	err := printer.Print(out, node.Body)
 
 	if err != nil {
 		fmt.Printf("%s❌ :: %sunable to parse function: %s\n",
@@ -86,7 +87,10 @@ func StringifyFuncDecl(node *syntax.FuncDecl) []string {
 		os.Exit(1)
 	}
 
-	fields = append(fields, out.String())
+	funcDecl := strings.TrimPrefix(out.String(), "{")
+	funcDecl = strings.TrimPrefix(funcDecl, "\n")
+	funcDecl = strings.TrimSuffix(funcDecl, "}")
+	funcDecl = strings.TrimSuffix(funcDecl, "\n")
 
-	return fields
+	return funcDecl
 }

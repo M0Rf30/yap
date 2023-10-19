@@ -7,37 +7,37 @@ var buildEnvironmentDeps = []string{
 const postInstall = `
 {{- if .PreInst}}
 pre_install() {
-  {{.PreInst}}"
+{{.PreInst}}
 }
 {{- end }}
 
 {{- if .PostInst}}
 post_install() {
-  {{.PostInst}}"
+{{.PostInst}}
 }
 {{- end }}
 
 {{- if .PreInst}}
 pre_upgrade() {
-  {{.PreInst}}"
+{{.PreInst}}
 }
 {{- end }}
 
 {{- if .PostInst}}
 post_upgrade() {
-  {{.PostInst}}"
+{{.PostInst}}
 }
 {{- end }}
 
 {{- if .PreRm}}
 pre_remove() {
-  {{.PreRm}}"
+{{.PreRm}}
 }
 {{- end }}
 
 {{- if .PostRm}}
 post_remove() {
-  {{.PostRm}}"
+{{.PostRm}}
 }
 {{- end }}
 `
@@ -72,5 +72,7 @@ license="CUSTOM"
 
 options="!check !fhs"
 
-package() {{.Package}}
+package() {
+{{.Package}}
+}
 `
