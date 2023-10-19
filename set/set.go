@@ -16,8 +16,8 @@ func (s *Set) Contains(value string) bool {
 	return c
 }
 
-func (s *Set) Iter() <-chan interface{} {
-	iter := make(chan interface{})
+func (s *Set) Iter() <-chan any {
+	iter := make(chan any)
 
 	go func() {
 		for key := range s.m {

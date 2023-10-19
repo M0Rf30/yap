@@ -57,8 +57,8 @@ func TestBuildMultipleProjectFromJSON(t *testing.T) {
 
 	defer os.RemoveAll(testDir)
 	packageRaw := filepath.Join(testDir, "yap.json")
-	prj1 := filepath.Join(testDir, "project1/", "PKGBUILD")
-	prj2 := filepath.Join(testDir, "project2/", "PKGBUILD")
+	prj1 := filepath.Join(testDir, "project1", "PKGBUILD")
+	prj2 := filepath.Join(testDir, "project2", "PKGBUILD")
 
 	assert.NoError(t, os.WriteFile(packageRaw, []byte(`{
     "name": "A test",

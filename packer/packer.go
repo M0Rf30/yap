@@ -20,26 +20,26 @@ type Packer interface {
 	Update() error
 }
 
-func GetPackageManager(pkgbuild *pkgbuild.PKGBUILD, distro string) Packer {
+func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	var packageManager Packer
 
 	distroFamily := constants.DistroToPackageManager[distro]
 	switch distroFamily {
 	case "alpine":
 		packageManager = &apk.Apk{
-			PKGBUILD: pkgbuild,
+			PKGBUILD: pkgBuild,
 		}
 	case "pacman":
 		packageManager = &pacman.Pacman{
-			PKGBUILD: pkgbuild,
+			PKGBUILD: pkgBuild,
 		}
 	case "debian":
 		packageManager = &debian.Debian{
-			PKGBUILD: pkgbuild,
+			PKGBUILD: pkgBuild,
 		}
 	case "redhat":
 		packageManager = &redhat.Redhat{
-			PKGBUILD: pkgbuild,
+			PKGBUILD: pkgBuild,
 		}
 	default:
 		fmt.Printf("%s%s ❌ :: unknown unsupported system.%s\n",

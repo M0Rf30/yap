@@ -201,7 +201,7 @@ func (src *Source) validate() error {
 		return err
 	}
 
-	var hash hash.Hash
+	var hashSum hash.Hash
 
 	if src.Hash == "SKIP" || info.IsDir() {
 		fmt.Printf("%s:: %sSkip integrity check for %s%s\n",
@@ -213,21 +213,21 @@ func (src *Source) validate() error {
 
 	switch len(src.Hash) {
 	case 64:
-		hash = sha256.New()
+		hashSum = sha256.New()
 	case 128:
-		hash = sha512.New()
+		hashSum = sha512.New()
 	default:
 		return err
 	}
 
 	file, _ := os.Open(filepath.Join(src.StartDir, src.SourceItemPath))
 
-	_, err = io.Copy(hash, file)
+	_, err = io.Copy(hashSum, file)
 	if err != nil {
 		return err
 	}
 
-	sum := hash.Sum([]byte{})
+	sum := hashSum.Sum([]byte{})
 
 	hexSum := fmt.Sprintf("%x", sum)
 
