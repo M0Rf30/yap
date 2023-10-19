@@ -11,6 +11,7 @@ import (
 
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/utils"
+	"mvdan.cc/sh/v3/shell"
 )
 
 var Verbose bool
@@ -60,8 +61,8 @@ type PKGBUILD struct {
 	priorities     map[string]int
 }
 
-func (p *PKGBUILD) AddItem(key string, data interface{}) error {
-	key, priority, err := p.parseDirective(key)
+func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
+	key, priority, err := pkgBuild.parseDirective(key)
 	if err != nil {
 		return err
 	}
@@ -70,20 +71,20 @@ func (p *PKGBUILD) AddItem(key string, data interface{}) error {
 		return err
 	}
 
-	if priority < p.priorities[key] {
+	if priority < pkgBuild.priorities[key] {
 		return err
 	}
 
-	p.priorities[key] = priority
-
-	p.mapVariables(key, data)
-	p.mapArrays(key, data)
-	p.mapFunctions(key, data)
+	pkgBuild.priorities[key] = priority
+	pkgBuild.mapVariables(key, data)
+	pkgBuild.setMainFolders()
+	pkgBuild.mapArrays(key, data)
+	pkgBuild.mapFunctions(key, data)
 
 	return err
 }
 
-func (p *PKGBUILD) CreateSpec(filePath string, script string) error {
+func (pkgBuild *PKGBUILD) CreateSpec(filePath, script string) error {
 	cleanFilePath := filepath.Clean(filePath)
 
 	file, err := os.Create(cleanFilePath)
@@ -109,13 +110,13 @@ func (p *PKGBUILD) CreateSpec(filePath string, script string) error {
 	template.Must(tmpl.Parse(script))
 
 	if Verbose {
-		err = tmpl.Execute(os.Stdout, p)
+		err = tmpl.Execute(os.Stdout, pkgBuild)
 		if err != nil {
 			log.Panic(err)
 		}
 	}
 
-	err = tmpl.Execute(writer, p)
+	err = tmpl.Execute(writer, pkgBuild)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -123,7 +124,7 @@ func (p *PKGBUILD) CreateSpec(filePath string, script string) error {
 	return err
 }
 
-func (p *PKGBUILD) GetDepends(packageManager string, args []string, makeDepends []string) error {
+func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []string) error {
 	var err error
 	if len(makeDepends) == 0 {
 		return err
@@ -139,7 +140,7 @@ func (p *PKGBUILD) GetDepends(packageManager string, args []string, makeDepends 
 	return err
 }
 
-func (p *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
+func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
 	err := utils.Exec("", packageManager, args...)
 	if err != nil {
 		return err
@@ -148,28 +149,28 @@ func (p *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
 	return err
 }
 
-func (p *PKGBUILD) Init() {
-	p.priorities = map[string]int{}
+func (pkgBuild *PKGBUILD) Init() {
+	pkgBuild.priorities = map[string]int{}
 
-	p.FullDistroName = p.Distro
-	if p.Codename != "" {
-		p.FullDistroName += "_" + p.Codename
+	pkgBuild.FullDistroName = pkgBuild.Distro
+	if pkgBuild.Codename != "" {
+		pkgBuild.FullDistroName += "_" + pkgBuild.Codename
 	}
 }
 
-func (p *PKGBUILD) Validate() {
-	if len(p.SourceURI) != len(p.HashSums) {
+func (pkgBuild *PKGBUILD) Validate() {
+	if len(pkgBuild.SourceURI) != len(pkgBuild.HashSums) {
 		fmt.Printf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
-			p.PkgName,
+			pkgBuild.PkgName,
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
 		os.Exit(1)
 	}
 
-	if len(p.Package) == 0 {
+	if pkgBuild.Package == "" {
 		fmt.Printf("%s%s ❌ :: %smissing package() function%s\n",
-			p.PkgName,
+			pkgBuild.PkgName,
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
@@ -177,87 +178,99 @@ func (p *PKGBUILD) Validate() {
 	}
 }
 
-func (p *PKGBUILD) mapArrays(key string, data interface{}) {
+func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 	switch key {
 	case "arch":
-		p.Arch = data.([]string)
+		pkgBuild.Arch = data.([]string)
 	case "license":
-		p.License = data.([]string)
+		pkgBuild.License = data.([]string)
 	case "depends":
-		p.Depends = data.([]string)
+		pkgBuild.Depends = data.([]string)
 	case "options":
-		p.Options = data.([]string)
+		pkgBuild.Options = data.([]string)
 	case "optdepends":
-		p.OptDepends = data.([]string)
+		pkgBuild.OptDepends = data.([]string)
 	case "makedepends":
-		p.MakeDepends = data.([]string)
+		pkgBuild.MakeDepends = data.([]string)
 	case "provides":
-		p.Provides = data.([]string)
+		pkgBuild.Provides = data.([]string)
 	case "conflicts":
-		p.Conflicts = data.([]string)
+		pkgBuild.Conflicts = data.([]string)
 	case "source":
-		p.SourceURI = data.([]string)
+		pkgBuild.SourceURI = data.([]string)
 	case "sha256sums":
-		p.HashSums = data.([]string)
+		pkgBuild.HashSums = data.([]string)
 	case "sha512sums":
-		p.HashSums = data.([]string)
+		pkgBuild.HashSums = data.([]string)
 	case "backup":
-		p.Backup = data.([]string)
-	default:
+		pkgBuild.Backup = data.([]string)
 	}
 }
 
-func (p *PKGBUILD) mapFunctions(key string, data interface{}) {
+func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 	switch key {
 	case "build":
-		p.Build = data.(string)
+		pkgBuild.Build, _ = shell.Expand(data.(string), os.Getenv)
 	case "package":
-		p.Package = data.(string)
+		pkgBuild.Package, _ = shell.Expand(data.(string), os.Getenv)
 	case "preinst":
-		p.PreInst = data.(string)
+		pkgBuild.PreInst = data.(string)
 	case "prepare":
-		p.Prepare = data.(string)
+		pkgBuild.Prepare, _ = shell.Expand(data.(string), os.Getenv)
 	case "postinst":
-		p.PostInst = data.(string)
+		pkgBuild.PostInst = data.(string)
 	case "prerm":
-		p.PreRm = data.(string)
+		pkgBuild.PreRm = data.(string)
 	case "postrm":
-		p.PostRm = data.(string)
-	default:
+		pkgBuild.PostRm = data.(string)
 	}
 }
 
-func (p *PKGBUILD) mapVariables(key string, data interface{}) {
+func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
+	var err error
+
 	switch key {
 	case "pkgname":
-		p.PkgName = data.(string)
+		err = os.Setenv(key, data.(string))
+		pkgBuild.PkgName = data.(string)
 	case "epoch":
-		p.Epoch = data.(string)
+		err = os.Setenv(key, data.(string))
+		pkgBuild.Epoch = data.(string)
 	case "pkgver":
-		p.PkgVer = data.(string)
+		err = os.Setenv(key, data.(string))
+		pkgBuild.PkgVer = data.(string)
 	case "pkgrel":
-		p.PkgRel = data.(string)
+		err = os.Setenv(key, data.(string))
+		pkgBuild.PkgRel = data.(string)
 	case "pkgdesc":
-		p.PkgDesc = data.(string)
+		pkgBuild.PkgDesc = data.(string)
 	case "maintainer":
-		p.Maintainer = data.(string)
+		pkgBuild.Maintainer = data.(string)
 	case "section":
-		p.Section = data.(string)
+		pkgBuild.Section = data.(string)
 	case "priority":
-		p.Priority = data.(string)
+		pkgBuild.Priority = data.(string)
 	case "url":
-		p.URL = data.(string)
+		err = os.Setenv(key, data.(string))
+		pkgBuild.URL = data.(string)
 	case "debconf_template":
-		p.DebTemplate = data.(string)
+		pkgBuild.DebTemplate = data.(string)
 	case "debconf_config":
-		p.DebConfig = data.(string)
+		pkgBuild.DebConfig = data.(string)
 	case "install":
-		p.Install = data.(string)
-	default:
+		pkgBuild.Install = data.(string)
+	}
+
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to set variable %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), key)
+
+		os.Exit(1)
 	}
 }
 
-func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
+func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 	split := strings.Split(input, "__")
 	key := split[0]
 
@@ -278,7 +291,7 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 		priority = -1
 	}
 
-	if p.FullDistroName == "" {
+	if pkgBuild.FullDistroName == "" {
 		return key, priority, err
 	}
 
@@ -288,12 +301,12 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 
 	directive := split[1]
 
-	if directive == p.FullDistroName {
+	if directive == pkgBuild.FullDistroName {
 		priority = 3
 	}
 
 	if constants.DistrosSet.Contains(directive) {
-		if directive == p.Distro {
+		if directive == pkgBuild.Distro {
 			priority = 2
 		}
 
@@ -301,7 +314,7 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 	}
 
 	if constants.PackagersSet.Contains(directive) {
-		if directive == constants.DistroPackageManager[p.Distro] {
+		if directive == constants.DistroPackageManager[pkgBuild.Distro] {
 			priority = 1
 		}
 
@@ -309,4 +322,32 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 	}
 
 	return key, priority, err
+}
+
+func (pkgBuild *PKGBUILD) setMainFolders() {
+	if pkgBuild.Distro == "arch" {
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "pkg", pkgBuild.PkgName)
+	}
+
+	if pkgBuild.Distro == "alpine" {
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
+	}
+
+	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to set variable pkgdir\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow))
+
+		os.Exit(1)
+	}
+
+	err = os.Setenv("srcdir", pkgBuild.SourceDir)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to set variable srcdir\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow))
+
+		os.Exit(1)
+	}
 }
