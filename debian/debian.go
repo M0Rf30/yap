@@ -102,7 +102,7 @@ func (d *Debian) createScripts() error {
 			continue
 		}
 
-		data := script + "\n"
+		data := script
 		if name == "prerm" || name == "postrm" {
 			data = removeHeader + data
 		}

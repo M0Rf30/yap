@@ -81,6 +81,7 @@ func (builder *Builder) getSources() error {
 			SrcDir:         builder.PKGBUILD.SourceDir,
 			SourceItemPath: "",
 		}
+
 		err = source.Get()
 
 		if err != nil {

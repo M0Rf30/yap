@@ -11,6 +11,7 @@ import (
 
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/utils"
+	"mvdan.cc/sh/v3/shell"
 )
 
 var Verbose bool
@@ -75,8 +76,8 @@ func (p *PKGBUILD) AddItem(key string, data interface{}) error {
 	}
 
 	p.priorities[key] = priority
-
 	p.mapVariables(key, data)
+	p.setMainFolders()
 	p.mapArrays(key, data)
 	p.mapFunctions(key, data)
 
@@ -203,39 +204,40 @@ func (p *PKGBUILD) mapArrays(key string, data interface{}) {
 		p.HashSums = data.([]string)
 	case "backup":
 		p.Backup = data.([]string)
-	default:
 	}
 }
 
 func (p *PKGBUILD) mapFunctions(key string, data interface{}) {
 	switch key {
 	case "build":
-		p.Build = data.(string)
+		p.Build, _ = shell.Expand(data.(string), os.Getenv)
 	case "package":
-		p.Package = data.(string)
+		p.Package, _ = shell.Expand(data.(string), os.Getenv)
 	case "preinst":
 		p.PreInst = data.(string)
 	case "prepare":
-		p.Prepare = data.(string)
+		p.Prepare, _ = shell.Expand(data.(string), os.Getenv)
 	case "postinst":
 		p.PostInst = data.(string)
 	case "prerm":
 		p.PreRm = data.(string)
 	case "postrm":
 		p.PostRm = data.(string)
-	default:
 	}
 }
 
 func (p *PKGBUILD) mapVariables(key string, data interface{}) {
 	switch key {
 	case "pkgname":
+		os.Setenv(key, data.(string))
 		p.PkgName = data.(string)
 	case "epoch":
 		p.Epoch = data.(string)
 	case "pkgver":
+		os.Setenv(key, data.(string))
 		p.PkgVer = data.(string)
 	case "pkgrel":
+		os.Setenv(key, data.(string))
 		p.PkgRel = data.(string)
 	case "pkgdesc":
 		p.PkgDesc = data.(string)
@@ -253,7 +255,6 @@ func (p *PKGBUILD) mapVariables(key string, data interface{}) {
 		p.DebConfig = data.(string)
 	case "install":
 		p.Install = data.(string)
-	default:
 	}
 }
 
@@ -309,4 +310,17 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 	}
 
 	return key, priority, err
+}
+
+func (p PKGBUILD) setMainFolders() {
+	if p.Distro == "arch" {
+		p.PackageDir = filepath.Join(p.StartDir, "pkg", p.PkgName)
+	}
+
+	if p.Distro == "alpine" {
+		p.PackageDir = filepath.Join(p.StartDir, "apk", "pkg", p.PkgName)
+	}
+
+	os.Setenv("pkgdir", p.PackageDir)
+	os.Setenv("srcdir", p.SourceDir)
 }
