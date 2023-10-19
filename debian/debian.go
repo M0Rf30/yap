@@ -55,7 +55,7 @@ func (d *Debian) createConfFiles() error {
 
 func (d *Debian) createDebconfTemplate() error {
 	var err error
-	if len(d.PKGBUILD.DebTemplate) == 0 {
+	if d.PKGBUILD.DebTemplate == "" {
 		return err
 	}
 
@@ -102,7 +102,7 @@ func (d *Debian) createScripts() error {
 			continue
 		}
 
-		data := script + "\n"
+		data := script
 		if name == "prerm" || name == "postrm" {
 			data = removeHeader + data
 		}

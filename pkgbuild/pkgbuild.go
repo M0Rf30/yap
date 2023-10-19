@@ -11,6 +11,7 @@ import (
 
 	"github.com/M0Rf30/yap/constants"
 	"github.com/M0Rf30/yap/utils"
+	"mvdan.cc/sh/v3/shell"
 )
 
 var Verbose bool
@@ -75,15 +76,15 @@ func (p *PKGBUILD) AddItem(key string, data interface{}) error {
 	}
 
 	p.priorities[key] = priority
-
 	p.mapVariables(key, data)
+	p.setMainFolders()
 	p.mapArrays(key, data)
 	p.mapFunctions(key, data)
 
 	return err
 }
 
-func (p *PKGBUILD) CreateSpec(filePath string, script string) error {
+func (p *PKGBUILD) CreateSpec(filePath, script string) error {
 	cleanFilePath := filepath.Clean(filePath)
 
 	file, err := os.Create(cleanFilePath)
@@ -123,7 +124,7 @@ func (p *PKGBUILD) CreateSpec(filePath string, script string) error {
 	return err
 }
 
-func (p *PKGBUILD) GetDepends(packageManager string, args []string, makeDepends []string) error {
+func (p *PKGBUILD) GetDepends(packageManager string, args, makeDepends []string) error {
 	var err error
 	if len(makeDepends) == 0 {
 		return err
@@ -167,7 +168,7 @@ func (p *PKGBUILD) Validate() {
 		os.Exit(1)
 	}
 
-	if len(p.Package) == 0 {
+	if p.Package == "" {
 		fmt.Printf("%s%s ❌ :: %smissing package() function%s\n",
 			p.PkgName,
 			string(constants.ColorBlue),
@@ -203,39 +204,42 @@ func (p *PKGBUILD) mapArrays(key string, data interface{}) {
 		p.HashSums = data.([]string)
 	case "backup":
 		p.Backup = data.([]string)
-	default:
 	}
 }
 
 func (p *PKGBUILD) mapFunctions(key string, data interface{}) {
 	switch key {
 	case "build":
-		p.Build = data.(string)
+		p.Build, _ = shell.Expand(data.(string), os.Getenv)
 	case "package":
-		p.Package = data.(string)
+		p.Package, _ = shell.Expand(data.(string), os.Getenv)
 	case "preinst":
 		p.PreInst = data.(string)
 	case "prepare":
-		p.Prepare = data.(string)
+		p.Prepare, _ = shell.Expand(data.(string), os.Getenv)
 	case "postinst":
 		p.PostInst = data.(string)
 	case "prerm":
 		p.PreRm = data.(string)
 	case "postrm":
 		p.PostRm = data.(string)
-	default:
 	}
 }
 
 func (p *PKGBUILD) mapVariables(key string, data interface{}) {
+	var err error
+
 	switch key {
 	case "pkgname":
+		err = os.Setenv(key, data.(string))
 		p.PkgName = data.(string)
 	case "epoch":
 		p.Epoch = data.(string)
 	case "pkgver":
+		err = os.Setenv(key, data.(string))
 		p.PkgVer = data.(string)
 	case "pkgrel":
+		err = os.Setenv(key, data.(string))
 		p.PkgRel = data.(string)
 	case "pkgdesc":
 		p.PkgDesc = data.(string)
@@ -253,7 +257,14 @@ func (p *PKGBUILD) mapVariables(key string, data interface{}) {
 		p.DebConfig = data.(string)
 	case "install":
 		p.Install = data.(string)
-	default:
+	}
+
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to set variable %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow), key)
+
+		os.Exit(1)
 	}
 }
 
@@ -309,4 +320,32 @@ func (p *PKGBUILD) parseDirective(input string) (string, int, error) {
 	}
 
 	return key, priority, err
+}
+
+func (p PKGBUILD) setMainFolders() {
+	if p.Distro == "arch" {
+		p.PackageDir = filepath.Join(p.StartDir, "pkg", p.PkgName)
+	}
+
+	if p.Distro == "alpine" {
+		p.PackageDir = filepath.Join(p.StartDir, "apk", "pkg", p.PkgName)
+	}
+
+	err := os.Setenv("pkgdir", p.PackageDir)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to set variable pkgdir\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow))
+
+		os.Exit(1)
+	}
+
+	err = os.Setenv("srcdir", p.SourceDir)
+	if err != nil {
+		fmt.Printf("%s❌ :: %sfailed to set variable srcdir\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow))
+
+		os.Exit(1)
+	}
 }

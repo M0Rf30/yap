@@ -36,3 +36,6 @@ linters:
 linters-settings:
   cyclop:
     max-complexity: 15
+
+run:
+  timeout: 5m
