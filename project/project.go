@@ -116,7 +116,7 @@ func (mpc *MultipleProject) Clean() error {
 	return err
 }
 
-func (mpc *MultipleProject) MultiProject(distro string, release string, path string) error {
+func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	err := mpc.readProject(path)
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 
 	mpc.packageManager = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
 	if !SkipSyncFlag {
-		if err = mpc.packageManager.Update(); err != nil {
+		if err := mpc.packageManager.Update(); err != nil {
 			return err
 		}
 	}
@@ -147,7 +147,7 @@ func (mpc *MultipleProject) MultiProject(distro string, release string, path str
 	if !SkipSyncBuildEnvironmentDeps {
 		mpc.getMakeDeps()
 
-		if err = mpc.packageManager.Prepare(mpc.makeDepends); err != nil {
+		if err := mpc.packageManager.Prepare(mpc.makeDepends); err != nil {
 			return err
 		}
 	}
@@ -205,23 +205,23 @@ func (mpc *MultipleProject) getMakeDeps() {
 	mpc.makeDepends = makeDepends
 }
 
-func (mpc *MultipleProject) populateProjects(distro string, release string, path string) error {
+func (mpc *MultipleProject) populateProjects(distro, release, path string) error {
 	var err error
 
 	var projects = make([]*Project, 0)
 
 	for _, child := range mpc.Projects {
-		pkgbuild, err := parser.ParseFile(distro, release, filepath.Join(mpc.BuildDir, child.Name),
+		pkgbuildFile, err := parser.ParseFile(distro, release, filepath.Join(mpc.BuildDir, child.Name),
 			filepath.Join(path, child.Name))
 		if err != nil {
 			return err
 		}
 
-		mpc.packageManager = packer.GetPackageManager(pkgbuild, distro)
+		mpc.packageManager = packer.GetPackageManager(pkgbuildFile, distro)
 
 		proj := &Project{
 			Name:           child.Name,
-			Builder:        &builder.Builder{PKGBUILD: pkgbuild},
+			Builder:        &builder.Builder{PKGBUILD: pkgbuildFile},
 			PackageManager: mpc.packageManager,
 			HasToInstall:   child.HasToInstall,
 		}
@@ -265,10 +265,10 @@ func (mpc *MultipleProject) readProject(path string) error {
 	return err
 }
 
-func (mpc *MultipleProject) validateAllProject(distro string, release string, path string) error {
+func (mpc *MultipleProject) validateAllProject(distro, release, path string) error {
 	var err error
 	for _, child := range mpc.Projects {
-		pkgbuild, err := parser.ParseFile(distro,
+		pkgbuildFile, err := parser.ParseFile(distro,
 			release,
 			filepath.Join(mpc.BuildDir, child.Name),
 			filepath.Join(path, child.Name))
@@ -276,7 +276,7 @@ func (mpc *MultipleProject) validateAllProject(distro string, release string, pa
 			return err
 		}
 
-		pkgbuild.Validate()
+		pkgbuildFile.Validate()
 	}
 
 	return err

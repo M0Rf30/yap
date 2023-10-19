@@ -30,7 +30,7 @@ func CheckGO() bool {
 	return false
 }
 
-func Download(destination string, url string) {
+func Download(destination, url string) {
 	// create client
 	client := grab.NewClient()
 	req, _ := grab.NewRequest(destination, url)

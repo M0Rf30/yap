@@ -59,10 +59,10 @@ func (d *Debian) createDebconfTemplate() error {
 		return err
 	}
 
-	template := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebTemplate)
+	debconfTemplate := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebTemplate)
 	path := filepath.Join(d.debDir, "templates")
 
-	err = copy.Copy(template, path)
+	err = copy.Copy(debconfTemplate, path)
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func (d *Debian) createDebconfTemplate() error {
 
 func (d *Debian) createDebconfConfig() error {
 	var err error
-	if len(d.PKGBUILD.DebConfig) == 0 {
+	if d.PKGBUILD.DebConfig == "" {
 		return err
 	}
 
@@ -98,7 +98,7 @@ func (d *Debian) createScripts() error {
 	}
 
 	for name, script := range scripts {
-		if len(script) == 0 {
+		if script == "" {
 			continue
 		}
 
