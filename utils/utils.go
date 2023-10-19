@@ -136,7 +136,7 @@ func GOSetup() {
 }
 
 func PullContainers(target string) error {
-	containerApp := "/usr/bin/docker"
+	containerApp := "/usr/bin/podman"
 	args := []string{
 		"pull",
 		constants.DockerOrg + target,
@@ -146,8 +146,6 @@ func PullContainers(target string) error {
 
 	if _, err = os.Stat(containerApp); err == nil {
 		err = Exec("", containerApp, args...)
-	} else {
-		err = Exec("", "podman", args...)
 	}
 
 	if err != nil {

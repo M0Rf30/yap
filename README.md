@@ -8,8 +8,8 @@
 Yap allows building packages for multiple GNU/Linux distributions with a
 consistent package spec format.
 
-Builds are done on Docker containers without needing to setup any virtual
-machines or install any software other than Docker.
+Builds are done on OCI containers without needing to setup any virtual
+machines or install any software other than Docker/Podman.
 
 All packages are built using a simple format that is similar to
 [PKGBUILD](https://wiki.archlinux.org/index.php/PKGBUILD) from Arch Linux.
