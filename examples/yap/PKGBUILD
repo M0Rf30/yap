@@ -37,7 +37,7 @@ build() {
     -buildvcs=false \
     -ldflags="-w -s -linkmode=external \
   -X main.version=${pkgver}" \
-    .
+    cmd
 }
 
 package() {
