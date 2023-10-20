@@ -39,7 +39,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-alpine:latest
-          file: docker/alpine/Dockerfile
+          file: build/deploy/alpine/Dockerfile
 
       # - name: Build and push
       #   uses: docker/build-push-action@v5
@@ -50,7 +50,7 @@ jobs:
       #     tags: |
       #       m0rf30/yap-arch:latest
       #       ghcr.io/m0rf30/yap-arch:latest
-      #     file: docker/arch/Dockerfile
+      #     file: build/deploy/arch/Dockerfile
 
       # - name: Build and push
       #   uses: docker/build-push-action@v5
@@ -61,7 +61,7 @@ jobs:
       #     tags: |
       #       m0rf30/yap-opensuse-tubleweed:latest
       #       ghcr.io/m0rf30/yap-opensuse-tubleweed:latest
-      #     file: docker/opensuse-tubleweed/Dockerfile
+      #     file: build/deploy/opensuse-tubleweed/Dockerfile
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -71,7 +71,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-rocky-8:latest
-          file: docker/rocky-8/Dockerfile
+          file: build/deploy/rocky-8/Dockerfile
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -81,7 +81,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-rocky-9:latest
-          file: docker/rocky-9/Dockerfile
+          file: build/deploy/rocky-9/Dockerfile
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -91,7 +91,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-ubuntu-focal:latest
-          file: docker/ubuntu-focal/Dockerfile
+          file: build/deploy/ubuntu-focal/Dockerfile
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -101,4 +101,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
             m0rf30/yap-ubuntu-jammy:latest
-          file: docker/ubuntu-jammy/Dockerfile
+          file: build/deploy/ubuntu-jammy/Dockerfile
