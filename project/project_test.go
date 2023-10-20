@@ -10,7 +10,7 @@ import (
 )
 
 const examplePkgbuild = `pkgname="httpserver"
-pkgver="1.0"
+pkgver="1.1"
 pkgrel="1"
 pkgdesc="Http file server written with Go"
 pkgdesc_centos="Http file server written with Go for CentOS"
