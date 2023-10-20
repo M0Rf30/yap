@@ -24,9 +24,9 @@ type Redhat struct {
 }
 
 func (r *Redhat) Build(artifactsPath string) error {
-	r.getRPMArch()
-	r.getRPMGroup()
-	r.getRPMRelease()
+	r.getArch()
+	r.getGroup()
+	r.getRelease()
 
 	r.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 
@@ -188,17 +188,17 @@ func (r *Redhat) getFiles() error {
 	return err
 }
 
-func (r *Redhat) getRPMArch() {
+func (r *Redhat) getArch() {
 	for index, arch := range r.PKGBUILD.Arch {
 		r.PKGBUILD.Arch[index] = RPMArchs[arch]
 	}
 }
 
-func (r *Redhat) getRPMGroup() {
+func (r *Redhat) getGroup() {
 	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
 }
 
-func (r *Redhat) getRPMRelease() {
+func (r *Redhat) getRelease() {
 	if r.PKGBUILD.Codename != "" {
 		r.PKGBUILD.PkgRel = r.PKGBUILD.PkgRel + RPMDistros[r.PKGBUILD.Distro] + r.PKGBUILD.Codename
 	}
