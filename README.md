@@ -1,9 +1,9 @@
 # Yap
 
-![yap-logo](https://raw.githubusercontent.com/M0Rf30/yap/main/images/yap.png)
+![yap-logo](assets/images/logo.png)
 
 [![report card](https://img.shields.io/badge/report%20card-a%2B-ff3333.svg?style=flat-square)](http://goreportcard.com/report/M0Rf30/yap)
-[![View examples](https://img.shields.io/badge/learn%20by-examples-0077b3.svg?style=flat-square)](https://github.com/M0Rf30/yap/tree/main/examples)
+[![View examples](https://img.shields.io/badge/learn%20by-examples-0077b3.svg?style=flat-square)](examples)
 
 Yap allows building packages for multiple GNU/Linux distributions with a
 consistent package spec format.
