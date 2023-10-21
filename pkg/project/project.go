@@ -28,6 +28,8 @@ type DistroProject interface {
 	Prepare() error
 }
 
+// MultipleProject defnes the content of yap.json specfile and some in-memory
+// objects.
 type MultipleProject struct {
 	makeDepends    []string
 	packageManager packer.Packer

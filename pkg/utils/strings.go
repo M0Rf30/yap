@@ -11,10 +11,9 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// GenerateRandomString returns a securely generated random string.
-// It will return an error if the system's secure random
-// number generator fails to function correctly, in which
-// case the caller should not continue.
+// GenerateRandomString returns a securely generated random string. It will
+// return an error if the system's secure random number generator fails to
+// function correctly, in which case the caller should not continue.
 func GenerateRandomString(n int) string {
 	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-"
 
@@ -32,7 +31,8 @@ func GenerateRandomString(n int) string {
 	return string(ret)
 }
 
-// Generates a string from a *syntax.Assign of an array declaration.
+// StringifyArray generates a string from a *syntax.Assign of an array
+// declaration.
 func StringifyArray(node *syntax.Assign) []string {
 	fields := make([]string, 0)
 	printer := syntax.NewPrinter(syntax.Indent(2))
@@ -55,7 +55,8 @@ func StringifyArray(node *syntax.Assign) []string {
 	return fields
 }
 
-// Generates a string from a *syntax.Assign of a variable declaration.
+// StringifyAssign generates a string from a *syntax.Assign of a variable
+// declaration.
 func StringifyAssign(node *syntax.Assign) string {
 	out := &strings.Builder{}
 	printer := syntax.NewPrinter(syntax.Indent(2))
@@ -72,7 +73,8 @@ func StringifyAssign(node *syntax.Assign) string {
 	return strings.Trim(out.String(), "\"")
 }
 
-// Generates strings from a *syntax.Assign of a function declaration.
+// StringifyFuncDecl generates strings from a *syntax.Assign of a function
+// declaration.
 func StringifyFuncDecl(node *syntax.FuncDecl) string {
 	out := &strings.Builder{}
 	printer := syntax.NewPrinter(syntax.Indent(2))

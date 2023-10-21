@@ -12,14 +12,28 @@ import (
 	"github.com/M0Rf30/yap/pkg/redhat"
 )
 
+// Packer is the common interface implemented by all package managers.
 type Packer interface {
+	// Prepare appends the dependencies required to build all the projects. It
+	// returns any error if encountered.
 	Prepare(depends []string) error
+	// Build reads the path where the final artifact will be written. It returns any
+	// error if encountered.
 	Build(output string) error
+	// Install reads the path where the final artifact will be written. It returns
+	// any error if encountered.
 	Install(output string) error
+	// PrepareEnvironment reads a flag to install golang tools on request, on the
+	// build machine. It returns any error if encountered.
 	PrepareEnvironment(flag bool) error
+	// Update performs a package manager update operation. It returns any error if
+	// encountered.
 	Update() error
 }
 
+// GetPackageManager reads the pkgBuild structure and the distro name. It
+// returns a Packer interface representing the specialized package manager for
+// that distro.
 func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	var packageManager Packer
 
