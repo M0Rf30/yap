@@ -9,10 +9,13 @@ import (
 	"github.com/M0Rf30/yap/pkg/utils"
 )
 
+// Builder maps PKGBUILD to generic functions aimed at artifacts generation.
 type Builder struct {
 	PKGBUILD *pkgbuild.PKGBUILD
 }
 
+// Compile manages all the instructions that lead to a single project artifact.
+// It returns any error if occurred.
 func (builder *Builder) Compile() error {
 	err := builder.initDirs()
 	if err != nil {
@@ -52,6 +55,8 @@ func (builder *Builder) Compile() error {
 	return err
 }
 
+// Package executes the instructions provided by a single project package()
+// function. It returns any error if occurred.
 func (builder *Builder) Package() error {
 	err := RunScript(builder.PKGBUILD.Package)
 	if err != nil {
@@ -61,6 +66,8 @@ func (builder *Builder) Package() error {
 	return err
 }
 
+// build executes the instructions provided by a single project build()
+// function. It returns any error if occurred.
 func (builder *Builder) build() error {
 	err := RunScript(builder.PKGBUILD.Build)
 	if err != nil {
@@ -70,6 +77,8 @@ func (builder *Builder) build() error {
 	return err
 }
 
+// getSources detects sources provided by a single project source array and
+// downloads them if occurred. It returns any error if occurred.
 func (builder *Builder) getSources() error {
 	var err error
 
@@ -92,6 +101,8 @@ func (builder *Builder) getSources() error {
 	return err
 }
 
+// initDirs creates mandatory fakeroot folders (src, pkg) for a single project.
+// It returns any error if occurred.
 func (builder *Builder) initDirs() error {
 	err := utils.ExistsMakeDir(builder.PKGBUILD.SourceDir)
 	if err != nil {
