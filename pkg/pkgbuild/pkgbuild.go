@@ -14,8 +14,12 @@ import (
 	"mvdan.cc/sh/v3/shell"
 )
 
+// Verbos is a flag to enable verbose output.
 var Verbose bool
 
+// PKGBUILD defines all the fields accepted by the yap specfile (variables,
+// arrays, functions). It adds some exotics fields to manage debconfig
+// templating and other rpm/deb descriptors.
 type PKGBUILD struct {
 	Arch           []string
 	Backup         []string
@@ -61,6 +65,10 @@ type PKGBUILD struct {
 	priorities     map[string]int
 }
 
+// AddItem reads a key and the related data. It checks the key for __ token and
+// give to it a priority value. After that, it binds any element (variable,
+// array, function) to the current environment. It returns any error if
+// encountered.
 func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	key, priority, err := pkgBuild.parseDirective(key)
 	if err != nil {
@@ -84,6 +92,9 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	return err
 }
 
+// CreateSpec reads the filepath where the specfile will be written and the
+// content of the specfile. Specfile generation is done using go templates for
+// every different distro family. It returns any error if encountered.
 func (pkgBuild *PKGBUILD) CreateSpec(filePath, script string) error {
 	cleanFilePath := filepath.Clean(filePath)
 
@@ -124,6 +135,9 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath, script string) error {
 	return err
 }
 
+// GetDepends reads the package manager name, its arguments and all the
+// dependencies required to build the package. It returns any error if
+// encountered.
 func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []string) error {
 	var err error
 	if len(makeDepends) == 0 {
@@ -140,6 +154,9 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 	return err
 }
 
+// GetUpdates reads the package manager name and its arguments to perform
+// a sync with remotes and consequently retrieve updates.
+// It returns any error if encountered.
 func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
 	err := utils.Exec("", packageManager, args...)
 	if err != nil {
@@ -158,6 +175,8 @@ func (pkgBuild *PKGBUILD) Init() {
 	}
 }
 
+// Validate checks that mandatory items are correctly provided by the PKGBUILD
+// file.
 func (pkgBuild *PKGBUILD) Validate() {
 	if len(pkgBuild.SourceURI) != len(pkgBuild.HashSums) {
 		fmt.Printf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
@@ -178,6 +197,8 @@ func (pkgBuild *PKGBUILD) Validate() {
 	}
 }
 
+// mapArrays reads an array name and its content and maps them to the PKGBUILD
+// struct.
 func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 	switch key {
 	case "arch":
@@ -207,6 +228,8 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 	}
 }
 
+// mapFunctions reads a function name and its content and maps them to the
+// PKGBUILD struct.
 func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 	switch key {
 	case "build":
@@ -226,6 +249,8 @@ func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 	}
 }
 
+// mapVariables reads a variable name and its content and maps them to the
+// PKGBUILD struct.
 func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	var err error
 
@@ -270,6 +295,10 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	}
 }
 
+// parseDirective reads a directive string and detect any specialized one (i.e
+// only to be applied for ubuntu). It detects if distro codename is given and
+// calculates and assigns a priority to the directive. It returns the directive
+// key, assigned priority and any error if occurred.
 func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 	split := strings.Split(input, "__")
 	key := split[0]
@@ -324,6 +353,8 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 	return key, priority, err
 }
 
+// setMainFolders checks for pkgbuild distro values and initialize the build
+// fakeroot accordingly.
 func (pkgBuild *PKGBUILD) setMainFolders() {
 	if pkgBuild.Distro == "arch" {
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "pkg", pkgBuild.PkgName)
