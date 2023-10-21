@@ -192,6 +192,8 @@ func (src *Source) symlinkSources() error {
 	return err
 }
 
+// validate checks that items declared in the source array have a valid hashsum.
+// It returns any error if encountered.
 func (src *Source) validate() error {
 	info, err := os.Stat(filepath.Join(src.StartDir, src.SourceItemPath))
 	if err != nil {

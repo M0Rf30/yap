@@ -37,7 +37,8 @@ build() {
     -buildvcs=false \
     -ldflags="-w -s -linkmode=external \
   -X main.version=${pkgver}" \
-    cmd
+    -o yap \
+    cmd/yap/main.go
 }
 
 package() {
@@ -50,11 +51,11 @@ package() {
   mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
   mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
 
-  ./"${pkgname}" completion bash > \
+  ./${pkgname} completion bash > \
     "${pkgdir}/usr/share/bash-completion/completions/${pkgname}"
-  ./"${pkgname}" completion zsh > \
+  ./${pkgname} completion zsh > \
     "${pkgdir}/usr/share/zsh/site-functions/_${pkgname}"
-  ./"${pkgname}" completion fish > \
+  ./${pkgname} completion fish > \
     "${pkgdir}/usr/share/fish/vendor_completions.d/${pkgname}.fish"
 
   install -Dm 644 -t \

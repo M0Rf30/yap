@@ -1,5 +1,9 @@
 package options
 
+// StripScript is a scriptlet taken from makepkg resources. It's executed by
+// mvdan/sh interpreter and provides strip instructions to dpkg-buildpackage.
+// Although it's a very dirty solution, for now it's the faster way to have this
+// essential feature.
 const StripScript = `
 strip_file() {
 	local binary=$1; shift
