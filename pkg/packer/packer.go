@@ -31,9 +31,11 @@ type Packer interface {
 	Update() error
 }
 
-// GetPackageManager reads the pkgBuild structure and the distro name. It
-// returns a Packer interface representing the specialized package manager for
-// that distro.
+// GetPackageManager returns a Packer interface based on the given package build and distribution.
+//
+// pkgBuild: A pointer to a pkgbuild.PKGBUILD struct.
+// distro: A string representing the distribution.
+// Returns a Packer interface.
 func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	var packageManager Packer
 

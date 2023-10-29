@@ -11,9 +11,9 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// GenerateRandomString returns a securely generated random string. It will
-// return an error if the system's secure random number generator fails to
-// function correctly, in which case the caller should not continue.
+// GenerateRandomString generates a random string of length n.
+//
+// It takes an integer n as a parameter and returns a string.
 func GenerateRandomString(n int) string {
 	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-"
 
@@ -31,8 +31,10 @@ func GenerateRandomString(n int) string {
 	return string(ret)
 }
 
-// StringifyArray generates a string from a *syntax.Assign of an array
-// declaration.
+// StringifyArray generates a string representation of an array in the given syntax.Assign node.
+//
+// node: A pointer to the syntax.Assign node representing the array.
+// []string: An array of strings representing the stringified elements of the array.
 func StringifyArray(node *syntax.Assign) []string {
 	fields := make([]string, 0)
 	printer := syntax.NewPrinter(syntax.Indent(2))
@@ -55,8 +57,10 @@ func StringifyArray(node *syntax.Assign) []string {
 	return fields
 }
 
-// StringifyAssign generates a string from a *syntax.Assign of a variable
-// declaration.
+// StringifyAssign returns a string representation of the given *syntax.Assign node.
+//
+// It takes a pointer to a *syntax.Assign node as its parameter.
+// It returns a string.
 func StringifyAssign(node *syntax.Assign) string {
 	out := &strings.Builder{}
 	printer := syntax.NewPrinter(syntax.Indent(2))
@@ -73,8 +77,9 @@ func StringifyAssign(node *syntax.Assign) string {
 	return strings.Trim(out.String(), "\"")
 }
 
-// StringifyFuncDecl generates strings from a *syntax.Assign of a function
-// declaration.
+// StringifyFuncDecl converts a syntax.FuncDecl node to a string representation.
+//
+// It takes a pointer to a syntax.FuncDecl node as a parameter and returns a string.
 func StringifyFuncDecl(node *syntax.FuncDecl) string {
 	out := &strings.Builder{}
 	printer := syntax.NewPrinter(syntax.Indent(2))

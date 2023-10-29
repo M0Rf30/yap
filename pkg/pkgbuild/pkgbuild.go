@@ -65,10 +65,10 @@ type PKGBUILD struct {
 	priorities     map[string]int
 }
 
-// AddItem reads a key and the related data. It checks the key for __ token and
-// give to it a priority value. After that, it binds any element (variable,
-// array, function) to the current environment. It returns any error if
-// encountered.
+// AddItem adds an item to the PKGBUILD.
+//
+// It takes a key string and data of any type as parameters.
+// It returns an error.
 func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	key, priority, err := pkgBuild.parseDirective(key)
 	if err != nil {

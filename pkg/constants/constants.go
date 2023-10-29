@@ -55,6 +55,15 @@ var (
 	CleanPrevious        = false
 )
 
+// init initializes the package.
+//
+// It iterates over the Releases slice and adds each release to the ReleasesSet set.
+// It also extracts the distribution name from each release and adds it to the Distros slice.
+// The function then iterates over the Distros slice and assigns the corresponding package manager
+// to each distribution in the DistroPackageManager map.
+// If a distribution does not have a supported package manager, the function prints an error message
+// and exits the program.
+// Finally, it adds each package manager to the PackagersSet set.
 func init() {
 	var packageManager string
 

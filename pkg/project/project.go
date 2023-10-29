@@ -23,13 +23,27 @@ var (
 	UntilPkgName                 string
 )
 
+// DistroProject is an interface that defines the methods for creating and
+// preparing a project for a specific distribution.
+//
+// It includes the following methods:
+//   - Create(): error
+//     This method is responsible for creating the project.
+//   - Prepare(): error
+//     This method is responsible for preparing the project.
 type DistroProject interface {
 	Create() error
 	Prepare() error
 }
 
-// MultipleProject defnes the content of yap.json specfile and some in-memory
-// objects.
+// MultipleProject represents a collection of projects.
+//
+// It contains a slice of Project objects and provides methods to interact
+// with multiple projects. The methods include building all the projects,
+// finding a package in the projects, and creating packages for each project.
+// The MultipleProject struct also contains the output directory for the
+// packages and the UntilPkgName field, which can be used to stop the build
+// process after a specific package.
 type MultipleProject struct {
 	makeDepends    []string
 	packageManager packer.Packer
@@ -41,6 +55,12 @@ type MultipleProject struct {
 	Projects       []*Project `json:"projects"    validate:"required,dive,required"`
 }
 
+// Project represents a single project.
+//
+// It contains the necessary information to build and manage the project.
+// The fields include the project's name, the path to the project directory,
+// the builder object, the package manager object, and a flag indicating
+// whether the project has to be installed.
 type Project struct {
 	Builder        *builder.Builder
 	BuildRoot      string
@@ -54,6 +74,12 @@ type Project struct {
 	HasToInstall   bool   `json:"install" validate:""`
 }
 
+// BuildAll builds all the projects in the MultipleProject struct.
+//
+// It compiles each project's package and creates the necessary packages.
+// If the project has to be installed, it installs the package.
+// If UntilPkgName is not empty, it stops building after the specified package.
+// It returns an error if any error occurs during the build process.
 func (mpc *MultipleProject) BuildAll() error {
 	if UntilPkgName != "" {
 		mpc.findPackageInProjects()
@@ -96,6 +122,9 @@ func (mpc *MultipleProject) BuildAll() error {
 	return nil
 }
 
+// Clean cleans up the MultipleProject by removing the package directories and
+// source directories if the NoCache flag is set. It takes no parameters. It
+// returns an error if there was a problem removing the directories.
 func (mpc *MultipleProject) Clean() error {
 	var err error
 
@@ -118,6 +147,14 @@ func (mpc *MultipleProject) Clean() error {
 	return err
 }
 
+// MultiProject is a function that performs multiple project operations.
+//
+// It takes in the following parameters:
+// - distro: a string representing the distribution
+// - release: a string representing the release
+// - path: a string representing the path
+//
+// It returns an error.
 func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	err := mpc.readProject(path)
 	if err != nil {
@@ -159,6 +196,10 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	return err
 }
 
+// createPackages creates packages for the MultipleProject.
+//
+// It takes a pointer to a MultipleProject as a receiver and a pointer to a Project as a parameter.
+// It returns an error.
 func (mpc *MultipleProject) createPackages(proj *Project) error {
 	if mpc.Output != "" {
 		mpc.Output, _ = filepath.Abs(mpc.Output)
@@ -176,6 +217,11 @@ func (mpc *MultipleProject) createPackages(proj *Project) error {
 	return err
 }
 
+// findPackageInProjects searches for a package in the MultipleProject struct.
+//
+// It iterates over the Projects slice and checks if the package name matches
+// the value of UntilPkgName. If a match is found, it sets the matchFound variable
+// to true. If no match is found, it prints an error message and exits the program.
 func (mpc *MultipleProject) findPackageInProjects() {
 	var matchFound bool
 
@@ -197,6 +243,11 @@ func (mpc *MultipleProject) findPackageInProjects() {
 	}
 }
 
+// getMakeDeps retrieves the make dependencies for the MultipleProject.
+//
+// It iterates over each child project and appends their make dependencies
+// to the makeDepends slice. The makeDepends slice is then assigned to the
+// makeDepends field of the MultipleProject.
 func (mpc *MultipleProject) getMakeDeps() {
 	var makeDepends []string
 
@@ -207,6 +258,13 @@ func (mpc *MultipleProject) getMakeDeps() {
 	mpc.makeDepends = makeDepends
 }
 
+// populateProjects populates the MultipleProject with projects based on the
+// given distro, release, and path.
+//
+// distro: The distribution of the projects.
+// release: The release version of the projects.
+// path: The path to the projects.
+// error: An error if any occurred during the population process.
 func (mpc *MultipleProject) populateProjects(distro, release, path string) error {
 	var err error
 
@@ -238,6 +296,10 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 	return err
 }
 
+// readProject reads the project file at the specified path and populates the MultipleProject struct.
+//
+// It takes a string parameter `path` which represents the path to the project file.
+// It returns an error if there was an issue opening or reading the file, or if the JSON data is invalid.
 func (mpc *MultipleProject) readProject(path string) error {
 	cleanFilePath := filepath.Clean(filepath.Join(path, "yap.json"))
 
@@ -269,6 +331,9 @@ func (mpc *MultipleProject) readProject(path string) error {
 	return err
 }
 
+// validateAllProject validates all projects in the MultipleProject struct.
+//
+// It takes in the distro, release, and path as parameters and returns an error.
 func (mpc *MultipleProject) validateAllProject(distro, release, path string) error {
 	var err error
 	for _, child := range mpc.Projects {
@@ -286,6 +351,10 @@ func (mpc *MultipleProject) validateAllProject(distro, release, path string) err
 	return err
 }
 
+// validateJSON validates the JSON of the MultipleProject struct.
+//
+// It uses the validator package to validate the struct and returns any errors encountered.
+// It returns an error if the validation fails.
 func (mpc *MultipleProject) validateJSON() error {
 	validate := validator.New()
 
