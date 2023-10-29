@@ -22,22 +22,43 @@ const (
 	git = "git"
 )
 
+// Source defines all the fields accepted by a source item.
 type Source struct {
-	Hash           string
-	RefKey         string
-	RefValue       string
+	// Hash is the integrity hashsum for a source item
+	Hash string
+	// RefKey is the reference name for a VCS fragment (branch, tag) declared in the
+	// URI. i.e: "myfile::git+https://example.com/example.git#branch=example"
+	RefKey string
+	// RefValue is the reference value for a VCS fragment declared in the URI. i.e:
+	// myfile::git+https://example.com/example.git#branch=refvalue
+	RefValue string
+	// SourceItemPath is the absolute path to a source item (folder or file)
 	SourceItemPath string
-	SourceItemURI  string
-	SrcDir         string
-	StartDir       string
+	// SourceItemURI it the full source item URI. i.e:
+	// "myfile::git+https://example.com/example.git#branch=example" i.e:
+	// "https://example.com/example.tar.gz"
+	SourceItemURI string
+	// SrcDir is the directory where all the source items are symlinked, extracted
+	// and processed by packaging functions.
+	SrcDir string
+	// StartDir is the root where a copied PKGBUILD lives and all the source items
+	// are downloaded. It generally contains the src and pkg folders.
+	StartDir string
 }
 
+// Get retrieves the source from the specified URI and performs necessary operations on it.
+//
+// It parses the URI, determines the source type, and calls the appropriate getURL function.
+// If the source type is not recognized or supported, it prints an error message and exits.
+// It then validates the source, creates symbolic links for sources, and extracts the source.
+//
+// Returns an error if any of the operations fail.
 func (src *Source) Get() error {
 	var err error
 
 	src.parseURI()
 
-	sourceType := src.getType()
+	sourceType := src.getProtocol()
 
 	switch sourceType {
 	case "http":
@@ -79,6 +100,13 @@ func (src *Source) Get() error {
 	return err
 }
 
+// extract extracts the source file to the destination directory.
+//
+// It opens the source file specified by the SourceItemPath field of the Source struct.
+// If the file cannot be opened, it prints an error message and returns the error.
+// Otherwise, it unarchives the file to the destination directory specified by the SrcDir field of the Source struct.
+// If the unarchiving fails, it prints an error message and panics.
+// Finally, it returns any error that occurred during the extraction process.
 func (src *Source) extract() error {
 	dlFile, err := os.Open(filepath.Join(src.StartDir, src.SourceItemPath))
 	if err != nil {
@@ -101,6 +129,10 @@ func (src *Source) extract() error {
 	return err
 }
 
+// getReferenceType returns the reference type for the given source.
+//
+// It takes no parameters.
+// It returns a plumbing.ReferenceName.
 func (src *Source) getReferenceType() plumbing.ReferenceName {
 	var referenceName plumbing.ReferenceName
 
@@ -115,7 +147,17 @@ func (src *Source) getReferenceType() plumbing.ReferenceName {
 	return referenceName
 }
 
-func (src *Source) getType() string {
+// getProtocol returns the protocol of the source item URI.
+//
+// It checks if the source item URI starts with "http://", "https://", or "ftp://".
+// If it does, it returns the corresponding protocol.
+// If the source item URI starts with "git+https://", it returns "git".
+// Otherwise, it returns "file".
+//
+// Returns:
+//
+//	string: The protocol of the source item URI.
+func (src *Source) getProtocol() string {
 	if strings.HasPrefix(src.SourceItemURI, "http://") {
 		return "http"
 	}
@@ -135,6 +177,10 @@ func (src *Source) getType() string {
 	return "file"
 }
 
+// getURL retrieves the URL for the Source object based on the specified protocol.
+//
+// protocol: The protocol to use for retrieving the URL.
+// Returns: None.
 func (src *Source) getURL(protocol string) {
 	dloadFilePath := filepath.Join(src.StartDir, src.SourceItemPath)
 
@@ -159,6 +205,11 @@ func (src *Source) getURL(protocol string) {
 	}
 }
 
+// parseURI parses the URI of the Source and updates the SourceItemPath,
+// SourceItemURI, RefKey, and RefValue fields accordingly.
+//
+// No parameters.
+// No return types.
 func (src *Source) parseURI() {
 	src.SourceItemPath = utils.Filename(src.SourceItemURI)
 
@@ -178,6 +229,9 @@ func (src *Source) parseURI() {
 	}
 }
 
+// symlinkSources creates a symbolic link from symlinkSource to symLinkTarget.
+//
+// It returns an error if the symlink creation fails.
 func (src *Source) symlinkSources() error {
 	var err error
 
@@ -192,8 +246,11 @@ func (src *Source) symlinkSources() error {
 	return err
 }
 
-// validate checks that items declared in the source array have a valid hashsum.
-// It returns any error if encountered.
+// validate validates the source by checking its integrity.
+//
+// It checks the hash of the source file against the expected hash value.
+// If the hashes don't match, it returns an error.
+// The function takes no parameters and returns an error.
 func (src *Source) validate() error {
 	info, err := os.Stat(filepath.Join(src.StartDir, src.SourceItemPath))
 	if err != nil {

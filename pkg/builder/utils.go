@@ -10,6 +10,10 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// RunScript runs a shell script.
+//
+// It takes a string parameter `cmds` which represents the shell script to be executed.
+// The function returns an error if there was an issue running the script.
 func RunScript(cmds string) error {
 	script, _ := syntax.NewParser().Parse(strings.NewReader(cmds), "")
 

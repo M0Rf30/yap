@@ -17,6 +17,10 @@ import (
 const goArchivePath = "/tmp/go.tar.gz"
 const goExecutable = "/usr/bin/go"
 
+// CheckGO checks if the GO executable is already installed.
+//
+// It does not take any parameters.
+// It returns a boolean value indicating whether the GO executable is already installed.
 func CheckGO() bool {
 	if _, err := os.Stat(goExecutable); err == nil {
 		fmt.Printf("%s🪛 :: %sGO is already installed%s\n",
@@ -30,6 +34,11 @@ func CheckGO() bool {
 	return false
 }
 
+// Download downloads a file from the given URL and saves it to the specified destination.
+//
+// Parameters:
+// - destination: the path where the downloaded file will be saved.
+// - url: the URL of the file to download.
 func Download(destination, url string) {
 	// create client
 	client := grab.NewClient()
@@ -98,6 +107,10 @@ Loop:
 	)
 }
 
+// GOSetup sets up the Go environment.
+//
+// It checks if Go is installed and if not, it downloads and installs it.
+// The function takes no parameters and does not return anything.
 func GOSetup() {
 	if CheckGO() {
 		return
@@ -135,6 +148,10 @@ func GOSetup() {
 		string(constants.ColorWhite))
 }
 
+// PullContainers pulls the specified container image.
+//
+// target: the name of the container image to pull.
+// error: returns an error if the container image cannot be pulled.
 func PullContainers(target string) error {
 	containerApp := "/usr/bin/podman"
 	args := []string{
@@ -155,17 +172,21 @@ func PullContainers(target string) error {
 	return err
 }
 
+// Unarchive extracts files from an archive and saves them to a destination directory.
+//
+// archiveReader is an io.Reader that represents the archive file.
+// destination is the path to the directory where the files will be saved.
+// Returns an error if there was a problem extracting the files.
 func Unarchive(archiveReader io.Reader, destination string) error {
 	format, archiveReader, _ := archiver.Identify("", archiveReader)
-	// the list of files we want out of the archive; any
-	// directories will include all their contents unless
-	// we return fs.SkipDir from our handler
-	// (leave this nil to walk ALL files from the archive)
+
+	// dirMap is the list of files we want out of the archive; any directories will
+	// include all their contents unless we return fs.SkipDir from our handler
+	// (leave this nil to walk ALL files from the archive).
 	dirMap := map[string]bool{}
 
-	// not sure if this should be a syncmap, or if a map is ok?
-	// not sure if the handler itself is invoked serially or if it
-	// is concurrent?
+	// not sure if this should be a syncmap, or if a map is ok? not sure if the
+	// handler itself is invoked serially or if it is concurrent?
 	handler := func(ctx context.Context, archiveFile archiver.File) error {
 		fileName := archiveFile.NameInArchive
 		newPath := filepath.Join(destination, fileName)
@@ -184,9 +205,9 @@ func Unarchive(archiveReader io.Reader, destination string) error {
 		if !seenDir {
 			dirMap[fileDir] = true
 
-			// linux default for new directories is 777 and let the umask handle
-			// if should have other controls
-			//#nosec
+			// linux default for new directories is 777 and let the umask handle if
+			// should have other controls.
+			// #nosec
 			err = os.MkdirAll(fileDir, 0777)
 		}
 

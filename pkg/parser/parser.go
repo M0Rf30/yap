@@ -13,8 +13,21 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// OverridePkgver is a variable that allows overriding the PkgVer field in
+// PKGBUILD. This can be useful for setting a custom package version.
 var OverridePkgver string
 
+// ParseFile parses a file and returns a PKGBUILD object and an error.
+//
+// Parameters:
+// - distro: the distribution name.
+// - release: the release version.
+// - startDir: the starting directory.
+// - home: the home directory.
+//
+// Returns:
+// - *pkgbuild.PKGBUILD: the parsed PKGBUILD object.
+// - error: an error if any occurred during parsing.
 func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
 
@@ -64,6 +77,15 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 	return pkgBuild, err
 }
 
+// getSyntaxFile reads and parses the PKGBUILD file into a syntax tree.
+//
+// Parameters:
+//   - startDir (string): The directory where the PKGBUILD file is located.
+//   - home (string): The home directory path for reference during parsing.
+//
+// Returns:
+//   - (*syntax.File): The syntax tree representing the PKGBUILD file's structure.
+//   - (error): An error if issues occur during file reading or parsing.
 func getSyntaxFile(startDir, home string) (*syntax.File, error) {
 	file, err := utils.Open(filepath.Join(startDir, "PKGBUILD"))
 	if err != nil {
@@ -81,6 +103,10 @@ func getSyntaxFile(startDir, home string) (*syntax.File, error) {
 	return pkgbuildSyntax, err
 }
 
+// parseSyntaxFile parses the given pkgbuildSyntax and populates the pkgBuild object.
+//
+// It takes in a pkgbuildSyntax object and a pkgBuild object as parameters.
+// It returns an error if any error occurs during parsing.
 func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) error {
 	var err error
 

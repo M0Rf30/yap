@@ -7,11 +7,17 @@ import (
 	"github.com/M0Rf30/yap/pkg/utils"
 )
 
+// Pacman represents a package manager for the Pacman distribution.
+//
+// It contains methods for building, installing, and updating packages.
 type Pacman struct {
 	PKGBUILD  *pkgbuild.PKGBUILD
 	pacmanDir string
 }
 
+// Build builds the Pacman package.
+//
+// It takes the artifactsPath as a parameter and returns an error if any.
 func (p *Pacman) Build(artifactsPath string) error {
 	p.pacmanDir = p.PKGBUILD.StartDir
 
@@ -37,6 +43,10 @@ func (p *Pacman) Build(artifactsPath string) error {
 	return nil
 }
 
+// Install installs the package using the given artifacts path.
+//
+// artifactsPath: the path where the package artifacts are located.
+// error: an error if the installation fails.
 func (p *Pacman) Install(artifactsPath string) error {
 	var err error
 
@@ -63,6 +73,10 @@ func (p *Pacman) Install(artifactsPath string) error {
 	return err
 }
 
+// Prepare prepares the Pacman package by getting the dependencies using the PKGBUILD.
+//
+// makeDepends is a slice of strings representing the dependencies to be included.
+// It returns an error if there is any issue getting the dependencies.
 func (p *Pacman) Prepare(makeDepends []string) error {
 	args := []string{
 		"-S",
@@ -77,6 +91,10 @@ func (p *Pacman) Prepare(makeDepends []string) error {
 	return err
 }
 
+// PrepareEnvironment prepares the environment for the Pacman.
+//
+// It takes a boolean parameter `golang` which indicates whether the environment should be prepared for Golang.
+// It returns an error if there is any issue in preparing the environment.
 func (p *Pacman) PrepareEnvironment(golang bool) error {
 	var err error
 
@@ -100,6 +118,10 @@ func (p *Pacman) PrepareEnvironment(golang bool) error {
 	return err
 }
 
+// Update updates the Pacman package manager.
+//
+// It retrieves the updates using the GetUpdates method of the PKGBUILD struct.
+// It returns an error if there is any issue during the update process.
 func (p *Pacman) Update() error {
 	err := p.PKGBUILD.GetUpdates("pacman", "-Sy")
 	if err != nil {
@@ -109,6 +131,12 @@ func (p *Pacman) Update() error {
 	return err
 }
 
+// pacmanBuild builds the package using makepkg command.
+//
+// It executes the makepkg command in the pacman directory and returns an error if any.
+// The error is returned as is.
+// Returns:
+// - error: An error if any occurred during the execution of the makepkg command.
 func (p *Pacman) pacmanBuild() error {
 	err := utils.Exec(p.pacmanDir, "makepkg", "-f")
 	if err != nil {

@@ -66,8 +66,8 @@ func (builder *Builder) Package() error {
 	return err
 }
 
-// build executes the instructions provided by a single project build()
-// function. It returns any error if occurred.
+// build executes a set of instructions provided by a project build function. If
+// there is an error during execution, it returns the error.
 func (builder *Builder) build() error {
 	err := RunScript(builder.PKGBUILD.Build)
 	if err != nil {

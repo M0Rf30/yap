@@ -7,11 +7,21 @@ import (
 	"github.com/M0Rf30/yap/pkg/utils"
 )
 
+// Apk represents the APK package manager.
+//
+// It contains the directory path of the package and the PKGBUILD struct, which
+// contains the metadata and build instructions for the package.
 type Apk struct {
+	// PKGBUILD is a pointer to the pkgbuild.PKGBUILD struct, which contains information about the package being built.
 	PKGBUILD *pkgbuild.PKGBUILD
-	apkDir   string
+
+	// apkDir is a string representing the directory where the APK package files are stored.
+	apkDir string
 }
 
+// Build builds the APK package.
+//
+// It takes the artifactsPath as a parameter and returns an error.
 func (a *Apk) Build(artifactsPath string) error {
 	a.apkDir = filepath.Join(a.PKGBUILD.StartDir, "apk")
 
@@ -43,6 +53,10 @@ func (a *Apk) Build(artifactsPath string) error {
 	return err
 }
 
+// Install installs the APK package to the specified artifacts path.
+//
+// It takes a string parameter `artifactsPath` which specifies the path where the artifacts are located.
+// It returns an error if there was an error during the installation process.
 func (a *Apk) Install(artifactsPath string) error {
 	var err error
 
@@ -69,6 +83,10 @@ func (a *Apk) Install(artifactsPath string) error {
 	return err
 }
 
+// Prepare prepares the Apk by adding dependencies to the PKGBUILD file.
+//
+// makeDepends is a slice of strings representing the dependencies to be added.
+// It returns an error if there is any issue with adding the dependencies.
 func (a *Apk) Prepare(makeDepends []string) error {
 	args := []string{
 		"add",
@@ -82,6 +100,9 @@ func (a *Apk) Prepare(makeDepends []string) error {
 	return err
 }
 
+// PrepareEnvironment prepares the build environment for APK packaging.
+// It installs requested Go tools if 'golang' is true.
+// It returns an error if any step fails.
 func (a *Apk) PrepareEnvironment(golang bool) error {
 	var err error
 
@@ -104,6 +125,8 @@ func (a *Apk) PrepareEnvironment(golang bool) error {
 	return err
 }
 
+// Update updates the APK package manager's package database.
+// It returns an error if the update process fails.
 func (a *Apk) Update() error {
 	err := a.PKGBUILD.GetUpdates("apk", "update")
 	if err != nil {
@@ -113,6 +136,8 @@ func (a *Apk) Update() error {
 	return err
 }
 
+// apkBuild compiles the APK package using 'abuild-keygen' and 'abuild'.
+// It returns an error if any compilation step fails.
 func (a *Apk) apkBuild(artifactsPath string) error {
 	err := utils.Exec(a.apkDir,
 		"abuild-keygen",
@@ -135,6 +160,10 @@ func (a *Apk) apkBuild(artifactsPath string) error {
 	return err
 }
 
+// makePackerDir creates the necessary directories for the Apk struct.
+//
+// It does not take any parameters.
+// It returns an error if any of the directory operations fail.
 func (a *Apk) makePackerDir() error {
 	err := utils.ExistsMakeDir(a.apkDir)
 	if err != nil {
