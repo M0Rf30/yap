@@ -35,9 +35,9 @@ build() {
 
   go build \
     -buildvcs=false \
-    -ldflags="-w -s -linkmode=external \
-  -X main.version=${pkgver}" \
-    cmd
+    -ldflags "-w -s" \
+    -o yap \
+    cmd/yap/main.go
 }
 
 package() {
