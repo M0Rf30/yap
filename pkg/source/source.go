@@ -7,15 +7,16 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/utils"
 	ggit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -54,79 +55,49 @@ type Source struct {
 //
 // Returns an error if any of the operations fail.
 func (src *Source) Get() error {
-	var err error
-
 	src.parseURI()
 
 	sourceType := src.getProtocol()
 
 	switch sourceType {
-	case "http":
-		src.getURL("http")
-	case "https":
-		src.getURL("https")
-	case "ftp":
-		src.getURL("ftp")
-	case "git":
-		src.getURL("git")
-	case "file":
+	case "http", "https", "ftp", "git":
+		src.getURL(sourceType)
 	default:
-		fmt.Printf("%s❌ :: %sunknown or unsupported source type: %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), sourceType)
-
-		os.Exit(1)
+		return errors.Wrapf(errors.New("unknown or unsupported source type"), sourceType)
 	}
 
-	if err != nil {
+	if err := src.validate(); err != nil {
 		return err
 	}
 
-	err = src.validate()
-	if err != nil {
+	if err := src.symlinkSources(); err != nil {
 		return err
 	}
 
-	err = src.symlinkSources()
-	if err != nil {
+	if err := src.extract(); err != nil {
 		return err
 	}
 
-	err = src.extract()
-	if err != nil {
-		return err
-	}
-
-	return err
+	return nil
 }
 
-// extract extracts the source file to the destination directory.
+// extract is a function that extracts a source file to a specified directory.
 //
-// It opens the source file specified by the SourceItemPath field of the Source struct.
-// If the file cannot be opened, it prints an error message and returns the error.
-// Otherwise, it unarchives the file to the destination directory specified by the SrcDir field of the Source struct.
-// If the unarchiving fails, it prints an error message and panics.
-// Finally, it returns any error that occurred during the extraction process.
+// It takes no parameters.
+// It returns an error if there was a problem opening the source file or
+// extracting it.
 func (src *Source) extract() error {
 	dlFile, err := os.Open(filepath.Join(src.StartDir, src.SourceItemPath))
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open source %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), src.SourceItemURI)
-
-		return err
+		return fmt.Errorf("failed to open source %s: %w", src.SourceItemURI, err)
 	}
 
 	err = utils.Unarchive(dlFile, src.SrcDir)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to extract source %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), src.SourceItemPath)
-
-		log.Panic(err)
+		return fmt.Errorf("failed to extract source %s: %w", src.SourceItemPath, err)
 	}
 
-	return err
+	return nil
 }
 
 // getReferenceType returns the reference type for the given source.
@@ -134,47 +105,30 @@ func (src *Source) extract() error {
 // It takes no parameters.
 // It returns a plumbing.ReferenceName.
 func (src *Source) getReferenceType() plumbing.ReferenceName {
-	var referenceName plumbing.ReferenceName
-
-	switch src.RefKey {
-	case "branch":
-		referenceName = plumbing.NewBranchReferenceName(src.RefValue)
-	case "tag":
-		referenceName = plumbing.NewTagReferenceName(src.RefValue)
-	default:
+	switch {
+	case src.RefKey == "branch":
+		return plumbing.NewBranchReferenceName(src.RefValue)
+	case src.RefKey == "tag":
+		return plumbing.NewTagReferenceName(src.RefValue)
 	}
 
-	return referenceName
+	return ""
 }
 
 // getProtocol returns the protocol of the source item URI.
-//
-// It checks if the source item URI starts with "http://", "https://", or "ftp://".
-// If it does, it returns the corresponding protocol.
-// If the source item URI starts with "git+https://", it returns "git".
-// Otherwise, it returns "file".
-//
-// Returns:
-//
-//	string: The protocol of the source item URI.
 func (src *Source) getProtocol() string {
-	if strings.HasPrefix(src.SourceItemURI, "http://") {
+	switch {
+	case strings.HasPrefix(src.SourceItemURI, "http://"):
 		return "http"
-	}
-
-	if strings.HasPrefix(src.SourceItemURI, "https://") {
+	case strings.HasPrefix(src.SourceItemURI, "https://"):
 		return "https"
-	}
-
-	if strings.HasPrefix(src.SourceItemURI, "ftp://") {
+	case strings.HasPrefix(src.SourceItemURI, "ftp://"):
 		return "ftp"
-	}
-
-	if strings.HasPrefix(src.SourceItemURI, git+"+https://") {
+	case strings.HasPrefix(src.SourceItemURI, git+"+https://"):
 		return git
+	default:
+		return "file"
 	}
-
-	return "file"
 }
 
 // getURL retrieves the URL for the Source object based on the specified protocol.
@@ -214,16 +168,16 @@ func (src *Source) parseURI() {
 	src.SourceItemPath = utils.Filename(src.SourceItemURI)
 
 	if strings.Contains(src.SourceItemURI, "::") {
-		split := strings.Split(src.SourceItemURI, "::")
+		split := strings.SplitN(src.SourceItemURI, "::", 2)
 		src.SourceItemPath = split[0]
 		src.SourceItemURI = split[1]
 	}
 
 	if strings.Contains(src.SourceItemURI, "#") {
-		split := strings.Split(src.SourceItemURI, "#")
+		split := strings.SplitN(src.SourceItemURI, "#", 2)
 		src.SourceItemURI = split[0]
 		fragment := split[1]
-		splitFragment := strings.Split(fragment, "=")
+		splitFragment := strings.SplitN(fragment, "=", 2)
 		src.RefKey = splitFragment[0]
 		src.RefValue = splitFragment[1]
 	}
@@ -233,35 +187,24 @@ func (src *Source) parseURI() {
 //
 // It returns an error if the symlink creation fails.
 func (src *Source) symlinkSources() error {
-	var err error
-
 	symlinkSource := filepath.Join(src.StartDir, src.SourceItemPath)
 
 	symLinkTarget := filepath.Join(src.SrcDir, src.SourceItemPath)
 
 	if !utils.Exists(symLinkTarget) {
-		err = os.Symlink(symlinkSource, symLinkTarget)
+		return os.Symlink(symlinkSource, symLinkTarget)
 	}
 
-	return err
+	return nil
 }
 
-// validate validates the source by checking its integrity.
-//
-// It checks the hash of the source file against the expected hash value.
-// If the hashes don't match, it returns an error.
-// The function takes no parameters and returns an error.
+// validate checks the source's integrity by comparing its hash with the expected hash value.
+// It returns an error if the hashes don't match.
 func (src *Source) validate() error {
 	info, err := os.Stat(filepath.Join(src.StartDir, src.SourceItemPath))
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open file for hash\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow))
-
-		return err
+		return fmt.Errorf("failed to open file for hash: %w", err)
 	}
-
-	var hashSum hash.Hash
 
 	if src.Hash == "SKIP" || info.IsDir() {
 		fmt.Printf("%s:: %sSkip integrity check for %s%s\n",
@@ -269,7 +212,11 @@ func (src *Source) validate() error {
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),
 			src.SourceItemURI)
+
+		return nil
 	}
+
+	var hashSum hash.Hash
 
 	switch len(src.Hash) {
 	case 64:
@@ -277,24 +224,25 @@ func (src *Source) validate() error {
 	case 128:
 		hashSum = sha512.New()
 	default:
-		return err
+		return errors.Wrapf(errors.New("invalid hash length: %s"), strconv.Itoa(len(src.Hash)))
 	}
 
-	file, _ := os.Open(filepath.Join(src.StartDir, src.SourceItemPath))
-
-	_, err = io.Copy(hashSum, file)
+	file, err := os.Open(filepath.Join(src.StartDir, src.SourceItemPath))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(hashSum, file); err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
 	}
 
-	sum := hashSum.Sum([]byte{})
+	sum := hashSum.Sum(nil)
 	hexSum := hex.EncodeToString(sum)
 
 	if hexSum != src.Hash {
-		fmt.Printf("%s❌ :: %sHash verification failed for %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), src.SourceItemPath)
+		return errors.Wrapf(errors.New("hash verification failed for %s"), src.SourceItemPath)
 	}
 
-	return err
+	return nil
 }

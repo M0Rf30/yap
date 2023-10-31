@@ -1,8 +1,7 @@
 package packer
 
 import (
-	"fmt"
-	"os"
+	"log"
 
 	"github.com/M0Rf30/yap/pkg/apk"
 	"github.com/M0Rf30/yap/pkg/constants"
@@ -37,33 +36,30 @@ type Packer interface {
 // distro: A string representing the distribution.
 // Returns a Packer interface.
 func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
-	var packageManager Packer
-
 	distroFamily := constants.DistroToPackageManager[distro]
 	switch distroFamily {
 	case "alpine":
-		packageManager = &apk.Apk{
+		return &apk.Apk{
 			PKGBUILD: pkgBuild,
 		}
 	case "pacman":
-		packageManager = &pacman.Pacman{
+		return &pacman.Pacman{
 			PKGBUILD: pkgBuild,
 		}
 	case "debian":
-		packageManager = &debian.Debian{
+		return &debian.Debian{
 			PKGBUILD: pkgBuild,
 		}
 	case "redhat":
-		packageManager = &redhat.Redhat{
+		return &redhat.Redhat{
 			PKGBUILD: pkgBuild,
 		}
 	default:
-		fmt.Printf("%s%s ❌ :: unknown unsupported system.%s\n",
+		log.Fatalf("%s❌ :: %sunknown unsupported system.%s",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
-		os.Exit(1)
 	}
 
-	return packageManager
+	return nil
 }

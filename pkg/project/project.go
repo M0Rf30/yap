@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -86,11 +87,13 @@ func (mpc *MultipleProject) BuildAll() error {
 	}
 
 	for _, proj := range mpc.Projects {
-		fmt.Printf("%s🚀 :: %sLaunching build for package: %s%s\n",
+		fmt.Printf("%s🚀 :: %sMaking package: %s%s %s-%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),
 			proj.Builder.PKGBUILD.PkgName,
+			proj.Builder.PKGBUILD.PkgVer,
+			proj.Builder.PKGBUILD.PkgRel,
 		)
 
 		if err := proj.Builder.Compile(); err != nil {
@@ -103,11 +106,14 @@ func (mpc *MultipleProject) BuildAll() error {
 		}
 
 		if proj.HasToInstall {
-			fmt.Printf("%s🤓 :: %s%s: installing package ...%s\n",
+			fmt.Printf("%s🤓 :: %sInstalling package: %s%s %s-%s\n",
 				string(constants.ColorBlue),
 				string(constants.ColorYellow),
-				proj.Name,
-				string(constants.ColorWhite))
+				string(constants.ColorWhite),
+				proj.Builder.PKGBUILD.PkgName,
+				proj.Builder.PKGBUILD.PkgVer,
+				proj.Builder.PKGBUILD.PkgRel,
+			)
 
 			if err := proj.PackageManager.Install(mpc.Output); err != nil {
 				return err
@@ -126,25 +132,19 @@ func (mpc *MultipleProject) BuildAll() error {
 // source directories if the NoCache flag is set. It takes no parameters. It
 // returns an error if there was a problem removing the directories.
 func (mpc *MultipleProject) Clean() error {
-	var err error
-
 	for _, project := range mpc.Projects {
-		err = utils.RemoveAll(project.Builder.PKGBUILD.PackageDir)
-		if err != nil {
+		if err := utils.RemoveAll(project.Builder.PKGBUILD.PackageDir); err != nil {
 			return err
 		}
-	}
 
-	if NoCache {
-		for _, project := range mpc.Projects {
-			err = utils.RemoveAll(project.Builder.PKGBUILD.SourceDir)
-			if err != nil {
+		if NoCache {
+			if err := utils.RemoveAll(project.Builder.PKGBUILD.SourceDir); err != nil {
 				return err
 			}
 		}
 	}
 
-	return err
+	return nil
 }
 
 // MultiProject is a function that performs multiple project operations.
@@ -193,7 +193,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 
 	mpc.root = path
 
-	return err
+	return nil
 }
 
 // createPackages creates packages for the MultipleProject.
@@ -202,19 +202,23 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 // It returns an error.
 func (mpc *MultipleProject) createPackages(proj *Project) error {
 	if mpc.Output != "" {
-		mpc.Output, _ = filepath.Abs(mpc.Output)
+		absOutput, err := filepath.Abs(mpc.Output)
+		if err != nil {
+			return err
+		}
+
+		mpc.Output = absOutput
 	}
 
 	if err := utils.ExistsMakeDir(mpc.Output); err != nil {
 		return err
 	}
 
-	err := proj.PackageManager.Build(mpc.Output)
-	if err != nil {
+	if err := proj.PackageManager.Build(mpc.Output); err != nil {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // findPackageInProjects searches for a package in the MultipleProject struct.
@@ -232,14 +236,12 @@ func (mpc *MultipleProject) findPackageInProjects() {
 	}
 
 	if !matchFound {
-		fmt.Printf("%s❌ :: %sPackage not found: %s%s\n",
+		log.Fatalf("%s❌ :: %spackage not found: %s%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),
 			UntilPkgName,
 		)
-
-		os.Exit(1)
 	}
 }
 
@@ -266,8 +268,6 @@ func (mpc *MultipleProject) getMakeDeps() {
 // path: The path to the projects.
 // error: An error if any occurred during the population process.
 func (mpc *MultipleProject) populateProjects(distro, release, path string) error {
-	var err error
-
 	var projects = make([]*Project, 0)
 
 	for _, child := range mpc.Projects {
@@ -293,7 +293,7 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 
 	mpc.Projects = projects
 
-	return err
+	return nil
 }
 
 // readProject reads the project file at the specified path and populates the MultipleProject struct.
@@ -305,37 +305,32 @@ func (mpc *MultipleProject) readProject(path string) error {
 
 	filePath, err := os.Open(cleanFilePath)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open yap.json file within '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			cleanFilePath,
-			string(constants.ColorWhite))
-		os.Exit(1)
+		return fmt.Errorf("failed to open yap.json file within '%s': %w", cleanFilePath, err)
 	}
+	defer filePath.Close()
 
 	prjContent, err := io.ReadAll(filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read yap.json file: %w", err)
 	}
 
 	err = json.Unmarshal(prjContent, &mpc)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal yap.json: %w", err)
 	}
 
 	err = mpc.validateJSON()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to validate yap.json: %w", err)
 	}
 
-	return err
+	return nil
 }
 
 // validateAllProject validates all projects in the MultipleProject struct.
 //
 // It takes in the distro, release, and path as parameters and returns an error.
 func (mpc *MultipleProject) validateAllProject(distro, release, path string) error {
-	var err error
 	for _, child := range mpc.Projects {
 		pkgbuildFile, err := parser.ParseFile(distro,
 			release,
@@ -348,7 +343,7 @@ func (mpc *MultipleProject) validateAllProject(distro, release, path string) err
 		pkgbuildFile.Validate()
 	}
 
-	return err
+	return nil
 }
 
 // validateJSON validates the JSON of the MultipleProject struct.
@@ -358,11 +353,5 @@ func (mpc *MultipleProject) validateAllProject(distro, release, path string) err
 func (mpc *MultipleProject) validateJSON() error {
 	validate := validator.New()
 
-	err := validate.Struct(mpc)
-
-	if err != nil {
-		return err
-	}
-
-	return err
+	return validate.Struct(mpc)
 }
