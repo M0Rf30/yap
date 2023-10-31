@@ -9,14 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const examplePkgbuild = `pkgname="httpserver"
+const examplePkgbuild = `
+pkgname="httpserver"
 pkgver="1.1"
 pkgrel="1"
 pkgdesc="Http file server written with Go"
-pkgdesc_centos="Http file server written with Go for CentOS"
-pkgdesc_debian="Http file server written with Go for Debian"
-pkgdesc_fedora="Http file server written with Go for Fedora"
-pkgdesc_ubuntu="Http file server written with Go for Ubuntu"
+pkgdesc__debian="Http file server written with Go for Debian"
+pkgdesc__fedora="Http file server written with Go for Fedora"
+pkgdesc__rocky="Http file server written with Go for Rocky"
+pkgdesc__ubuntu="Http file server written with Go for Ubuntu"
 maintainer="Example <example@yap.org>"
 arch=("all")
 license=("GPLv3")
@@ -24,26 +25,26 @@ section="utils"
 priority="optional"
 url="https://github.com/M0Rf30/${pkgname}"
 source=(
-    "${url}/archive/${pkgver}.tar.gz"
+  "${url}/archive/${pkgver}.tar.gz"
 )
 sha256sums=(
-    "SKIP"
+  "SKIP"
 )
 
 build() {
-	export GO111MODULE=off
-    mkdir -p "go/src"
-    export GOPATH="${srcdir}/go"
-    mv "${pkgname}-${pkgver}" "go/src"
-    cd "go/src/${pkgname}-${pkgver}"
-    go get
-    go build cmd
+  export GO111MODULE=off
+  mkdir -p "go/src"
+  export GOPATH="${srcdir}/go"
+  mv "${pkgname}-${pkgver}" "go/src"
+  cd "go/src/${pkgname}-${pkgver}"
+  go get
+  go build cmd
 }
 
 package() {
-    cd "${srcdir}/go/src/${pkgname}-${pkgver}"
-    mkdir -p "${pkgdir}/usr/bin"
-    cp ${pkgname}-${pkgver} ${pkgdir}/usr/bin/${pkgname}
+  cd "${srcdir}/go/src/${pkgname}-${pkgver}"
+  mkdir -p "${pkgdir}/usr/bin"
+  cp ${pkgname}-${pkgver} ${pkgdir}/usr/bin/${pkgname}
 }
 `
 

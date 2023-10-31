@@ -12,6 +12,7 @@
 .Trashes
 ._*
 .trunk
+/main
 /yap
 Icon?
 Thumbs.db
