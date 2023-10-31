@@ -1,8 +1,7 @@
 package constants
 
 import (
-	"fmt"
-	"os"
+	"log"
 	"strings"
 
 	"github.com/M0Rf30/yap/pkg/set"
@@ -85,11 +84,9 @@ func init() {
 		case "redhat":
 			packageManager = "yum"
 		default:
-			fmt.Printf("%s❌ :: %sfailed to find supported package manager for %s\n",
+			log.Fatalf("%s❌ :: %sfailed to find supported package manager for %s\n",
 				string(ColorBlue),
 				string(ColorYellow), distro)
-
-			os.Exit(1)
 		}
 
 		DistroPackageManager[distro] = packageManager

@@ -17,7 +17,7 @@ RUN \
     -modcacherw \
     -trimpath \
     -o /usr/bin/yap \
-    cmd/yap/main.go
+    cmd/yap/yap.go
 
 FROM docker.io/archlinux:base
 COPY --from=builder /usr/bin/yap /usr/bin/yap

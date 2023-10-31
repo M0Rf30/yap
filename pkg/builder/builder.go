@@ -22,7 +22,7 @@ func (builder *Builder) Compile() error {
 		return err
 	}
 
-	fmt.Printf("%s🖧  :: %sGetting sources ...%s\n",
+	fmt.Printf("%s🖧  :: %sRetrieving sources ...%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
@@ -52,7 +52,7 @@ func (builder *Builder) Compile() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Package executes the instructions provided by a single project package()
@@ -63,7 +63,7 @@ func (builder *Builder) Package() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // build executes a set of instructions provided by a project build function. If
@@ -74,14 +74,12 @@ func (builder *Builder) build() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // getSources detects sources provided by a single project source array and
 // downloads them if occurred. It returns any error if occurred.
 func (builder *Builder) getSources() error {
-	var err error
-
 	for index, sourceURI := range builder.PKGBUILD.SourceURI {
 		sourceObj := source.Source{
 			StartDir:       builder.PKGBUILD.StartDir,
@@ -91,28 +89,26 @@ func (builder *Builder) getSources() error {
 			SourceItemPath: "",
 		}
 
-		err = sourceObj.Get()
-
-		if err != nil {
+		if err := sourceObj.Get(); err != nil {
 			return err
 		}
 	}
 
-	return err
+	return nil
 }
 
 // initDirs creates mandatory fakeroot folders (src, pkg) for a single project.
 // It returns any error if occurred.
 func (builder *Builder) initDirs() error {
-	err := utils.ExistsMakeDir(builder.PKGBUILD.SourceDir)
-	if err != nil {
-		return err
+	dirs := []string{
+		builder.PKGBUILD.SourceDir,
+		builder.PKGBUILD.PackageDir}
+
+	for _, dir := range dirs {
+		if err := utils.ExistsMakeDir(dir); err != nil {
+			return err
+		}
 	}
 
-	err = utils.ExistsMakeDir(builder.PKGBUILD.PackageDir)
-	if err != nil {
-		return err
-	}
-
-	return err
+	return nil
 }
