@@ -2,7 +2,6 @@ package pkgbuild
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/utils"
-	"mvdan.cc/sh/v3/shell"
 )
 
 // Verbose is a flag to enable verbose output.
@@ -71,16 +69,12 @@ type PKGBUILD struct {
 // It returns an error.
 func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	key, priority, err := pkgBuild.parseDirective(key)
-	if err != nil {
-		return err
-	}
-
-	if priority == -1 {
+	if err != nil || priority == -1 {
 		return err
 	}
 
 	if priority < pkgBuild.priorities[key] {
-		return err
+		return nil
 	}
 
 	pkgBuild.priorities[key] = priority
@@ -89,7 +83,7 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	pkgBuild.mapArrays(key, data)
 	pkgBuild.mapFunctions(key, data)
 
-	return err
+	return nil
 }
 
 // CreateSpec reads the filepath where the specfile will be written and the
@@ -100,14 +94,11 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath, script string) error {
 
 	file, err := os.Create(cleanFilePath)
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
-
 	defer file.Close()
-	writer := io.Writer(file)
 
-	tmpl := template.New("template")
-	tmpl.Funcs(template.FuncMap{
+	tmpl := template.New("template").Funcs(template.FuncMap{
 		"join": func(strs []string) string {
 			return strings.Trim(strings.Join(strs, ", "), " ")
 		},
@@ -123,16 +114,11 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath, script string) error {
 	if Verbose {
 		err = tmpl.Execute(os.Stdout, pkgBuild)
 		if err != nil {
-			log.Panic(err)
+			return err
 		}
 	}
 
-	err = tmpl.Execute(writer, pkgBuild)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	return err
+	return tmpl.Execute(file, pkgBuild)
 }
 
 // GetDepends reads the package manager name, its arguments and all the
@@ -151,7 +137,7 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // GetUpdates reads the package manager name and its arguments to perform
@@ -163,11 +149,15 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 		return err
 	}
 
-	return err
+	return nil
 }
 
+// Init initializes the PKGBUILD struct.
+//
+// It sets up the priorities map and assigns the full distribution name based on
+// the Distro and Codename fields.
 func (pkgBuild *PKGBUILD) Init() {
-	pkgBuild.priorities = map[string]int{}
+	pkgBuild.priorities = make(map[string]int)
 
 	pkgBuild.FullDistroName = pkgBuild.Distro
 	if pkgBuild.Codename != "" {
@@ -179,21 +169,19 @@ func (pkgBuild *PKGBUILD) Init() {
 // file.
 func (pkgBuild *PKGBUILD) Validate() {
 	if len(pkgBuild.SourceURI) != len(pkgBuild.HashSums) {
-		fmt.Printf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
+		log.Fatalf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
 			pkgBuild.PkgName,
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
-		os.Exit(1)
 	}
 
 	if pkgBuild.Package == "" {
-		fmt.Printf("%s%s ❌ :: %smissing package() function%s\n",
+		log.Fatalf("%s%s ❌ :: %smissing package() function%s\n",
 			pkgBuild.PkgName,
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
-		os.Exit(1)
 	}
 }
 
@@ -233,13 +221,13 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 	switch key {
 	case "build":
-		pkgBuild.Build, _ = shell.Expand(data.(string), os.Getenv)
+		pkgBuild.Build = os.ExpandEnv(data.(string))
 	case "package":
-		pkgBuild.Package, _ = shell.Expand(data.(string), os.Getenv)
+		pkgBuild.Package = os.ExpandEnv(data.(string))
 	case "preinst":
 		pkgBuild.PreInst = data.(string)
 	case "prepare":
-		pkgBuild.Prepare, _ = shell.Expand(data.(string), os.Getenv)
+		pkgBuild.Prepare = os.ExpandEnv(data.(string))
 	case "postinst":
 		pkgBuild.PostInst = data.(string)
 	case "prerm":
@@ -287,98 +275,74 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	}
 
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to set variable %s\n",
+		log.Fatalf("%s❌ :: %sfailed to set variable %s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow), key)
-
-		os.Exit(1)
 	}
 }
 
-// parseDirective reads a directive string and detect any specialized one (i.e
-// only to be applied for ubuntu). It detects if distro codename is given and
-// calculates and assigns a priority to the directive. It returns the directive
-// key, assigned priority and any error if occurred.
+// parseDirective is a function that takes an input string and returns a key,
+// priority, and an error.
 func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
+	// Split the input string by "__" to separate the key and the directive.
 	split := strings.Split(input, "__")
 	key := split[0]
 
-	var err error
-
-	var priority int
-
-	numElem := 2
-
-	switch {
-	case len(split) == 1:
-		priority = 0
-
-		return key, priority, err
-	case len(split) != numElem:
-		return key, priority, fmt.Errorf("pack: Invalid use of '__' directive in '%w'", err)
-	default:
-		priority = -1
+	// If there is only one element in the split array, return the key and a priority of 0.
+	if len(split) == 1 {
+		return key, 0, nil
 	}
 
+	// If there are more than two elements in the split array, return an error.
+	if len(split) != 2 {
+		return key, 0, fmt.Errorf("pack: Invalid use of '__' directive in '%w'", nil)
+	}
+
+	// If the FullDistroName is empty, return the key and a priority of 0.
 	if pkgBuild.FullDistroName == "" {
-		return key, priority, err
+		return key, 0, nil
 	}
 
-	if key == "pkgver" || key == "pkgrel" {
-		return key, priority, fmt.Errorf("pack: Cannot use directive for '%w'", err)
-	}
-
+	// Set the directive to the second element in the split array.
 	directive := split[1]
+	priority := -1
 
+	// Check if the directive matches the FullDistroName and set the priority accordingly.
 	if directive == pkgBuild.FullDistroName {
 		priority = 3
+	} else if constants.DistrosSet.Contains(directive) &&
+		directive == pkgBuild.Distro {
+		priority = 2
+	} else if constants.PackagersSet.Contains(directive) &&
+		directive == constants.DistroPackageManager[pkgBuild.Distro] {
+		priority = 1
 	}
 
-	if constants.DistrosSet.Contains(directive) {
-		if directive == pkgBuild.Distro {
-			priority = 2
-		}
-
-		return key, priority, err
-	}
-
-	if constants.PackagersSet.Contains(directive) {
-		if directive == constants.DistroPackageManager[pkgBuild.Distro] {
-			priority = 1
-		}
-
-		return key, priority, err
-	}
-
-	return key, priority, err
+	// Return the key, priority, and no error.
+	return key, priority, nil
 }
 
-// setMainFolders checks for pkgbuild distro values and initialize the build
-// fakeroot accordingly.
+// setMainFolders sets the main folders for the PKGBUILD.
+//
+// It takes no parameters.
+// It does not return anything.
 func (pkgBuild *PKGBUILD) setMainFolders() {
-	if pkgBuild.Distro == "arch" {
+	switch pkgBuild.Distro {
+	case "arch":
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "pkg", pkgBuild.PkgName)
-	}
-
-	if pkgBuild.Distro == "alpine" {
+	case "alpine":
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
 	}
 
-	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to set variable pkgdir\n",
+	if err := os.Setenv("pkgdir", pkgBuild.PackageDir); err != nil {
+		log.Fatalf("%s❌ :: %sfailed to set variable pkgdir\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow))
-
-		os.Exit(1)
 	}
 
-	err = os.Setenv("srcdir", pkgBuild.SourceDir)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to set variable srcdir\n",
+	if err := os.Setenv("srcdir", pkgBuild.SourceDir); err != nil {
+		log.Fatalf("%s❌ :: %sfailed to set variable srcdir\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow))
-
-		os.Exit(1)
 	}
 }

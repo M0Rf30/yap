@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,7 @@ func Chmod(path string, perm os.FileMode) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Create creates a new file at the specified path.
@@ -76,7 +77,7 @@ func CreateWrite(path, data string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Exists checks if a file or directory exists at the given path.
@@ -86,7 +87,7 @@ func CreateWrite(path, data string) error {
 func Exists(path string) bool {
 	_, err := os.Stat(path)
 
-	return !os.IsNotExist(err)
+	return err == nil || !os.IsNotExist(err)
 }
 
 // ExistsMakeDir checks if a directory exists at the given path and creates it if it doesn't.
@@ -94,27 +95,15 @@ func Exists(path string) bool {
 // path: the path to the directory.
 // error: returns an error if the directory cannot be created or accessed.
 func ExistsMakeDir(path string) error {
-	_, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = MkdirAll(path)
-			if err != nil {
-				return err
-			}
-		} else {
-			fmt.Printf("%s❌ :: %sfailed to stat '%s'%s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow),
-				path,
-				string(constants.ColorWhite))
-
-			return err
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+			return fmt.Errorf("failed to create directory '%s': %w", path, err)
 		}
-
-		return err
+	} else if err != nil {
+		return fmt.Errorf("failed to access directory '%s': %w", path, err)
 	}
 
-	return err
+	return nil
 }
 
 // Filename returns the filename from a given path.
@@ -138,13 +127,11 @@ func GetDirSize(path string) (int64, error) {
 
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
-			fmt.Printf("%s❌ :: %sfailed to get dir size '%s'%s\n",
+			log.Fatalf("%s❌ :: %sfailed to get dir size '%s'%s\n",
 				string(constants.ColorBlue),
 				string(constants.ColorYellow),
 				path,
 				string(constants.ColorWhite))
-
-			os.Exit(1)
 		}
 		if !info.IsDir() {
 			size += info.Size()
@@ -175,7 +162,7 @@ func MkdirAll(path string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Open opens a file at the specified path and returns a pointer to the file and an error.
@@ -213,7 +200,7 @@ func Remove(path string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // RemoveAll removes a file or directory and any children it contains.
@@ -232,5 +219,5 @@ func RemoveAll(path string) error {
 		return err
 	}
 
-	return err
+	return nil
 }

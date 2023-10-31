@@ -14,8 +14,6 @@ import (
 )
 
 var (
-	NoCache bool
-
 	// buildCmd represents the command to build the entire project.
 	buildCmd = &cobra.Command{
 		Use:   "build [target] [path]",
@@ -35,25 +33,28 @@ var (
 			mpc := project.MultipleProject{}
 			err := mpc.MultiProject(distro, release, fullJSONPath)
 			if err != nil {
-				fmt.Printf("%s❌ :: %serror:\n",
+				fmt.Printf("%s❌ :: %sError:\n%s",
 					string(constants.ColorBlue),
-					string(constants.ColorYellow))
+					string(constants.ColorYellow),
+					string(constants.ColorWhite))
 				log.Fatal(err)
 			}
 
 			if project.NoCache {
 				if err := mpc.Clean(); err != nil {
-					fmt.Printf("%s❌ :: %serror:\n",
+					fmt.Printf("%s❌ :: %sError:\n%s",
 						string(constants.ColorBlue),
-						string(constants.ColorYellow))
+						string(constants.ColorYellow),
+						string(constants.ColorWhite))
 					log.Fatal(err)
 				}
 			}
 
 			if err := mpc.BuildAll(); err != nil {
-				fmt.Printf("%s❌ :: %serror:\n",
+				fmt.Printf("%s❌ :: %sError:\n%s",
 					string(constants.ColorBlue),
-					string(constants.ColorYellow))
+					string(constants.ColorYellow),
+					string(constants.ColorWhite))
 				log.Fatal(err)
 			}
 		},

@@ -60,7 +60,7 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 
 	pkgBuild.Init()
 
-	pkgbuildSyntax, err := getSyntaxFile(startDir, home)
+	pkgbuildSyntax, err := getSyntaxFile(startDir)
 	if err != nil {
 		return nil, err
 	}
@@ -77,30 +77,26 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 	return pkgBuild, err
 }
 
-// getSyntaxFile reads and parses the PKGBUILD file into a syntax tree.
+// getSyntaxFile returns a syntax.File and an error.
 //
-// Parameters:
-//   - startDir (string): The directory where the PKGBUILD file is located.
-//   - home (string): The home directory path for reference during parsing.
-//
-// Returns:
-//   - (*syntax.File): The syntax tree representing the PKGBUILD file's structure.
-//   - (error): An error if issues occur during file reading or parsing.
-func getSyntaxFile(startDir, home string) (*syntax.File, error) {
-	file, err := utils.Open(filepath.Join(startDir, "PKGBUILD"))
+// It takes a startDir string as a parameter and returns a *syntax.File and an error.
+func getSyntaxFile(startDir string) (*syntax.File, error) {
+	filePath := filepath.Join(startDir, "PKGBUILD")
+	file, err := utils.Open(filePath)
+
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
 	pkgbuildParser := syntax.NewParser(syntax.Variant(syntax.LangBash))
-	pkgbuildSyntax, err := pkgbuildParser.Parse(file, home+"/PKGBUILD")
 
+	pkgbuildSyntax, err := pkgbuildParser.Parse(file, filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	return pkgbuildSyntax, err
+	return pkgbuildSyntax, nil
 }
 
 // parseSyntaxFile parses the given pkgbuildSyntax and populates the pkgBuild object.
@@ -135,10 +131,6 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) e
 
 		return true
 	})
-
-	if err != nil {
-		return err
-	}
 
 	return err
 }

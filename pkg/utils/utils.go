@@ -87,14 +87,12 @@ Loop:
 
 	// check for errors
 	if err := resp.Err(); err != nil {
-		fmt.Printf("%s❌ :: %sDownload failed: %s\n%v\n",
+		log.Fatalf("%s❌ :: %sdownload failed: %s\n%v\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),
 			err,
 		)
-
-		os.Exit(1)
 	}
 
 	defer ticker.Stop()
@@ -120,11 +118,9 @@ func GOSetup() {
 
 	dlFile, err := os.Open(goArchivePath)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open %s\n",
+		log.Fatalf("%s❌ :: %sfailed to open %s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow), goArchivePath)
-
-		os.Exit(1)
 	}
 
 	err = Unarchive(dlFile, "/usr/lib")
@@ -169,7 +165,7 @@ func PullContainers(target string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Unarchive extracts files from an archive and saves them to a destination directory.
@@ -180,18 +176,11 @@ func PullContainers(target string) error {
 func Unarchive(archiveReader io.Reader, destination string) error {
 	format, archiveReader, _ := archiver.Identify("", archiveReader)
 
-	// dirMap is the list of files we want out of the archive; any directories will
-	// include all their contents unless we return fs.SkipDir from our handler
-	// (leave this nil to walk ALL files from the archive).
-	dirMap := map[string]bool{}
+	dirMap := make(map[string]bool)
 
-	// not sure if this should be a syncmap, or if a map is ok? not sure if the
-	// handler itself is invoked serially or if it is concurrent?
 	handler := func(ctx context.Context, archiveFile archiver.File) error {
 		fileName := archiveFile.NameInArchive
 		newPath := filepath.Join(destination, fileName)
-
-		var err error
 
 		if archiveFile.IsDir() {
 			dirMap[newPath] = true
@@ -204,46 +193,38 @@ func Unarchive(archiveReader io.Reader, destination string) error {
 
 		if !seenDir {
 			dirMap[fileDir] = true
-
-			// linux default for new directories is 777 and let the umask handle if
-			// should have other controls.
 			// #nosec
-			err = os.MkdirAll(fileDir, 0777)
-		}
-
-		if err != nil {
-			return err
+			return os.MkdirAll(fileDir, 0777)
 		}
 
 		cleanNewPath := filepath.Clean(newPath)
 
-		newFile, err := os.OpenFile(cleanNewPath, os.O_CREATE|os.O_WRONLY, archiveFile.Mode())
+		newFile, err := os.OpenFile(cleanNewPath,
+			os.O_CREATE|os.O_WRONLY,
+			archiveFile.Mode())
 		if err != nil {
 			return err
 		}
-
 		defer newFile.Close()
 
-		// copy file data into tar writer
 		archiveFileTemp, err := archiveFile.Open()
 		if err != nil {
 			return err
 		}
-
 		defer archiveFileTemp.Close()
 
-		if _, err := io.Copy(newFile, archiveFileTemp); err != nil {
-			return err
-		}
+		_, err = io.Copy(newFile, archiveFileTemp)
 
 		return err
 	}
 
-	// make sure the format is capable of extracting
 	ex, ok := format.(archiver.Extractor)
 	if !ok {
 		return nil
 	}
 
-	return ex.Extract(context.Background(), archiveReader, nil, handler)
+	return ex.Extract(context.Background(),
+		archiveReader,
+		nil,
+		handler)
 }

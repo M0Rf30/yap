@@ -48,8 +48,6 @@ func (p *Pacman) Build(artifactsPath string) error {
 // artifactsPath: the path where the package artifacts are located.
 // error: an error if the installation fails.
 func (p *Pacman) Install(artifactsPath string) error {
-	var err error
-
 	for _, arch := range p.PKGBUILD.Arch {
 		pkgName := p.PKGBUILD.PkgName + "-" +
 			p.PKGBUILD.PkgVer +
@@ -70,7 +68,7 @@ func (p *Pacman) Install(artifactsPath string) error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 // Prepare prepares the Pacman package by getting the dependencies using the PKGBUILD.
@@ -88,7 +86,7 @@ func (p *Pacman) Prepare(makeDepends []string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // PrepareEnvironment prepares the environment for the Pacman.
@@ -115,7 +113,7 @@ func (p *Pacman) PrepareEnvironment(golang bool) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Update updates the Pacman package manager.
@@ -128,7 +126,7 @@ func (p *Pacman) Update() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // pacmanBuild builds the package using makepkg command.
@@ -143,5 +141,5 @@ func (p *Pacman) pacmanBuild() error {
 		return err
 	}
 
-	return err
+	return nil
 }

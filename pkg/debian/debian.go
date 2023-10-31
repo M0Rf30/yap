@@ -65,7 +65,7 @@ func (d *Debian) createConfFiles() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // createDebconfTemplate creates a Debian package configuration file template.
@@ -86,7 +86,7 @@ func (d *Debian) createDebconfTemplate() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // createDebconfConfig creates a Debian configuration file.
@@ -106,7 +106,7 @@ func (d *Debian) createDebconfConfig() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // createScripts generates and writes the scripts for the Debian package.
@@ -114,8 +114,6 @@ func (d *Debian) createDebconfConfig() error {
 // It takes no parameters.
 // It returns an error if there was an issue generating or writing the scripts.
 func (d *Debian) createScripts() error {
-	var err error
-
 	scripts := map[string]string{
 		"preinst":  d.PKGBUILD.PreInst,
 		"postinst": d.PKGBUILD.PostInst,
@@ -146,7 +144,7 @@ func (d *Debian) createScripts() error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 // dpkgDeb generates Debian package files from the given artifact path.
@@ -175,7 +173,7 @@ func (d *Debian) dpkgDeb(artifactPath string) error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 // Prepare prepares the Debian package by installing its dependencies using apt-get.
@@ -193,7 +191,7 @@ func (d *Debian) Prepare(makeDepends []string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Strip strips binaries from the Debian package.
@@ -226,7 +224,7 @@ func (d *Debian) Strip() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Update updates the Debian package list.
@@ -243,7 +241,7 @@ func (d *Debian) Update() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // createDebResources creates the Debian package resources.
@@ -290,7 +288,7 @@ func (d *Debian) createDebResources() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Build builds the Debian package.
@@ -327,7 +325,7 @@ func (d *Debian) Build(artifactsPath string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 func (d *Debian) Install(artifactsPath string) error {
@@ -346,7 +344,7 @@ func (d *Debian) Install(artifactsPath string) error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 // PrepareEnvironment prepares the environment for the Debian package.
@@ -371,7 +369,7 @@ func (d *Debian) PrepareEnvironment(golang bool) error {
 		utils.GOSetup()
 	}
 
-	return err
+	return nil
 }
 
 func (d *Debian) getRelease() {

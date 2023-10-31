@@ -24,7 +24,7 @@ RUN \
     -modcacherw \
     -trimpath \
     -o /usr/bin/yap \
-    cmd/yap/main.go
+    cmd/yap/yap.go
 
 FROM docker.io/amazonlinux:2
 COPY --from=builder /usr/bin/yap /usr/bin/yap

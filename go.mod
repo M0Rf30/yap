@@ -8,6 +8,7 @@ require (
 	github.com/go-playground/validator/v10 v10.15.5
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
 	github.com/otiai10/copy v1.14.0
+	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
 	mvdan.cc/sh/v3 v3.7.0

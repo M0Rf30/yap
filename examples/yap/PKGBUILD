@@ -36,8 +36,7 @@ build() {
   go build \
     -buildvcs=false \
     -ldflags "-w -s" \
-    -o yap \
-    cmd/yap/main.go
+    cmd/yap/yap.go
 }
 
 package() {

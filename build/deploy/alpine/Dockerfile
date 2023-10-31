@@ -16,7 +16,7 @@ RUN \
     -modcacherw \
     -trimpath \
     -o /usr/bin/yap \
-    cmd/yap/main.go
+    cmd/yap/yap.go
 
 FROM docker.io/alpine:latest
 COPY --from=builder /usr/bin/yap /usr/bin/yap

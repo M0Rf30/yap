@@ -27,7 +27,7 @@ func Exec(dir, name string, arg ...string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // ExecOutput executes a command with the given arguments and returns its output as a string.
