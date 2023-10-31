@@ -75,7 +75,7 @@ func (r *Redhat) Build(artifactsPath string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Install installs the Redhat package to the specified artifacts path.
@@ -85,8 +85,6 @@ func (r *Redhat) Build(artifactsPath string) error {
 //
 // It returns an error if there was an issue during the installation process.
 func (r *Redhat) Install(artifactsPath string) error {
-	var err error
-
 	for _, arch := range r.PKGBUILD.Arch {
 		pkgName := r.PKGBUILD.PkgName +
 			"-" +
@@ -108,7 +106,7 @@ func (r *Redhat) Install(artifactsPath string) error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 // PrepareEnvironment prepares the environment for the Redhat struct.
@@ -134,7 +132,7 @@ func (r *Redhat) PrepareEnvironment(golang bool) error {
 		utils.GOSetup()
 	}
 
-	return err
+	return nil
 }
 
 // Prepare prepares the Redhat instance by installing the required dependencies.
@@ -152,7 +150,7 @@ func (r *Redhat) Prepare(makeDepends []string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Update updates the Redhat object.
@@ -160,9 +158,7 @@ func (r *Redhat) Prepare(makeDepends []string) error {
 // It takes no parameters.
 // It returns an error.
 func (r *Redhat) Update() error {
-	var err error
-
-	return err
+	return nil
 }
 
 // getFiles retrieves the files from the Redhat package directory and populates the PKGBUILD.Files field.
@@ -223,7 +219,7 @@ func (r *Redhat) getFiles() error {
 		r.PKGBUILD.Files = append(r.PKGBUILD.Files, pathInf)
 	}
 
-	return err
+	return nil
 }
 
 // getArch updates the architecture values in the Redhat struct.
@@ -287,7 +283,7 @@ func (r *Redhat) makeDirs() error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 // rpmBuild builds an RPM package using the Redhat package manager.
@@ -311,5 +307,5 @@ func (r *Redhat) rpmBuild() error {
 		return err
 	}
 
-	return err
+	return nil
 }

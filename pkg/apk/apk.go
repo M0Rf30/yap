@@ -50,7 +50,7 @@ func (a *Apk) Build(artifactsPath string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Install installs the APK package to the specified artifacts path.
@@ -58,8 +58,6 @@ func (a *Apk) Build(artifactsPath string) error {
 // It takes a string parameter `artifactsPath` which specifies the path where the artifacts are located.
 // It returns an error if there was an error during the installation process.
 func (a *Apk) Install(artifactsPath string) error {
-	var err error
-
 	for _, arch := range a.PKGBUILD.Arch {
 		pkgName := a.PKGBUILD.PkgName + "-" +
 			a.PKGBUILD.PkgVer +
@@ -80,7 +78,7 @@ func (a *Apk) Install(artifactsPath string) error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 // Prepare prepares the Apk by adding dependencies to the PKGBUILD file.
@@ -97,7 +95,7 @@ func (a *Apk) Prepare(makeDepends []string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // PrepareEnvironment prepares the build environment for APK packaging.
@@ -122,7 +120,7 @@ func (a *Apk) PrepareEnvironment(golang bool) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // Update updates the APK package manager's package database.
@@ -133,7 +131,7 @@ func (a *Apk) Update() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // apkBuild compiles the APK package using 'abuild-keygen' and 'abuild'.
@@ -157,7 +155,7 @@ func (a *Apk) apkBuild(artifactsPath string) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // makePackerDir creates the necessary directories for the Apk struct.
@@ -177,5 +175,5 @@ func (a *Apk) makePackerDir() error {
 		return err
 	}
 
-	return err
+	return nil
 }
