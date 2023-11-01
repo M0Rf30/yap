@@ -166,6 +166,7 @@ func (d *Debian) dpkgDeb(artifactPath string) error {
 		err = utils.Exec("",
 			"dpkg-deb",
 			"-b",
+			"-Zzstd",
 			d.PKGBUILD.PackageDir, artifactFilePath)
 
 		if err != nil {
