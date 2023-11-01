@@ -11,7 +11,7 @@ import (
 
 const examplePkgbuild = `
 pkgname="httpserver"
-pkgver="1.1"
+pkgver="1.0"
 pkgrel="1"
 pkgdesc="Http file server written with Go"
 pkgdesc__debian="Http file server written with Go for Debian"
