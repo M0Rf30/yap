@@ -52,11 +52,10 @@ pkgver={{.PkgVer}}
 pkgrel={{.PkgRel}}
 pkgdesc="{{.PkgDesc}}"
 arch="all"
-{{- with .Depends}}
-depends="{{join .}}"
-{{- end }}
-{{- with .Conflicts}}
-conflicts=({{join .}})
+{{- if .Depends}}
+depends="
+{{ range .Depends }}{{ . }} 
+{{ end }}"
 {{- end }}
 {{- if .URL}}
 url="{{.URL}}"

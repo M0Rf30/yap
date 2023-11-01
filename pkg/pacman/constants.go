@@ -56,33 +56,58 @@ epoch={{.Epoch}}
 pkgver={{.PkgVer}}
 pkgrel={{.PkgRel}}
 pkgdesc="{{.PkgDesc}}"
-{{- with .Arch}}
-arch=({{join .}})
+{{- if .Arch}}
+arch=(
+  {{ range .Arch }}"{{ . }}"
+  {{ end }}
+)
 {{- end }}
-{{- with .Depends}}
-depends=({{join .}})
+{{- if .Depends}}
+depends=(
+  {{ range .Depends }}"{{ . }}"
+  {{ end }}
+)
 {{- end }}
-{{- with .OptDepends}}
-optdepends=({{join .}})
+{{- if .OptDepends}}
+optdepends=(
+  {{ range .OptDepends }}"{{ . }}"
+  {{ end }}
+)
 {{- end }}
+
 {{- /* Optional fields */ -}}
-{{- with .Provides}}
-provides=({{join .}})
+{{- if .Provides}}
+provides=(
+  {{ range .Provides }}"{{ . }}"
+  {{ end }}
+)
 {{- end }}
-{{- with .Conflicts}}
-conflicts=({{join .}})
+{{- if .Conflicts}}
+conflicts=(
+  {{ range .Conflicts }}"{{ . }}"
+  {{ end }}
+)
 {{- end }}
 {{- if .URL}}
 url="{{.URL}}"
 {{- end }}
 {{- if .Backup}}
-backup=("{{join .}}")
+backup=(
+  {{ range .Backup }}"{{ . }}"
+  {{ end }}
+)
 {{- end }}
-{{- with .License}}
-license=({{join .}})
+{{- if .License}}
+license=(
+  {{ range .License }}"{{ . }}"
+  {{ end }}
+)
 {{- end }}
-{{- with .Options}}
-options=({{join .}})
+{{- if .Options}}
+options=(
+  {{ range .Options }}"{{ . }}"
+  {{ end }}
+)
 {{- end }}
 install={{.PkgName}}.install
 
