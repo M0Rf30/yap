@@ -8,9 +8,12 @@ pkgdesc__debian="Package software with ease for Debian"
 pkgdesc__fedora="Package software with ease for Fedora"
 pkgdesc__rocky="Package software with ease for Rocky"
 pkgdesc__ubuntu="Package software with ease for Ubuntu"
-maintainer="Example <example@yap.org>"
+maintainer="The Yap Packager <packager@yap.org>"
+copyright=(
+  "2023, The Yap Project <https://github.com/M0Rf30/yap>"
+)
 arch=('x86_64')
-license=('GPLv3')
+license=('GPL-3.0-only')
 section=misc
 priority=optional
 url="https://github.com/M0Rf30/${pkgname}"
@@ -57,7 +60,7 @@ package() {
     "${pkgdir}/usr/share/fish/vendor_completions.d/${pkgname}.fish"
 
   install -Dm 644 -t \
-    "${pkgdir}/usr/share/licenses/${pkgname}/GPL3" LICENSE.md
+    "${pkgdir}/usr/share/licenses/${pkgname}" LICENSE.md
   install -Dm 644 -t \
     "${pkgdir}/usr/share/doc/${pkgname}" README.md
 }

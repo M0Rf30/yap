@@ -1,4 +1,4 @@
-package debian
+package dpkg
 
 import (
 	"bytes"
@@ -16,33 +16,33 @@ import (
 	"github.com/otiai10/copy"
 )
 
-// Debian represents a Debian package.
+// Deb represents a Deb package.
 //
 // It contains the directory path of the package and the PKGBUILD struct, which
 // contains the metadata and build instructions for the package.
-type Debian struct {
+type Deb struct {
 	debDir   string
 	PKGBUILD *pkgbuild.PKGBUILD
 }
 
-// getArch updates the architecture field in the Debian struct.
+// getArch updates the architecture field in the Deb struct.
 //
-// It iterates over the architecture values in the PKGBUILD field of the Debian struct
-// and replaces them with the corresponding values from the DebianArchs map.
-func (d *Debian) getArch() {
+// It iterates over the architecture values in the PKGBUILD field of the Deb struct
+// and replaces them with the corresponding values from the DebArchs map.
+func (d *Deb) getArch() {
 	for index, arch := range d.PKGBUILD.Arch {
-		d.PKGBUILD.Arch[index] = DebianArchs[arch]
+		d.PKGBUILD.Arch[index] = DebArchs[arch]
 	}
 }
 
-// createConfFiles creates the conffiles file in the Debian package.
+// createConfFiles creates the conffiles file in the Deb package.
 //
 // It iterates over the Backup field of the PKGBUILD struct and adds each name
 // to the data string. The data string is then written to the conffiles file
 // located at the debDir path.
 //
 // Returns an error if there was a problem creating or writing to the file.
-func (d *Debian) createConfFiles() error {
+func (d *Deb) createConfFiles() error {
 	var err error
 	if len(d.PKGBUILD.Backup) == 0 {
 		return err
@@ -68,11 +68,21 @@ func (d *Debian) createConfFiles() error {
 	return nil
 }
 
-// createDebconfTemplate creates a Debian package configuration file template.
+func (d *Deb) createCopyrightFile() error {
+	if len(d.PKGBUILD.License) == 0 {
+		return nil
+	}
+
+	copyrightFilePath := filepath.Join(d.debDir, "copyright")
+
+	return d.PKGBUILD.CreateSpec(copyrightFilePath, copyrightFile)
+}
+
+// createDebconfTemplate creates a Deb package configuration file template.
 //
 // It does not take any parameters.
 // It returns an error if there was an issue creating the template.
-func (d *Debian) createDebconfTemplate() error {
+func (d *Deb) createDebconfTemplate() error {
 	var err error
 	if d.PKGBUILD.DebTemplate == "" {
 		return err
@@ -89,10 +99,10 @@ func (d *Debian) createDebconfTemplate() error {
 	return nil
 }
 
-// createDebconfConfig creates a Debian configuration file.
+// createDebconfConfig creates a Deb configuration file.
 //
 // It takes no parameters and returns an error.
-func (d *Debian) createDebconfConfig() error {
+func (d *Deb) createDebconfConfig() error {
 	var err error
 	if d.PKGBUILD.DebConfig == "" {
 		return err
@@ -109,11 +119,11 @@ func (d *Debian) createDebconfConfig() error {
 	return nil
 }
 
-// createScripts generates and writes the scripts for the Debian package.
+// createScripts generates and writes the scripts for the Deb package.
 //
 // It takes no parameters.
 // It returns an error if there was an issue generating or writing the scripts.
-func (d *Debian) createScripts() error {
+func (d *Deb) createScripts() error {
 	scripts := map[string]string{
 		"preinst":  d.PKGBUILD.PreInst,
 		"postinst": d.PKGBUILD.PostInst,
@@ -147,14 +157,14 @@ func (d *Debian) createScripts() error {
 	return nil
 }
 
-// dpkgDeb generates Debian package files from the given artifact path.
+// dpkgDeb generates Deb package files from the given artifact path.
 //
 // It takes a string parameter `artifactPath` which represents the path where the
-// Debian package files will be generated.
+// Deb package files will be generated.
 //
-// The function returns an error if there was an issue generating the Debian package
+// The function returns an error if there was an issue generating the Deb package
 // files.
-func (d *Debian) dpkgDeb(artifactPath string) error {
+func (d *Deb) dpkgDeb(artifactPath string) error {
 	var err error
 
 	for _, arch := range d.PKGBUILD.Arch {
@@ -177,11 +187,11 @@ func (d *Debian) dpkgDeb(artifactPath string) error {
 	return nil
 }
 
-// Prepare prepares the Debian package by installing its dependencies using apt-get.
+// Prepare prepares the Deb package by installing its dependencies using apt-get.
 //
 // makeDepends: a slice of strings representing the dependencies to be installed.
 // Returns an error if there was a problem installing the dependencies.
-func (d *Debian) Prepare(makeDepends []string) error {
+func (d *Deb) Prepare(makeDepends []string) error {
 	args := []string{
 		"--assume-yes",
 		"install",
@@ -195,11 +205,11 @@ func (d *Debian) Prepare(makeDepends []string) error {
 	return nil
 }
 
-// Strip strips binaries from the Debian package.
+// Strip strips binaries from the Deb package.
 //
 // It does not take any parameters.
 // It returns an error if there is any issue during stripping.
-func (d *Debian) Strip() error {
+func (d *Deb) Strip() error {
 	var err error
 
 	var tmplBytesBuffer bytes.Buffer
@@ -228,15 +238,15 @@ func (d *Debian) Strip() error {
 	return nil
 }
 
-// Update updates the Debian package list.
+// Update updates the Deb package list.
 //
-// It calls the GetUpdates method of the PKGBUILD field of the Debian struct
+// It calls the GetUpdates method of the PKGBUILD field of the Deb struct
 // to retrieve any updates using the "apt-get" command and the "update" argument.
 // If an error occurs during the update, it is returned.
 //
 // Returns:
 // - error: An error if the update fails.
-func (d *Debian) Update() error {
+func (d *Deb) Update() error {
 	err := d.PKGBUILD.GetUpdates("apt-get", "update")
 	if err != nil {
 		return err
@@ -245,16 +255,16 @@ func (d *Debian) Update() error {
 	return nil
 }
 
-// createDebResources creates the Debian package resources.
+// createDebResources creates the Deb package resources.
 //
-// It creates the necessary directories and files for the Debian package.
+// It creates the necessary directories and files for the Deb package.
 // It also sets the installed size of the package based on the size of the package directory.
 // It generates the control file for the package.
 // It creates the scripts for the package.
 // It creates the debconf template file.
 // It creates the debconf config file.
 // It returns an error if any of the operations fail.
-func (d *Debian) createDebResources() error {
+func (d *Deb) createDebResources() error {
 	d.debDir = filepath.Join(d.PKGBUILD.PackageDir, "DEBIAN")
 	err := utils.ExistsMakeDir(d.debDir)
 
@@ -270,6 +280,11 @@ func (d *Debian) createDebResources() error {
 	d.PKGBUILD.InstalledSize, _ = utils.GetDirSize(d.PKGBUILD.PackageDir)
 
 	err = d.PKGBUILD.CreateSpec(filepath.Join(d.debDir, "control"), specFile)
+	if err != nil {
+		return err
+	}
+
+	err = d.createCopyrightFile()
 	if err != nil {
 		return err
 	}
@@ -292,10 +307,10 @@ func (d *Debian) createDebResources() error {
 	return nil
 }
 
-// Build builds the Debian package.
+// Build builds the Deb package.
 //
 // It takes the artifactsPath as a parameter and returns an error if any.
-func (d *Debian) Build(artifactsPath string) error {
+func (d *Deb) Build(artifactsPath string) error {
 	var err error
 
 	d.getArch()
@@ -329,7 +344,7 @@ func (d *Debian) Build(artifactsPath string) error {
 	return nil
 }
 
-func (d *Debian) Install(artifactsPath string) error {
+func (d *Deb) Install(artifactsPath string) error {
 	var err error
 
 	for _, arch := range d.PKGBUILD.Arch {
@@ -348,11 +363,11 @@ func (d *Debian) Install(artifactsPath string) error {
 	return nil
 }
 
-// PrepareEnvironment prepares the environment for the Debian package.
+// PrepareEnvironment prepares the environment for the Deb package.
 //
 // It takes a boolean parameter `golang` which indicates whether or not to set up Go.
 // It returns an error if there was a problem during the environment preparation.
-func (d *Debian) PrepareEnvironment(golang bool) error {
+func (d *Deb) PrepareEnvironment(golang bool) error {
 	var err error
 
 	args := []string{
@@ -373,7 +388,7 @@ func (d *Debian) PrepareEnvironment(golang bool) error {
 	return nil
 }
 
-func (d *Debian) getRelease() {
+func (d *Deb) getRelease() {
 	if d.PKGBUILD.Codename != "" {
 		d.PKGBUILD.PkgRel += d.PKGBUILD.Codename
 	} else {

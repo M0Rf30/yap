@@ -10,6 +10,7 @@ import (
 
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/utils"
+	"github.com/github/go-spdx/v2/spdxexp"
 )
 
 // Verbose is a flag to enable verbose output.
@@ -23,6 +24,7 @@ type PKGBUILD struct {
 	Backup         []string
 	Build          string
 	Conflicts      []string
+	Copyright      []string
 	DebConfig      string
 	DebTemplate    string
 	Depends        []string
@@ -168,8 +170,25 @@ func (pkgBuild *PKGBUILD) Init() {
 // Validate checks that mandatory items are correctly provided by the PKGBUILD
 // file.
 func (pkgBuild *PKGBUILD) Validate() {
+	var isValid = true
+
+	if !pkgBuild.validateLicense() {
+		isValid = false
+
+		fmt.Printf("%s%s ❌ :: %sinvalid SPDX license identifier%s\n",
+			pkgBuild.PkgName,
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite))
+
+		fmt.Println("You can find valid SPDX license identifiers here")
+		fmt.Println("🌐 https://spdx.org/licenses/")
+	}
+
 	if len(pkgBuild.SourceURI) != len(pkgBuild.HashSums) {
-		log.Fatalf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
+		isValid = false
+
+		fmt.Printf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
 			pkgBuild.PkgName,
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
@@ -177,11 +196,17 @@ func (pkgBuild *PKGBUILD) Validate() {
 	}
 
 	if pkgBuild.Package == "" {
-		log.Fatalf("%s%s ❌ :: %smissing package() function%s\n",
+		isValid = false
+
+		fmt.Printf("%s%s ❌ :: %smissing package() function%s\n",
 			pkgBuild.PkgName,
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
+	}
+
+	if !isValid {
+		os.Exit(1)
 	}
 }
 
@@ -191,6 +216,8 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 	switch key {
 	case "arch":
 		pkgBuild.Arch = data.([]string)
+	case "copyright":
+		pkgBuild.Copyright = data.([]string)
 	case "license":
 		pkgBuild.License = data.([]string)
 	case "depends":
@@ -258,6 +285,7 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	case "pkgdesc":
 		pkgBuild.PkgDesc = data.(string)
 	case "maintainer":
+		err = os.Setenv(key, data.(string))
 		pkgBuild.Maintainer = data.(string)
 	case "section":
 		pkgBuild.Section = data.(string)
@@ -295,7 +323,7 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 
 	// If there are more than two elements in the split array, return an error.
 	if len(split) != 2 {
-		return key, 0, fmt.Errorf("pack: Invalid use of '__' directive in '%w'", nil)
+		return key, 0, fmt.Errorf("invalid use of '__' directive in '%w'", nil)
 	}
 
 	// If the FullDistroName is empty, return the key and a priority of 0.
@@ -345,4 +373,15 @@ func (pkgBuild *PKGBUILD) setMainFolders() {
 			string(constants.ColorBlue),
 			string(constants.ColorYellow))
 	}
+}
+
+// validateLicense validates the license of the PKGBUILD.
+//
+// It takes no parameters and returns a boolean indicating whether the license
+// is valid, and a slice of strings containing any errors encountered during
+// validation.
+func (pkgBuild *PKGBUILD) validateLicense() bool {
+	isValid, _ := spdxexp.ValidateLicenses(pkgBuild.License)
+
+	return isValid
 }

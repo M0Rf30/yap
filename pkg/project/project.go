@@ -87,7 +87,7 @@ func (mpc *MultipleProject) BuildAll() error {
 	}
 
 	for _, proj := range mpc.Projects {
-		fmt.Printf("%s🚀 :: %sMaking package: %s%s %s-%s\n",
+		fmt.Printf("%s🚀 :: %sMaking package: %s\t%s %s-%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),

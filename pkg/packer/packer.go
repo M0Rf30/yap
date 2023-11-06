@@ -5,10 +5,10 @@ import (
 
 	"github.com/M0Rf30/yap/pkg/apk"
 	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/debian"
+	"github.com/M0Rf30/yap/pkg/dpkg"
 	"github.com/M0Rf30/yap/pkg/pacman"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/redhat"
+	"github.com/M0Rf30/yap/pkg/rpm"
 )
 
 // Packer is the common interface implemented by all package managers.
@@ -47,11 +47,11 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 			PKGBUILD: pkgBuild,
 		}
 	case "debian":
-		return &debian.Debian{
+		return &dpkg.Deb{
 			PKGBUILD: pkgBuild,
 		}
 	case "redhat":
-		return &redhat.Redhat{
+		return &rpm.RPM{
 			PKGBUILD: pkgBuild,
 		}
 	default:
