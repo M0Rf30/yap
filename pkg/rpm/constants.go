@@ -1,4 +1,4 @@
-package redhat
+package rpm
 
 const (
 	Communications = "Applications/Communications"
@@ -102,6 +102,8 @@ License: CUSTOM
 {{- if .Maintainer}}
 Packager: {{.Maintainer}}
 {{- end }}
+{{- if .Copyright}}
+Vendor: {{ range .Copyright}}{{ . }}; {{ end }}{{- end }}
 {{- with .Provides}}
 Provides: {{join .}}
 {{- end }}

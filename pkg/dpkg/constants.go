@@ -1,4 +1,4 @@
-package debian
+package dpkg
 
 var buildEnvironmentDeps = []string{
 	"build-essential",
@@ -7,7 +7,7 @@ var buildEnvironmentDeps = []string{
 	"ca-certificates",
 }
 
-var DebianArchs = map[string]string{
+var DebArchs = map[string]string{
 	"any":     "all",
 	"x86_64":  "amd64",
 	"i686":    "386",
@@ -21,7 +21,6 @@ const specFile = `
 {{- /* Mandatory fields */ -}}
 Package: {{.PkgName}}
 Version: {{ if .Epoch}}{{ .Epoch }}:{{ end }}{{.PkgVer}}
-         {{- if .PreRelease}}~{{ .PreRelease }}{{- end }}
          {{- if .PkgRel}}-{{ .PkgRel }}{{- end }}
 Section: {{.Section}}
 Priority: {{.Priority}}
@@ -54,4 +53,20 @@ case $1 in
     purge|remove|abort-install) ;;
     *) exit;;
 esac
+`
+
+const copyrightFile = `Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: {{.PkgName}}
+Upstream-Contact: {{.Maintainer}}
+{{- if .URL}}
+Source: {{.URL}}
+{{- end }}
+Files: *
+{{- if .Copyright}}
+Copyright: {{ range .Copyright}}{{ . }}
+           {{ end }}{{- end }}
+{{- if .License}}
+{{- range .License}}
+License: {{ . }}{{- end }}
+{{- end }}
 `
