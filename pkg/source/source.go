@@ -70,7 +70,7 @@ func (src *Source) Get() error {
 		return errors.New("unsupported source type")
 	}
 
-	if err := src.validate(sourceFilePath); err != nil {
+	if err := src.validateSource(sourceFilePath); err != nil {
 		return err
 	}
 
@@ -85,11 +85,12 @@ func (src *Source) Get() error {
 	return nil
 }
 
-// extract is a function that extracts a source file to a specified directory.
+// extract extracts the contents of a source file to the specified source
+// directory.
 //
-// It takes no parameters.
-// It returns an error if there was a problem opening the source file or
-// extracting it.
+// sourceFilePath: The path to the source file to be extracted. Returns: An
+// error if there was a problem opening the source file or extracting its
+// contents.
 func (src *Source) extract(sourceFilePath string) error {
 	dlFile, err := os.Open(filepath.Clean(sourceFilePath))
 	if err != nil {
@@ -200,17 +201,17 @@ func (src *Source) symlinkSources(symlinkSource string) error {
 	return nil
 }
 
-// validate checks the integrity of the source files.
+// validateSource checks the integrity of the source files.
 //
 // It takes the source file path as a parameter and returns an error if any.
-func (src *Source) validate(sourceFilePath string) error {
+func (src *Source) validateSource(sourceFilePath string) error {
 	info, err := os.Stat(sourceFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file for hash: %w", err)
 	}
 
 	if src.Hash == "SKIP" || info.IsDir() {
-		fmt.Printf("%s:: %sSkip integrity check for %s%s\n",
+		fmt.Printf("%s:: %sSkip integrity check for %s\t%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),
@@ -247,7 +248,7 @@ func (src *Source) validate(sourceFilePath string) error {
 		return errors.Wrapf(errors.New("hash verification failed"), src.SourceItemPath)
 	}
 
-	fmt.Printf("%s:: %sintegrity check for %s%s\n",
+	fmt.Printf("%s:: %sintegrity check for %s\t%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite),
