@@ -2,7 +2,7 @@ package rpm
 
 import (
 	"fmt"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"strings"
 
@@ -161,12 +161,22 @@ func (r *RPM) Update() error {
 	return nil
 }
 
-// getFiles retrieves the files from the RPM package directory and populates the PKGBUILD.Files field.
+// getFiles retrieves a list of files from the RPM struct.
 //
-// It iterates over the files in the package directory and adds them to the PKGBUILD.Files slice.
-// It also handles the backup paths specified in the PKGBUILD.Backup field.
+// This function iterates over the list of backup paths in the PKGBUILD struct
+// and adds them to the "backup" set. It then uses filepath.WalkDir to walk
+// through the files in the PKGBUILD.PackageDir directory. For each file, it
+// checks if it is a directory or a regular file. If it is a directory, it
+// checks if it is an empty directory and adds it to the "files" list if it is.
+// If it is a regular file, it adds it to the "files" list. After collecting all
+// the file paths, it removes the parent directories of each file path from the
+// "paths" set and adds the remaining file paths to the "PKGBUILD.Files" list in
+// the RPM struct. If a file path is found in the "backup" set, it is marked as
+// a config file and its path is prefixed with "%config". Finally, it returns
+// nil, indicating that no error occurred.
 //
-// Returns an error if there is any issue while walking the directory or retrieving the files.
+// No parameters.
+// Returns an error if there was an issue retrieving the files.
 func (r *RPM) getFiles() error {
 	backup := set.NewSet()
 	paths := set.NewSet()
@@ -181,14 +191,22 @@ func (r *RPM) getFiles() error {
 
 	var files []string
 
-	err := filepath.Walk(r.PKGBUILD.PackageDir,
-		func(path string,
-			info os.FileInfo, err error) error {
-			if !info.IsDir() {
+	err := filepath.WalkDir(r.PKGBUILD.PackageDir,
+		func(path string, dirEntry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if dirEntry.IsDir() {
+				isEmptyDir := utils.IsEmptyDir(path, dirEntry)
+				if isEmptyDir {
+					files = append(files, path)
+				}
+			} else {
 				files = append(files, path)
 			}
 
-			return err
+			return nil
 		})
 
 	if err != nil {
