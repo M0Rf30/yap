@@ -145,6 +145,26 @@ func GetDirSize(path string) (int64, error) {
 	return size, err
 }
 
+// IsEmptyDir checks if a directory is empty.
+//
+// It takes in two parameters: path, a string representing the directory path,
+// and dirEntry, an os.DirEntry representing the directory entry. It returns a
+// boolean value indicating whether the directory is empty or not.
+func IsEmptyDir(path string, dirEntry os.DirEntry) bool {
+	cleanFilePath := filepath.Clean(path)
+
+	if !dirEntry.IsDir() {
+		return false
+	}
+
+	entries, err := os.ReadDir(cleanFilePath)
+	if err != nil {
+		return false
+	}
+
+	return len(entries) == 0
+}
+
 // MkdirAll creates a directory and all its parent directories.
 //
 // It takes a string parameter `path` which represents the path of the directory to be created.
