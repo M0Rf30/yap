@@ -16,7 +16,6 @@ var buildEnvironmentDeps = []string{
 	"gcc-c++",
 	"make",
 	"openssl",
-	"rpm-build",
 	"rpm-sign",
 	"which",
 }
