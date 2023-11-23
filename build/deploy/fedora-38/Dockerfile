@@ -29,7 +29,11 @@ RUN \
 FROM docker.io/fedora:38
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
-  dnf -y install bash-completion sudo; \
+  dnf -y install \
+    bash-completion \
+    ca-certificates \
+    rpm-build \
+    sudo; \
   yap completion bash > /etc/bash_completion.d/yap; \
   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \
   dnf clean all
