@@ -375,12 +375,24 @@ func (pkgBuild *PKGBUILD) setMainFolders() {
 	}
 }
 
-// validateLicense validates the license of the PKGBUILD.
+// validateLicense checks if the license of the PKGBUILD is valid.
 //
-// It takes no parameters and returns a boolean indicating whether the license
-// is valid, and a slice of strings containing any errors encountered during
-// validation.
+// This function takes no parameters.
+//
+// It first checks if the license is either "PROPRIETARY" or "CUSTOM". If it is,
+// the function returns true, indicating that the license is valid.
+//
+// If the license is not one of the above, the function uses the spdxexp package
+// to validate the license.
+//
+// Returns a boolean indicating if the license is valid.
 func (pkgBuild *PKGBUILD) validateLicense() bool {
+	for _, license := range pkgBuild.License {
+		if license == "PROPRIETARY" || license == "CUSTOM" {
+			return true
+		}
+	}
+
 	isValid, _ := spdxexp.ValidateLicenses(pkgBuild.License)
 
 	return isValid
