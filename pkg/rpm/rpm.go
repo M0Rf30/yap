@@ -224,17 +224,19 @@ func (r *RPM) getFiles() error {
 	}
 
 	for pathInf := range paths.Iter() {
-		if !strings.HasPrefix(pathInf, "/") {
-			pathInf = "/" + pathInf
-		}
+		if pathInf != "" {
+			if !strings.HasPrefix(pathInf, "/") {
+				pathInf = "/" + pathInf
+			}
 
-		if backup.Contains(pathInf) {
-			pathInf = `%config "` + pathInf + `"`
-		} else {
-			pathInf = `"` + pathInf + `"`
-		}
+			if backup.Contains(pathInf) {
+				pathInf = `%config "` + pathInf + `"`
+			} else {
+				pathInf = `"` + pathInf + `"`
+			}
 
-		r.PKGBUILD.Files = append(r.PKGBUILD.Files, pathInf)
+			r.PKGBUILD.Files = append(r.PKGBUILD.Files, pathInf)
+		}
 	}
 
 	return nil
