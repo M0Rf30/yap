@@ -41,6 +41,9 @@ Depends: {{join .}}
 {{- with .Conflicts}}
 Conflicts: {{join .}}
 {{- end }}
+{{- with .Replaces}}
+Replaces: {{join .}}
+{{- end }}
 {{- if .URL}}
 Homepage: {{.URL}}
 {{- end }}

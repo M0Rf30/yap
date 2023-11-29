@@ -23,6 +23,7 @@ type PKGBUILD struct {
 	Arch           []string
 	Backup         []string
 	Build          string
+	Codename       string
 	Conflicts      []string
 	Copyright      []string
 	DebConfig      string
@@ -51,18 +52,18 @@ type PKGBUILD struct {
 	PostInst       string
 	PostRm         string
 	PreInst        string
+	Prepare        string
 	PreRelease     string
 	PreRm          string
-	Prepare        string
+	priorities     map[string]int
 	Priority       string
 	Provides       []string
-	Codename       string
-	StartDir       string
+	Replaces       []string
 	Section        string
 	SourceDir      string
 	SourceURI      []string
+	StartDir       string
 	URL            string
-	priorities     map[string]int
 }
 
 // AddItem adds an item to the PKGBUILD.
@@ -232,6 +233,8 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 		pkgBuild.Provides = data.([]string)
 	case "conflicts":
 		pkgBuild.Conflicts = data.([]string)
+	case "replaces":
+		pkgBuild.Replaces = data.([]string)
 	case "source":
 		pkgBuild.SourceURI = data.([]string)
 	case "sha256sums":
