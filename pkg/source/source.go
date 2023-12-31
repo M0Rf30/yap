@@ -248,7 +248,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return errors.Wrapf(errors.New("hash verification failed"), src.SourceItemPath)
 	}
 
-	fmt.Printf("%s:: %sintegrity check for %s\t%s\n",
+	fmt.Printf("%s:: %sIntegrity check for %s\t%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite),

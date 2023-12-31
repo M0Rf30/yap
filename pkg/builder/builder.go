@@ -37,7 +37,7 @@ func (builder *Builder) Compile() error {
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
 
-	err = builder.build()
+	err = builder.processFunction(builder.PKGBUILD.Build)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (builder *Builder) Compile() error {
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
 
-	err = builder.Package()
+	err = builder.processFunction(builder.PKGBUILD.Package)
 	if err != nil {
 		return err
 	}
@@ -55,21 +55,12 @@ func (builder *Builder) Compile() error {
 	return nil
 }
 
-// Package executes the instructions provided by a single project package()
-// function. It returns any error if occurred.
-func (builder *Builder) Package() error {
-	err := RunScript(builder.PKGBUILD.Package)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// build executes a set of instructions provided by a project build function. If
-// there is an error during execution, it returns the error.
-func (builder *Builder) build() error {
-	err := RunScript(builder.PKGBUILD.Build)
+// processFunction is a function that processes a pkgbuildFunction.
+//
+// It takes a pkgbuildFunction string as a parameter and runs it as a script.
+// It returns an error if the script encounters any issues.
+func (builder *Builder) processFunction(pkgbuildFunction string) error {
+	err := RunScript("  set -e\n" + pkgbuildFunction)
 	if err != nil {
 		return err
 	}
