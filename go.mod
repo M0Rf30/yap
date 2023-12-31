@@ -1,6 +1,6 @@
 module github.com/M0Rf30/yap
 
-go 1.19
+go 1.21
 
 require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
