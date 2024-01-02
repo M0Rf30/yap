@@ -21,7 +21,13 @@ var (
 	NoCache                      bool
 	SkipSyncFlag                 bool
 	SkipSyncBuildEnvironmentDeps bool
-	UntilPkgName                 string
+)
+
+// FromPkgName is used to start the build process from a specific package.
+// ToPkgName is used to stop the build process after a specific package.
+var (
+	FromPkgName string
+	ToPkgName   string
 )
 
 // DistroProject is an interface that defines the methods for creating and
@@ -43,7 +49,7 @@ type DistroProject interface {
 // with multiple projects. The methods include building all the projects,
 // finding a package in the projects, and creating packages for each project.
 // The MultipleProject struct also contains the output directory for the
-// packages and the UntilPkgName field, which can be used to stop the build
+// packages and the ToPkgName field, which can be used to stop the build
 // process after a specific package.
 type MultipleProject struct {
 	makeDepends    []string
@@ -79,14 +85,16 @@ type Project struct {
 //
 // It compiles each project's package and creates the necessary packages.
 // If the project has to be installed, it installs the package.
-// If UntilPkgName is not empty, it stops building after the specified package.
+// If ToPkgName is not empty, it stops building after the specified package.
 // It returns an error if any error occurs during the build process.
 func (mpc *MultipleProject) BuildAll() error {
-	if UntilPkgName != "" {
-		mpc.findPackageInProjects()
-	}
+	mpc.checkPkgsRange(FromPkgName, ToPkgName)
 
 	for _, proj := range mpc.Projects {
+		if FromPkgName != "" && proj.Builder.PKGBUILD.PkgName != FromPkgName {
+			continue
+		}
+
 		fmt.Printf("%s🚀 :: %sMaking package: %s\t%s %s-%s\n",
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
@@ -120,7 +128,7 @@ func (mpc *MultipleProject) BuildAll() error {
 			}
 		}
 
-		if UntilPkgName != "" && proj.Builder.PKGBUILD.PkgName == UntilPkgName {
+		if ToPkgName != "" && proj.Builder.PKGBUILD.PkgName == ToPkgName {
 			return nil
 		}
 	}
@@ -196,6 +204,33 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	return nil
 }
 
+// checkPkgsRange checks the range of packages from `fromPkgName` to `toPkgName`.
+//
+// It takes two parameters:
+// - fromPkgName: string representing the name of the starting package.
+// - toPkgName: string representing the name of the ending package.
+func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
+	var firstIndex, lastIndex int
+
+	if fromPkgName != "" {
+		firstIndex = mpc.findPackageInProjects(fromPkgName)
+	}
+
+	if toPkgName != "" {
+		lastIndex = mpc.findPackageInProjects(toPkgName)
+	}
+
+	if fromPkgName != "" && toPkgName != "" && firstIndex > lastIndex {
+		log.Fatalf("%s❌ :: %sInvalid package order: %s%s should be built before %s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite),
+			toPkgName,
+			fromPkgName,
+		)
+	}
+}
+
 // createPackages creates packages for the MultipleProject.
 //
 // It takes a pointer to a MultipleProject as a receiver and a pointer to a Project as a parameter.
@@ -221,17 +256,19 @@ func (mpc *MultipleProject) createPackages(proj *Project) error {
 	return nil
 }
 
-// findPackageInProjects searches for a package in the MultipleProject struct.
+// findPackageInProjects finds a package in the MultipleProject struct.
 //
-// It iterates over the Projects slice and checks if the package name matches
-// the value of UntilPkgName. If a match is found, it sets the matchFound variable
-// to true. If no match is found, it prints an error message and exits the program.
-func (mpc *MultipleProject) findPackageInProjects() {
+// pkgName: the name of the package to find.
+// int: the index of the package if found, else -1.
+func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 	var matchFound bool
 
-	for _, proj := range mpc.Projects {
-		if UntilPkgName == proj.Builder.PKGBUILD.PkgName {
+	var index int
+
+	for i, proj := range mpc.Projects {
+		if pkgName == proj.Builder.PKGBUILD.PkgName {
 			matchFound = true
+			index = i
 		}
 	}
 
@@ -240,9 +277,11 @@ func (mpc *MultipleProject) findPackageInProjects() {
 			string(constants.ColorBlue),
 			string(constants.ColorYellow),
 			string(constants.ColorWhite),
-			UntilPkgName,
+			pkgName,
 		)
 	}
+
+	return index
 }
 
 // getMakeDeps retrieves the make dependencies for the MultipleProject.
