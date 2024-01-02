@@ -72,8 +72,10 @@ func init() {
 		"override-pkgver", "p", "", "Override package version (pkgver)")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncFlag,
 		"skip-sync", "s", false, "Skip sync with remotes for package managers")
-	buildCmd.Flags().StringVarP(&project.UntilPkgName,
-		"until", "u", "", "Build until a defined package name")
+	buildCmd.Flags().StringVarP(&project.FromPkgName,
+		"from", "", "", "Build starting from a defined package name")
+	buildCmd.Flags().StringVarP(&project.ToPkgName,
+		"to", "", "", "Build until a defined package name")
 	buildCmd.PersistentFlags().BoolVarP(&pkgbuild.Verbose,
-		"verbose", "v", false, "verbose output")
+		"verbose", "v", false, "Verbose output")
 }
