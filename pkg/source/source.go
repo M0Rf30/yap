@@ -14,13 +14,12 @@ import (
 
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/utils"
-	ggit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/pkg/errors"
 )
 
-const (
-	git = "git"
+var (
+	SSHPassword string
 )
 
 // Source defines all the fields accepted by a source item.
@@ -33,6 +32,8 @@ type Source struct {
 	// RefValue is the reference value for a VCS fragment declared in the URI. i.e:
 	// myfile::git+https://example.com/example.git#branch=refvalue
 	RefValue string
+	// SSHPassword is used to store the password for SSH authentication.
+	SSHPassword string
 	// SourceItemPath is the absolute path to a source item (folder or file)
 	SourceItemPath string
 	// SourceItemURI it the full source item URI. i.e:
@@ -61,9 +62,9 @@ func (src *Source) Get() error {
 	sourceType := src.getProtocol()
 
 	switch sourceType {
-	case "http", "https", "ftp", git:
+	case "http", "https", "ftp", constants.Git:
 		if !utils.Exists(sourceFilePath) {
-			src.getURL(sourceType, sourceFilePath)
+			return src.getURL(sourceType, sourceFilePath, SSHPassword)
 		}
 	case "file":
 	default:
@@ -131,37 +132,31 @@ func (src *Source) getProtocol() string {
 		strings.HasPrefix(src.SourceItemURI, "https://"),
 		strings.HasPrefix(src.SourceItemURI, "ftp://"):
 		return strings.Split(src.SourceItemURI, "://")[0]
-	case strings.HasPrefix(src.SourceItemURI, git+"+https://"):
-		return git
+	case strings.HasPrefix(src.SourceItemURI, constants.Git+"+https://"):
+		return constants.Git
 	default:
 		return ""
 	}
 }
 
-// getURL retrieves the URL for the Source object based on the specified protocol.
+// getURL is a function that retrieves a URL based on the provided protocol and
+// download file path.
 //
-// protocol: The protocol to use for retrieving the URL.
-// Returns: None.
-func (src *Source) getURL(protocol, dloadFilePath string) {
-	if protocol != git {
-		utils.Download(dloadFilePath, src.SourceItemURI)
+// Parameters:
+// - protocol: a string representing the protocol for the URL.
+// - dloadFilePath: a string representing the file path for the downloaded file.
+func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
+	var err error
+
+	switch protocol {
+	case constants.Git:
+		referenceName := src.getReferenceType()
+		err = utils.GitClone(src.SourceItemURI, dloadFilePath, sshPassword, referenceName)
+	default:
+		err = utils.Download(dloadFilePath, src.SourceItemURI)
 	}
 
-	if protocol == git {
-		_, err := ggit.PlainClone(dloadFilePath,
-			false, &ggit.CloneOptions{
-				Progress:      os.Stdout,
-				ReferenceName: src.getReferenceType(),
-				URL:           strings.Trim(src.SourceItemURI, git+"+"),
-			})
-
-		if err != nil && err.Error() == "repository already exists" {
-			_, _ = ggit.PlainOpenWithOptions(dloadFilePath, &ggit.PlainOpenOptions{
-				DetectDotGit:          true,
-				EnableDotGitCommonDir: true,
-			})
-		}
-	}
+	return err
 }
 
 // parseURI parses the URI of the Source and updates the SourceItemPath,
