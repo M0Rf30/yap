@@ -13,7 +13,7 @@ const (
 	ColorWhite   = "\033[37m"
 	DockerOrg    = "m0rf30/yap-"
 	Git          = "git"
-	GoArchiveURL = "https://go.dev/dl/go1.21.3.linux-amd64.tar.gz"
+	GoArchiveURL = "https://go.dev/dl/go1.21.6.linux-amd64.tar.gz"
 )
 
 var (
