@@ -10,6 +10,7 @@ import (
 	"github.com/M0Rf30/yap/pkg/parser"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/project"
+	"github.com/M0Rf30/yap/pkg/source"
 	"github.com/spf13/cobra"
 )
 
@@ -64,12 +65,14 @@ var (
 func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.AddCommand(listTargetsCmd)
+	buildCmd.Flags().StringVarP(&source.SSHPassword,
+		"ssh-password", "p", "", "Optional SSH password to use for private repositories")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncBuildEnvironmentDeps,
 		"ignore-makedeps", "d", false, "Ignore make dependencies resolution")
 	buildCmd.Flags().BoolVarP(&project.NoCache,
 		"no-cache", "c", false, "Do not use cache when building the project")
 	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgver,
-		"override-pkgver", "p", "", "Override package version (pkgver)")
+		"override-pkgver", "o", "", "Override package version (pkgver)")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncFlag,
 		"skip-sync", "s", false, "Skip sync with remotes for package managers")
 	buildCmd.Flags().StringVarP(&project.FromPkgName,
