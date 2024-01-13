@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/cavaliergopher/grab/v3"
+	ggit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/mholt/archiver/v4"
 )
 
@@ -39,10 +44,10 @@ func CheckGO() bool {
 // Parameters:
 // - destination: the path where the downloaded file will be saved.
 // - url: the URL of the file to download.
-func Download(destination, url string) {
+func Download(destination, uri string) {
 	// create client
 	client := grab.NewClient()
-	req, _ := grab.NewRequest(destination, url)
+	req, _ := grab.NewRequest(destination, uri)
 
 	// start download
 	fmt.Printf("%s📥 :: %sDownloading %s\t%v\n",
@@ -103,6 +108,55 @@ Loop:
 		string(constants.ColorWhite),
 		destination,
 	)
+}
+
+// GitClone clones a Git repository from the given sourceItemURI to the specified dloadFilePath.
+//
+// Parameters:
+// - sourceItemURI: the URI of the Git repository to clone.
+// - dloadFilePath: the file path to clone the repository into.
+// - sshPassword: the password for SSH authentication (optional).
+// - referenceName: the reference name for the clone operation.
+func GitClone(sourceItemURI, dloadFilePath, sshPassword string, referenceName plumbing.ReferenceName) {
+	normalizedURI := strings.Trim(sourceItemURI, constants.Git+"+")
+	cloneOptions := &ggit.CloneOptions{
+		Progress:      os.Stdout,
+		ReferenceName: referenceName,
+		URL:           normalizedURI,
+	}
+
+	if Exists(dloadFilePath) {
+		_, _ = ggit.PlainOpenWithOptions(dloadFilePath, &ggit.PlainOpenOptions{
+			DetectDotGit:          true,
+			EnableDotGitCommonDir: true,
+		})
+	}
+
+	_, err := ggit.PlainClone(dloadFilePath, false, cloneOptions)
+	if err != nil && err.Error() == "authentication required" {
+		sourceURL, _ := url.Parse(normalizedURI)
+		sshKeyPath := os.Getenv("HOME") + "/.ssh/id_rsa"
+		publicKey, keyError := ssh.NewPublicKeysFromFile("git", sshKeyPath, sshPassword)
+
+		if keyError != nil {
+			fmt.Printf("%s❌ :: %sfailed to load ssh key '%s'%s\n",
+				string(constants.ColorBlue),
+				string(constants.ColorYellow),
+				keyError,
+				string(constants.ColorWhite))
+			fmt.Printf("%s:: %sTry to use an ssh-password with the -p flag%s\n",
+				string(constants.ColorBlue),
+				string(constants.ColorYellow),
+				string(constants.ColorWhite))
+
+			os.Exit(1)
+		}
+
+		sshURL := constants.Git + "@" + sourceURL.Hostname() + strings.Replace(sourceURL.EscapedPath(), "/", ":", 1)
+		cloneOptions.Auth = publicKey
+		cloneOptions.URL = sshURL
+		_, _ = ggit.PlainClone(dloadFilePath, false, cloneOptions)
+	}
 }
 
 // GOSetup sets up the Go environment.
