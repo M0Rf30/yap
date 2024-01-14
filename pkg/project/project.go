@@ -18,9 +18,10 @@ import (
 )
 
 var (
-	NoCache                      bool
-	SkipSyncFlag                 bool
-	SkipSyncBuildEnvironmentDeps bool
+	CleanBuild   bool
+	NoBuild      bool
+	NoMakeDeps   bool
+	SkipSyncDeps bool
 )
 
 // FromPkgName is used to start the build process from a specific package.
@@ -104,13 +105,14 @@ func (mpc *MultipleProject) BuildAll() error {
 			proj.Builder.PKGBUILD.PkgRel,
 		)
 
-		if err := proj.Builder.Compile(); err != nil {
+		if err := proj.Builder.Compile(NoBuild); err != nil {
 			return err
 		}
 
-		err := mpc.createPackages(proj)
-		if err != nil {
-			return err
+		if !NoBuild {
+			if err := mpc.createPackages(proj); err != nil {
+				return err
+			}
 		}
 
 		if proj.HasToInstall {
@@ -145,7 +147,7 @@ func (mpc *MultipleProject) Clean() error {
 			return err
 		}
 
-		if NoCache {
+		if CleanBuild {
 			if err := utils.RemoveAll(project.Builder.PKGBUILD.SourceDir); err != nil {
 				return err
 			}
@@ -180,7 +182,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	}
 
 	mpc.packageManager = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
-	if !SkipSyncFlag {
+	if !SkipSyncDeps {
 		if err := mpc.packageManager.Update(); err != nil {
 			return err
 		}
@@ -191,7 +193,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	if !SkipSyncBuildEnvironmentDeps {
+	if !NoMakeDeps {
 		mpc.getMakeDeps()
 
 		if err := mpc.packageManager.Prepare(mpc.makeDepends); err != nil {

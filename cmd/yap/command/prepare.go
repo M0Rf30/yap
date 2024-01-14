@@ -25,7 +25,7 @@ var (
 			distro := split[0]
 
 			packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
-			if !project.SkipSyncFlag {
+			if !project.SkipSyncDeps {
 				if err := packageManager.Update(); err != nil {
 					log.Fatal(err)
 				}
@@ -53,7 +53,7 @@ var (
 
 func init() {
 	rootCmd.AddCommand(prepareCmd)
-	prepareCmd.Flags().BoolVarP(&project.SkipSyncFlag,
+	prepareCmd.Flags().BoolVarP(&project.SkipSyncDeps,
 		"skip-sync", "s", false, "Skip sync with remotes for package managers")
 	prepareCmd.Flags().BoolVarP(&GoLang,
 		"golang", "g", false, "Additionally install golang")
