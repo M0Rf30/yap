@@ -235,14 +235,8 @@ func PullContainers(target string) error {
 		constants.DockerOrg + target,
 	}
 
-	var err error
-
-	if _, err = os.Stat(containerApp); err == nil {
-		err = Exec("", containerApp, args...)
-	}
-
-	if err != nil {
-		return err
+	if _, err := os.Stat(containerApp); err == nil {
+		return Exec("", containerApp, args...)
 	}
 
 	return nil

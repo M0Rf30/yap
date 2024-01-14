@@ -25,28 +25,25 @@ type Apk struct {
 func (a *Apk) Build(artifactsPath string) error {
 	a.apkDir = filepath.Join(a.PKGBUILD.StartDir, "apk")
 
-	err := utils.RemoveAll(a.apkDir)
-	if err != nil {
+	if err := utils.RemoveAll(a.apkDir); err != nil {
 		return err
 	}
 
-	err = a.makePackerDir()
-	if err != nil {
+	if err := a.makePackerDir(); err != nil {
 		return err
 	}
 
-	err = a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir, "APKBUILD"), specFile)
-	if err != nil {
+	if err := a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir,
+		"APKBUILD"), specFile); err != nil {
 		return err
 	}
 
-	err = a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir, a.PKGBUILD.PkgName+".install"), postInstall)
-	if err != nil {
+	if err := a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir,
+		a.PKGBUILD.PkgName+".install"), postInstall); err != nil {
 		return err
 	}
 
-	err = a.apkBuild(artifactsPath)
-	if err != nil {
+	if err := a.apkBuild(artifactsPath); err != nil {
 		return err
 	}
 
@@ -90,20 +87,13 @@ func (a *Apk) Prepare(makeDepends []string) error {
 		"add",
 	}
 
-	err := a.PKGBUILD.GetDepends("apk", args, makeDepends)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return a.PKGBUILD.GetDepends("apk", args, makeDepends)
 }
 
 // PrepareEnvironment prepares the build environment for APK packaging.
 // It installs requested Go tools if 'golang' is true.
 // It returns an error if any step fails.
 func (a *Apk) PrepareEnvironment(golang bool) error {
-	var err error
-
 	args := []string{
 		"add",
 	}
@@ -115,43 +105,31 @@ func (a *Apk) PrepareEnvironment(golang bool) error {
 		args = append(args, "go")
 	}
 
-	err = utils.Exec("", "apk", args...)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return utils.Exec("", "apk", args...)
 }
 
 // Update updates the APK package manager's package database.
 // It returns an error if the update process fails.
 func (a *Apk) Update() error {
-	err := a.PKGBUILD.GetUpdates("apk", "update")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return a.PKGBUILD.GetUpdates("apk", "update")
 }
 
 // apkBuild compiles the APK package using 'abuild-keygen' and 'abuild'.
 // It returns an error if any compilation step fails.
 func (a *Apk) apkBuild(artifactsPath string) error {
-	err := utils.Exec(a.apkDir,
+	if err := utils.Exec(a.apkDir,
 		"abuild-keygen",
 		"-n",
-		"-a")
-	if err != nil {
+		"-a"); err != nil {
 		return err
 	}
 
-	err = utils.Exec(a.apkDir,
+	if err := utils.Exec(a.apkDir,
 		"abuild",
 		"-F",
 		"-K",
 		"-P",
-		artifactsPath)
-	if err != nil {
+		artifactsPath); err != nil {
 		return err
 	}
 
@@ -163,15 +141,13 @@ func (a *Apk) apkBuild(artifactsPath string) error {
 // It does not take any parameters.
 // It returns an error if any of the directory operations fail.
 func (a *Apk) makePackerDir() error {
-	err := utils.ExistsMakeDir(a.apkDir)
-	if err != nil {
+	if err := utils.ExistsMakeDir(a.apkDir); err != nil {
 		return err
 	}
 
-	err = utils.ExistsMakeDir(a.apkDir +
+	if err := utils.ExistsMakeDir(a.apkDir +
 		"/pkg/" +
-		a.PKGBUILD.PkgName)
-	if err != nil {
+		a.PKGBUILD.PkgName); err != nil {
 		return err
 	}
 

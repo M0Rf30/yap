@@ -128,19 +128,13 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath, script string) error {
 // dependencies required to build the package. It returns any error if
 // encountered.
 func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []string) error {
-	var err error
 	if len(makeDepends) == 0 {
-		return err
+		return nil
 	}
 
 	args = append(args, makeDepends...)
 
-	err = utils.Exec("", packageManager, args...)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return utils.Exec("", packageManager, args...)
 }
 
 // GetUpdates reads the package manager name and its arguments to perform
