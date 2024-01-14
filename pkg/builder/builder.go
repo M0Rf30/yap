@@ -16,9 +16,8 @@ type Builder struct {
 
 // Compile manages all the instructions that lead to a single project artifact.
 // It returns any error if occurred.
-func (builder *Builder) Compile() error {
-	err := builder.initDirs()
-	if err != nil {
+func (builder *Builder) Compile(noBuild bool) error {
+	if err := builder.initDirs(); err != nil {
 		return err
 	}
 
@@ -27,29 +26,28 @@ func (builder *Builder) Compile() error {
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
 
-	err = builder.getSources()
-	if err != nil {
+	if err := builder.getSources(); err != nil {
 		return err
 	}
 
-	fmt.Printf("%s🏗️  :: %sBuilding ...%s\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite))
+	if !noBuild {
+		fmt.Printf("%s🏗️  :: %sBuilding ...%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite))
 
-	err = builder.processFunction(builder.PKGBUILD.Build)
-	if err != nil {
-		return err
-	}
+		if err := builder.processFunction(builder.PKGBUILD.Build); err != nil {
+			return err
+		}
 
-	fmt.Printf("%s📦 :: %sGenerating package ...%s\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite))
+		fmt.Printf("%s📦 :: %sGenerating package ...%s\n",
+			string(constants.ColorBlue),
+			string(constants.ColorYellow),
+			string(constants.ColorWhite))
 
-	err = builder.processFunction(builder.PKGBUILD.Package)
-	if err != nil {
-		return err
+		if err := builder.processFunction(builder.PKGBUILD.Package); err != nil {
+			return err
+		}
 	}
 
 	return nil
