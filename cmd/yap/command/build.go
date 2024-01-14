@@ -41,7 +41,7 @@ var (
 				log.Fatal(err)
 			}
 
-			if project.NoCache {
+			if project.CleanBuild {
 				if err := mpc.Clean(); err != nil {
 					fmt.Printf("%s❌ :: %sError:\n%s",
 						string(constants.ColorBlue),
@@ -65,16 +65,18 @@ var (
 func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.AddCommand(listTargetsCmd)
+	buildCmd.Flags().BoolVarP(&project.CleanBuild,
+		"cleanbuild", "c", false, "Remove $srcdir/ dir before building the package")
+	buildCmd.Flags().BoolVarP(&project.NoMakeDeps,
+		"nomakedeps", "d", false, "Skip all make dependency (makedeps) checks")
+	buildCmd.Flags().BoolVarP(&project.NoBuild,
+		"nobuild", "o", false, "Download and extract files only")
+	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgver,
+		"pkgver", "w", "", "Use a custom package version (pkgver)")
+	buildCmd.Flags().BoolVarP(&project.SkipSyncDeps,
+		"skip-sync", "s", false, "Skip sync with remotes for package managers")
 	buildCmd.Flags().StringVarP(&source.SSHPassword,
 		"ssh-password", "p", "", "Optional SSH password to use for private repositories")
-	buildCmd.Flags().BoolVarP(&project.SkipSyncBuildEnvironmentDeps,
-		"ignore-makedeps", "d", false, "Ignore make dependencies resolution")
-	buildCmd.Flags().BoolVarP(&project.NoCache,
-		"no-cache", "c", false, "Do not use cache when building the project")
-	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgver,
-		"override-pkgver", "o", "", "Override package version (pkgver)")
-	buildCmd.Flags().BoolVarP(&project.SkipSyncFlag,
-		"skip-sync", "s", false, "Skip sync with remotes for package managers")
 	buildCmd.Flags().StringVarP(&project.FromPkgName,
 		"from", "", "", "Build starting from a defined package name")
 	buildCmd.Flags().StringVarP(&project.ToPkgName,
