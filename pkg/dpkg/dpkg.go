@@ -3,7 +3,6 @@ package dpkg
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -43,9 +42,8 @@ func (d *Deb) getArch() {
 //
 // Returns an error if there was a problem creating or writing to the file.
 func (d *Deb) createConfFiles() error {
-	var err error
 	if len(d.PKGBUILD.Backup) == 0 {
-		return err
+		return nil
 	}
 
 	path := filepath.Join(d.debDir, "conffiles")
@@ -60,12 +58,7 @@ func (d *Deb) createConfFiles() error {
 		data += name + "\n"
 	}
 
-	err = utils.CreateWrite(path, data)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return utils.CreateWrite(path, data)
 }
 
 func (d *Deb) createCopyrightFile() error {
@@ -75,48 +68,26 @@ func (d *Deb) createCopyrightFile() error {
 
 	copyrightFilePath := filepath.Join(d.debDir, "copyright")
 
-	return d.PKGBUILD.CreateSpec(copyrightFilePath, copyrightFile)
+	return d.PKGBUILD.CreateSpec(copyrightFilePath,
+		copyrightFile)
 }
 
-// createDebconfTemplate creates a Deb package configuration file template.
+// createDebconfFile creates a debconf file with the given variable and name.
 //
-// It does not take any parameters.
-// It returns an error if there was an issue creating the template.
-func (d *Deb) createDebconfTemplate() error {
-	var err error
-	if d.PKGBUILD.DebTemplate == "" {
-		return err
-	}
-
-	debconfTemplate := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebTemplate)
-	path := filepath.Join(d.debDir, "templates")
-
-	err = copy.Copy(debconfTemplate, path)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// createDebconfConfig creates a Deb configuration file.
+// Parameters:
+// - variable: the variable used to create the debconf asset.
+// - name: the name of the debconf asset.
 //
-// It takes no parameters and returns an error.
-func (d *Deb) createDebconfConfig() error {
-	var err error
-	if d.PKGBUILD.DebConfig == "" {
-		return err
+// Return type: error.
+func (d *Deb) createDebconfFile(variable, name string) error {
+	if variable == "" {
+		return nil
 	}
 
-	config := filepath.Join(d.PKGBUILD.Home, d.PKGBUILD.DebConfig)
-	path := filepath.Join(d.debDir, "config")
+	assetPath := filepath.Join(d.PKGBUILD.Home, variable)
+	destPath := filepath.Join(d.debDir, name)
 
-	err = copy.Copy(config, path)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return copy.Copy(assetPath, destPath)
 }
 
 // createScripts generates and writes the scripts for the Deb package.
@@ -143,13 +114,11 @@ func (d *Deb) createScripts() error {
 
 		path := filepath.Join(d.debDir, name)
 
-		err := utils.CreateWrite(path, data)
-		if err != nil {
+		if err := utils.CreateWrite(path, data); err != nil {
 			return err
 		}
 
-		err = utils.Chmod(path, 0o755)
-		if err != nil {
+		if err := utils.Chmod(path, 0o755); err != nil {
 			return err
 		}
 	}
@@ -165,21 +134,17 @@ func (d *Deb) createScripts() error {
 // The function returns an error if there was an issue generating the Deb package
 // files.
 func (d *Deb) dpkgDeb(artifactPath string) error {
-	var err error
-
 	for _, arch := range d.PKGBUILD.Arch {
 		artifactFilePath := filepath.Join(artifactPath,
 			fmt.Sprintf("%s_%s-%s_%s.deb",
 				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
 				arch))
 
-		err = utils.Exec("",
+		if err := utils.Exec("",
 			"dpkg-deb",
 			"-b",
 			"-Zzstd",
-			d.PKGBUILD.PackageDir, artifactFilePath)
-
-		if err != nil {
+			d.PKGBUILD.PackageDir, artifactFilePath); err != nil {
 			return err
 		}
 	}
@@ -197,12 +162,7 @@ func (d *Deb) Prepare(makeDepends []string) error {
 		"install",
 	}
 
-	err := d.PKGBUILD.GetDepends("apt-get", args, makeDepends)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return d.PKGBUILD.GetDepends("apt-get", args, makeDepends)
 }
 
 // Strip strips binaries from the Deb package.
@@ -210,8 +170,6 @@ func (d *Deb) Prepare(makeDepends []string) error {
 // It does not take any parameters.
 // It returns an error if there is any issue during stripping.
 func (d *Deb) Strip() error {
-	var err error
-
 	var tmplBytesBuffer bytes.Buffer
 
 	fmt.Printf("%s🧹 :: %sStripping binaries ...%s\n",
@@ -224,18 +182,10 @@ func (d *Deb) Strip() error {
 	template.Must(tmpl.Parse(options.StripScript))
 
 	if pkgbuild.Verbose {
-		err = tmpl.Execute(&tmplBytesBuffer, d.PKGBUILD)
-		if err != nil {
-			log.Fatal(err)
-		}
+		return tmpl.Execute(&tmplBytesBuffer, d.PKGBUILD)
 	}
 
-	err = builder.RunScript(tmplBytesBuffer.String())
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return builder.RunScript(tmplBytesBuffer.String())
 }
 
 // Update updates the Deb package list.
@@ -247,12 +197,7 @@ func (d *Deb) Strip() error {
 // Returns:
 // - error: An error if the update fails.
 func (d *Deb) Update() error {
-	err := d.PKGBUILD.GetUpdates("apt-get", "update")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return d.PKGBUILD.GetUpdates("apt-get", "update")
 }
 
 // createDebResources creates the Deb package resources.
@@ -261,46 +206,41 @@ func (d *Deb) Update() error {
 // It also sets the installed size of the package based on the size of the package directory.
 // It generates the control file for the package.
 // It creates the scripts for the package.
-// It creates the debconf template file.
+// It creates the debconf templates file.
 // It creates the debconf config file.
 // It returns an error if any of the operations fail.
 func (d *Deb) createDebResources() error {
 	d.debDir = filepath.Join(d.PKGBUILD.PackageDir, "DEBIAN")
-	err := utils.ExistsMakeDir(d.debDir)
-
-	if err != nil {
+	if err := utils.ExistsMakeDir(d.debDir); err != nil {
 		return err
 	}
 
-	err = d.createConfFiles()
-	if err != nil {
+	if err := d.createConfFiles(); err != nil {
 		return err
 	}
 
 	d.PKGBUILD.InstalledSize, _ = utils.GetDirSize(d.PKGBUILD.PackageDir)
 
-	err = d.PKGBUILD.CreateSpec(filepath.Join(d.debDir, "control"), specFile)
-	if err != nil {
+	if err := d.PKGBUILD.CreateSpec(filepath.Join(d.debDir,
+		"control"), specFile); err != nil {
 		return err
 	}
 
-	err = d.createCopyrightFile()
-	if err != nil {
+	if err := d.createCopyrightFile(); err != nil {
 		return err
 	}
 
-	err = d.createScripts()
-	if err != nil {
+	if err := d.createScripts(); err != nil {
 		return err
 	}
 
-	err = d.createDebconfTemplate()
-	if err != nil {
+	if err := d.createDebconfFile("config",
+		d.PKGBUILD.DebConfig); err != nil {
 		return err
 	}
 
-	err = d.createDebconfConfig()
-	if err != nil {
+	if err := d.createDebconfFile("templates",
+		d.PKGBUILD.DebTemplate); err != nil {
 		return err
 	}
 
@@ -311,33 +251,26 @@ func (d *Deb) createDebResources() error {
 //
 // It takes the artifactsPath as a parameter and returns an error if any.
 func (d *Deb) Build(artifactsPath string) error {
-	var err error
-
 	d.getArch()
 	d.getRelease()
 
-	err = utils.RemoveAll(d.debDir)
-	if err != nil {
+	if err := utils.RemoveAll(d.debDir); err != nil {
 		return err
 	}
 
-	err = d.createDebResources()
-	if err != nil {
+	if err := d.createDebResources(); err != nil {
 		return err
 	}
 
-	err = d.Strip()
-	if err != nil {
+	if err := d.Strip(); err != nil {
 		return err
 	}
 
-	err = d.dpkgDeb(artifactsPath)
-	if err != nil {
+	if err := d.dpkgDeb(artifactsPath); err != nil {
 		return err
 	}
 
-	err = utils.RemoveAll(d.PKGBUILD.PackageDir)
-	if err != nil {
+	if err := utils.RemoveAll(d.PKGBUILD.PackageDir); err != nil {
 		return err
 	}
 
@@ -345,17 +278,13 @@ func (d *Deb) Build(artifactsPath string) error {
 }
 
 func (d *Deb) Install(artifactsPath string) error {
-	var err error
-
 	for _, arch := range d.PKGBUILD.Arch {
 		artifactFilePath := filepath.Join(artifactsPath,
 			fmt.Sprintf("%s_%s-%s_%s.deb",
 				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
 				arch))
 
-		err = utils.Exec("", "apt-get", "install", "-y", artifactFilePath)
-
-		if err != nil {
+		if err := utils.Exec("", "apt-get", "install", "-y", artifactFilePath); err != nil {
 			return err
 		}
 	}
@@ -368,16 +297,13 @@ func (d *Deb) Install(artifactsPath string) error {
 // It takes a boolean parameter `golang` which indicates whether or not to set up Go.
 // It returns an error if there was a problem during the environment preparation.
 func (d *Deb) PrepareEnvironment(golang bool) error {
-	var err error
-
 	args := []string{
 		"--assume-yes",
 		"install",
 	}
 	args = append(args, buildEnvironmentDeps...)
 
-	err = utils.Exec("", "apt-get", args...)
-	if err != nil {
+	if err := utils.Exec("", "apt-get", args...); err != nil {
 		return err
 	}
 

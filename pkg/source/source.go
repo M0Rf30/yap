@@ -146,19 +146,16 @@ func (src *Source) getProtocol() string {
 // - protocol: a string representing the protocol for the URL.
 // - dloadFilePath: a string representing the file path for the downloaded file.
 func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
-	var err error
-
 	normalizedURI := strings.TrimPrefix(src.SourceItemURI, constants.Git+"+")
 
 	switch protocol {
 	case constants.Git:
 		referenceName := src.getReferenceType()
-		err = utils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName)
-	default:
-		err = utils.Download(dloadFilePath, normalizedURI)
-	}
 
-	return err
+		return utils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName)
+	default:
+		return utils.Download(dloadFilePath, normalizedURI)
+	}
 }
 
 // parseURI parses the URI of the Source and updates the SourceItemPath,

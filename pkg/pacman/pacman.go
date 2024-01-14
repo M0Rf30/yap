@@ -94,8 +94,6 @@ func (p *Pacman) Prepare(makeDepends []string) error {
 // It takes a boolean parameter `golang` which indicates whether the environment should be prepared for Golang.
 // It returns an error if there is any issue in preparing the environment.
 func (p *Pacman) PrepareEnvironment(golang bool) error {
-	var err error
-
 	args := []string{
 		"-S",
 		"--noconfirm",
@@ -108,12 +106,7 @@ func (p *Pacman) PrepareEnvironment(golang bool) error {
 		args = append(args, "go")
 	}
 
-	err = utils.Exec("", "pacman", args...)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return utils.Exec("", "pacman", args...)
 }
 
 // Update updates the Pacman package manager.
@@ -121,12 +114,7 @@ func (p *Pacman) PrepareEnvironment(golang bool) error {
 // It retrieves the updates using the GetUpdates method of the PKGBUILD struct.
 // It returns an error if there is any issue during the update process.
 func (p *Pacman) Update() error {
-	err := p.PKGBUILD.GetUpdates("pacman", "-Sy")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return p.PKGBUILD.GetUpdates("pacman", "-Sy")
 }
 
 // pacmanBuild builds the package using makepkg command.
@@ -136,10 +124,5 @@ func (p *Pacman) Update() error {
 // Returns:
 // - error: An error if any occurred during the execution of the makepkg command.
 func (p *Pacman) pacmanBuild() error {
-	err := utils.Exec(p.pacmanDir, "makepkg", "-f")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return utils.Exec(p.pacmanDir, "makepkg", "-f")
 }
