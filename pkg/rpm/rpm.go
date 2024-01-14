@@ -37,18 +37,15 @@ func (r *RPM) Build(artifactsPath string) error {
 
 	r.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 
-	err := utils.RemoveAll(r.RPMDir)
-	if err != nil {
+	if err := utils.RemoveAll(r.RPMDir); err != nil {
 		return err
 	}
 
-	err = r.makeDirs()
-	if err != nil {
+	if err := r.makeDirs(); err != nil {
 		return err
 	}
 
-	err = r.getFiles()
-	if err != nil {
+	if err := r.getFiles(); err != nil {
 		return err
 	}
 
@@ -59,19 +56,16 @@ func (r *RPM) Build(artifactsPath string) error {
 		r.PKGBUILD.PkgRel,
 		r.PKGBUILD.Arch[0])
 
-	err = copy.Copy(r.PKGBUILD.PackageDir, buildRootPackageDir)
-	if err != nil {
+	if err := copy.Copy(r.PKGBUILD.PackageDir, buildRootPackageDir); err != nil {
 		return err
 	}
 
-	err = r.PKGBUILD.CreateSpec(filepath.Join(r.specsDir,
-		r.PKGBUILD.PkgName+".spec"), specFile)
-	if err != nil {
+	if err := r.PKGBUILD.CreateSpec(filepath.Join(r.specsDir,
+		r.PKGBUILD.PkgName+".spec"), specFile); err != nil {
 		return err
 	}
 
-	err = r.rpmBuild()
-	if err != nil {
+	if err := r.rpmBuild(); err != nil {
 		return err
 	}
 
@@ -114,17 +108,13 @@ func (r *RPM) Install(artifactsPath string) error {
 // It takes a boolean parameter `golang` which indicates whether or not to set up the Go environment.
 // It returns an error if there was an issue with the environment preparation.
 func (r *RPM) PrepareEnvironment(golang bool) error {
-	var err error
-
 	args := []string{
 		"-y",
 		"install",
 	}
 	args = append(args, buildEnvironmentDeps...)
 
-	err = utils.Exec("", "yum", args...)
-
-	if err != nil {
+	if err := utils.Exec("", "yum", args...); err != nil {
 		return err
 	}
 
@@ -145,12 +135,7 @@ func (r *RPM) Prepare(makeDepends []string) error {
 		"install",
 	}
 
-	err := r.PKGBUILD.GetDepends("dnf", args, makeDepends)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.PKGBUILD.GetDepends("dnf", args, makeDepends)
 }
 
 // Update updates the RPM object.
@@ -278,8 +263,6 @@ func (r *RPM) getRelease() {
 // It does not take any parameters.
 // It returns an error if any directory creation fails.
 func (r *RPM) makeDirs() error {
-	var err error
-
 	r.RPMDir = filepath.Join(r.PKGBUILD.StartDir, "RPM")
 	r.buildDir = filepath.Join(r.RPMDir, "BUILD")
 	r.buildRootDir = filepath.Join(r.RPMDir, "BUILDROOT")
@@ -297,8 +280,7 @@ func (r *RPM) makeDirs() error {
 		r.specsDir,
 		r.srpmsDir,
 	} {
-		err = utils.ExistsMakeDir(path)
-		if err != nil {
+		if err := utils.ExistsMakeDir(path); err != nil {
 			return err
 		}
 	}
@@ -315,17 +297,20 @@ func (r *RPM) makeDirs() error {
 // Returns an error if the 'rpmbuild' command fails to execute or if there
 // are any errors during the package building process.
 func (r *RPM) rpmBuild() error {
-	err := utils.Exec(r.specsDir,
-		"rpmbuild",
+	args := []string{
 		"--define",
-		"_topdir "+
+		"_topdir " +
 			r.RPMDir,
 		"-bb",
-		r.PKGBUILD.PkgName+
-			".spec")
-	if err != nil {
-		return err
+		r.PKGBUILD.PkgName +
+			".spec",
 	}
 
-	return nil
+	if pkgbuild.Verbose {
+		args = append(args, "--verbose")
+	} else {
+		args = append(args, "--quiet")
+	}
+
+	return utils.Exec(r.specsDir, "rpmbuild", args...)
 }
