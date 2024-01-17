@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -219,6 +220,9 @@ func (d *Deb) createDebResources() error {
 	}
 
 	d.PKGBUILD.InstalledSize, _ = utils.GetDirSize(d.PKGBUILD.PackageDir)
+	d.PKGBUILD.Depends = d.processDepends(d.PKGBUILD.Depends)
+	d.PKGBUILD.MakeDepends = d.processDepends(d.PKGBUILD.MakeDepends)
+	d.PKGBUILD.OptDepends = d.processDepends(d.PKGBUILD.OptDepends)
 
 	if err := d.PKGBUILD.CreateSpec(filepath.Join(d.debDir,
 		"control"), specFile); err != nil {
@@ -319,4 +323,34 @@ func (d *Deb) getRelease() {
 	} else {
 		d.PKGBUILD.PkgRel += d.PKGBUILD.Distro
 	}
+}
+
+// processDepends takes a slice of strings and processes each string in order to
+// modify it and return a new slice of strings for deb syntax.
+//
+// It splits each string into three parts: name, operator, and version. If the
+// string is split successfully, it combines the three parts into a new format
+// and replaces the original string in the slice.
+//
+// Parameters:
+//   - depends: a slice of strings to be processed.
+//
+// Returns:
+//   - a new slice of strings with modified elements for deb syntax.
+func (d *Deb) processDepends(depends []string) []string {
+	pattern := `(?m)(<|<=|>=|=|>|<)`
+	regex := regexp.MustCompile(pattern)
+
+	for index, depend := range depends {
+		result := regex.Split(depend, -1)
+
+		if len(result) == 2 {
+			name := result[0]
+			operator := strings.Trim(depend, result[0]+result[1])
+			version := result[1]
+			depends[index] = name + " (" + operator + " " + version + ")"
+		}
+	}
+
+	return depends
 }

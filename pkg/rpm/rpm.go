@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
@@ -59,6 +60,10 @@ func (r *RPM) Build(artifactsPath string) error {
 	if err := copy.Copy(r.PKGBUILD.PackageDir, buildRootPackageDir); err != nil {
 		return err
 	}
+
+	r.PKGBUILD.Depends = r.processDepends(r.PKGBUILD.Depends)
+	r.PKGBUILD.MakeDepends = r.processDepends(r.PKGBUILD.MakeDepends)
+	r.PKGBUILD.OptDepends = r.processDepends(r.PKGBUILD.OptDepends)
 
 	if err := r.PKGBUILD.CreateSpec(filepath.Join(r.specsDir,
 		r.PKGBUILD.PkgName+".spec"), specFile); err != nil {
@@ -286,6 +291,36 @@ func (r *RPM) makeDirs() error {
 	}
 
 	return nil
+}
+
+// processDepends takes a slice of strings and processes each string in order to
+// modify it and return a new slice of strings for rpm syntax.
+//
+// It splits each string into three parts: name, operator, and version. If the
+// string is split successfully, it combines the three parts into a new format
+// and replaces the original string in the slice.
+//
+// Parameters:
+//   - depends: a slice of strings to be processed.
+//
+// Returns:
+//   - a new slice of strings with modified elements for rpm syntax.
+func (r *RPM) processDepends(depends []string) []string {
+	pattern := `(?m)(<|<=|>=|=|>|<)`
+	regex := regexp.MustCompile(pattern)
+
+	for index, depend := range depends {
+		result := regex.Split(depend, -1)
+
+		if len(result) == 2 {
+			name := result[0]
+			operator := strings.Trim(depend, result[0]+result[1])
+			version := result[1]
+			depends[index] = name + " " + operator + " " + version
+		}
+	}
+
+	return depends
 }
 
 // rpmBuild builds an RPM package using the RPM package manager.
