@@ -36,7 +36,7 @@ func (builder *Builder) Compile(noBuild bool) error {
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
 
-		if err := builder.processFunction(builder.PKGBUILD.Build); err != nil {
+		if err := processFunction(builder.PKGBUILD.Build); err != nil {
 			return err
 		}
 
@@ -45,7 +45,7 @@ func (builder *Builder) Compile(noBuild bool) error {
 			string(constants.ColorYellow),
 			string(constants.ColorWhite))
 
-		if err := builder.processFunction(builder.PKGBUILD.Package); err != nil {
+		if err := processFunction(builder.PKGBUILD.Package); err != nil {
 			return err
 		}
 	}
@@ -57,8 +57,8 @@ func (builder *Builder) Compile(noBuild bool) error {
 //
 // It takes a pkgbuildFunction string as a parameter and runs it as a script.
 // It returns an error if the script encounters any issues.
-func (builder *Builder) processFunction(pkgbuildFunction string) error {
-	return RunScript("  set -e\n" + pkgbuildFunction)
+func processFunction(pkgbuildFunction string) error {
+	return utils.RunScript("  set -e\n" + pkgbuildFunction)
 }
 
 // getSources detects sources provided by a single project source array and

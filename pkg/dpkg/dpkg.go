@@ -7,7 +7,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/M0Rf30/yap/pkg/builder"
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/options"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
@@ -185,7 +184,7 @@ func (d *Deb) Strip() error {
 		return tmpl.Execute(&tmplBytesBuffer, d.PKGBUILD)
 	}
 
-	return builder.RunScript(tmplBytesBuffer.String())
+	return utils.RunScript(tmplBytesBuffer.String())
 }
 
 // Update updates the Deb package list.

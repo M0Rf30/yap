@@ -81,12 +81,7 @@ func (p *Pacman) Prepare(makeDepends []string) error {
 		"--noconfirm",
 	}
 
-	err := p.PKGBUILD.GetDepends("pacman", args, makeDepends)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return p.PKGBUILD.GetDepends("pacman", args, makeDepends)
 }
 
 // PrepareEnvironment prepares the environment for the Pacman.
