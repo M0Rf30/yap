@@ -141,12 +141,7 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 // a sync with remotes and consequently retrieve updates.
 // It returns any error if encountered.
 func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
-	err := utils.Exec("", packageManager, args...)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return utils.Exec("", packageManager, args...)
 }
 
 // Init initializes the PKGBUILD struct.

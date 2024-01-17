@@ -17,6 +17,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/mholt/archiver/v4"
+	"mvdan.cc/sh/v3/expand"
+	"mvdan.cc/sh/v3/interp"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 const goArchivePath = "/tmp/go.tar.gz"
@@ -240,6 +243,21 @@ func PullContainers(target string) error {
 	}
 
 	return nil
+}
+
+// RunScript runs a shell script.
+//
+// It takes a string parameter `cmds` which represents the shell script to be executed.
+// The function returns an error if there was an issue running the script.
+func RunScript(cmds string) error {
+	script, _ := syntax.NewParser().Parse(strings.NewReader(cmds), "")
+
+	runner, _ := interp.New(
+		interp.Env(expand.ListEnviron(os.Environ()...)),
+		interp.StdIO(nil, os.Stdout, os.Stdout),
+	)
+
+	return runner.Run(context.TODO(), script)
 }
 
 // Unarchive extracts files from an archive and saves them to a destination directory.
