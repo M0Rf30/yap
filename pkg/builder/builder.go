@@ -31,21 +31,18 @@ func (builder *Builder) Compile(noBuild bool) error {
 	}
 
 	if !noBuild {
-		fmt.Printf("%s🏗️  :: %sBuilding ...%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite))
-
-		if err := processFunction(builder.PKGBUILD.Build); err != nil {
+		if err := processFunction(builder.PKGBUILD.Prepare,
+			"Preparing"); err != nil {
 			return err
 		}
 
-		fmt.Printf("%s📦 :: %sGenerating package ...%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite))
+		if err := processFunction(builder.PKGBUILD.Build,
+			"Building"); err != nil {
+			return err
+		}
 
-		if err := processFunction(builder.PKGBUILD.Package); err != nil {
+		if err := processFunction(builder.PKGBUILD.Package,
+			"Generating package"); err != nil {
 			return err
 		}
 	}
@@ -53,11 +50,21 @@ func (builder *Builder) Compile(noBuild bool) error {
 	return nil
 }
 
-// processFunction is a function that processes a pkgbuildFunction.
+// processFunction processes the given pkgbuildFunction and message.
 //
-// It takes a pkgbuildFunction string as a parameter and runs it as a script.
-// It returns an error if the script encounters any issues.
-func processFunction(pkgbuildFunction string) error {
+// It takes two parameters: pkgbuildFunction string, message string.
+// It returns an error.
+func processFunction(pkgbuildFunction, message string) error {
+	if pkgbuildFunction == "" {
+		return nil
+	}
+
+	fmt.Printf("%s📦 :: %s%s ...%s\n",
+		string(constants.ColorBlue),
+		string(constants.ColorYellow),
+		message,
+		string(constants.ColorWhite))
+
 	return utils.RunScript("  set -e\n" + pkgbuildFunction)
 }
 
