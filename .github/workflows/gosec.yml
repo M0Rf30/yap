@@ -11,12 +11,13 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    env:
-      GO111MODULE: on
     steps:
-      - name: Checkout Source
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Run Gosec Security Scanner
+        with:
+          fetch-depth: 0
+
+      - name: Run gosec
         uses: securego/gosec@master
         with:
           args: ./...

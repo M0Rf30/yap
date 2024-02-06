@@ -1,9 +1,15 @@
-name: Docker Image CI
+# .github/workflows/release.yml
+name: goreleaser
 
 on:
   push:
-    branches:
-      - main
+    # run only against tags
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
 jobs:
   distro_matrix:
     strategy:
@@ -15,6 +21,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -34,7 +56,7 @@ jobs:
             org.opencontainers.image.description=Package software with ease 📦
             org.opencontainers.image.vendor=M0Rf30
           tags: |
-            type=raw,value=latest
+            type=ref,event=tag
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -43,5 +65,5 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
-            m0rf30/yap-${{ matrix.os }}:latest
+            m0rf30/yap-${{ matrix.os }}:${{ steps.meta.outputs.tags }}
           file: build/deploy/${{ matrix.os }}/Dockerfile

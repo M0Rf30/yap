@@ -1,11 +1,5 @@
 name: Reviewdog
-on:
-  push:
-    tags:
-      - "*"
-    branches:
-      - "*"
-  pull_request:
+on: [pull_request]
 
 jobs:
   golangci-lint:
@@ -14,8 +8,6 @@ jobs:
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v4
+
       - name: golangci-lint
         uses: reviewdog/action-golangci-lint@v2
-        with:
-          tool_name: "golangci-lint-github-check"
-          reporter: "github-check"
