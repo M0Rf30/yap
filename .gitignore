@@ -16,6 +16,7 @@
 Icon?
 Thumbs.db
 artifacts
+dist/
 ehthumbs.db
 examples/yap/pkg
 examples/yap/src
