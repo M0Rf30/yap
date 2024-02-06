@@ -1,2 +1,2 @@
 # Disable individual error codes
-disable=SC2154,SC2164,SC2034
+disable=SC2148,SC2154,SC2164,SC2034
