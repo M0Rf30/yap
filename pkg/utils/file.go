@@ -133,6 +133,7 @@ func GetDirSize(path string) (int64, error) {
 				path,
 				string(constants.ColorWhite))
 		}
+
 		if !info.IsDir() {
 			size += info.Size()
 		}
