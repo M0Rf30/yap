@@ -87,6 +87,7 @@ func getSyntaxFile(startDir string) (*syntax.File, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer file.Close()
 
 	pkgbuildParser := syntax.NewParser(syntax.Variant(syntax.LangBash))
@@ -119,6 +120,7 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) e
 				for _, line := range utils.StringifyArray(nodeType) {
 					arrayDecl, _ = shell.Fields(line, os.Getenv)
 				}
+
 				err = pkgBuild.AddItem(nodeType.Name.Value, arrayDecl)
 			} else {
 				varDecl, _ = shell.Expand(utils.StringifyAssign(nodeType), os.Getenv)
