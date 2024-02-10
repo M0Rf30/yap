@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"path/filepath"
 
 	"github.com/M0Rf30/yap/pkg/builder"
@@ -61,6 +60,7 @@ type MultipleProject struct {
 	Name           string     `json:"name"        validate:"required"`
 	Output         string     `json:"output"      validate:"required"`
 	Projects       []*Project `json:"projects"    validate:"required,dive,required"`
+	singleProject  bool
 }
 
 // Project represents a single project.
@@ -73,7 +73,6 @@ type Project struct {
 	Builder        *builder.Builder
 	BuildRoot      string
 	Distro         string
-	MirrorRoot     string
 	PackageManager packer.Packer
 	Path           string
 	Release        string
@@ -166,12 +165,11 @@ func (mpc *MultipleProject) Clean() error {
 //
 // It returns an error.
 func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
-	err := mpc.readProject(path)
-	if err != nil {
+	if err := mpc.readProject(path); err != nil {
 		return err
 	}
 
-	err = mpc.validateAllProject(distro, release, path)
+	err := mpc.validateAllProject(distro, release, path)
 	if err != nil {
 		return err
 	}
@@ -312,10 +310,18 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 	var projects = make([]*Project, 0)
 
 	for _, child := range mpc.Projects {
+		startDir := filepath.Join(mpc.BuildDir, child.Name)
+		home := filepath.Join(path, child.Name)
+
+		if mpc.singleProject {
+			startDir = path
+			home = path
+		}
+
 		pkgbuildFile, err := parser.ParseFile(distro,
 			release,
-			filepath.Join(mpc.BuildDir, child.Name),
-			filepath.Join(path, child.Name))
+			startDir,
+			home)
 		if err != nil {
 			return err
 		}
@@ -342,30 +348,53 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 // It takes a string parameter `path` which represents the path to the project file.
 // It returns an error if there was an issue opening or reading the file, or if the JSON data is invalid.
 func (mpc *MultipleProject) readProject(path string) error {
-	cleanFilePath := filepath.Clean(filepath.Join(path, "yap.json"))
+	jsonFilePath := filepath.Join(path, "yap.json")
+	pkgbuildFilePath := filepath.Join(path, "PKGBUILD")
 
-	filePath, err := os.Open(cleanFilePath)
+	filePath, err := utils.Open(jsonFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to open yap.json file within '%s': %w", cleanFilePath, err)
+		_, err = utils.Open(pkgbuildFilePath)
+		if err != nil {
+			return err
+		}
+
+		mpc.setSingleProject(path)
+
+		return nil
 	}
 	defer filePath.Close()
 
 	prjContent, err := io.ReadAll(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read yap.json file: %w", err)
+		return err
 	}
 
 	err = json.Unmarshal(prjContent, &mpc)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal yap.json: %w", err)
+		return err
 	}
 
 	err = mpc.validateJSON()
 	if err != nil {
-		return fmt.Errorf("failed to validate yap.json: %w", err)
+		return err
 	}
 
 	return nil
+}
+
+// setSingleProject reads the PKGBUILD file at the given path and updates the
+// MultipleProject instance.
+func (mpc *MultipleProject) setSingleProject(path string) {
+	cleanFilePath := filepath.Clean(path)
+	proj := &Project{
+		Name:           "",
+		PackageManager: mpc.packageManager,
+		HasToInstall:   false,
+	}
+
+	mpc.BuildDir = cleanFilePath
+	mpc.Output = cleanFilePath
+	mpc.Projects = append(mpc.Projects, proj)
 }
 
 // validateAllProject validates all projects in the MultipleProject struct.

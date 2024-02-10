@@ -20,7 +20,7 @@ var (
 		Use:   "build [target] [path]",
 		Short: "Build multiple PKGBUILD definitions within a yap.json project",
 		Args:  cobra.MinimumNArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			fullJSONPath, _ := filepath.Abs(args[1])
 
 			split := strings.Split(args[0], "-")

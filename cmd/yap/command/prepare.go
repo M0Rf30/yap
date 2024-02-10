@@ -20,7 +20,7 @@ var (
 		Use:   "prepare [target]",
 		Short: "Install base development packages for every supported distro",
 		Args:  cobra.MinimumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			split := strings.Split(args[0], "-")
 			distro := split[0]
 

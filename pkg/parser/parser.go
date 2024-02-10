@@ -30,6 +30,11 @@ var OverridePkgver string
 // - error: an error if any occurred during parsing.
 func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
+	copyOpt := copy.Options{
+		OnSymlink: func(_ string) copy.SymlinkAction {
+			return copy.Skip
+		},
+	}
 
 	if err != nil {
 		fmt.Printf("%s❌ :: %sfailed to get root directory from %s\n",
@@ -53,7 +58,10 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 		return pkgBuild, err
 	}
 
-	err = copy.Copy(home, startDir)
+	if home != startDir {
+		err = copy.Copy(home, startDir, copyOpt)
+	}
+
 	if err != nil {
 		return pkgBuild, err
 	}
