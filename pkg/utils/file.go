@@ -205,25 +205,6 @@ func Open(path string) (*os.File, error) {
 	return file, err
 }
 
-// Remove deletes a file or directory at the specified path.
-//
-// path: the path of the file or directory to be removed.
-// Returns an error if the removal fails.
-func Remove(path string) error {
-	err := os.Remove(path)
-	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
-
-		return err
-	}
-
-	return nil
-}
-
 // RemoveAll removes a file or directory and any children it contains.
 //
 // path: the path of the file or directory to be removed.

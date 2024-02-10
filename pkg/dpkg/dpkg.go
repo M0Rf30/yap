@@ -67,9 +67,9 @@ func (d *Deb) createCopyrightFile() error {
 	}
 
 	copyrightFilePath := filepath.Join(d.debDir, "copyright")
+	tmpl := d.PKGBUILD.RenderSpec(copyrightFile)
 
-	return d.PKGBUILD.CreateSpec(copyrightFilePath,
-		copyrightFile)
+	return d.PKGBUILD.CreateSpec(copyrightFilePath, tmpl)
 }
 
 // createDebconfFile creates a debconf file with the given variable and name.
@@ -224,8 +224,9 @@ func (d *Deb) createDebResources() error {
 	d.PKGBUILD.MakeDepends = d.processDepends(d.PKGBUILD.MakeDepends)
 	d.PKGBUILD.OptDepends = d.processDepends(d.PKGBUILD.OptDepends)
 
+	tmpl := d.PKGBUILD.RenderSpec(specFile)
 	if err := d.PKGBUILD.CreateSpec(filepath.Join(d.debDir,
-		"control"), specFile); err != nil {
+		"control"), tmpl); err != nil {
 		return err
 	}
 
@@ -311,7 +312,7 @@ func (d *Deb) PrepareEnvironment(golang bool) error {
 	}
 
 	if golang {
-		utils.GOSetup()
+		return utils.GOSetup()
 	}
 
 	return nil

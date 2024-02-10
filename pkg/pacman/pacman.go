@@ -23,20 +23,25 @@ func (p *Pacman) Build(artifactsPath string) error {
 
 	p.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 
+	tmpl := p.PKGBUILD.RenderSpec(specFile)
+
+	if p.PKGBUILD.Home != p.PKGBUILD.StartDir {
+		err := p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir,
+			"PKGBUILD"), tmpl)
+		if err != nil {
+			return err
+		}
+	}
+
+	tmpl = p.PKGBUILD.RenderSpec(postInstall)
 	err := p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir,
-		"PKGBUILD"), specFile)
+		p.PKGBUILD.PkgName+".install"), tmpl)
+
 	if err != nil {
 		return err
 	}
 
-	err = p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir,
-		p.PKGBUILD.PkgName+".install"), postInstall)
-	if err != nil {
-		return err
-	}
-
-	err = p.pacmanBuild()
-	if err != nil {
+	if err := p.pacmanBuild(); err != nil {
 		return err
 	}
 
@@ -119,5 +124,5 @@ func (p *Pacman) Update() error {
 // Returns:
 // - error: An error if any occurred during the execution of the makepkg command.
 func (p *Pacman) pacmanBuild() error {
-	return utils.Exec(p.pacmanDir, "makepkg", "-f")
+	return utils.Exec(p.pacmanDir, "makepkg", "-ef")
 }

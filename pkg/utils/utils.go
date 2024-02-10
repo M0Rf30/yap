@@ -189,9 +189,9 @@ func GitClone(dloadFilePath, sourceItemURI, sshPassword string,
 //
 // It checks if Go is installed and if not, it downloads and installs it.
 // The function takes no parameters and does not return anything.
-func GOSetup() {
+func GOSetup() error {
 	if CheckGO() {
-		return
+		return nil
 	}
 
 	err := Download(goArchivePath, constants.GoArchiveURL)
@@ -199,32 +199,32 @@ func GOSetup() {
 		log.Panic(err)
 	}
 
-	dlFile, err := os.Open(goArchivePath)
+	dlFile, err := Open(goArchivePath)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), goArchivePath)
+		return err
 	}
 
 	err = Unarchive(dlFile, "/usr/lib")
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
 
 	err = os.Symlink("/usr/lib/go/bin/go", goExecutable)
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
 
 	err = os.Symlink("/usr/lib/go/bin/gofmt", "/usr/bin/gofmt")
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
 
 	fmt.Printf("%s🪛 :: %sGO successfully installed%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
 		string(constants.ColorWhite))
+
+	return err
 }
 
 // PullContainers pulls the specified container image.
@@ -270,7 +270,7 @@ func Unarchive(archiveReader io.Reader, destination string) error {
 
 	dirMap := make(map[string]bool)
 
-	handler := func(ctx context.Context, archiveFile archiver.File) error {
+	handler := func(_ context.Context, archiveFile archiver.File) error {
 		fileName := archiveFile.NameInArchive
 		newPath := filepath.Join(destination, fileName)
 

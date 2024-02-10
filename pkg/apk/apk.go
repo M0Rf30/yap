@@ -33,13 +33,17 @@ func (a *Apk) Build(artifactsPath string) error {
 		return err
 	}
 
+	tmpl := a.PKGBUILD.RenderSpec(specFile)
+
 	if err := a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir,
-		"APKBUILD"), specFile); err != nil {
+		"APKBUILD"), tmpl); err != nil {
 		return err
 	}
 
+	tmpl = a.PKGBUILD.RenderSpec(postInstall)
+
 	if err := a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir,
-		a.PKGBUILD.PkgName+".install"), postInstall); err != nil {
+		a.PKGBUILD.PkgName+".install"), tmpl); err != nil {
 		return err
 	}
 

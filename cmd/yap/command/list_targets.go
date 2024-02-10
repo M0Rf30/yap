@@ -11,7 +11,7 @@ import (
 var listTargetsCmd = &cobra.Command{
 	Use:   "list-targets",
 	Short: "List a bunch of available build targets",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		ListTargets()
 	},
 }

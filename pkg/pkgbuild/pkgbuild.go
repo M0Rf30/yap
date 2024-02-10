@@ -92,7 +92,7 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 // CreateSpec reads the filepath where the specfile will be written and the
 // content of the specfile. Specfile generation is done using go templates for
 // every different distro family. It returns any error if encountered.
-func (pkgBuild *PKGBUILD) CreateSpec(filePath, script string) error {
+func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) error {
 	cleanFilePath := filepath.Clean(filePath)
 
 	file, err := os.Create(cleanFilePath)
@@ -101,6 +101,16 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath, script string) error {
 	}
 	defer file.Close()
 
+	if Verbose {
+		if err := tmpl.Execute(os.Stdout, pkgBuild); err != nil {
+			return err
+		}
+	}
+
+	return tmpl.Execute(file, pkgBuild)
+}
+
+func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
 	tmpl := template.New("template").Funcs(template.FuncMap{
 		"join": func(strs []string) string {
 			return strings.Trim(strings.Join(strs, ", "), " ")
@@ -114,14 +124,7 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath, script string) error {
 
 	template.Must(tmpl.Parse(script))
 
-	if Verbose {
-		err = tmpl.Execute(os.Stdout, pkgBuild)
-		if err != nil {
-			return err
-		}
-	}
-
-	return tmpl.Execute(file, pkgBuild)
+	return tmpl
 }
 
 // GetDepends reads the package manager name, its arguments and all the
