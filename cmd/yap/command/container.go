@@ -12,7 +12,7 @@ var containerCmd = &cobra.Command{
 	Use:   "container [target]",
 	Short: "Pull the built images",
 	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		err := utils.PullContainers(args[0])
 		log.Fatal(err)
 	},

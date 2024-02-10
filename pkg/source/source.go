@@ -93,9 +93,9 @@ func (src *Source) Get() error {
 // error if there was a problem opening the source file or extracting its
 // contents.
 func (src *Source) extract(sourceFilePath string) error {
-	dlFile, err := os.Open(filepath.Clean(sourceFilePath))
+	dlFile, err := utils.Open(filepath.Clean(sourceFilePath))
 	if err != nil {
-		return fmt.Errorf("failed to open source %s: %w", src.SourceItemURI, err)
+		return err
 	}
 
 	err = utils.Unarchive(dlFile, src.SrcDir)
@@ -224,9 +224,9 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return errors.Wrapf(errors.New("invalid hash length: %s"), strconv.Itoa(len(src.Hash)))
 	}
 
-	file, err := os.Open(filepath.Clean(sourceFilePath))
+	file, err := utils.Open(filepath.Clean(sourceFilePath))
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return err
 	}
 	defer file.Close()
 

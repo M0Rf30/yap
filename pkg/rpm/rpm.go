@@ -65,8 +65,9 @@ func (r *RPM) Build(artifactsPath string) error {
 	r.PKGBUILD.MakeDepends = r.processDepends(r.PKGBUILD.MakeDepends)
 	r.PKGBUILD.OptDepends = r.processDepends(r.PKGBUILD.OptDepends)
 
+	tmpl := r.PKGBUILD.RenderSpec(specFile)
 	if err := r.PKGBUILD.CreateSpec(filepath.Join(r.specsDir,
-		r.PKGBUILD.PkgName+".spec"), specFile); err != nil {
+		r.PKGBUILD.PkgName+".spec"), tmpl); err != nil {
 		return err
 	}
 
@@ -124,7 +125,7 @@ func (r *RPM) PrepareEnvironment(golang bool) error {
 	}
 
 	if golang {
-		utils.GOSetup()
+		return utils.GOSetup()
 	}
 
 	return nil
