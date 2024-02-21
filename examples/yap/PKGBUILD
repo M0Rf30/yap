@@ -27,16 +27,9 @@ sha256sums=(
 
 build() {
   cd "${srcdir}/${pkgname}"
-  export CGO_LDFLAGS="$LDFLAGS"
-  export CGO_CFLAGS="$CFLAGS"
-  export CGO_CPPFLAGS="$CPPFLAGS"
-  export CGO_CXXFLAGS="$CXXFLAGS"
-  export GOFLAGS="-buildmode=pie \
-  -trimpath \
-  -mod=readonly \
-  -modcacherw"
 
-  go build \
+  CGO_ENABLED=0 \
+    go build \
     -buildvcs=false \
     -ldflags "-w -s" \
     cmd/yap/yap.go
