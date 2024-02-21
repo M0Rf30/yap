@@ -10,12 +10,10 @@ RUN \
 COPY . /project
 WORKDIR /project
 RUN \
-  go build \
+  CGO_ENABLED=0 \
+    go build \
     -buildvcs=false \
     -ldflags "-w -s" \
-    -mod=readonly \
-    -modcacherw \
-    -trimpath \
     -o /usr/bin/yap \
     cmd/yap/yap.go
 
