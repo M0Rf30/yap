@@ -219,6 +219,11 @@ func GOSetup() error {
 		return err
 	}
 
+	err = RemoveAll(goArchivePath)
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("%s🪛 :: %sGO successfully installed%s\n",
 		string(constants.ColorBlue),
 		string(constants.ColorYellow),
