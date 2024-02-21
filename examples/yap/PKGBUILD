@@ -17,7 +17,12 @@ license=('GPL-3.0-only')
 section=misc
 priority=optional
 url="https://github.com/M0Rf30/${pkgname}"
-
+makedepends=(
+  'upx'
+)
+makedepends__apt=(
+  'upx-ucl'
+)
 source=(
   "git+${url}"
 )
@@ -33,6 +38,8 @@ build() {
     -buildvcs=false \
     -ldflags "-w -s" \
     cmd/yap/yap.go
+
+  upx "${pkgname}"
 }
 
 package() {

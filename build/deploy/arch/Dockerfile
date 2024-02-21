@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.vendor="M0Rf30"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN \
-  pacman -Syu --noconfirm go
+  pacman -Syu --noconfirm go upx
 
 COPY . /project
 WORKDIR /project
@@ -15,7 +15,8 @@ RUN \
     -buildvcs=false \
     -ldflags "-w -s" \
     -o /usr/bin/yap \
-    cmd/yap/yap.go
+    cmd/yap/yap.go; \
+    upx /usr/bin/yap
 
 FROM docker.io/archlinux:base
 COPY --from=builder /usr/bin/yap /usr/bin/yap

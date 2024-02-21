@@ -8,7 +8,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN \
   apt-get update; \
   apt-get upgrade; \
-  apt-get install -y --no-install-recommends ca-certificates curl tar; \
+  apt-get install -y --no-install-recommends ca-certificates curl tar upx-ucl; \
   curl -sL https://go.dev/dl/go1.22.0.linux-amd64.tar.gz --output go.tar.gz; \
   echo "f6c8a87aa03b92c4b0bf3d558e28ea03006eb29db78917daec5cfb6ec1046265 go.tar.gz" | sha256sum -c - ; \
   tar -C /usr/lib -xf go.tar.gz; \
@@ -24,7 +24,8 @@ RUN \
     -buildvcs=false \
     -ldflags "-w -s" \
     -o /usr/bin/yap \
-    cmd/yap/yap.go
+    cmd/yap/yap.go; \
+    upx /usr/bin/yap
 
 FROM docker.io/debian:jessie
 COPY --from=builder /usr/bin/yap /usr/bin/yap
