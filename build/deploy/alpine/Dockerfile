@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.description="Package software with ease 📦"
 LABEL org.opencontainers.image.vendor="M0Rf30"
 
 RUN \
-  apk add --no-cache go
+  apk add --no-cache go upx
 
 COPY . /project
 WORKDIR /project
@@ -14,7 +14,8 @@ RUN \
     -buildvcs=false \
     -ldflags "-w -s" \
     -o /usr/bin/yap \
-    cmd/yap/yap.go
+    cmd/yap/yap.go; \
+    upx /usr/bin/yap
 
 FROM docker.io/alpine:latest
 COPY --from=builder /usr/bin/yap /usr/bin/yap
