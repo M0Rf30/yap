@@ -6,8 +6,8 @@ LABEL org.opencontainers.image.vendor="M0Rf30"
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN \
   dnf -y install curl-minimal tar; \
-  curl -sL https://go.dev/dl/go1.21.6.linux-amd64.tar.gz --output go.tar.gz; \
-  echo "3f934f40ac360b9c01f616a9aa1796d227d8b0328bf64cb045c7b8c4ee9caea4 go.tar.gz" | sha256sum -c - ; \
+  curl -sL https://go.dev/dl/go1.22.0.linux-amd64.tar.gz --output go.tar.gz; \
+  echo "f6c8a87aa03b92c4b0bf3d558e28ea03006eb29db78917daec5cfb6ec1046265 go.tar.gz" | sha256sum -c - ; \
   tar -C /usr/lib -xf go.tar.gz; \
   ln -sf /usr/lib/go/bin/go /usr/bin/go; \
   ln -sf /usr/lib/go/bin/gofmt /usr/bin/gofmt; \
