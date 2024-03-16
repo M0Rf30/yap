@@ -199,12 +199,7 @@ func GOSetup() error {
 		log.Panic(err)
 	}
 
-	dlFile, err := Open(goArchivePath)
-	if err != nil {
-		return err
-	}
-
-	err = Unarchive(dlFile, "/usr/lib")
+	err = Unarchive(goArchivePath, "/usr/lib")
 	if err != nil {
 		return err
 	}
@@ -265,15 +260,29 @@ func RunScript(cmds string) error {
 	return runner.Run(context.TODO(), script)
 }
 
-// Unarchive extracts files from an archive and saves them to a destination directory.
+// Unarchive is a function that takes a source file and a destination. It opens
+// the source archive file, identifies its format, and extracts it to the
+// destination.
 //
-// archiveReader is an io.Reader that represents the archive file.
-// destination is the path to the directory where the files will be saved.
 // Returns an error if there was a problem extracting the files.
-func Unarchive(archiveReader io.Reader, destination string) error {
-	format, archiveReader, _ := archiver.Identify("", archiveReader)
+func Unarchive(source, destination string) error {
+	// Open the source archive file
+	archive, err := Open(source)
+	if err != nil {
+		return err
+	}
+
+	// Identify the archive file's format
+	format, archiveReader, _ := archiver.Identify("", archive)
 
 	dirMap := make(map[string]bool)
+
+	// Check if the format is an extractor. If not, skip the archive file.
+	extractor, ok := format.(archiver.Extractor)
+
+	if !ok {
+		return nil
+	}
 
 	handler := func(_ context.Context, archiveFile archiver.File) error {
 		fileName := archiveFile.NameInArchive
@@ -282,7 +291,7 @@ func Unarchive(archiveReader io.Reader, destination string) error {
 		if archiveFile.IsDir() {
 			dirMap[newPath] = true
 
-			return os.MkdirAll(newPath, archiveFile.Mode())
+			return MkdirAll(newPath)
 		}
 
 		fileDir := filepath.Dir(newPath)
@@ -290,8 +299,8 @@ func Unarchive(archiveReader io.Reader, destination string) error {
 
 		if !seenDir {
 			dirMap[fileDir] = true
-			// #nosec
-			return os.MkdirAll(fileDir, 0777)
+
+			_ = MkdirAll(fileDir)
 		}
 
 		cleanNewPath := filepath.Clean(newPath)
@@ -315,12 +324,7 @@ func Unarchive(archiveReader io.Reader, destination string) error {
 		return err
 	}
 
-	ex, ok := format.(archiver.Extractor)
-	if !ok {
-		return nil
-	}
-
-	return ex.Extract(context.Background(),
+	return extractor.Extract(context.Background(),
 		archiveReader,
 		nil,
 		handler)
