@@ -312,7 +312,9 @@ func (d *Deb) PrepareEnvironment(golang bool) error {
 	}
 
 	if golang {
-		return utils.GOSetup()
+		if err := utils.GOSetup(); err != nil {
+			return err
+		}
 	}
 
 	return nil

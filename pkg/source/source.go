@@ -79,28 +79,8 @@ func (src *Source) Get() error {
 		return err
 	}
 
-	if err := src.extract(sourceFilePath); err != nil {
+	if err := utils.Unarchive(sourceFilePath, src.SrcDir); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// extract extracts the contents of a source file to the specified source
-// directory.
-//
-// sourceFilePath: The path to the source file to be extracted. Returns: An
-// error if there was a problem opening the source file or extracting its
-// contents.
-func (src *Source) extract(sourceFilePath string) error {
-	dlFile, err := utils.Open(filepath.Clean(sourceFilePath))
-	if err != nil {
-		return err
-	}
-
-	err = utils.Unarchive(dlFile, src.SrcDir)
-	if err != nil {
-		return fmt.Errorf("failed to extract source %s: %w", src.SourceItemPath, err)
 	}
 
 	return nil
