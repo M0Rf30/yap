@@ -56,8 +56,6 @@ linters-settings:
       - opinionated
       - performance
       - style
-  gocyclo:
-    max-complexity: 15
   gofmt:
     rewrite-rules:
       - pattern: interface{}
