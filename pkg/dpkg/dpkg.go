@@ -107,14 +107,13 @@ func (d *Deb) createScripts() error {
 			continue
 		}
 
-		data := script
 		if name == "prerm" || name == "postrm" {
-			data = removeHeader + data
+			script = removeHeader + script
 		}
 
 		path := filepath.Join(d.debDir, name)
 
-		if err := utils.CreateWrite(path, data); err != nil {
+		if err := utils.CreateWrite(path, script); err != nil {
 			return err
 		}
 
