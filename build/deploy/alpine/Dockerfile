@@ -4,7 +4,13 @@ LABEL org.opencontainers.image.description="Package software with ease 📦"
 LABEL org.opencontainers.image.vendor="M0Rf30"
 
 RUN \
-  apk add --no-cache go upx
+  apk add --no-cache upx; \
+  wget https://go.dev/dl/go1.22.0.linux-amd64.tar.gz -O go.tar.gz; \
+  echo "f6c8a87aa03b92c4b0bf3d558e28ea03006eb29db78917daec5cfb6ec1046265 go.tar.gz" | sha256sum -c - ; \
+  tar -C /usr/lib -xf go.tar.gz; \
+  ln -sf /usr/lib/go/bin/go /usr/bin/go; \
+  ln -sf /usr/lib/go/bin/gofmt /usr/bin/gofmt; \
+  ln -sf /usr/share/doc/go /usr/lib/go/doc;
 
 COPY . /project
 WORKDIR /project

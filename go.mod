@@ -1,6 +1,6 @@
 module github.com/M0Rf30/yap
 
-go 1.21.3
+go 1.22
 
 toolchain go1.22.1
 
