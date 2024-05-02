@@ -34,6 +34,7 @@ RUN \
   apt-get upgrade; \
   apt-get install -y --no-install-recommends \
     bash-completion \
+    binutils \
     ca-certificates \
     sudo; \
   yap completion bash > /usr/share/bash-completion/completions/yap; \
