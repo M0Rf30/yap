@@ -2,13 +2,10 @@ package project
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
-	"log"
 	"path/filepath"
 
 	"github.com/M0Rf30/yap/pkg/builder"
-	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/packer"
 	"github.com/M0Rf30/yap/pkg/parser"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
@@ -17,17 +14,44 @@ import (
 )
 
 var (
-	CleanBuild   bool
-	NoBuild      bool
-	NoMakeDeps   bool
-	SkipSyncDeps bool
-)
+	// CleanBuild indicates whether a clean build should be performed,
+	// potentially clearing existing binaries or intermediate files.
+	CleanBuild bool
 
-// FromPkgName is used to start the build process from a specific package.
-// ToPkgName is used to stop the build process after a specific package.
-var (
+	// FromPkgName is used to start the build process from a specific package.
 	FromPkgName string
-	ToPkgName   string
+
+	// makeDepends lists packages that must be present as dependencies
+	// during the build process but are not required at runtime.
+	makeDepends []string
+
+	// NoBuild specifies whether the build process should be skipped,
+	// useful for debugging or when only non-compilation tasks are needed.
+	NoBuild bool
+
+	// NoMakeDeps indicates whether dependency checks and installations
+	// should be bypassed during the build process.
+	NoMakeDeps bool
+
+	// packageManager is an instance of packer.Packer, used to manage
+	// package operations such as installation, removal, or updates.
+	packageManager packer.Packer
+
+	// singleProject indicates whether the operation should be limited to a
+	// single project or applied across multiple projects.
+	singleProject bool
+
+	// SkipSyncDeps determines whether synchronization of dependencies
+	// should be skipped, potentially speeding up operations but risking
+	// inconsistencies.
+	SkipSyncDeps bool
+
+	// ToPkgName is used to stop the build process after a specific package.
+	ToPkgName string
+
+	// Zap indicates whether resources should be aggressively cleaned up
+	// after operations, such as removing temporary files or caches.
+	Zap bool
 )
 
 // DistroProject is an interface that defines the methods for creating and
@@ -52,15 +76,11 @@ type DistroProject interface {
 // packages and the ToPkgName field, which can be used to stop the build
 // process after a specific package.
 type MultipleProject struct {
-	makeDepends    []string
-	packageManager packer.Packer
-	root           string
-	BuildDir       string     `json:"buildDir"    validate:"required"`
-	Description    string     `json:"description" validate:"required"`
-	Name           string     `json:"name"        validate:"required"`
-	Output         string     `json:"output"      validate:"required"`
-	Projects       []*Project `json:"projects"    validate:"required,dive,required"`
-	singleProject  bool
+	BuildDir    string     `json:"buildDir"    validate:"required"`
+	Description string     `json:"description" validate:"required"`
+	Name        string     `json:"name"        validate:"required"`
+	Output      string     `json:"output"      validate:"required"`
+	Projects    []*Project `json:"projects"    validate:"required,dive,required"`
 }
 
 // Project represents a single project.
@@ -88,7 +108,7 @@ type Project struct {
 // If ToPkgName is not empty, it stops building after the specified package.
 // It returns an error if any error occurs during the build process.
 func (mpc *MultipleProject) BuildAll() error {
-	if !mpc.singleProject {
+	if !singleProject {
 		mpc.checkPkgsRange(FromPkgName, ToPkgName)
 	}
 
@@ -97,14 +117,9 @@ func (mpc *MultipleProject) BuildAll() error {
 			continue
 		}
 
-		fmt.Printf("%s🚀 :: %sMaking package: %s\t%s %s-%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite),
-			proj.Builder.PKGBUILD.PkgName,
-			proj.Builder.PKGBUILD.PkgVer,
-			proj.Builder.PKGBUILD.PkgRel,
-		)
+		utils.Logger.Info("making package", utils.Logger.Args("pkgname", proj.Builder.PKGBUILD.PkgName,
+			"pkgver", proj.Builder.PKGBUILD.PkgVer,
+			"pkgrel", proj.Builder.PKGBUILD.PkgRel))
 
 		if err := proj.Builder.Compile(NoBuild); err != nil {
 			return err
@@ -117,14 +132,9 @@ func (mpc *MultipleProject) BuildAll() error {
 		}
 
 		if proj.HasToInstall {
-			fmt.Printf("%s🤓 :: %sInstalling package: %s%s %s-%s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow),
-				string(constants.ColorWhite),
-				proj.Builder.PKGBUILD.PkgName,
-				proj.Builder.PKGBUILD.PkgVer,
-				proj.Builder.PKGBUILD.PkgRel,
-			)
+			utils.Logger.Info("installing package", utils.Logger.Args("pkgname", proj.Builder.PKGBUILD.PkgName,
+				"pkgver", proj.Builder.PKGBUILD.PkgVer,
+				"pkgrel", proj.Builder.PKGBUILD.PkgRel))
 
 			if err := proj.PackageManager.Install(mpc.Output); err != nil {
 				return err
@@ -150,6 +160,12 @@ func (mpc *MultipleProject) Clean() error {
 
 		if CleanBuild {
 			if err := utils.RemoveAll(project.Builder.PKGBUILD.SourceDir); err != nil {
+				return err
+			}
+		}
+
+		if Zap && !singleProject {
+			if err := utils.RemoveAll(project.Builder.PKGBUILD.StartDir); err != nil {
 				return err
 			}
 		}
@@ -181,9 +197,9 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	mpc.packageManager = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
+	packageManager = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
 	if !SkipSyncDeps {
-		if err := mpc.packageManager.Update(); err != nil {
+		if err := packageManager.Update(); err != nil {
 			return err
 		}
 	}
@@ -196,12 +212,10 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	if !NoMakeDeps {
 		mpc.getMakeDeps()
 
-		if err := mpc.packageManager.Prepare(mpc.makeDepends); err != nil {
+		if err := packageManager.Prepare(makeDepends); err != nil {
 			return err
 		}
 	}
-
-	mpc.root = path
 
 	return nil
 }
@@ -223,13 +237,8 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
 	}
 
 	if fromPkgName != "" && toPkgName != "" && firstIndex > lastIndex {
-		log.Fatalf("%s❌ :: %sInvalid package order: %s%s should be built before %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite),
-			toPkgName,
-			fromPkgName,
-		)
+		utils.Logger.Fatal("invalid package order: %s should be built before %s",
+			utils.Logger.Args(fromPkgName, toPkgName))
 	}
 }
 
@@ -275,12 +284,8 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 	}
 
 	if !matchFound {
-		log.Fatalf("%s❌ :: %spackage not found: %s%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite),
-			pkgName,
-		)
+		utils.Logger.Fatal("package not found",
+			utils.Logger.Args("pkgname", pkgName))
 	}
 
 	return index
@@ -292,13 +297,9 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 // to the makeDepends slice. The makeDepends slice is then assigned to the
 // makeDepends field of the MultipleProject.
 func (mpc *MultipleProject) getMakeDeps() {
-	var makeDepends []string
-
 	for _, child := range mpc.Projects {
 		makeDepends = append(makeDepends, child.Builder.PKGBUILD.MakeDepends...)
 	}
-
-	mpc.makeDepends = makeDepends
 }
 
 // populateProjects populates the MultipleProject with projects based on the
@@ -323,12 +324,12 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
-		mpc.packageManager = packer.GetPackageManager(pkgbuildFile, distro)
+		packageManager = packer.GetPackageManager(pkgbuildFile, distro)
 
 		proj := &Project{
 			Name:           child.Name,
 			Builder:        &builder.Builder{PKGBUILD: pkgbuildFile},
-			PackageManager: mpc.packageManager,
+			PackageManager: packageManager,
 			HasToInstall:   child.HasToInstall,
 		}
 
@@ -348,16 +349,31 @@ func (mpc *MultipleProject) readProject(path string) error {
 	jsonFilePath := filepath.Join(path, "yap.json")
 	pkgbuildFilePath := filepath.Join(path, "PKGBUILD")
 
-	filePath, err := utils.Open(jsonFilePath)
-	if err != nil {
-		_, err = utils.Open(pkgbuildFilePath)
-		if err != nil {
-			return err
-		}
+	var projectFilePath string
+
+	if utils.Exists(jsonFilePath) {
+		projectFilePath = jsonFilePath
+		utils.Logger.Info("molti-project file found",
+			utils.Logger.Args("path", projectFilePath))
+	} else {
+		utils.Logger.Info("the multi-project file does not exist.",
+			utils.Logger.Args("path", jsonFilePath))
+	}
+
+	if utils.Exists(pkgbuildFilePath) {
+		projectFilePath = pkgbuildFilePath
+		utils.Logger.Info("single-project file found",
+			utils.Logger.Args("path", projectFilePath))
 
 		mpc.setSingleProject(path)
+	} else {
+		utils.Logger.Info("the single-project file does not exist.",
+			utils.Logger.Args("path", pkgbuildFilePath))
+	}
 
-		return nil
+	filePath, err := utils.Open(projectFilePath)
+	if err != nil || singleProject {
+		return err
 	}
 	defer filePath.Close()
 
@@ -376,7 +392,7 @@ func (mpc *MultipleProject) readProject(path string) error {
 		return err
 	}
 
-	return nil
+	return err
 }
 
 // setSingleProject reads the PKGBUILD file at the given path and updates the
@@ -385,14 +401,14 @@ func (mpc *MultipleProject) setSingleProject(path string) {
 	cleanFilePath := filepath.Clean(path)
 	proj := &Project{
 		Name:           "",
-		PackageManager: mpc.packageManager,
+		PackageManager: packageManager,
 		HasToInstall:   false,
 	}
 
 	mpc.BuildDir = cleanFilePath
 	mpc.Output = cleanFilePath
 	mpc.Projects = append(mpc.Projects, proj)
-	mpc.singleProject = true
+	singleProject = true
 }
 
 // validateAllProject validates all projects in the MultipleProject struct.
