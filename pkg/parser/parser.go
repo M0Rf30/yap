@@ -1,11 +1,9 @@
 package parser
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/otiai10/copy"
@@ -37,9 +35,8 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 	}
 
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to get root directory from %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), home)
+		utils.Logger.Error("failed to get root directory",
+			utils.Logger.Args("path", home))
 
 		return nil, err
 	}

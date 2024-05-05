@@ -1,9 +1,6 @@
 package builder
 
 import (
-	"fmt"
-
-	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/source"
 	"github.com/M0Rf30/yap/pkg/utils"
@@ -21,10 +18,7 @@ func (builder *Builder) Compile(noBuild bool) error {
 		return err
 	}
 
-	fmt.Printf("%s🖧  :: %sRetrieving sources ...%s\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite))
+	utils.Logger.Info("retrieving sources")
 
 	if err := builder.getSources(); err != nil {
 		return err
@@ -32,17 +26,17 @@ func (builder *Builder) Compile(noBuild bool) error {
 
 	if !noBuild {
 		if err := processFunction(builder.PKGBUILD.Prepare,
-			"Preparing"); err != nil {
+			"preparing"); err != nil {
 			return err
 		}
 
 		if err := processFunction(builder.PKGBUILD.Build,
-			"Building"); err != nil {
+			"building"); err != nil {
 			return err
 		}
 
 		if err := processFunction(builder.PKGBUILD.Package,
-			"Generating package"); err != nil {
+			"generating package"); err != nil {
 			return err
 		}
 	}
@@ -59,11 +53,7 @@ func processFunction(pkgbuildFunction, message string) error {
 		return nil
 	}
 
-	fmt.Printf("%s📦 :: %s%s ...%s\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		message,
-		string(constants.ColorWhite))
+	utils.Logger.Info(message)
 
 	return utils.RunScript("  set -e\n" + pkgbuildFunction)
 }

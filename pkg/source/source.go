@@ -4,12 +4,10 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
-	"fmt"
 	"hash"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/M0Rf30/yap/pkg/constants"
@@ -63,12 +61,17 @@ func (src *Source) Get() error {
 
 	switch sourceType {
 	case "http", "https", "ftp", constants.Git:
+		var err error
 		if !utils.Exists(sourceFilePath) {
-			_ = src.getURL(sourceType, sourceFilePath, SSHPassword)
+			err = src.getURL(sourceType, sourceFilePath, SSHPassword)
+		}
+
+		if err != nil {
+			return err
 		}
 	case "file":
 	default:
-		return errors.New("unsupported source type")
+		return errors.Errorf("unsupported source type")
 	}
 
 	if err := src.validateSource(sourceFilePath); err != nil {
@@ -179,16 +182,13 @@ func (src *Source) symlinkSources(symlinkSource string) error {
 // It takes the source file path as a parameter and returns an error if any.
 func (src *Source) validateSource(sourceFilePath string) error {
 	info, err := os.Stat(sourceFilePath)
+
 	if err != nil {
-		return fmt.Errorf("failed to open file for hash: %w", err)
+		return errors.Errorf("failed to open file for hash %s", sourceFilePath)
 	}
 
 	if src.Hash == "SKIP" || info.IsDir() {
-		fmt.Printf("%s:: %sSkip integrity check for %s\t%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite),
-			src.SourceItemURI)
+		utils.Logger.Info("skip integrity check for", utils.Logger.Args("source", src.SourceItemURI))
 
 		return nil
 	}
@@ -201,7 +201,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	case 128:
 		hashSum = sha512.New()
 	default:
-		return errors.Wrapf(errors.New("invalid hash length: %s"), strconv.Itoa(len(src.Hash)))
+		return errors.Errorf("unsupported hash length %d", len(src.Hash))
 	}
 
 	file, err := utils.Open(filepath.Clean(sourceFilePath))
@@ -211,21 +211,17 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	defer file.Close()
 
 	if _, err := io.Copy(hashSum, file); err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+		return errors.Errorf("failed to copy file %s", sourceFilePath)
 	}
 
 	sum := hashSum.Sum(nil)
 	hexSum := hex.EncodeToString(sum)
 
 	if hexSum != src.Hash {
-		return errors.Wrapf(errors.New("hash verification failed"), src.SourceItemPath)
+		return errors.Errorf("hash verification failed %s", src.SourceItemPath)
 	}
 
-	fmt.Printf("%s:: %sIntegrity check for %s\t%s\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite),
-		src.SourceItemURI)
+	utils.Logger.Info("integrity check for", utils.Logger.Args("source", src.SourceItemURI))
 
 	return nil
 }

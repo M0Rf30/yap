@@ -1,6 +1,7 @@
 package dpkg
 
 var buildEnvironmentDeps = []string{
+	"autoconf",
 	"build-essential",
 	"libltdl7",
 	"libtool",

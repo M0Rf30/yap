@@ -1,9 +1,8 @@
 package command
 
 import (
-	"fmt"
-
 	"github.com/M0Rf30/yap/pkg/constants"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +17,7 @@ var listTargetsCmd = &cobra.Command{
 
 func ListTargets() {
 	for _, release := range constants.Releases {
-		fmt.Println(release)
+		pterm.Println(release)
 	}
 }
 

@@ -13,10 +13,15 @@ import (
 // - arg: optional arguments to be passed to the command.
 //
 // It returns an error if the command execution fails.
-func Exec(dir, name string, arg ...string) error {
-	cmd := exec.Command(name, arg...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+func Exec(excludeStdout bool, dir, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = MultiPrinter.Writer
+	cmd.Stderr = MultiPrinter.Writer
+
+	if excludeStdout {
+		cmd.Stderr = nil
+		cmd.Stdout = nil
+	}
 
 	if dir != "" {
 		cmd.Dir = dir

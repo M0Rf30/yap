@@ -6,11 +6,13 @@ linters:
     # here some dropped deprecated checks
     # reduce warning messages
     - deadcode
+    - execinquery
     - exhaustivestruct
     - golint
     - ifshort
     - interfacer
     - maligned
+    - mnd
     - nosnakecase
     - scopelint
     - structcheck

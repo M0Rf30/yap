@@ -8,7 +8,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/options"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
@@ -139,7 +138,7 @@ func (d *Deb) dpkgDeb(artifactPath string) error {
 				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
 				arch))
 
-		if err := utils.Exec("",
+		if err := utils.Exec(true, "",
 			"dpkg-deb",
 			"-b",
 			"-Zzstd",
@@ -171,10 +170,7 @@ func (d *Deb) Prepare(makeDepends []string) error {
 func (d *Deb) Strip() error {
 	var tmplBytesBuffer bytes.Buffer
 
-	fmt.Printf("%s🧹 :: %sStripping binaries ...%s\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite))
+	utils.Logger.Info("stripping binaries")
 
 	tmpl := template.New("strip")
 
@@ -287,7 +283,7 @@ func (d *Deb) Install(artifactsPath string) error {
 				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
 				arch))
 
-		if err := utils.Exec("", "apt-get", "install", "-y", artifactFilePath); err != nil {
+		if err := utils.Exec(false, "", "apt-get", "install", "-y", artifactFilePath); err != nil {
 			return err
 		}
 	}
@@ -306,7 +302,7 @@ func (d *Deb) PrepareEnvironment(golang bool) error {
 	}
 	args = append(args, buildEnvironmentDeps...)
 
-	if err := utils.Exec("", "apt-get", args...); err != nil {
+	if err := utils.Exec(false, "", "apt-get", args...); err != nil {
 		return err
 	}
 

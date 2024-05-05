@@ -1,16 +1,14 @@
 package command
 
 import (
-	"fmt"
-	"log"
 	"path/filepath"
 	"strings"
 
-	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/parser"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/project"
 	"github.com/M0Rf30/yap/pkg/source"
+	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +20,6 @@ var (
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(_ *cobra.Command, args []string) {
 			fullJSONPath, _ := filepath.Abs(args[1])
-
 			split := strings.Split(args[0], "-")
 			distro := split[0]
 			release := ""
@@ -34,29 +31,20 @@ var (
 			mpc := project.MultipleProject{}
 			err := mpc.MultiProject(distro, release, fullJSONPath)
 			if err != nil {
-				fmt.Printf("%s❌ :: %sError:\n%s",
-					string(constants.ColorBlue),
-					string(constants.ColorYellow),
-					string(constants.ColorWhite))
-				log.Fatal(err)
+				utils.Logger.Fatal("fatal error",
+					utils.Logger.Args("error", err))
 			}
 
 			if project.CleanBuild {
 				if err := mpc.Clean(); err != nil {
-					fmt.Printf("%s❌ :: %sError:\n%s",
-						string(constants.ColorBlue),
-						string(constants.ColorYellow),
-						string(constants.ColorWhite))
-					log.Fatal(err)
+					utils.Logger.Fatal("fatal error",
+						utils.Logger.Args("error", err))
 				}
 			}
 
 			if err := mpc.BuildAll(); err != nil {
-				fmt.Printf("%s❌ :: %sError:\n%s",
-					string(constants.ColorBlue),
-					string(constants.ColorYellow),
-					string(constants.ColorWhite))
-				log.Fatal(err)
+				utils.Logger.Fatal("fatal error",
+					utils.Logger.Args("error", err))
 			}
 		},
 	}

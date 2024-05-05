@@ -1,13 +1,11 @@
 package utils
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/M0Rf30/yap/pkg/constants"
+	"github.com/pkg/errors"
 )
 
 // Chmod changes the file mode of the specified path.
@@ -21,11 +19,7 @@ import (
 func Chmod(path string, perm os.FileMode) error {
 	err := os.Chmod(path, perm)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to chmod '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
+		Logger.Error("failed to chmod", Logger.Args("path", path))
 
 		return err
 	}
@@ -41,12 +35,9 @@ func Create(path string) (*os.File, error) {
 	cleanFilePath := filepath.Clean(path)
 
 	file, err := os.Create(cleanFilePath)
+
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to create '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
+		Logger.Error("failed to create path", Logger.Args("path", path))
 	}
 
 	return file, err
@@ -68,11 +59,7 @@ func CreateWrite(path, data string) error {
 
 	_, err = file.WriteString(data)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to write to file '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
+		Logger.Error("failed to write to file", Logger.Args("path", path))
 
 		return err
 	}
@@ -97,10 +84,10 @@ func Exists(path string) bool {
 func ExistsMakeDir(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if err := os.MkdirAll(path, os.ModePerm); err != nil {
-			return fmt.Errorf("failed to create directory '%s': %w", path, err)
+			return errors.Errorf("failed to create directory %s", path)
 		}
 	} else if err != nil {
-		return fmt.Errorf("failed to access directory '%s': %w", path, err)
+		return errors.Errorf("failed to access directory %s", path)
 	}
 
 	return nil
@@ -127,11 +114,8 @@ func GetDirSize(path string) (int64, error) {
 
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Fatalf("%s❌ :: %sfailed to get dir size '%s'%s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow),
-				path,
-				string(constants.ColorWhite))
+			Logger.Fatal("failed to get dir size",
+				Logger.Args("path", path))
 		}
 
 		if !info.IsDir() {
@@ -174,11 +158,8 @@ func MkdirAll(path string) error {
 	//#nosec
 	err := os.MkdirAll(path, 0o755)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to mkdir '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
+		Logger.Error("failed to make directory",
+			Logger.Args("path", path))
 
 		return err
 	}
@@ -195,11 +176,8 @@ func Open(path string) (*os.File, error) {
 
 	file, err := os.Open(cleanFilePath)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to open file '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
+		Logger.Error("failed to open file",
+			Logger.Args("path", path))
 	}
 
 	return file, err
@@ -212,11 +190,8 @@ func Open(path string) (*os.File, error) {
 func RemoveAll(path string) error {
 	err := os.RemoveAll(path)
 	if err != nil {
-		fmt.Printf("%s❌ :: %sfailed to remove '%s'%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			path,
-			string(constants.ColorWhite))
+		Logger.Error("failed to remove",
+			Logger.Args("path", path))
 
 		return err
 	}
