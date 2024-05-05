@@ -30,8 +30,11 @@ RUN \
   dnf -y install \
     bash-completion \
     ca-certificates \
+    dnf-plugins-core \
     rpm-build \
     sudo; \
+  dnf config-manager --enable devel; \
+  dnf config-manager --enable powertools; \
   yap completion bash > /etc/bash_completion.d/yap; \
   echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \
   dnf clean all
