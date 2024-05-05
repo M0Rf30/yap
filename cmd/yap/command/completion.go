@@ -1,9 +1,7 @@
 package command
 
 import (
-	"log"
-	"os"
-
+	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -48,19 +46,22 @@ $ yap completion zsh > "${fpath[1]}/_yap"
 	Run: func(cmd *cobra.Command, args []string) {
 		switch args[0] {
 		case "bash":
-			err := cmd.Root().GenBashCompletion(os.Stdout)
+			err := cmd.Root().GenBashCompletion(utils.MultiPrinter.Writer)
 			if err != nil {
-				log.Fatal(err)
+				utils.Logger.Fatal("failed to generate bash completion",
+					utils.Logger.Args("error", err))
 			}
 		case "fish":
-			err := cmd.Root().GenFishCompletion(os.Stdout, true)
+			err := cmd.Root().GenFishCompletion(utils.MultiPrinter.Writer, true)
 			if err != nil {
-				log.Fatal(err)
+				utils.Logger.Fatal("failed to generate fish completion",
+					utils.Logger.Args("error", err))
 			}
 		case "zsh":
-			err := cmd.Root().GenZshCompletion(os.Stdout)
+			err := cmd.Root().GenZshCompletion(utils.MultiPrinter.Writer)
 			if err != nil {
-				log.Fatal(err)
+				utils.Logger.Fatal("failed to generate zsh completion",
+					utils.Logger.Args("error", err))
 			}
 		}
 	},

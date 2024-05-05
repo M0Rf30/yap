@@ -70,7 +70,7 @@ func (a *Apk) Install(artifactsPath string) error {
 
 		pkgFilePath := filepath.Join(artifactsPath, a.PKGBUILD.PkgName, arch, pkgName)
 
-		if err := utils.Exec("",
+		if err := utils.Exec(true,
 			"apk",
 			"add",
 			"--allow-untrusted",
@@ -109,7 +109,7 @@ func (a *Apk) PrepareEnvironment(golang bool) error {
 		args = append(args, "go")
 	}
 
-	return utils.Exec("", "apk", args...)
+	return utils.Exec(true, "", "apk", args...)
 }
 
 // Update updates the APK package manager's package database.
@@ -121,14 +121,14 @@ func (a *Apk) Update() error {
 // apkBuild compiles the APK package using 'abuild-keygen' and 'abuild'.
 // It returns an error if any compilation step fails.
 func (a *Apk) apkBuild(artifactsPath string) error {
-	if err := utils.Exec(a.apkDir,
+	if err := utils.Exec(true, a.apkDir,
 		"abuild-keygen",
 		"-n",
 		"-a"); err != nil {
 		return err
 	}
 
-	if err := utils.Exec(a.apkDir,
+	if err := utils.Exec(true, a.apkDir,
 		"abuild",
 		"-F",
 		"-K",
