@@ -9,11 +9,14 @@ const (
 )
 
 var buildEnvironmentDeps = []string{
+	"autoconf",
 	"automake",
 	"createrepo",
 	"expect",
 	"gcc",
 	"gcc-c++",
+	"libtool-ltdl",
+	"libtool-ltdl-devel",
 	"make",
 	"openssl",
 	"rpm-sign",

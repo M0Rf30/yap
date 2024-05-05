@@ -3,6 +3,8 @@ package dpkg
 var buildEnvironmentDeps = []string{
 	"autoconf",
 	"build-essential",
+	"libltdl7",
+	"libtool",
 	"reprepro",
 	"tzdata",
 	"ca-certificates",
