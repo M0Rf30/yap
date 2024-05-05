@@ -1,8 +1,6 @@
 package pkgbuild
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +9,7 @@ import (
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/github/go-spdx/v2/spdxexp"
+	"github.com/pkg/errors"
 )
 
 // Verbose is a flag to enable verbose output.
@@ -102,7 +101,7 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	defer file.Close()
 
 	if Verbose {
-		if err := tmpl.Execute(os.Stdout, pkgBuild); err != nil {
+		if err := tmpl.Execute(utils.MultiPrinter.Writer, pkgBuild); err != nil {
 			return err
 		}
 	}
@@ -137,14 +136,14 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 
 	args = append(args, makeDepends...)
 
-	return utils.Exec("", packageManager, args...)
+	return utils.Exec(false, "", packageManager, args...)
 }
 
 // GetUpdates reads the package manager name and its arguments to perform
 // a sync with remotes and consequently retrieve updates.
 // It returns any error if encountered.
 func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
-	return utils.Exec("", packageManager, args...)
+	return utils.Exec(false, "", packageManager, args...)
 }
 
 // Init initializes the PKGBUILD struct.
@@ -168,34 +167,23 @@ func (pkgBuild *PKGBUILD) Validate() {
 	if !pkgBuild.validateLicense() {
 		isValid = false
 
-		fmt.Printf("%s%s ❌ :: %sinvalid SPDX license identifier%s\n",
-			pkgBuild.PkgName,
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite))
-
-		fmt.Println("You can find valid SPDX license identifiers here")
-		fmt.Println("🌐 https://spdx.org/licenses/")
+		utils.Logger.Error("invalid SPDX license identifier", utils.Logger.Args("pkgname", pkgBuild.PkgName))
+		utils.Logger.Info("you can find valid SPDX license identifiers here",
+			utils.Logger.Args("🌐", "https://spdx.org/licenses/"))
 	}
 
 	if len(pkgBuild.SourceURI) != len(pkgBuild.HashSums) {
 		isValid = false
 
-		fmt.Printf("%s%s ❌ :: %snumber of sources and hashsums differs%s\n",
-			pkgBuild.PkgName,
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite))
+		utils.Logger.Error("number of sources and hashsums differs",
+			utils.Logger.Args("pkgname", pkgBuild.PkgName))
 	}
 
 	if pkgBuild.Package == "" {
 		isValid = false
 
-		fmt.Printf("%s%s ❌ :: %smissing package() function%s\n",
-			pkgBuild.PkgName,
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite))
+		utils.Logger.Error("missing package() function",
+			utils.Logger.Args("pkgname", pkgBuild.PkgName))
 	}
 
 	if !isValid {
@@ -298,9 +286,8 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	}
 
 	if err != nil {
-		log.Fatalf("%s❌ :: %sfailed to set variable %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), key)
+		utils.Logger.Fatal("failed to set variable",
+			utils.Logger.Args("variable", key))
 	}
 }
 
@@ -318,7 +305,7 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 
 	// If there are more than two elements in the split array, return an error.
 	if len(split) != 2 {
-		return key, 0, fmt.Errorf("invalid use of '__' directive in '%w'", nil)
+		return key, 0, errors.Errorf("invalid use of '__' directive in %s", input)
 	}
 
 	// If the FullDistroName is empty, return the key and a priority of 0.
@@ -358,15 +345,11 @@ func (pkgBuild *PKGBUILD) setMainFolders() {
 	}
 
 	if err := os.Setenv("pkgdir", pkgBuild.PackageDir); err != nil {
-		log.Fatalf("%s❌ :: %sfailed to set variable pkgdir\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow))
+		utils.Logger.Fatal("failed to set variable pkgdir")
 	}
 
 	if err := os.Setenv("srcdir", pkgBuild.SourceDir); err != nil {
-		log.Fatalf("%s❌ :: %sfailed to set variable srcdir\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow))
+		utils.Logger.Fatal("failed to set variable srcdir")
 	}
 }
 

@@ -1,11 +1,8 @@
 package utils
 
 import (
-	"fmt"
-	"log"
 	"strings"
 
-	"github.com/M0Rf30/yap/pkg/constants"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -20,9 +17,8 @@ func StringifyArray(node *syntax.Assign) []string {
 
 	for index := range node.Array.Elems {
 		if err := printer.Print(out, node.Array.Elems[index].Value); err != nil {
-			fmt.Printf("%s❌ :: %sunable to parse array element: %s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow), out.String())
+			Logger.Error("unable to parse array element",
+				Logger.Args("name", out.String()))
 		}
 
 		out.WriteString(" ")
@@ -41,9 +37,8 @@ func StringifyAssign(node *syntax.Assign) string {
 	printer := syntax.NewPrinter(syntax.Indent(2))
 
 	if err := printer.Print(out, node.Value); err != nil {
-		fmt.Printf("%s❌ :: %sunable to parse variable: %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), out.String())
+		Logger.Error("unable to parse variable",
+			Logger.Args("name", out.String()))
 	}
 
 	return strings.Trim(out.String(), "\"")
@@ -59,9 +54,8 @@ func StringifyFuncDecl(node *syntax.FuncDecl) string {
 	err := printer.Print(out, node.Body)
 
 	if err != nil {
-		log.Fatalf("%s❌ :: %sunable to parse function: %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow), out.String())
+		Logger.Error("unable to parse function",
+			Logger.Args("name", out.String()))
 	}
 
 	funcDecl := strings.Trim(out.String(), "{\n}")

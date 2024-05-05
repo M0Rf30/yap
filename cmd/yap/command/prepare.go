@@ -1,14 +1,12 @@
 package command
 
 import (
-	"fmt"
-	"log"
 	"strings"
 
-	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/packer"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/project"
+	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -27,25 +25,20 @@ var (
 			packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
 			if !project.SkipSyncDeps {
 				if err := packageManager.Update(); err != nil {
-					log.Fatal(err)
+					utils.Logger.Error(err.Error(),
+						utils.Logger.Args("error", err))
 				}
 			}
 
 			err := packageManager.PrepareEnvironment(GoLang)
 			if err != nil {
-				log.Fatal(err)
+				utils.Logger.Error(err.Error())
 			}
 
-			fmt.Printf("%s🪛 :: %sBasic build environment successfully prepared%s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow),
-				string(constants.ColorWhite))
+			utils.Logger.Info("basic build environment successfully prepared")
 
 			if GoLang {
-				fmt.Printf("%s🪛 :: %sGO successfully installed%s\n",
-					string(constants.ColorBlue),
-					string(constants.ColorYellow),
-					string(constants.ColorWhite))
+				utils.Logger.Info("go successfully installed")
 			}
 		},
 	}
