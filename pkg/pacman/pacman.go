@@ -64,7 +64,7 @@ func (p *Pacman) Install(artifactsPath string) error {
 
 		pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-		if err := utils.Exec("",
+		if err := utils.Exec(false, "",
 			"pacman",
 			"-U",
 			"--noconfirm",
@@ -106,7 +106,7 @@ func (p *Pacman) PrepareEnvironment(golang bool) error {
 		args = append(args, "go")
 	}
 
-	return utils.Exec("", "pacman", args...)
+	return utils.Exec(false, "", "pacman", args...)
 }
 
 // Update updates the Pacman package manager.
@@ -124,5 +124,5 @@ func (p *Pacman) Update() error {
 // Returns:
 // - error: An error if any occurred during the execution of the makepkg command.
 func (p *Pacman) pacmanBuild() error {
-	return utils.Exec(p.pacmanDir, "makepkg", "-ef")
+	return utils.Exec(true, p.pacmanDir, "makepkg", "-ef")
 }

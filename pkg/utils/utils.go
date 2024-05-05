@@ -2,9 +2,7 @@ package utils
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,13 +15,25 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/mholt/archiver/v4"
+	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/interp"
 	"mvdan.cc/sh/v3/syntax"
 )
 
-const goArchivePath = "/tmp/go.tar.gz"
-const goExecutable = "/usr/bin/go"
+const (
+	goArchivePath = "/tmp/go.tar.gz"
+	goExecutable  = "/usr/bin/go"
+)
+
+var (
+	// Logger is the default logger with information level logging.
+	// It writes to the MultiPrinter's writer.
+	Logger = pterm.DefaultLogger.WithLevel(pterm.LogLevelInfo).WithWriter(MultiPrinter.Writer)
+	// MultiPrinter is the default multi printer.
+	MultiPrinter = pterm.DefaultMultiPrinter
+)
 
 // CheckGO checks if the GO executable is already installed.
 //
@@ -31,10 +41,7 @@ const goExecutable = "/usr/bin/go"
 // It returns a boolean value indicating whether the GO executable is already installed.
 func CheckGO() bool {
 	if _, err := os.Stat(goExecutable); err == nil {
-		fmt.Printf("%s🪛 :: %sGO is already installed%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite))
+		Logger.Info("go is already installed")
 
 		return true
 	}
@@ -50,71 +57,45 @@ func CheckGO() bool {
 func Download(destination, uri string) error {
 	// create client
 	client := grab.NewClient()
-	req, err := grab.NewRequest(destination, uri)
 
+	req, err := grab.NewRequest(destination, uri)
 	if err != nil {
-		return err
+		return errors.Errorf("download failed %s", err)
+	}
+
+	resp := client.Do(req)
+	if resp.HTTPResponse == nil {
+		Logger.Fatal("download failed: no response", Logger.Args("error", resp.Err()))
 	}
 
 	// start download
-	fmt.Printf("%s📥 :: %sDownloading %s\t%v\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite),
-		req.URL(),
-	)
-
-	resp := client.Do(req)
-	fmt.Printf("%s📥 :: %sResponse: %s\t%v\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite),
-		resp.HTTPResponse.Status,
-	)
-
-	fmt.Printf("%s📥 :: %sDownload in progress: %s\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite),
-	)
+	Logger.Info("downloading", Logger.Args("url", req.URL()))
+	Logger.Info("response", Logger.Args("status", resp.HTTPResponse.Status))
+	Logger.Info("download in progress")
 
 	// start UI loop
 	ticker := time.NewTicker(500 * time.Millisecond)
+	progressBar, _ := pterm.DefaultProgressbar.Start()
 
 Loop:
 	for {
 		select {
-		case <-ticker.C:
-			fmt.Printf("\033[2K\r%d.1 of %d.1 MB | %.2f %%",
-				resp.BytesComplete()/1024/1024,
-				resp.Size()/1024/1024,
-				100*resp.Progress(),
-			)
-
 		case <-resp.Done:
-			// download is complete
+			progressBar.Current = 100
+
+			Logger.Info("download completed", Logger.Args("destination", destination))
+			if _, err = progressBar.Stop(); err != nil {
+				Logger.Fatal("failed to stop progress bar", Logger.Args("error", err))
+			}
+
+			ticker.Stop()
+
 			break Loop
+
+		case <-ticker.C:
+			progressBar.Current = int(100 * resp.Progress())
 		}
 	}
-
-	// check for errors
-	if err = resp.Err(); err != nil {
-		fmt.Printf("%s❌ :: %sdownload failed: %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite))
-
-		return err
-	}
-
-	defer ticker.Stop()
-
-	fmt.Printf("\n%s📥 :: %sDownload saved: %s\t%v\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite),
-		destination,
-	)
 
 	return err
 }
@@ -128,45 +109,34 @@ Loop:
 // - referenceName: the reference name for the clone operation.
 func GitClone(dloadFilePath, sourceItemURI, sshPassword string,
 	referenceName plumbing.ReferenceName) error {
+	var err error
+
 	cloneOptions := &ggit.CloneOptions{
-		Progress:      os.Stdout,
+		Progress:      MultiPrinter.Writer,
 		ReferenceName: referenceName,
 		URL:           sourceItemURI,
 	}
 
-	// start download
-	fmt.Printf("%s📥 :: %sCloning %s\t%v\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite),
-		sourceItemURI,
-	)
-
-	if Exists(dloadFilePath) {
-		_, err := ggit.PlainOpenWithOptions(dloadFilePath, &ggit.PlainOpenOptions{
-			DetectDotGit:          true,
-			EnableDotGitCommonDir: true,
-		})
-		if err != nil {
-			return err
-		}
+	plainOpenOptions := &ggit.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
 	}
 
-	_, err := ggit.PlainClone(dloadFilePath, false, cloneOptions)
+	Logger.Info("cloning", Logger.Args("repo", sourceItemURI))
+
+	if Exists(dloadFilePath) {
+		_, _ = ggit.PlainOpenWithOptions(dloadFilePath, plainOpenOptions)
+	}
+
+	_, err = ggit.PlainClone(dloadFilePath, false, cloneOptions)
 	if err != nil && err.Error() == "authentication required" {
 		sourceURL, _ := url.Parse(sourceItemURI)
 		sshKeyPath := os.Getenv("HOME") + "/.ssh/id_rsa"
 		publicKey, err := ssh.NewPublicKeysFromFile("git", sshKeyPath, sshPassword)
 
 		if err != nil {
-			fmt.Printf("%s❌ :: %sfailed to load ssh key%s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow),
-				string(constants.ColorWhite))
-			fmt.Printf("%s:: %sTry to use an ssh-password with the -p flag%s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow),
-				string(constants.ColorWhite))
+			Logger.Error("failed to load ssh key")
+			Logger.Warn("try to use an ssh-password with the -p")
 
 			return err
 		}
@@ -182,7 +152,7 @@ func GitClone(dloadFilePath, sourceItemURI, sshPassword string,
 		}
 	}
 
-	return nil
+	return err
 }
 
 // GOSetup sets up the Go environment.
@@ -196,7 +166,7 @@ func GOSetup() error {
 
 	err := Download(goArchivePath, constants.GoArchiveURL)
 	if err != nil {
-		log.Panic(err)
+		Logger.Fatal("download failed", Logger.Args("error", err))
 	}
 
 	err = Unarchive(goArchivePath, "/usr/lib")
@@ -219,10 +189,7 @@ func GOSetup() error {
 		return err
 	}
 
-	fmt.Printf("%s🪛 :: %sGO successfully installed%s\n",
-		string(constants.ColorBlue),
-		string(constants.ColorYellow),
-		string(constants.ColorWhite))
+	Logger.Info("go successfully installed")
 
 	return err
 }
@@ -232,14 +199,23 @@ func GOSetup() error {
 // target: the name of the container image to pull.
 // error: returns an error if the container image cannot be pulled.
 func PullContainers(target string) error {
-	containerApp := "/usr/bin/podman"
+	var containerApp string
+
+	if Exists("/usr/bin/podman") {
+		containerApp = "/usr/bin/podman"
+	} else if Exists("/usr/bin/docker") {
+		containerApp = "/usr/bin/docker"
+	} else {
+		return errors.Errorf("no container application found")
+	}
+
 	args := []string{
 		"pull",
 		constants.DockerOrg + target,
 	}
 
 	if _, err := os.Stat(containerApp); err == nil {
-		return Exec("", containerApp, args...)
+		return Exec(true, "", containerApp, args...)
 	}
 
 	return nil
@@ -252,12 +228,22 @@ func PullContainers(target string) error {
 func RunScript(cmds string) error {
 	script, _ := syntax.NewParser().Parse(strings.NewReader(cmds), "")
 
+	if _, err := MultiPrinter.Start(); err != nil {
+		return err
+	}
+
 	runner, _ := interp.New(
 		interp.Env(expand.ListEnviron(os.Environ()...)),
-		interp.StdIO(nil, os.Stdout, os.Stdout),
+		interp.StdIO(nil, MultiPrinter.Writer, MultiPrinter.Writer),
 	)
 
-	return runner.Run(context.TODO(), script)
+	err := runner.Run(context.TODO(), script)
+
+	if _, err := MultiPrinter.Stop(); err != nil {
+		return err
+	}
+
+	return err
 }
 
 // Unarchive is a function that takes a source file and a destination. It opens

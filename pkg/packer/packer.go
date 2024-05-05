@@ -1,14 +1,13 @@
 package packer
 
 import (
-	"log"
-
 	"github.com/M0Rf30/yap/pkg/apk"
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/dpkg"
 	"github.com/M0Rf30/yap/pkg/pacman"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/rpm"
+	"github.com/M0Rf30/yap/pkg/utils"
 )
 
 // Packer is the common interface implemented by all package managers.
@@ -55,10 +54,8 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 			PKGBUILD: pkgBuild,
 		}
 	default:
-		log.Fatalf("%s❌ :: %sunknown unsupported system.%s",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite))
+		utils.Logger.Fatal("unknown unsupported linux target",
+			utils.Logger.Args("distro", distro))
 	}
 
 	return nil
