@@ -2,18 +2,16 @@ package project
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
-	"log"
 	"path/filepath"
 
 	"github.com/M0Rf30/yap/pkg/builder"
-	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/packer"
 	"github.com/M0Rf30/yap/pkg/parser"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/go-playground/validator/v10"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -97,14 +95,9 @@ func (mpc *MultipleProject) BuildAll() error {
 			continue
 		}
 
-		fmt.Printf("%s🚀 :: %sMaking package: %s\t%s %s-%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite),
-			proj.Builder.PKGBUILD.PkgName,
-			proj.Builder.PKGBUILD.PkgVer,
-			proj.Builder.PKGBUILD.PkgRel,
-		)
+		utils.Logger.Info("making package", utils.Logger.Args("name", proj.Builder.PKGBUILD.PkgName,
+			"pkgver", proj.Builder.PKGBUILD.PkgVer,
+			"pkgrel", proj.Builder.PKGBUILD.PkgRel))
 
 		if err := proj.Builder.Compile(NoBuild); err != nil {
 			return err
@@ -117,14 +110,9 @@ func (mpc *MultipleProject) BuildAll() error {
 		}
 
 		if proj.HasToInstall {
-			fmt.Printf("%s🤓 :: %sInstalling package: %s%s %s-%s\n",
-				string(constants.ColorBlue),
-				string(constants.ColorYellow),
-				string(constants.ColorWhite),
-				proj.Builder.PKGBUILD.PkgName,
-				proj.Builder.PKGBUILD.PkgVer,
-				proj.Builder.PKGBUILD.PkgRel,
-			)
+			utils.Logger.Info("installing package", utils.Logger.Args("pkgname", proj.Builder.PKGBUILD.PkgName,
+				"pkgver", proj.Builder.PKGBUILD.PkgVer,
+				"pkgrel", proj.Builder.PKGBUILD.PkgRel))
 
 			if err := proj.PackageManager.Install(mpc.Output); err != nil {
 				return err
@@ -223,13 +211,8 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
 	}
 
 	if fromPkgName != "" && toPkgName != "" && firstIndex > lastIndex {
-		log.Fatalf("%s❌ :: %sInvalid package order: %s%s should be built before %s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite),
-			toPkgName,
-			fromPkgName,
-		)
+		utils.Logger.Fatal("invalid package order: %s should be built before %s",
+			utils.Logger.Args(fromPkgName, toPkgName))
 	}
 }
 
@@ -275,12 +258,8 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 	}
 
 	if !matchFound {
-		log.Fatalf("%s❌ :: %spackage not found: %s%s\n",
-			string(constants.ColorBlue),
-			string(constants.ColorYellow),
-			string(constants.ColorWhite),
-			pkgName,
-		)
+		utils.Logger.Fatal("package not found",
+			utils.Logger.Args("pkgname", pkgName))
 	}
 
 	return index
@@ -348,17 +327,19 @@ func (mpc *MultipleProject) readProject(path string) error {
 	jsonFilePath := filepath.Join(path, "yap.json")
 	pkgbuildFilePath := filepath.Join(path, "PKGBUILD")
 
+	var err error
+
 	filePath, err := utils.Open(jsonFilePath)
 	if err != nil {
-		_, err = utils.Open(pkgbuildFilePath)
-		if err != nil {
-			return err
-		}
+		filePath, err = utils.Open(pkgbuildFilePath)
 
 		mpc.setSingleProject(path)
-
-		return nil
 	}
+
+	if err != nil {
+		return errors.Errorf("Unable to open any yap.json or PKGBUILD file")
+	}
+
 	defer filePath.Close()
 
 	prjContent, err := io.ReadAll(filePath)
@@ -376,7 +357,7 @@ func (mpc *MultipleProject) readProject(path string) error {
 		return err
 	}
 
-	return nil
+	return err
 }
 
 // setSingleProject reads the PKGBUILD file at the given path and updates the

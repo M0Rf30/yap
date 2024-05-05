@@ -1,8 +1,6 @@
 package command
 
 import (
-	"log"
-
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -14,7 +12,8 @@ var containerCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(_ *cobra.Command, args []string) {
 		err := utils.PullContainers(args[0])
-		log.Fatal(err)
+		utils.Logger.Fatal("failed to pull containers",
+			utils.Logger.Args("error", err))
 	},
 }
 
