@@ -19,6 +19,7 @@ var (
 	NoBuild      bool
 	NoMakeDeps   bool
 	SkipSyncDeps bool
+	Zap          bool
 )
 
 // FromPkgName is used to start the build process from a specific package.
@@ -138,6 +139,12 @@ func (mpc *MultipleProject) Clean() error {
 
 		if CleanBuild {
 			if err := utils.RemoveAll(project.Builder.PKGBUILD.SourceDir); err != nil {
+				return err
+			}
+		}
+
+		if Zap {
+			if err := utils.RemoveAll(project.Builder.PKGBUILD.StartDir); err != nil {
 				return err
 			}
 		}

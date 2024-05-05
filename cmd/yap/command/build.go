@@ -35,7 +35,7 @@ var (
 					utils.Logger.Args("error", err))
 			}
 
-			if project.CleanBuild {
+			if project.CleanBuild || project.Zap {
 				if err := mpc.Clean(); err != nil {
 					utils.Logger.Fatal("fatal error",
 						utils.Logger.Args("error", err))
@@ -70,4 +70,6 @@ func init() {
 		"to", "", "", "Build until a defined package name")
 	buildCmd.PersistentFlags().BoolVarP(&pkgbuild.Verbose,
 		"verbose", "v", false, "Verbose output")
+	buildCmd.Flags().BoolVarP(&project.Zap,
+		"zap", "z", false, "Remove entire staging dir before building the package")
 }
