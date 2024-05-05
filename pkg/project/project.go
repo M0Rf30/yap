@@ -209,6 +209,13 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
+	if CleanBuild || Zap {
+		if err := mpc.Clean(); err != nil {
+			utils.Logger.Fatal("fatal error",
+				utils.Logger.Args("error", err))
+		}
+	}
+
 	if !NoMakeDeps {
 		mpc.getMakeDeps()
 
