@@ -115,6 +115,12 @@ Requires: {{join .}}
 {{- with .MakeDepends}}
 BuildRequires: {{join .}}
 {{- end }}
+{{- with .OptDepends}}
+Recommends: {{join .}}
+{{- end }}
+{{- with .OptDepends}}
+Suggests: {{join .}}
+{{- end }}
 
 {{- if .PkgDest}}
 %define _rpmdir {{.PkgDest}}
