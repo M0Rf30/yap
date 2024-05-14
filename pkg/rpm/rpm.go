@@ -98,7 +98,7 @@ func (r *RPM) Install(artifactsPath string) error {
 		pkgFilePath := filepath.Join(artifactsPath, RPMArchs[arch], pkgName)
 
 		if err := utils.Exec(false, "",
-			"yum",
+			"dnf",
 			"install",
 			"-y",
 			pkgFilePath); err != nil {
@@ -120,7 +120,7 @@ func (r *RPM) PrepareEnvironment(golang bool) error {
 	}
 	args = append(args, buildEnvironmentDeps...)
 
-	if err := utils.Exec(false, "", "yum", args...); err != nil {
+	if err := utils.Exec(false, "", "dnf", args...); err != nil {
 		return err
 	}
 
