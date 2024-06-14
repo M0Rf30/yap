@@ -51,8 +51,8 @@ func init() {
 		"nomakedeps", "d", false, "Skip all make dependency (makedeps) checks")
 	buildCmd.Flags().BoolVarP(&project.NoBuild,
 		"nobuild", "o", false, "Download and extract files only")
-	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgver,
-		"pkgver", "w", "", "Use a custom package version (pkgver)")
+	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgRel,
+		"pkgrel", "r", "", "Use a custom package release (pkgrel)")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncDeps,
 		"skip-sync", "s", false, "Skip sync with remotes for package managers")
 	buildCmd.Flags().StringVarP(&source.SSHPassword,
