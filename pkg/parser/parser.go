@@ -11,9 +11,14 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// OverridePkgver is a variable that allows overriding the PkgVer field in
+// OverridePkgRel is a variable that allows overriding the Pkgrel field in
+// PKGBUILD. This can be useful for setting a custom package revision in
+// CI, as a timestamp, for example.
+var OverridePkgRel string
+
+// OverridePkgVer is a variable that allows overriding the PkgVer field in
 // PKGBUILD. This can be useful for setting a custom package version.
-var OverridePkgver string
+var OverridePkgVer string
 
 // ParseFile parses a file and returns a PKGBUILD object and an error.
 //
@@ -75,8 +80,12 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 		return nil, err
 	}
 
-	if OverridePkgver != "" {
-		pkgBuild.PkgVer = OverridePkgver
+	if OverridePkgRel != "" {
+		pkgBuild.PkgRel = OverridePkgRel
+	}
+
+	if OverridePkgVer != "" {
+		pkgBuild.PkgVer = OverridePkgVer
 	}
 
 	return pkgBuild, err

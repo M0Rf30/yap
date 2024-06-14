@@ -83,6 +83,7 @@ func Exists(path string) bool {
 // error: returns an error if the directory cannot be created or accessed.
 func ExistsMakeDir(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
+		//#nosec
 		if err := os.MkdirAll(path, os.ModePerm); err != nil {
 			return errors.Errorf("failed to create directory %s", path)
 		}
