@@ -6,7 +6,7 @@ toolchain go1.22.1
 
 require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/github/go-spdx/v2 v2.2.0
+	github.com/github/go-spdx/v2 v2.3.1
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-playground/validator/v10 v10.22.0
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20240213202252-43a073ede779
