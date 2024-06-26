@@ -1,0 +1,9 @@
+kind: pipeline
+type: kubernetes
+name: default
+
+steps:
+  - name: Linter
+    image: golangci/golangci-lint:v1.59.1
+    commands:
+      - golangci-lint run ./...
