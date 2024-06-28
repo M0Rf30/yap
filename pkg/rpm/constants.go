@@ -125,6 +125,7 @@ Recommends: {{join .}}
 {{- with .OptDepends}}
 Suggests: {{join .}}
 {{- end }}
+AutoReqProv: no
 
 {{- if .PkgDest}}
 %define _rpmdir {{.PkgDest}}
