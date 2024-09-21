@@ -267,7 +267,13 @@ func (mpc *MultipleProject) createPackages(proj *Project) error {
 		return err
 	}
 
-	if err := proj.PackageManager.Build(mpc.Output); err != nil {
+	if err := proj.PackageManager.PrepareFakeroot(mpc.Output); err != nil {
+		return err
+	}
+
+	utils.Logger.Info("building resulting package")
+
+	if err := proj.PackageManager.BuildPackage(mpc.Output); err != nil {
 		return err
 	}
 

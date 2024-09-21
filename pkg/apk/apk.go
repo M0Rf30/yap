@@ -19,10 +19,17 @@ type Apk struct {
 	apkDir string
 }
 
-// Build builds the APK package.
-//
-// It takes the artifactsPath as a parameter and returns an error.
-func (a *Apk) Build(artifactsPath string) error {
+// BuildPackage initiates the package building process for the Apk instance.
+// It takes artifactsPath to specify where to store the build artifacts
+// and calls the internal apkBuild method, returning any errors encountered.
+func (a *Apk) BuildPackage(artifactsPath string) error {
+	return a.apkBuild(artifactsPath)
+}
+
+// PrepareFakeroot sets up the environment for building an APK package in a fakeroot context.
+// It initializes the apkDir, cleans up any existing directory, creates the necessary packer directory,
+// and generates the APKBUILD and post-installation script files. The method returns an error if any step fails.
+func (a *Apk) PrepareFakeroot(_ string) error {
 	a.apkDir = filepath.Join(a.PKGBUILD.StartDir, "apk")
 
 	if err := utils.RemoveAll(a.apkDir); err != nil {
@@ -44,10 +51,6 @@ func (a *Apk) Build(artifactsPath string) error {
 
 	if err := a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir,
 		a.PKGBUILD.PkgName+".install"), tmpl); err != nil {
-		return err
-	}
-
-	if err := a.apkBuild(artifactsPath); err != nil {
 		return err
 	}
 
