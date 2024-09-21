@@ -15,10 +15,24 @@ type Pacman struct {
 	pacmanDir string
 }
 
-// Build builds the Pacman package.
+// BuildPackage initiates the package building process for the Pacman instance.
 //
-// It takes the artifactsPath as a parameter and returns an error if any.
-func (p *Pacman) Build(artifactsPath string) error {
+// It takes a single parameter:
+// - artifactsPath: a string representing the path where the build artifacts will be stored.
+//
+// The method calls the internal pacmanBuild function to perform the actual build process.
+// It returns an error if the build process encounters any issues.
+func (p *Pacman) BuildPackage(_ string) error {
+	return p.pacmanBuild()
+}
+
+// PrepareFakeroot sets up the environment for building a package in a fakeroot context.
+//
+// It takes an artifactsPath parameter, which specifies where to store build artifacts.
+// The method initializes the pacmanDir, resolves the package destination, and creates
+// the PKGBUILD and post-installation script files if necessary. It returns an error
+// if any step fails.
+func (p *Pacman) PrepareFakeroot(artifactsPath string) error {
 	p.pacmanDir = p.PKGBUILD.StartDir
 
 	p.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
@@ -38,10 +52,6 @@ func (p *Pacman) Build(artifactsPath string) error {
 		p.PKGBUILD.PkgName+".install"), tmpl)
 
 	if err != nil {
-		return err
-	}
-
-	if err := p.pacmanBuild(); err != nil {
 		return err
 	}
 

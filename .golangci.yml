@@ -11,6 +11,7 @@ linters:
     # they will be enabled
     - depguard
     - exhaustruct
+    - exportloopref
     - forbidigo
     - forcetypeassert
     - funlen

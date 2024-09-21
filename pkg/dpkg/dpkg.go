@@ -1,12 +1,10 @@
 package dpkg
 
 import (
-	"bytes"
 	"fmt"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"text/template"
 
 	"github.com/M0Rf30/yap/pkg/options"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
@@ -168,19 +166,17 @@ func (d *Deb) Prepare(makeDepends []string) error {
 // It does not take any parameters.
 // It returns an error if there is any issue during stripping.
 func (d *Deb) Strip() error {
-	var tmplBytesBuffer bytes.Buffer
+	var output strings.Builder
+
+	tmpl := d.PKGBUILD.RenderSpec(options.StripScript)
 
 	utils.Logger.Info("stripping binaries")
 
-	tmpl := template.New("strip")
-
-	template.Must(tmpl.Parse(options.StripScript))
-
-	if pkgbuild.Verbose {
-		return tmpl.Execute(&tmplBytesBuffer, d.PKGBUILD)
+	if err := tmpl.Execute(&output, d.PKGBUILD); err != nil {
+		return err
 	}
 
-	return utils.RunScript(tmplBytesBuffer.String())
+	return utils.RunScript(output.String())
 }
 
 // Update updates the Deb package list.
@@ -246,10 +242,26 @@ func (d *Deb) createDebResources() error {
 	return nil
 }
 
-// Build builds the Deb package.
-//
-// It takes the artifactsPath as a parameter and returns an error if any.
-func (d *Deb) Build(artifactsPath string) error {
+// BuildPackage builds the Debian package and cleans up afterward.
+// It takes artifactsPath to specify where to store the package.
+// The method calls dpkgDeb to create the package and removes the
+// package directory, returning an error if any step fails.
+func (d *Deb) BuildPackage(artifactsPath string) error {
+	if err := d.dpkgDeb(artifactsPath); err != nil {
+		return err
+	}
+
+	if err := utils.RemoveAll(d.PKGBUILD.PackageDir); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PrepareFakeroot sets up the environment for building a Debian package in a fakeroot context.
+// It retrieves architecture and release information, cleans up the debDir, creates necessary
+// resources, and strips binaries. The method returns an error if any step fails.
+func (d *Deb) PrepareFakeroot(_ string) error {
 	d.getArch()
 	d.getRelease()
 
@@ -262,14 +274,6 @@ func (d *Deb) Build(artifactsPath string) error {
 	}
 
 	if err := d.Strip(); err != nil {
-		return err
-	}
-
-	if err := d.dpkgDeb(artifactsPath); err != nil {
-		return err
-	}
-
-	if err := utils.RemoveAll(d.PKGBUILD.PackageDir); err != nil {
 		return err
 	}
 

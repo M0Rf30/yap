@@ -28,10 +28,18 @@ type RPM struct {
 	srpmsDir     string
 }
 
-// Build builds the RPM package.
-//
-// It takes the artifactsPath as a parameter and returns an error.
-func (r *RPM) Build(artifactsPath string) error {
+// BuildPackage initiates the package building process for the RPM instance.
+// It calls the internal rpmBuild method and returns any errors encountered during the process.
+func (r *RPM) BuildPackage(_ string) error {
+	return r.rpmBuild()
+}
+
+// PrepareFakeroot sets up the environment for building an RPM package in a fakeroot context.
+// It retrieves architecture, group, and release information, sets the package destination,
+// cleans up the RPM directory, creates necessary directories, and gathers files.
+// It also processes package dependencies and creates the RPM spec file, returning
+// an error if any step fails.
+func (r *RPM) PrepareFakeroot(artifactsPath string) error {
 	r.getArch()
 	r.getGroup()
 	r.getRelease()
@@ -68,10 +76,6 @@ func (r *RPM) Build(artifactsPath string) error {
 	tmpl := r.PKGBUILD.RenderSpec(specFile)
 	if err := r.PKGBUILD.CreateSpec(filepath.Join(r.specsDir,
 		r.PKGBUILD.PkgName+".spec"), tmpl); err != nil {
-		return err
-	}
-
-	if err := r.rpmBuild(); err != nil {
 		return err
 	}
 

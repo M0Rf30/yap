@@ -26,17 +26,17 @@ func (builder *Builder) Compile(noBuild bool) error {
 
 	if !noBuild {
 		if err := processFunction(builder.PKGBUILD.Prepare,
-			"preparing"); err != nil {
+			"preparing sources"); err != nil {
 			return err
 		}
 
 		if err := processFunction(builder.PKGBUILD.Build,
-			"building"); err != nil {
+			"processing sources"); err != nil {
 			return err
 		}
 
 		if err := processFunction(builder.PKGBUILD.Package,
-			"generating package"); err != nil {
+			"preparing fakeroot"); err != nil {
 			return err
 		}
 	}
