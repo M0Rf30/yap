@@ -109,6 +109,14 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	return tmpl.Execute(file, pkgBuild)
 }
 
+// RenderSpec initializes a new template with custom functions and parses the provided script.
+// It adds two custom functions to the template:
+//  1. "join": Takes a slice of strings and joins them into a single string, separated by commas,
+//     while also trimming any leading or trailing spaces.
+//  2. "multiline": Takes a string and replaces newline characters with a newline followed by a space,
+//     effectively formatting the string for better readability in multi-line contexts.
+//
+// The method returns the parsed template, which can be used for rendering with data.
 func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
 	tmpl := template.New("template").Funcs(template.FuncMap{
 		"join": func(strs []string) string {

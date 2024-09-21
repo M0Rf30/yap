@@ -12,18 +12,21 @@ import (
 
 // Packer is the common interface implemented by all package managers.
 type Packer interface {
-	// Prepare appends the dependencies required to build all the projects. It
-	// returns any error if encountered.
-	Prepare(depends []string) error
-	// Build reads the path where the final artifact will be written. It returns any
-	// error if encountered.
-	Build(output string) error
+	// BuildPackage starts the package building process and writes the final artifact
+	// to the specified output path. It returns an error if any issues occur during the build.
+	BuildPackage(output string) error
 	// Install reads the path where the final artifact will be written. It returns
 	// any error if encountered.
 	Install(output string) error
+	// Prepare appends the dependencies required to build all the projects. It
+	// returns any error if encountered.
+	Prepare(depends []string) error
 	// PrepareEnvironment reads a flag to install golang tools on request, on the
 	// build machine. It returns any error if encountered.
 	PrepareEnvironment(flag bool) error
+	// PrepareFakeroot sets up the environment for building the final artifact in a fakeroot context.
+	// It takes an output path where the artifact will be written and returns an error if any issues occur.
+	PrepareFakeroot(output string) error
 	// Update performs a package manager update operation. It returns any error if
 	// encountered.
 	Update() error
