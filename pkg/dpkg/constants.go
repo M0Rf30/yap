@@ -77,3 +77,9 @@ Copyright: {{ range .Copyright}}{{ . }}
 License: {{ . }}{{- end }}
 {{- end }}
 `
+const (
+	binaryContent   = "2.0\n"
+	binaryFilename  = "debian-binary"
+	controlFilename = "control.tar.zst"
+	dataFilename    = "data.tar.zst"
+)
