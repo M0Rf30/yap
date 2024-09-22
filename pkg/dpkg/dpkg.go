@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/pkg/options"
+
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/otiai10/copy"
@@ -161,23 +162,23 @@ func (d *Deb) Prepare(makeDepends []string) error {
 	return d.PKGBUILD.GetDepends("apt-get", args, makeDepends)
 }
 
-// Strip strips binaries from the Deb package.
-//
-// It does not take any parameters.
-// It returns an error if there is any issue during stripping.
-func (d *Deb) Strip() error {
-	var output strings.Builder
+// // Strip strips binaries from the Deb package.
+// //
+// // It does not take any parameters.
+// // It returns an error if there is any issue during stripping.
+// func (d *Deb) Strip() error {
+// 	var output strings.Builder
 
-	tmpl := d.PKGBUILD.RenderSpec(options.StripScript)
+// 	tmpl := d.PKGBUILD.RenderSpec(options.StripScript)
 
-	utils.Logger.Info("stripping binaries")
+// 	utils.Logger.Info("stripping binaries")
 
-	if err := tmpl.Execute(&output, d.PKGBUILD); err != nil {
-		return err
-	}
+// 	if err := tmpl.Execute(&output, d.PKGBUILD); err != nil {
+// 		return err
+// 	}
 
-	return utils.RunScript(output.String())
-}
+// 	return utils.RunScript(output.String())
+// }
 
 // Update updates the Deb package list.
 //
@@ -273,7 +274,7 @@ func (d *Deb) PrepareFakeroot(_ string) error {
 		return err
 	}
 
-	if err := d.Strip(); err != nil {
+	if err := options.Strip(d.PKGBUILD.PackageDir); err != nil {
 		return err
 	}
 
