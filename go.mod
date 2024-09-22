@@ -3,6 +3,7 @@ module github.com/M0Rf30/yap
 go 1.23
 
 require (
+	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.3.2
 	github.com/go-git/go-git/v5 v5.12.0

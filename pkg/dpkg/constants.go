@@ -2,13 +2,18 @@ package dpkg
 
 var buildEnvironmentDeps = []string{
 	"autoconf",
-	"build-essential",
+	"binutils",
+	"ca-certificates",
+	"g++",
+	"gcc",
+	"libc-dev",
+	"libc6-dev",
 	"libltdl7",
 	"libtool",
+	"make",
+	"patch",
 	"pkg-config",
-	"reprepro",
 	"tzdata",
-	"ca-certificates",
 }
 
 var DebArchs = map[string]string{
@@ -77,3 +82,9 @@ Copyright: {{ range .Copyright}}{{ . }}
 License: {{ . }}{{- end }}
 {{- end }}
 `
+const (
+	binaryContent   = "2.0\n"
+	binaryFilename  = "debian-binary"
+	controlFilename = "control.tar.zst"
+	dataFilename    = "data.tar.zst"
+)

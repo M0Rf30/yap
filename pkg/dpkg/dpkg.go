@@ -1,7 +1,9 @@
 package dpkg
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -9,7 +11,10 @@ import (
 	"github.com/M0Rf30/yap/pkg/options"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
+	"github.com/blakesmith/ar"
+	"github.com/mholt/archiver/v4"
 	"github.com/otiai10/copy"
+	"github.com/pkg/errors"
 )
 
 // Deb represents a Deb package.
@@ -29,6 +34,31 @@ func (d *Deb) getArch() {
 	for index, arch := range d.PKGBUILD.Arch {
 		d.PKGBUILD.Arch[index] = DebArchs[arch]
 	}
+}
+
+func createTarZst(sourceDir, outputFile string) error {
+	files, err := archiver.FilesFromDisk(nil, map[string]string{
+		sourceDir + string(os.PathSeparator): "",
+	})
+
+	if err != nil {
+		return err
+	}
+
+	cleanFilePath := filepath.Clean(outputFile)
+
+	out, err := os.Create(cleanFilePath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	format := archiver.CompressedArchive{
+		Compression: archiver.Zstd{},
+		Archival:    archiver.Tar{},
+	}
+
+	return format.Archive(context.Background(), out, files)
 }
 
 // createConfFiles creates the conffiles file in the Deb package.
@@ -122,27 +152,58 @@ func (d *Deb) createScripts() error {
 	return nil
 }
 
-// dpkgDeb generates Deb package files from the given artifact path.
+// createDeb generates Deb package files from the given artifact path.
 //
 // It takes a string parameter `artifactPath` which represents the path where the
 // Deb package files will be generated.
 //
 // The function returns an error if there was an issue generating the Deb package
 // files.
-func (d *Deb) dpkgDeb(artifactPath string) error {
-	for _, arch := range d.PKGBUILD.Arch {
-		artifactFilePath := filepath.Join(artifactPath,
-			fmt.Sprintf("%s_%s-%s_%s.deb",
-				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
-				arch))
+func (d *Deb) createDeb(artifactPath, control, data string) error {
+	// Create the .deb package
+	artifactFilePath := filepath.Join(artifactPath,
+		fmt.Sprintf("%s_%s-%s_%s.deb",
+			d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
+			d.PKGBUILD.Arch[0]))
 
-		if err := utils.Exec(true, "",
-			"dpkg-deb",
-			"-b",
-			"-Zzstd",
-			d.PKGBUILD.PackageDir, artifactFilePath); err != nil {
-			return err
-		}
+	cleanFilePath := filepath.Clean(artifactFilePath)
+	debianBinary := []byte(binaryContent)
+
+	debPackage, err := os.Create(cleanFilePath)
+	if err != nil {
+		return err
+	}
+	defer debPackage.Close()
+
+	cleanFilePath = filepath.Clean(control)
+
+	controlArchive, err := os.ReadFile(cleanFilePath)
+	if err != nil {
+		return err
+	}
+
+	cleanFilePath = filepath.Clean(data)
+
+	dataArchive, err := os.ReadFile(cleanFilePath)
+	if err != nil {
+		return err
+	}
+
+	writer := ar.NewWriter(debPackage)
+	if err := writer.WriteGlobalHeader(); err != nil {
+		return err
+	}
+
+	if err := addArFile(writer, binaryFilename, debianBinary); err != nil {
+		return err
+	}
+
+	if err := addArFile(writer, controlFilename, controlArchive); err != nil {
+		return err
+	}
+
+	if err := addArFile(writer, dataFilename, dataArchive); err != nil {
+		return err
 	}
 
 	return nil
@@ -247,7 +308,30 @@ func (d *Deb) createDebResources() error {
 // The method calls dpkgDeb to create the package and removes the
 // package directory, returning an error if any step fails.
 func (d *Deb) BuildPackage(artifactsPath string) error {
-	if err := d.dpkgDeb(artifactsPath); err != nil {
+	debTemp, err := os.MkdirTemp(d.PKGBUILD.StartDir, "temp")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(debTemp)
+
+	controlArchive := filepath.Join(debTemp, controlFilename)
+	dataArchive := filepath.Join(debTemp, dataFilename)
+
+	// Create control archive
+	if err := createTarZst(d.debDir, controlArchive); err != nil {
+		return err
+	}
+
+	if err := utils.RemoveAll(d.debDir); err != nil {
+		return err
+	}
+
+	// Create data archive
+	if err := createTarZst(d.PKGBUILD.PackageDir, dataArchive); err != nil {
+		return err
+	}
+
+	if err := d.createDeb(artifactsPath, controlArchive, dataArchive); err != nil {
 		return err
 	}
 
@@ -317,6 +401,22 @@ func (d *Deb) PrepareEnvironment(golang bool) error {
 	}
 
 	return nil
+}
+
+func addArFile(writer *ar.Writer, name string, body []byte) error {
+	header := ar.Header{
+		Name: name,
+		Size: int64(len(body)),
+		Mode: 0o644,
+	}
+
+	if err := writer.WriteHeader(&header); err != nil {
+		return errors.Errorf("cannot write file header")
+	}
+
+	_, err := writer.Write(body)
+
+	return err
 }
 
 func (d *Deb) getRelease() {

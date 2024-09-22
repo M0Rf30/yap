@@ -1,7 +1,7 @@
 package options
 
 // StripScript is a scriptlet taken from makepkg resources. It's executed by
-// mvdan/sh interpreter and provides strip instructions to dpkg-buildpackage.
+// mvdan/sh interpreter and provides strip instructions to debian packaging.
 // Although it's a very dirty solution, for now it's the faster way to have this
 // essential feature.
 const StripScript = `
