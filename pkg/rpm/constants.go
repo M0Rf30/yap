@@ -86,8 +86,8 @@ Epoch: {{.Epoch}}
 {{- end }}
 Version: {{.PkgVer}}
 Release: {{.PkgRel}}
-{{- with .Arch}}
-BuildArch: {{join .}}
+{{- if .ArchComputed}}
+BuildArch: {{.ArchComputed}}
 {{- end }}
 {{- if .Section}}
 Group: {{.Section}}

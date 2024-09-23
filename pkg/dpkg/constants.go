@@ -28,8 +28,8 @@ Version: {{ if .Epoch}}{{ .Epoch }}:{{ end }}{{.PkgVer}}
          {{- if .PkgRel}}-{{ .PkgRel }}{{- end }}
 Section: {{.Section}}
 Priority: {{.Priority}}
-{{- with .Arch}}
-Architecture: {{join .}}
+{{- if .ArchComputed}}
+Architecture: {{.ArchComputed}}
 {{- end }}
 {{- /* Optional fields */ -}}
 {{- if .Maintainer}}
