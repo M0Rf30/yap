@@ -56,11 +56,8 @@ epoch={{.Epoch}}
 pkgver={{.PkgVer}}
 pkgrel={{.PkgRel}}
 pkgdesc="{{.PkgDesc}}"
-{{- if .Arch}}
-arch=(
-  {{ range .Arch }}"{{ . }}"
-  {{ end }}
-)
+{{- if .ArchComputed}}
+arch=({{.ArchComputed}})
 {{- end }}
 {{- if .Depends}}
 depends=(
