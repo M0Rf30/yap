@@ -27,11 +27,11 @@ var (
 
 	DistroToPackageManager = map[string]string{
 		"alpine": "alpine",
-		"arch":   "pacman",
 		"amazon": "redhat",
-		"fedora": "redhat",
+		"arch":   "pacman",
 		"centos": "redhat",
 		"debian": "debian",
+		"fedora": "redhat",
 		"oracle": "redhat",
 		"rocky":  "redhat",
 		"ubuntu": "debian",

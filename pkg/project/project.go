@@ -126,7 +126,7 @@ func (mpc *MultipleProject) BuildAll() error {
 		}
 
 		if !NoBuild {
-			if err := mpc.createPackages(proj); err != nil {
+			if err := mpc.createPackage(proj); err != nil {
 				return err
 			}
 		}
@@ -249,11 +249,11 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
 	}
 }
 
-// createPackages creates packages for the MultipleProject.
+// createPackage creates packages for the MultipleProject.
 //
 // It takes a pointer to a MultipleProject as a receiver and a pointer to a Project as a parameter.
 // It returns an error.
-func (mpc *MultipleProject) createPackages(proj *Project) error {
+func (mpc *MultipleProject) createPackage(proj *Project) error {
 	if mpc.Output != "" {
 		absOutput, err := filepath.Abs(mpc.Output)
 		if err != nil {
@@ -336,6 +336,8 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 		if err != nil {
 			return err
 		}
+
+		pkgbuildFile.ValidateArchitecture()
 
 		packageManager = packer.GetPackageManager(pkgbuildFile, distro)
 

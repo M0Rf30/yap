@@ -62,3 +62,14 @@ func StringifyFuncDecl(node *syntax.FuncDecl) string {
 
 	return funcDecl
 }
+
+// Contains checks if a string is present in an array of strings.
+func Contains(array []string, str string) bool {
+	for _, item := range array {
+		if item == str {
+			return true
+		}
+	}
+
+	return false
+}

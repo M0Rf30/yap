@@ -63,24 +63,22 @@ func (p *Pacman) PrepareFakeroot(artifactsPath string) error {
 // artifactsPath: the path where the package artifacts are located.
 // error: an error if the installation fails.
 func (p *Pacman) Install(artifactsPath string) error {
-	for _, arch := range p.PKGBUILD.Arch {
-		pkgName := p.PKGBUILD.PkgName + "-" +
-			p.PKGBUILD.PkgVer +
-			"-" +
-			p.PKGBUILD.PkgRel +
-			"-" +
-			arch +
-			".pkg.tar.zst"
+	pkgName := p.PKGBUILD.PkgName + "-" +
+		p.PKGBUILD.PkgVer +
+		"-" +
+		p.PKGBUILD.PkgRel +
+		"-" +
+		p.PKGBUILD.ArchComputed +
+		".pkg.tar.zst"
 
-		pkgFilePath := filepath.Join(artifactsPath, pkgName)
+	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-		if err := utils.Exec(false, "",
-			"pacman",
-			"-U",
-			"--noconfirm",
-			pkgFilePath); err != nil {
-			return err
-		}
+	if err := utils.Exec(false, "",
+		"pacman",
+		"-U",
+		"--noconfirm",
+		pkgFilePath); err != nil {
+		return err
 	}
 
 	return nil

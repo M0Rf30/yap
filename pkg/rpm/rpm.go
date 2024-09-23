@@ -40,9 +40,9 @@ func (r *RPM) BuildPackage(_ string) error {
 // It also processes package dependencies and creates the RPM spec file, returning
 // an error if any step fails.
 func (r *RPM) PrepareFakeroot(artifactsPath string) error {
-	r.getArch()
 	r.getGroup()
 	r.getRelease()
+	r.PKGBUILD.ArchComputed = RPMArchs[r.PKGBUILD.ArchComputed]
 
 	r.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 
@@ -63,7 +63,7 @@ func (r *RPM) PrepareFakeroot(artifactsPath string) error {
 		r.PKGBUILD.PkgName,
 		r.PKGBUILD.PkgVer,
 		r.PKGBUILD.PkgRel,
-		r.PKGBUILD.Arch[0])
+		r.PKGBUILD.ArchComputed)
 
 	if err := copy.Copy(r.PKGBUILD.PackageDir, buildRootPackageDir); err != nil {
 		return err
@@ -89,25 +89,23 @@ func (r *RPM) PrepareFakeroot(artifactsPath string) error {
 //
 // It returns an error if there was an issue during the installation process.
 func (r *RPM) Install(artifactsPath string) error {
-	for _, arch := range r.PKGBUILD.Arch {
-		pkgName := r.PKGBUILD.PkgName +
-			"-" +
-			r.PKGBUILD.PkgVer +
-			"-" +
-			r.PKGBUILD.PkgRel +
-			"." +
-			RPMArchs[arch] +
-			".rpm"
+	pkgName := r.PKGBUILD.PkgName +
+		"-" +
+		r.PKGBUILD.PkgVer +
+		"-" +
+		r.PKGBUILD.PkgRel +
+		"." +
+		r.PKGBUILD.ArchComputed +
+		".rpm"
 
-		pkgFilePath := filepath.Join(artifactsPath, RPMArchs[arch], pkgName)
+	pkgFilePath := filepath.Join(artifactsPath, r.PKGBUILD.ArchComputed, pkgName)
 
-		if err := utils.Exec(false, "",
-			"dnf",
-			"install",
-			"-y",
-			pkgFilePath); err != nil {
-			return err
-		}
+	if err := utils.Exec(false, "",
+		"dnf",
+		"install",
+		"-y",
+		pkgFilePath); err != nil {
+		return err
 	}
 
 	return nil
@@ -239,16 +237,6 @@ func (r *RPM) getFiles() error {
 	return nil
 }
 
-// getArch updates the architecture values in the RPM struct.
-//
-// It does not take any parameters.
-// It does not return anything.
-func (r *RPM) getArch() {
-	for index, arch := range r.PKGBUILD.Arch {
-		r.PKGBUILD.Arch[index] = RPMArchs[arch]
-	}
-}
-
 // getGroup updates the section of the RPM struct with the corresponding
 // value from the RPMGroups map.
 //
@@ -346,6 +334,8 @@ func (r *RPM) rpmBuild() error {
 		"-bb",
 		r.PKGBUILD.PkgName +
 			".spec",
+		"--target",
+		r.PKGBUILD.ArchComputed,
 	}
 
 	if pkgbuild.Verbose {

@@ -20,6 +20,7 @@ var Verbose bool
 // templating and other rpm/deb descriptors.
 type PKGBUILD struct {
 	Arch           []string
+	ArchComputed   string
 	Backup         []string
 	Build          string
 	Codename       string
@@ -338,6 +339,31 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 
 	// Return the key, priority, and no error.
 	return key, priority, nil
+}
+
+// ValidateArchitecture checks if the architecture specified in the PKGBUILD
+// is supported. If the architecture is "any", it sets the computed architecture
+// to "any". If the architecture is not "any", it checks if the current architecture
+// is in the list of supported architectures. If the current architecture is not
+// supported, it logs a fatal error with the package name. Finally, it sets the
+// computed architecture to the current architecture if it is supported.
+func (pkgBuild *PKGBUILD) ValidateArchitecture() {
+	isSupported := utils.Contains(pkgBuild.Arch, "any")
+	if isSupported {
+		pkgBuild.ArchComputed = "any"
+
+		return
+	}
+
+	currentArch := utils.GetArchitecture()
+
+	isSupported = utils.Contains(pkgBuild.Arch, currentArch)
+	if !isSupported {
+		utils.Logger.Fatal("unsupported architecture",
+			utils.Logger.Args("pkgname", pkgBuild.PkgName))
+	}
+
+	pkgBuild.ArchComputed = currentArch
 }
 
 // setMainFolders sets the main folders for the PKGBUILD.

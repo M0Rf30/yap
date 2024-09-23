@@ -1,8 +1,19 @@
 package apk
 
-var buildEnvironmentDeps = []string{
-	"alpine-sdk",
-}
+var (
+	APKArchs = map[string]string{
+		"x86_64":  "x86_64",
+		"i686":    "x86",
+		"aarch64": "aarch64",
+		"armv7h":  "armv7h",
+		"armv6h":  "armv6h",
+		"any":     "all",
+	}
+
+	buildEnvironmentDeps = []string{
+		"alpine-sdk",
+	}
+)
 
 const postInstall = `
 {{- if .PreInst}}
@@ -51,7 +62,9 @@ epoch={{.Epoch}}
 pkgver={{.PkgVer}}
 pkgrel={{.PkgRel}}
 pkgdesc="{{.PkgDesc}}"
-arch="all"
+{{- if .ArchComputed}}
+arch="{{.ArchComputed}}"
+{{- end}}
 {{- if .Depends}}
 depends="
 {{ range .Depends }}{{ . }} 

@@ -26,17 +26,12 @@ type Deb struct {
 	PKGBUILD *pkgbuild.PKGBUILD
 }
 
-// getArch updates the architecture field in the Deb struct.
-//
-// It iterates over the architecture values in the PKGBUILD field of the Deb struct
-// and replaces them with the corresponding values from the DebArchs map.
-func (d *Deb) getArch() {
-	for index, arch := range d.PKGBUILD.Arch {
-		d.PKGBUILD.Arch[index] = DebArchs[arch]
-	}
-}
-
+// createTarZst creates a compressed tar.zst archive from the specified source directory.
+// It takes the source directory and the output file path as arguments and returns an error if any occurs.
 func createTarZst(sourceDir, outputFile string) error {
+	// Retrieve the list of files from the source directory on disk.
+	// The map specifies that the files should be read from the sourceDir
+	// and the output path in the archive should be empty.
 	files, err := archiver.FilesFromDisk(nil, map[string]string{
 		sourceDir + string(os.PathSeparator): "",
 	})
@@ -61,13 +56,10 @@ func createTarZst(sourceDir, outputFile string) error {
 	return format.Archive(context.Background(), out, files)
 }
 
-// createConfFiles creates the conffiles file in the Deb package.
-//
-// It iterates over the Backup field of the PKGBUILD struct and adds each name
-// to the data string. The data string is then written to the conffiles file
-// located at the debDir path.
-//
-// Returns an error if there was a problem creating or writing to the file.
+// createConfFiles creates the configuration files for the Debian package.
+// It generates a file located at the debDir path containing the backup
+// files specified in the PKGBUILD. Returns an error if there was a
+// problem creating or writing to the file.
 func (d *Deb) createConfFiles() error {
 	if len(d.PKGBUILD.Backup) == 0 {
 		return nil
@@ -88,6 +80,10 @@ func (d *Deb) createConfFiles() error {
 	return utils.CreateWrite(path, data)
 }
 
+// createCopyrightFile generates a copyright file for the Debian package.
+// It checks if there is a license specified in the PKGBUILD and creates
+// the copyright file accordingly. Returns an error if there was an
+// issue creating the file.
 func (d *Deb) createCopyrightFile() error {
 	if len(d.PKGBUILD.License) == 0 {
 		return nil
@@ -99,13 +95,10 @@ func (d *Deb) createCopyrightFile() error {
 	return d.PKGBUILD.CreateSpec(copyrightFilePath, tmpl)
 }
 
-// createDebconfFile creates a debconf file with the given variable and name.
-//
-// Parameters:
-// - variable: the variable used to create the debconf asset.
-// - name: the name of the debconf asset.
-//
-// Return type: error.
+// createDebconfFile creates a debconf file with the given variable and
+// name. It takes parameters for the variable used to create the debconf
+// asset and the name of the debconf asset. Returns an error if there
+// was an issue during the creation.
 func (d *Deb) createDebconfFile(name, variable string) error {
 	if variable == "" {
 		return nil
@@ -118,9 +111,8 @@ func (d *Deb) createDebconfFile(name, variable string) error {
 }
 
 // createScripts generates and writes the scripts for the Deb package.
-//
-// It takes no parameters.
-// It returns an error if there was an issue generating or writing the scripts.
+// It takes no parameters and returns an error if there was an issue
+// generating or writing the scripts.
 func (d *Deb) createScripts() error {
 	scripts := map[string]string{
 		"preinst":  d.PKGBUILD.PreInst,
@@ -153,18 +145,15 @@ func (d *Deb) createScripts() error {
 }
 
 // createDeb generates Deb package files from the given artifact path.
-//
-// It takes a string parameter `artifactPath` which represents the path where the
-// Deb package files will be generated.
-//
-// The function returns an error if there was an issue generating the Deb package
-// files.
+// It takes a string parameter `artifactPath` which represents the path
+// where the Deb package files will be generated. The function returns
+// an error if there was an issue generating the Deb package files.
 func (d *Deb) createDeb(artifactPath, control, data string) error {
 	// Create the .deb package
 	artifactFilePath := filepath.Join(artifactPath,
 		fmt.Sprintf("%s_%s-%s_%s.deb",
 			d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
-			d.PKGBUILD.Arch[0]))
+			d.PKGBUILD.ArchComputed))
 
 	cleanFilePath := filepath.Clean(artifactFilePath)
 	debianBinary := []byte(binaryContent)
@@ -346,8 +335,8 @@ func (d *Deb) BuildPackage(artifactsPath string) error {
 // It retrieves architecture and release information, cleans up the debDir, creates necessary
 // resources, and strips binaries. The method returns an error if any step fails.
 func (d *Deb) PrepareFakeroot(_ string) error {
-	d.getArch()
 	d.getRelease()
+	d.PKGBUILD.ArchComputed = DebArchs[d.PKGBUILD.ArchComputed]
 
 	if err := utils.RemoveAll(d.debDir); err != nil {
 		return err
@@ -365,15 +354,13 @@ func (d *Deb) PrepareFakeroot(_ string) error {
 }
 
 func (d *Deb) Install(artifactsPath string) error {
-	for _, arch := range d.PKGBUILD.Arch {
-		artifactFilePath := filepath.Join(artifactsPath,
-			fmt.Sprintf("%s_%s-%s_%s.deb",
-				d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
-				arch))
+	artifactFilePath := filepath.Join(artifactsPath,
+		fmt.Sprintf("%s_%s-%s_%s.deb",
+			d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
+			d.PKGBUILD.ArchComputed))
 
-		if err := utils.Exec(false, "", "apt-get", "install", "-y", artifactFilePath); err != nil {
-			return err
-		}
+	if err := utils.Exec(false, "", "apt-get", "install", "-y", artifactFilePath); err != nil {
+		return err
 	}
 
 	return nil
