@@ -71,8 +71,10 @@ var (
 	}
 
 	RPMDistros = map[string]string{
+		"alma":   ".el",
 		"amazon": ".amzn",
 		"fedora": ".fc",
+		"rhel":   ".el",
 		"rocky":  ".el",
 	}
 )

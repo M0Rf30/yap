@@ -15,17 +15,20 @@ const (
 
 var (
 	Releases = [...]string{
+		"alma",
 		"alpine",
 		"amazon",
 		"arch",
 		"centos",
 		"debian",
 		"fedora",
+		"rhel",
 		"rocky",
 		"ubuntu",
 	}
 
 	DistroToPackageManager = map[string]string{
+		"alma":   "redhat",
 		"alpine": "alpine",
 		"amazon": "redhat",
 		"arch":   "pacman",
@@ -33,6 +36,7 @@ var (
 		"debian": "debian",
 		"fedora": "redhat",
 		"oracle": "redhat",
+		"rhel":   "redhat",
 		"rocky":  "redhat",
 		"ubuntu": "debian",
 	}
