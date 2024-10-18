@@ -370,9 +370,6 @@ func (mpc *MultipleProject) readProject(path string) error {
 		projectFilePath = jsonFilePath
 		utils.Logger.Info("molti-project file found",
 			utils.Logger.Args("path", projectFilePath))
-	} else {
-		utils.Logger.Info("the multi-project file does not exist.",
-			utils.Logger.Args("path", jsonFilePath))
 	}
 
 	if utils.Exists(pkgbuildFilePath) {
@@ -381,9 +378,6 @@ func (mpc *MultipleProject) readProject(path string) error {
 			utils.Logger.Args("path", projectFilePath))
 
 		mpc.setSingleProject(path)
-	} else {
-		utils.Logger.Info("the single-project file does not exist.",
-			utils.Logger.Args("path", pkgbuildFilePath))
 	}
 
 	filePath, err := utils.Open(projectFilePath)

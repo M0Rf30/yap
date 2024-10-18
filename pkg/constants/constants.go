@@ -28,24 +28,17 @@ var (
 	}
 
 	DistroToPackageManager = map[string]string{
-		"alma":   "redhat",
-		"alpine": "alpine",
-		"amazon": "redhat",
+		"alma":   "rpm",
+		"alpine": "apk",
+		"amazon": "rpm",
 		"arch":   "pacman",
-		"centos": "redhat",
-		"debian": "debian",
-		"fedora": "redhat",
-		"oracle": "redhat",
-		"rhel":   "redhat",
-		"rocky":  "redhat",
-		"ubuntu": "debian",
-	}
-
-	PackageManagers = [...]string{
-		"apk",
-		"apt",
-		"pacman",
-		"yum",
+		"centos": "rpm",
+		"debian": "dpkg",
+		"fedora": "rpm",
+		"oracle": "rpm",
+		"rhel":   "rpm",
+		"rocky":  "rpm",
+		"ubuntu": "dpkg",
 	}
 
 	ReleasesSet          = set.NewSet()

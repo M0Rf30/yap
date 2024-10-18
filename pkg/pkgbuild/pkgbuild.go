@@ -64,6 +64,8 @@ type PKGBUILD struct {
 	SourceURI      []string
 	StartDir       string
 	URL            string
+	StaticEnabled  bool
+	StripEnabled   bool
 }
 
 // AddItem adds an item to the PKGBUILD.
@@ -85,6 +87,7 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	pkgBuild.setMainFolders()
 	pkgBuild.mapArrays(key, data)
 	pkgBuild.mapFunctions(key, data)
+	pkgBuild.processOptions()
 
 	return nil
 }
@@ -108,31 +111,6 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	}
 
 	return tmpl.Execute(file, pkgBuild)
-}
-
-// RenderSpec initializes a new template with custom functions and parses the provided script.
-// It adds two custom functions to the template:
-//  1. "join": Takes a slice of strings and joins them into a single string, separated by commas,
-//     while also trimming any leading or trailing spaces.
-//  2. "multiline": Takes a string and replaces newline characters with a newline followed by a space,
-//     effectively formatting the string for better readability in multi-line contexts.
-//
-// The method returns the parsed template, which can be used for rendering with data.
-func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
-	tmpl := template.New("template").Funcs(template.FuncMap{
-		"join": func(strs []string) string {
-			return strings.Trim(strings.Join(strs, ", "), " ")
-		},
-		"multiline": func(strs string) string {
-			ret := strings.ReplaceAll(strs, "\n", "\n ")
-
-			return strings.Trim(ret, " \n")
-		},
-	})
-
-	template.Must(tmpl.Parse(script))
-
-	return tmpl
 }
 
 // GetDepends reads the package manager name, its arguments and all the
@@ -168,6 +146,31 @@ func (pkgBuild *PKGBUILD) Init() {
 	}
 }
 
+// RenderSpec initializes a new template with custom functions and parses the provided script.
+// It adds two custom functions to the template:
+//  1. "join": Takes a slice of strings and joins them into a single string, separated by commas,
+//     while also trimming any leading or trailing spaces.
+//  2. "multiline": Takes a string and replaces newline characters with a newline followed by a space,
+//     effectively formatting the string for better readability in multi-line contexts.
+//
+// The method returns the parsed template, which can be used for rendering with data.
+func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
+	tmpl := template.New("template").Funcs(template.FuncMap{
+		"join": func(strs []string) string {
+			return strings.Trim(strings.Join(strs, ", "), " ")
+		},
+		"multiline": func(strs string) string {
+			ret := strings.ReplaceAll(strs, "\n", "\n ")
+
+			return strings.Trim(ret, " \n")
+		},
+	})
+
+	template.Must(tmpl.Parse(script))
+
+	return tmpl
+}
+
 // Validate checks that mandatory items are correctly provided by the PKGBUILD
 // file.
 func (pkgBuild *PKGBUILD) Validate() {
@@ -198,6 +201,28 @@ func (pkgBuild *PKGBUILD) Validate() {
 	if !isValid {
 		os.Exit(1)
 	}
+}
+
+// ValidateArchitecture checks if the specified architecture is supported.
+// If "any", sets to "any". Otherwise, checks if current architecture is supported.
+// Logs error if not supported, then sets to current architecture if supported.
+func (pkgBuild *PKGBUILD) ValidateArchitecture() {
+	isSupported := utils.Contains(pkgBuild.Arch, "any")
+	if isSupported {
+		pkgBuild.ArchComputed = "any"
+
+		return
+	}
+
+	currentArch := utils.GetArchitecture()
+
+	isSupported = utils.Contains(pkgBuild.Arch, currentArch)
+	if !isSupported {
+		utils.Logger.Fatal("unsupported architecture",
+			utils.Logger.Args("pkgname", pkgBuild.PkgName))
+	}
+
+	pkgBuild.ArchComputed = currentArch
 }
 
 // mapArrays reads an array name and its content and maps them to the PKGBUILD
@@ -341,31 +366,6 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 	return key, priority, nil
 }
 
-// ValidateArchitecture checks if the architecture specified in the PKGBUILD
-// is supported. If the architecture is "any", it sets the computed architecture
-// to "any". If the architecture is not "any", it checks if the current architecture
-// is in the list of supported architectures. If the current architecture is not
-// supported, it logs a fatal error with the package name. Finally, it sets the
-// computed architecture to the current architecture if it is supported.
-func (pkgBuild *PKGBUILD) ValidateArchitecture() {
-	isSupported := utils.Contains(pkgBuild.Arch, "any")
-	if isSupported {
-		pkgBuild.ArchComputed = "any"
-
-		return
-	}
-
-	currentArch := utils.GetArchitecture()
-
-	isSupported = utils.Contains(pkgBuild.Arch, currentArch)
-	if !isSupported {
-		utils.Logger.Fatal("unsupported architecture",
-			utils.Logger.Args("pkgname", pkgBuild.PkgName))
-	}
-
-	pkgBuild.ArchComputed = currentArch
-}
-
 // setMainFolders sets the main folders for the PKGBUILD.
 //
 // It takes no parameters.
@@ -408,4 +408,20 @@ func (pkgBuild *PKGBUILD) validateLicense() bool {
 	isValid, _ := spdxexp.ValidateLicenses(pkgBuild.License)
 
 	return isValid
+}
+
+func (pkgBuild *PKGBUILD) processOptions() {
+	// Initialize all flags to true
+	pkgBuild.StaticEnabled = true
+	pkgBuild.StripEnabled = true
+
+	// Iterate over the features array
+	for _, option := range pkgBuild.Options {
+		switch {
+		case strings.HasPrefix(option, "!strip"):
+			pkgBuild.StripEnabled = false
+		case strings.HasPrefix(option, "!staticlibs"):
+			pkgBuild.StaticEnabled = false
+		}
+	}
 }
