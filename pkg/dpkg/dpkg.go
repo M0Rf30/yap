@@ -204,6 +204,7 @@ func (d *Deb) createDeb(artifactPath, control, data string) error {
 // Returns an error if there was a problem installing the dependencies.
 func (d *Deb) Prepare(makeDepends []string) error {
 	args := []string{
+		"--allow-downgrades",
 		"--assume-yes",
 		"install",
 	}
