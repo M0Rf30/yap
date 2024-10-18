@@ -1,12 +1,27 @@
 package utils
 
 import (
+	"debug/elf"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+// CheckWritable checks if a binary file is writeable.
+//
+// It checks if the file exists and if write permission is granted.
+// If the file does not exist or does not have write permission,
+// an error is returned.
+func CheckWritable(binary string) error {
+	info, err := os.Stat(binary)
+	if err != nil || info.Mode().Perm()&0200 == 0 {
+		return err
+	}
+
+	return nil
+}
 
 // Chmod changes the file mode of the specified path.
 //
@@ -131,6 +146,27 @@ func GetDirSize(path string) (int64, error) {
 	return size, err
 }
 
+// GetFileType uses readelf to determine the type of the binary file.
+func GetFileType(binary string) string {
+	cleanFilePath := filepath.Clean(binary)
+
+	// Open the ELF binary
+	file, err := os.Open(cleanFilePath)
+	if err != nil {
+		Logger.Fatal("fatal error",
+			Logger.Args("error", err))
+	}
+	defer file.Close()
+
+	// Parse the ELF file
+	elfFile, err := elf.NewFile(file)
+	if err != nil {
+		return ""
+	}
+
+	return elfFile.Type.String()
+}
+
 // IsEmptyDir checks if a directory is empty.
 //
 // It takes in two parameters: path, a string representing the directory path,
@@ -149,6 +185,37 @@ func IsEmptyDir(path string, dirEntry os.DirEntry) bool {
 	}
 
 	return len(entries) == 0
+}
+
+// isStaticLibrary checks if the binary is a static library.
+func IsStaticLibrary(binary string) bool {
+	// Check the file extension
+	if strings.HasSuffix(binary, ".a") {
+		return true
+	}
+
+	cleanFilePath := filepath.Clean(binary)
+
+	file, err := os.Open(cleanFilePath)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	// Read the first few bytes to check the format
+	header := make([]byte, 8)
+	_, err = file.Read(header)
+
+	if err != nil {
+		return false
+	}
+
+	// Check for the "!<arch>" magic string which indicates a static library
+	if string(header) == "!<arch>\n" {
+		return true
+	}
+
+	return false
 }
 
 // MkdirAll creates a directory and all its parent directories.
@@ -194,6 +261,43 @@ func RemoveAll(path string) error {
 		Logger.Error("failed to remove",
 			Logger.Args("path", path))
 
+		return err
+	}
+
+	return nil
+}
+
+// StripFile strips the binary file using the strip command.
+func StripFile(binary string, args ...string) error {
+	return strip(binary, args...)
+}
+
+// StripLTO strips LTO-related sections from the binary file.
+func StripLTO(binary string, args ...string) error {
+	return strip(binary, append(args, "-R", ".gnu.lto_*", "-R", ".gnu.debuglto_*", "-N", "__gnu_lto_v1")...)
+}
+
+// strip performs a strip operation on the specified binary file.
+//
+// The strip command removes any symbol table from the binary executable.
+// This can be useful for smaller binary sizes, but makes debugging and
+// analysis more difficult.
+//
+// The original file is replaced with the stripped one.
+func strip(binary string, args ...string) error {
+	tempFile, err := os.CreateTemp("", filepath.Base(binary))
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tempFile.Name()) // Ensure the temp file is removed
+
+	args = append(args, "-o", tempFile.Name(), binary)
+
+	if err := Exec(false, "", "strip", args...); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tempFile.Name(), binary); err != nil {
 		return err
 	}
 
