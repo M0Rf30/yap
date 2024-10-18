@@ -1,63 +1,77 @@
 package options
 
-// StripScript is a scriptlet taken from makepkg resources. It's executed by
-// mvdan/sh interpreter and provides strip instructions to debian packaging.
-// Although it's a very dirty solution, for now it's the faster way to have this
-// essential feature.
-const StripScript = `
-  strip_file() {
-	local binary=$1
-	shift
-  
-	local tempfile=$(mktemp "$binary.XXXXXX")
-	if strip "$@" "$binary" -o "$tempfile"; then
-	  cat "$tempfile" >"$binary"
-	fi
-	rm -f "$tempfile"
-  }
-  
-  strip_lto() {
-	local binary=$1
-  
-	local tempfile=$(mktemp "$binary.XXXXXX")
-	if strip -R .gnu.lto_* -R .gnu.debuglto_* -N __gnu_lto_v1 "$binary" -o "$tempfile"; then
-	  cat "$tempfile" >"$binary"
-	fi
-	rm -f "$tempfile"
-  }
-  
-  # make sure library stripping variables are defined to prevent excess stripping
-  [[ -z ${STRIP_SHARED+x} ]] && STRIP_SHARED="-S"
-  [[ -z ${STRIP_STATIC+x} ]] && STRIP_STATIC="-S"
-  
-  declare binary strip_flags
-  binaries=$(find {{.PackageDir}} -type f -perm -u+w -exec echo {} +)
-  
-  for binary in ${binaries[@]}; do
-	STRIPLTO=0
-	case "$(LC_ALL=C readelf -h "$binary" 2>/dev/null)" in
-	  *Type:*'DYN (Shared object file)'*) # Libraries (.so) or Relocatable binaries
-		strip_flags="$STRIP_SHARED" ;;
-	  *Type:*'DYN (Position-Independent Executable file)'*) # Relocatable binaries
-		strip_flags="$STRIP_SHARED" ;;
-	  *Type:*'EXEC (Executable file)'*) # Binaries
-		strip_flags="$STRIP_BINARIES" ;;
-	  *Type:*'REL (Relocatable file)'*)     # Libraries (.a) or objects
-		if ar t "$binary" &>/dev/null; then # Libraries (.a)
-		  strip_flags="$STRIP_STATIC"
-		  STRIPLTO=1
-		elif [[ $binary = *'.ko' || $binary = *'.o' ]]; then # Kernel module or object file
-		  strip_flags="$STRIP_SHARED"
-		else
-		  continue
-		fi
-		;;
-	  *)
-		continue
-		;;
-	esac
-	strip_file "$binary" ${strip_flags}
-	((STRIPLTO)) && strip_lto "$binary"
-  done
-  exit 0   
-`
+import (
+	"io/fs"
+	"path/filepath"
+	"strings"
+
+	"github.com/M0Rf30/yap/pkg/utils"
+)
+
+// Strip walks through the directory to process each file.
+func Strip(packageDir string) error {
+	utils.Logger.Info("stripping binaries")
+
+	return filepath.WalkDir(packageDir, processFile)
+}
+
+// processFile Processes a single file, checking for stripping and LTO
+// operations if applicable.
+func processFile(binary string, dirEntry fs.DirEntry, err error) error {
+	if err != nil {
+		return err
+	}
+
+	if dirEntry.IsDir() {
+		return nil
+	}
+
+	if err := utils.CheckWritable(binary); err != nil {
+		return err // Skip if not writable
+	}
+
+	fileType := utils.GetFileType(binary)
+	if fileType == "" || fileType == "ET_NONE" {
+		return err
+	}
+
+	stripFlags, stripLTO := determineStripFlags(fileType, binary)
+
+	if err := utils.StripFile(binary, stripFlags); err != nil {
+		return err
+	}
+
+	if stripLTO {
+		if err := utils.StripLTO(binary); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// determineStripFlags determines strip flags based on file
+// type and binary.
+//
+// Returns strip flags and whether the binary is a shared library.
+func determineStripFlags(fileType, binary string) (string, bool) {
+	stripBinaries := "--strip-all"
+	stripShared := "--strip-unneeded"
+	stripStatic := "--strip-debug"
+
+	switch {
+	case strings.Contains(fileType, "ET_DYN"):
+		return stripShared, false
+	case strings.Contains(fileType, "ET_EXEC"):
+		return stripBinaries, false
+	case strings.Contains(fileType, "ET_REL"):
+		isStatic := utils.IsStaticLibrary(binary)
+		if isStatic {
+			return stripStatic, true
+		} else if strings.HasSuffix(binary, ".ko") || strings.HasSuffix(binary, ".o") {
+			return stripShared, false
+		}
+	}
+
+	return "", false
+}

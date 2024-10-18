@@ -38,9 +38,9 @@ type Packer interface {
 // distro: A string representing the distribution.
 // Returns a Packer interface.
 func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
-	distroFamily := constants.DistroToPackageManager[distro]
-	switch distroFamily {
-	case "alpine":
+	pkgManager := constants.DistroToPackageManager[distro]
+	switch pkgManager {
+	case "apk":
 		return &apk.Apk{
 			PKGBUILD: pkgBuild,
 		}
@@ -48,11 +48,11 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 		return &pacman.Pacman{
 			PKGBUILD: pkgBuild,
 		}
-	case "debian":
+	case "dpkg":
 		return &dpkg.Deb{
 			PKGBUILD: pkgBuild,
 		}
-	case "redhat":
+	case "rpm":
 		return &rpm.RPM{
 			PKGBUILD: pkgBuild,
 		}

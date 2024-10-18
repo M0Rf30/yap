@@ -81,7 +81,6 @@ license={{.License}}
 {{- else }}
 license="CUSTOM"
 {{- end }}
-
 options="!check !fhs"
 
 package() {
