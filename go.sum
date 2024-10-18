@@ -195,10 +195,8 @@ github.com/lithammer/fuzzysearch v1.1.8/go.mod h1:IdqeyBClc3FFqSzYq/MXESsS4S0FsZ
 github.com/mattn/go-runewidth v0.0.13/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
 github.com/mattn/go-runewidth v0.0.15 h1:UNAjwbU9l54TA3KzvqLGxwWjHmMgBUVhBiTjelZgg3U=
 github.com/mattn/go-runewidth v0.0.15/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
-github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20240823034847-a902fcc00a18 h1:75uWKPLDPn/o9yfWbdMZ/Wf/tWKfU4HaRdsGIAzOZUg=
-github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20240823034847-a902fcc00a18/go.mod h1:oHpu/V+YPY3yAwf5dqzjXk/RttIefJf+sJt/rYfU5q8=
-github.com/mholt/lzip-go v0.3.6 h1:M32wuPUoU7OWXMFukNnK/OZRXdPQyZsdn9ls/Gqivts=
-github.com/mholt/lzip-go v0.3.6/go.mod h1:E5mRuN06hLueqwJepeuv1xf2X5GnW9xd+Qs+JJBDGBM=
+github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20240924230722-275fd2ee4270 h1:3eopBNs2XVFRaBntC3LeSI6rmzx/dT8+yOZdGovOgK0=
+github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20240924230722-275fd2ee4270/go.mod h1:vWy/UY/te5cwJ/BNEzrAw27G0M3YvrdxtcOLlb3nMxc=
 github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELUXHmA=
 github.com/muesli/cancelreader v0.2.2/go.mod h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=
 github.com/nwaples/rardecode/v2 v2.0.0-beta.2 h1:e3mzJFJs4k83GXBEiTaQ5HgSc/kOK8q0rDaRO0MPaOk=
