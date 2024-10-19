@@ -47,12 +47,11 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 	}
 
 	pkgBuild := &pkgbuild.PKGBUILD{
-		Distro:     distro,
-		Codename:   release,
-		StartDir:   startDir,
-		Home:       home,
-		SourceDir:  filepath.Join(startDir, "src"),
-		PackageDir: filepath.Join(startDir, "staging"),
+		Distro:    distro,
+		Codename:  release,
+		StartDir:  startDir,
+		Home:      home,
+		SourceDir: filepath.Join(startDir, "src"),
 	}
 
 	err = utils.ExistsMakeDir(startDir)
@@ -74,6 +73,8 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 	if err != nil {
 		return nil, err
 	}
+
+	pkgBuild.SetMainFolders()
 
 	err = parseSyntaxFile(pkgbuildSyntax, pkgBuild)
 	if err != nil {
