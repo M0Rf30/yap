@@ -14,7 +14,6 @@ import (
 	"github.com/blakesmith/ar"
 	"github.com/mholt/archiver/v4"
 	"github.com/otiai10/copy"
-	"github.com/pkg/errors"
 )
 
 // Deb represents a Deb package.
@@ -280,7 +279,7 @@ func (d *Deb) createDebResources() error {
 // The method calls dpkgDeb to create the package and removes the
 // package directory, returning an error if any step fails.
 func (d *Deb) BuildPackage(artifactsPath string) error {
-	debTemp, err := os.MkdirTemp(d.PKGBUILD.StartDir, "temp")
+	debTemp, err := os.MkdirTemp(d.PKGBUILD.SourceDir, "tmp")
 	if err != nil {
 		return err
 	}
@@ -381,7 +380,7 @@ func addArFile(writer *ar.Writer, name string, body []byte) error {
 	}
 
 	if err := writer.WriteHeader(&header); err != nil {
-		return errors.Errorf("cannot write file header")
+		return err
 	}
 
 	_, err := writer.Write(body)
@@ -415,7 +414,6 @@ func (d *Deb) processDepends(depends []string) []string {
 
 	for index, depend := range depends {
 		result := regex.Split(depend, -1)
-
 		if len(result) == 2 {
 			name := result[0]
 			operator := strings.Trim(depend, result[0]+result[1])
