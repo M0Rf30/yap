@@ -84,7 +84,6 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 
 	pkgBuild.priorities[key] = priority
 	pkgBuild.mapVariables(key, data)
-	pkgBuild.setMainFolders()
 	pkgBuild.mapArrays(key, data)
 	pkgBuild.mapFunctions(key, data)
 	pkgBuild.processOptions()
@@ -370,12 +369,16 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 //
 // It takes no parameters.
 // It does not return anything.
-func (pkgBuild *PKGBUILD) setMainFolders() {
+func (pkgBuild *PKGBUILD) SetMainFolders() {
 	switch pkgBuild.Distro {
 	case "arch":
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "pkg", pkgBuild.PkgName)
 	case "alpine":
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
+	default:
+		pkgBuild.PackageDir, _ = os.MkdirTemp(
+			pkgBuild.StartDir,
+			pkgBuild.Distro)
 	}
 
 	if err := os.Setenv("pkgdir", pkgBuild.PackageDir); err != nil {

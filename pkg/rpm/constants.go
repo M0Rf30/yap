@@ -11,7 +11,6 @@ const (
 var buildEnvironmentDeps = []string{
 	"autoconf",
 	"automake",
-	"createrepo",
 	"expect",
 	"gcc",
 	"gcc-c++",
@@ -20,7 +19,6 @@ var buildEnvironmentDeps = []string{
 	"make",
 	"openssl",
 	"pkgconf",
-	"rpm-sign",
 	"which",
 }
 
@@ -78,95 +76,3 @@ var (
 		"rocky":  ".el",
 	}
 )
-
-const specFile = `
-{{- /* Mandatory fields */ -}}
-Name: {{.PkgName}}
-Summary: {{.PkgDesc}}
-{{- if .Epoch}}
-Epoch: {{.Epoch}}
-{{- end }}
-Version: {{.PkgVer}}
-Release: {{.PkgRel}}
-{{- if .ArchComputed}}
-BuildArch: {{.ArchComputed}}
-{{- end }}
-{{- if .Section}}
-Group: {{.Section}}
-{{- end }}
-{{- if .URL}}
-URL: {{.URL}}
-{{- end }}
-{{- if .License}}
-{{- with .License}}
-License: {{join .}}
-{{- end }}
-{{- else }}
-License: CUSTOM
-{{- end }}
-{{- if .Maintainer}}
-Packager: {{.Maintainer}}
-{{- end }}
-{{- if .Copyright}}
-Vendor: {{ range .Copyright}}{{ . }}; {{ end }}{{- end }}
-{{- with .Provides}}
-Provides: {{join .}}
-{{- end }}
-{{- with .Conflicts}}
-Conflicts: {{join .}}
-{{- end }}
-{{- with .Depends}}
-Requires: {{join .}}
-{{- end }}
-{{- with .MakeDepends}}
-BuildRequires: {{join .}}
-{{- end }}
-{{- with .OptDepends}}
-Recommends: {{join .}}
-{{- end }}
-{{- with .OptDepends}}
-Suggests: {{join .}}
-{{- end }}
-AutoReqProv: no
-
-{{- if .PkgDest}}
-%define _rpmdir {{.PkgDest}}
-{{- end }}
-
-%global _build_id_links none
-%global _python_bytecompile_extra 0
-%global _python_bytecompile_errors_terminate_build 0
-%undefine __brp_python_bytecompile
-
-%description
-{{.PkgDesc}}
-
-%files
-{{- range $key, $value := .Files }}
-{{- if $value }}
-{{$value}}
-{{- end }}
-{{- end }}
-
-{{- if .PreInst}}
-%pre
-{{.PreInst}}
-{{- end }}
-
-{{- if .PostInst}}
-%post
-{{.PostInst}}
-{{- end }}
-
-{{- if .PreRm}}
-%preun
-if [[ "$1" -ne 0 ]]; then exit 0; fi
-{{.PreRm}}
-{{- end }}
-
-{{- if .PostRm}}
-%postun
-if [[ "$1" -ne 0 ]]; then exit 0; fi
-{{.PostRm}}
-{{- end }}
-`

@@ -81,15 +81,5 @@ func (builder *Builder) getSources() error {
 // initDirs creates mandatory fakeroot folders (src, pkg) for a single project.
 // It returns any error if occurred.
 func (builder *Builder) initDirs() error {
-	dirs := []string{
-		builder.PKGBUILD.SourceDir,
-		builder.PKGBUILD.PackageDir}
-
-	for _, dir := range dirs {
-		if err := utils.ExistsMakeDir(dir); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return utils.ExistsMakeDir(builder.PKGBUILD.SourceDir)
 }

@@ -154,10 +154,6 @@ func (mpc *MultipleProject) BuildAll() error {
 // returns an error if there was a problem removing the directories.
 func (mpc *MultipleProject) Clean() error {
 	for _, project := range mpc.Projects {
-		if err := utils.RemoveAll(project.Builder.PKGBUILD.PackageDir); err != nil {
-			return err
-		}
-
 		if CleanBuild {
 			if err := utils.RemoveAll(project.Builder.PKGBUILD.SourceDir); err != nil {
 				return err
@@ -187,12 +183,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	err := mpc.validateAllProject(distro, release, path)
-	if err != nil {
-		return err
-	}
-
-	err = utils.ExistsMakeDir(mpc.BuildDir)
+	err := utils.ExistsMakeDir(mpc.BuildDir)
 	if err != nil {
 		return err
 	}
@@ -277,6 +268,10 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		return err
 	}
 
+	if err := utils.RemoveAll(proj.Builder.PKGBUILD.PackageDir); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -337,6 +332,7 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
+		pkgbuildFile.Validate()
 		pkgbuildFile.ValidateArchitecture()
 
 		packageManager = packer.GetPackageManager(pkgbuildFile, distro)
@@ -418,25 +414,6 @@ func (mpc *MultipleProject) setSingleProject(path string) {
 	mpc.Output = cleanFilePath
 	mpc.Projects = append(mpc.Projects, proj)
 	singleProject = true
-}
-
-// validateAllProject validates all projects in the MultipleProject struct.
-//
-// It takes in the distro, release, and path as parameters and returns an error.
-func (mpc *MultipleProject) validateAllProject(distro, release, path string) error {
-	for _, child := range mpc.Projects {
-		pkgbuildFile, err := parser.ParseFile(distro,
-			release,
-			filepath.Join(mpc.BuildDir, child.Name),
-			filepath.Join(path, child.Name))
-		if err != nil {
-			return err
-		}
-
-		pkgbuildFile.Validate()
-	}
-
-	return nil
 }
 
 // validateJSON validates the JSON of the MultipleProject struct.
