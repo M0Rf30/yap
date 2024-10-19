@@ -31,7 +31,6 @@ RUN \
     bash-completion \
     ca-certificates \
     dnf-plugins-core \
-    rpm-build \
     sudo; \
   dnf config-manager --enable crb; \
   dnf config-manager --enable devel; \
