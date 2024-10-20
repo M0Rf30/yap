@@ -9,7 +9,7 @@ require (
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/google/rpmpack v0.6.1-0.20240413165640-60c43da513f7
-	github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20240924230722-275fd2ee4270
+	github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20241018202043-264c9016644b
 	github.com/otiai10/copy v1.14.0
 	github.com/pkg/errors v0.9.1
 	github.com/pterm/pterm v0.12.79
@@ -62,7 +62,7 @@ require (
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/nwaples/rardecode/v2 v2.0.0-beta.2 // indirect
+	github.com/nwaples/rardecode/v2 v2.0.0-beta.3 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
