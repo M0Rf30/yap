@@ -170,42 +170,47 @@ func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
 	return tmpl
 }
 
-// Validate checks that mandatory items are correctly provided by the PKGBUILD
+// ValidateGeneral checks that mandatory items are correctly provided by the PKGBUILD
 // file.
-func (pkgBuild *PKGBUILD) Validate() {
-	var isValid = true
+func (pkgBuild *PKGBUILD) ValidateGeneral() {
+	var checkErrors []string
 
-	if !pkgBuild.validateLicense() {
-		isValid = false
+	// Validate license
+	if !pkgBuild.checkLicense() {
+		checkErrors = append(checkErrors, "license")
 
-		utils.Logger.Error("invalid SPDX license identifier", utils.Logger.Args("pkgname", pkgBuild.PkgName))
+		utils.Logger.Error("invalid SPDX license identifier",
+			utils.Logger.Args("pkgname", pkgBuild.PkgName))
 		utils.Logger.Info("you can find valid SPDX license identifiers here",
 			utils.Logger.Args("🌐", "https://spdx.org/licenses/"))
 	}
 
+	// Check source and hash sums
 	if len(pkgBuild.SourceURI) != len(pkgBuild.HashSums) {
-		isValid = false
+		checkErrors = append(checkErrors, "source-hash mismatch")
 
 		utils.Logger.Error("number of sources and hashsums differs",
 			utils.Logger.Args("pkgname", pkgBuild.PkgName))
 	}
 
+	// Check for package() function
 	if pkgBuild.Package == "" {
-		isValid = false
+		checkErrors = append(checkErrors, "package function")
 
 		utils.Logger.Error("missing package() function",
 			utils.Logger.Args("pkgname", pkgBuild.PkgName))
 	}
 
-	if !isValid {
+	// Exit if there are validation errors
+	if len(checkErrors) > 0 {
 		os.Exit(1)
 	}
 }
 
-// ValidateArchitecture checks if the specified architecture is supported.
+// ComputeArchitecture checks if the specified architecture is supported.
 // If "any", sets to "any". Otherwise, checks if current architecture is supported.
 // Logs error if not supported, then sets to current architecture if supported.
-func (pkgBuild *PKGBUILD) ValidateArchitecture() {
+func (pkgBuild *PKGBUILD) ComputeArchitecture() {
 	isSupported := utils.Contains(pkgBuild.Arch, "any")
 	if isSupported {
 		pkgBuild.ArchComputed = "any"
@@ -218,7 +223,9 @@ func (pkgBuild *PKGBUILD) ValidateArchitecture() {
 	isSupported = utils.Contains(pkgBuild.Arch, currentArch)
 	if !isSupported {
 		utils.Logger.Fatal("unsupported architecture",
-			utils.Logger.Args("pkgname", pkgBuild.PkgName))
+			utils.Logger.Args(
+				"pkgname", pkgBuild.PkgName,
+				"arch", strings.Join(pkgBuild.Arch, " ")))
 	}
 
 	pkgBuild.ArchComputed = currentArch
@@ -390,7 +397,7 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 	}
 }
 
-// validateLicense checks if the license of the PKGBUILD is valid.
+// checkLicense checks if the license of the PKGBUILD is valid.
 //
 // This function takes no parameters.
 //
@@ -401,7 +408,7 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 // to validate the license.
 //
 // Returns a boolean indicating if the license is valid.
-func (pkgBuild *PKGBUILD) validateLicense() bool {
+func (pkgBuild *PKGBUILD) checkLicense() bool {
 	for _, license := range pkgBuild.License {
 		if license == "PROPRIETARY" || license == "CUSTOM" {
 			return true
@@ -426,5 +433,35 @@ func (pkgBuild *PKGBUILD) processOptions() {
 		case strings.HasPrefix(option, "!staticlibs"):
 			pkgBuild.StaticEnabled = false
 		}
+	}
+}
+
+// ValidateMandatoryItems checks that mandatory items are correctly provided by the PKGBUILD
+// file.
+func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
+	var validationErrors []string
+
+	// Check mandatory variables
+	mandatoryChecks := map[string]string{
+		"maintainer": pkgBuild.Maintainer,
+		"pkgdesc":    pkgBuild.PkgDesc,
+		"pkgname":    pkgBuild.PkgName,
+		"pkgrel":     pkgBuild.PkgRel,
+		"pkgver":     pkgBuild.PkgVer,
+	}
+
+	for variable, value := range mandatoryChecks {
+		if value == "" {
+			validationErrors = append(validationErrors, variable)
+		}
+	}
+
+	// Exit if there are validation errors
+	if len(validationErrors) > 0 {
+		utils.Logger.Fatal(
+			"failed to set variables",
+			utils.Logger.Args(
+				"variables",
+				strings.Join(validationErrors, " ")))
 	}
 }
