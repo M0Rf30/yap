@@ -15,6 +15,11 @@ func StringifyArray(node *syntax.Assign) []string {
 	printer := syntax.NewPrinter(syntax.Indent(2))
 	out := &strings.Builder{}
 
+	if len(node.Array.Elems) == 0 {
+		Logger.Fatal("empty array, please give it a value",
+			Logger.Args("array", node.Name.Value))
+	}
+
 	for index := range node.Array.Elems {
 		if err := printer.Print(out, node.Array.Elems[index].Value); err != nil {
 			Logger.Error("unable to parse array element",
@@ -36,9 +41,13 @@ func StringifyAssign(node *syntax.Assign) string {
 	out := &strings.Builder{}
 	printer := syntax.NewPrinter(syntax.Indent(2))
 
+	if node.Value == nil {
+		Logger.Fatal("empty variable, please give it a value",
+			Logger.Args("variable", node.Name.Value))
+	}
+
 	if err := printer.Print(out, node.Value); err != nil {
-		Logger.Error("unable to parse variable",
-			Logger.Args("name", out.String()))
+		return ""
 	}
 
 	return strings.Trim(out.String(), "\"")
@@ -59,6 +68,11 @@ func StringifyFuncDecl(node *syntax.FuncDecl) string {
 	}
 
 	funcDecl := strings.Trim(out.String(), "{\n}")
+
+	if funcDecl == "" {
+		Logger.Fatal("empty function, please give it a value",
+			Logger.Args("function", node.Name.Value))
+	}
 
 	return funcDecl
 }
