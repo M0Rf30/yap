@@ -4,13 +4,13 @@ import (
 	"runtime"
 )
 
-// GetArchitecture returns the corresponding uname -m output for the current GOARCH.
+// GetArchitecture returns the corresponding pacman architecture for the current GOARCH.
 func GetArchitecture() string {
-	// Create a map of GOARCH values to uname -m outputs
+	// Create a map of GOARCH values to pacman arch ones
 	architectureMap := map[string]string{
 		"amd64":   "x86_64",
-		"386":     "i386",
-		"arm":     "armv7l",  // Common for ARM 32-bit
+		"386":     "i686",
+		"arm":     "armv7h",  // Common for ARM 32-bit
 		"arm64":   "aarch64", // Common for ARM 64-bit
 		"ppc64":   "ppc64",
 		"ppc64le": "ppc64le",
@@ -24,8 +24,8 @@ func GetArchitecture() string {
 	// Get the current architecture using runtime.GOARCH
 	currentArch := runtime.GOARCH
 
-	// Get the corresponding uname -m output from the map
-	unameOutput := architectureMap[currentArch]
+	// Get the corresponding pacman architecture from the map
+	pacmanArch := architectureMap[currentArch]
 
-	return unameOutput
+	return pacmanArch
 }
