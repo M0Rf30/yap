@@ -217,7 +217,7 @@ func PullContainers(target string) error {
 	}
 
 	if _, err := os.Stat(containerApp); err == nil {
-		return Exec(true, "", containerApp, args...)
+		return Exec(false, "", containerApp, args...)
 	}
 
 	return nil
