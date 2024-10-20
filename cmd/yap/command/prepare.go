@@ -13,7 +13,7 @@ import (
 var (
 	GoLang bool
 
-	// prepareCmd represents the listTargets command.
+	// prepareCmd represents the listDistros command.
 	prepareCmd = &cobra.Command{
 		Use:   "prepare [target]",
 		Short: "Install base development packages for every supported distro",
