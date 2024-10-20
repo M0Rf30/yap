@@ -332,8 +332,9 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
-		pkgbuildFile.Validate()
-		pkgbuildFile.ValidateArchitecture()
+		pkgbuildFile.ComputeArchitecture()
+		pkgbuildFile.ValidateMandatoryItems()
+		pkgbuildFile.ValidateGeneral()
 
 		packageManager = packer.GetPackageManager(pkgbuildFile, distro)
 
@@ -364,7 +365,7 @@ func (mpc *MultipleProject) readProject(path string) error {
 
 	if utils.Exists(jsonFilePath) {
 		projectFilePath = jsonFilePath
-		utils.Logger.Info("molti-project file found",
+		utils.Logger.Info("multi-project file found",
 			utils.Logger.Args("path", projectFilePath))
 	}
 

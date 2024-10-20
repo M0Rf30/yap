@@ -6,21 +6,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// listTargetsCmd represents the listTargets command.
-var listTargetsCmd = &cobra.Command{
-	Use:   "list-targets",
-	Short: "List a bunch of available build targets",
+// listDistrosCmd represents the listDistros command.
+var listDistrosCmd = &cobra.Command{
+	Use:   "list-distros",
+	Short: "List a bunch of available distros to build for",
 	Run: func(_ *cobra.Command, _ []string) {
-		ListTargets()
+		ListDistros()
 	},
 }
 
-func ListTargets() {
+func ListDistros() {
 	for _, release := range constants.Releases {
 		pterm.Println(release)
 	}
 }
 
 func init() {
-	rootCmd.AddCommand(listTargetsCmd)
+	rootCmd.AddCommand(listDistrosCmd)
 }
