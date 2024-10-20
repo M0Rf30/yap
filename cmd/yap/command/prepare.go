@@ -15,7 +15,7 @@ var (
 
 	// prepareCmd represents the listDistros command.
 	prepareCmd = &cobra.Command{
-		Use:   "prepare [target]",
+		Use:   "prepare [distro]",
 		Short: "Install base development packages for every supported distro",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(_ *cobra.Command, args []string) {

@@ -15,7 +15,7 @@ import (
 var (
 	// buildCmd represents the command to build the entire project.
 	buildCmd = &cobra.Command{
-		Use:   "build [target] [path]",
+		Use:   "build [distro] [path]",
 		Short: "Build multiple PKGBUILD definitions within a yap.json project",
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(_ *cobra.Command, args []string) {

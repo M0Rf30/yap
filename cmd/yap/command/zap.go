@@ -12,7 +12,7 @@ import (
 var (
 	// zapCmd represents the command to build the entire project.
 	zapCmd = &cobra.Command{
-		Use:   "zap [target] [path]",
+		Use:   "zap [distro] [path]",
 		Short: "Deeply clean the build environment of a project",
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(_ *cobra.Command, args []string) {
