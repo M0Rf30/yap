@@ -443,11 +443,10 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
 
 	// Check mandatory variables
 	mandatoryChecks := map[string]string{
-		"maintainer": pkgBuild.Maintainer,
-		"pkgdesc":    pkgBuild.PkgDesc,
-		"pkgname":    pkgBuild.PkgName,
-		"pkgrel":     pkgBuild.PkgRel,
-		"pkgver":     pkgBuild.PkgVer,
+		"pkgdesc": pkgBuild.PkgDesc,
+		"pkgname": pkgBuild.PkgName,
+		"pkgrel":  pkgBuild.PkgRel,
+		"pkgver":  pkgBuild.PkgVer,
 	}
 
 	for variable, value := range mandatoryChecks {
