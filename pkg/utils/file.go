@@ -5,9 +5,50 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
+
+const (
+	// Symbolic link.
+	TagLink = 0o120000
+	// Directory.
+	TagDirectory = 0o40000
+	// TypeFile is the type of a regular file. This is also the type that is
+	// implied when no type is specified.
+	TypeFile = "file"
+	// TypeDir is the type of a directory that is explicitly added in order to
+	// declare ownership or non-standard permission.
+	TypeDir = "dir"
+	// TypeSymlink is the type of a symlink that is created at the destination
+	// path and points to the source path.
+	TypeSymlink = "symlink"
+	// TypeConfig is the type of a configuration file that may be changed by the
+	// user of the package.
+	TypeConfig = "config"
+	// TypeConfigNoReplace is like TypeConfig with an added noreplace directive
+	// that is respected by RPM-based distributions.
+	// For all other package formats it is handled exactly like TypeConfig.
+	TypeConfigNoReplace = "config|noreplace"
+)
+
+// FileContent describes the source and destination
+// of one file to copy into a package.
+type FileContent struct {
+	Source      string
+	Destination string
+	Type        string
+	FileInfo    *FileInfo
+}
+
+type FileInfo struct {
+	Owner string
+	Group string
+	Mode  os.FileMode
+	MTime time.Time
+	Size  int64
+}
 
 // CheckWritable checks if a binary file is writeable.
 //
@@ -165,6 +206,19 @@ func GetFileType(binary string) string {
 	}
 
 	return elfFile.Type.String()
+}
+
+// GetModTime retrieves the modification time of a file and checks for overflow.
+// It returns the modification time as an uint32.
+func GetModTime(fileInfo os.FileInfo) uint32 {
+	mTime := fileInfo.ModTime().Unix()
+	// Check for overflow in the modification time.
+	if mTime < 0 || mTime > int64(^uint32(0)) {
+		Logger.Fatal("modification time is out of range for uint32",
+			Logger.Args("time", mTime))
+	}
+
+	return uint32(mTime)
 }
 
 // IsEmptyDir checks if a directory is empty.
