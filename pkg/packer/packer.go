@@ -57,7 +57,7 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 			PKGBUILD: pkgBuild,
 		}
 	default:
-		utils.Logger.Fatal("unsupported linux target",
+		utils.Logger.Fatal("unsupported linux distro",
 			utils.Logger.Args("distro", distro))
 	}
 

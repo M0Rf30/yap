@@ -66,9 +66,7 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		BuildTime:   time.Now(),
 	})
 
-	r.addScriptFiles(rpm)
-
-	if err := r.addFiles(rpm); err != nil {
+	if err := r.createFilesInsideRPM(rpm); err != nil {
 		return err
 	}
 
@@ -178,61 +176,139 @@ func (r *RPM) Update() error {
 	return nil
 }
 
-// addFiles adds files from the specified package directory to the RPM package.
-func (r *RPM) addFiles(rpm *rpmpack.RPM) error {
-	var files []string
+// createFilesInsideRPM prepares and adds files to the specified RPM object.
+// It retrieves backup files, walks through the package directory, and adds the contents to the RPM.
+func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
+	// Prepare a list of backup files by calling the prepareBackupFiles method.
+	backupFiles := r.prepareBackupFiles()
 
-	err := filepath.WalkDir(r.PKGBUILD.PackageDir,
-		func(path string, dirEntry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if dirEntry.IsDir() {
-				isEmptyDir := utils.IsEmptyDir(path, dirEntry)
-				if isEmptyDir {
-					files = append(files, path)
-				}
-			} else {
-				files = append(files, path)
-			}
-
-			return nil
-		})
-
+	// Walk through the package directory and retrieve the contents.
+	contents, err := walkPackageDirectory(r.PKGBUILD.PackageDir, backupFiles)
 	if err != nil {
-		return err
+		return err // Return the error if walking the directory fails.
 	}
 
-	for _, filePath := range files {
-		cleanFilePath := filepath.Clean(filePath)
-		body, _ := os.ReadFile(cleanFilePath)
-		rpm.AddFile(rpmpack.RPMFile{
-			Name: strings.TrimPrefix(filePath, r.PKGBUILD.PackageDir),
-			Body: body,
-		})
+	// Add the retrieved contents to the RPM object and return any error that occurs.
+	return addContentsToRPM(contents, rpm)
+}
+
+// addContentsToRPM adds a slice of FileContent objects to the specified RPM object.
+// It creates RPMFile objects from the FileContent and adds them to the RPM.
+func addContentsToRPM(contents []*utils.FileContent, rpm *rpmpack.RPM) error {
+	// Iterate over each FileContent in the provided slice.
+	for _, content := range contents {
+		// Create an RPMFile from the FileContent.
+		file, err := createRPMFile(content)
+		if err != nil {
+			return err // Return the error if creating the RPMFile fails.
+		}
+
+		// Clean the file name to ensure it has a proper format.
+		file.Name = filepath.Clean(file.Name)
+		// Add the created RPMFile to the RPM object.
+		rpm.AddFile(*file)
 	}
 
+	// Return nil indicating that all contents were added successfully.
 	return nil
 }
 
-// addScriptFiles adds script files to the RPM package based on the PKGBUILD configuration.
-func (r *RPM) addScriptFiles(rpm *rpmpack.RPM) {
-	if r.PKGBUILD.PreInst != "" {
-		rpm.AddPretrans(r.PKGBUILD.PreInst)
+// asRPMDirectory creates an RPMFile object for a directory based on the provided FileContent.
+// It retrieves the directory's modification time and sets the appropriate fields in the RPMFile.
+func asRPMDirectory(content *utils.FileContent) *rpmpack.RPMFile {
+	// Get file information for the directory specified in the content.
+	fileInfo, _ := os.Stat(filepath.Clean(content.Source))
+
+	// Retrieve the modification time of the directory.
+	mTime := utils.GetModTime(fileInfo)
+
+	// Create and return an RPMFile object for the directory.
+	return &rpmpack.RPMFile{
+		Name:  content.Destination,      // Set the destination name.
+		Mode:  uint(utils.TagDirectory), // Set the mode to indicate it's a directory.
+		MTime: mTime,                    // Set the modification time.
+		Owner: "root",                   // Set the owner to "root".
+		Group: "root",                   // Set the group to "root".
+	}
+}
+
+// asRPMFile creates an RPMFile object for a regular file based on the provided FileContent.
+// It reads the file's data and retrieves its modification time.
+func asRPMFile(content *utils.FileContent, fileType rpmpack.FileType) (*rpmpack.RPMFile, error) {
+	// Read the file data from the source path.
+	data, err := os.ReadFile(content.Source)
+	if err != nil {
+		return nil, err // Return nil and the error if reading the file fails.
 	}
 
-	if r.PKGBUILD.PreRm != "" {
-		rpm.AddPretrans(r.PKGBUILD.PreRm)
+	cleanFilePath := filepath.Clean(content.Source)
+	fileInfo, _ := os.Stat(cleanFilePath)
+
+	// Retrieve the modification time of the file.
+	mTime := utils.GetModTime(fileInfo)
+
+	// Create and return an RPMFile object for the regular file.
+	return &rpmpack.RPMFile{
+		Name:  content.Destination,   // Set the destination name.
+		Body:  data,                  // Set the file data.
+		Mode:  uint(fileInfo.Mode()), // Set the file mode.
+		MTime: mTime,                 // Set the modification time.
+		Owner: "root",                // Set the owner to "root".
+		Group: "root",                // Set the group to "root".
+		Type:  fileType,              // Set the file type.
+	}, nil
+}
+
+// asRPMSymlink creates an RPMFile object for a symbolic link based on the provided FileContent.
+// It retrieves the link's target and modification time.
+func asRPMSymlink(content *utils.FileContent) *rpmpack.RPMFile {
+	cleanFilePath := filepath.Clean(content.Source)
+	fileInfo, _ := os.Lstat(cleanFilePath) // Use Lstat to get information about the symlink.
+	body, _ := os.Readlink(cleanFilePath)  // Read the target of the symlink.
+
+	// Retrieve the modification time of the symlink.
+	mTime := utils.GetModTime(fileInfo)
+
+	// Create and return an RPMFile object for the symlink.
+	return &rpmpack.RPMFile{
+		Name:  content.Destination, // Set the destination name.
+		Body:  []byte(body),        // Set the target of the symlink as the body.
+		Mode:  uint(utils.TagLink), // Set the mode to indicate it's a symlink.
+		MTime: mTime,               // Set the modification time.
+		Owner: "root",              // Set the owner to "root".
+		Group: "root",              // Set the group to "root".
+	}
+}
+
+// createContent creates a new FileContent object with the specified source path,
+// destination path (relative to the package directory), and content type.
+func createContent(path, packageDir, contentType string) *utils.FileContent {
+	return &utils.FileContent{
+		Source:      path,
+		Destination: strings.TrimPrefix(path, packageDir),
+		Type:        contentType,
+	}
+}
+
+// createRPMFile converts a FileContent object into an RPMFile object based on its type.
+// It returns the created RPMFile and any error encountered during the conversion.
+func createRPMFile(content *utils.FileContent) (*rpmpack.RPMFile, error) {
+	var file *rpmpack.RPMFile
+
+	var err error
+
+	switch content.Type {
+	case utils.TypeConfigNoReplace:
+		file, err = asRPMFile(content, rpmpack.ConfigFile|rpmpack.NoReplaceFile)
+	case utils.TypeSymlink:
+		file = asRPMSymlink(content)
+	case utils.TypeDir:
+		file = asRPMDirectory(content)
+	case utils.TypeFile:
+		file, err = asRPMFile(content, rpmpack.GenericFile)
 	}
 
-	if r.PKGBUILD.PostInst != "" {
-		rpm.AddPretrans(r.PKGBUILD.PostInst)
-	}
-
-	if r.PKGBUILD.PostRm != "" {
-		rpm.AddPretrans(r.PKGBUILD.PostRm)
-	}
+	return file, err
 }
 
 // getGroup updates the section of the RPM struct with the corresponding
@@ -254,6 +330,42 @@ func (r *RPM) getRelease() {
 			RPMDistros[r.PKGBUILD.Distro] +
 			r.PKGBUILD.Codename
 	}
+}
+
+// handleFileEntry processes a file entry at the given path, checking if it is a backup file,
+// and appending its content to the provided slice based on its type (config, symlink, or regular file).
+func handleFileEntry(path string, backupFiles []string,
+	packageDir string, contents *[]*utils.FileContent) error {
+	fileInfo, err := os.Lstat(path)
+	if err != nil {
+		return err // Handle error from os.Lstat
+	}
+
+	if fileInfo.Mode()&os.ModeSymlink != 0 {
+		*contents = append(*contents, createContent(path, packageDir, utils.TypeSymlink))
+	} else if utils.Contains(backupFiles, strings.TrimPrefix(path, packageDir)) {
+		*contents = append(*contents, createContent(path, packageDir, utils.TypeConfigNoReplace))
+	} else {
+		*contents = append(*contents, createContent(path, packageDir, utils.TypeFile))
+	}
+
+	return nil
+}
+
+// prepareBackupFiles prepares a list of backup file paths by ensuring each path
+// has a leading slash and returns the resulting slice of backup file paths.
+func (r *RPM) prepareBackupFiles() []string {
+	backupFiles := make([]string, 0)
+
+	for _, filePath := range r.PKGBUILD.Backup {
+		if !strings.HasPrefix(filePath, "/") {
+			filePath = "/" + filePath
+		}
+
+		backupFiles = append(backupFiles, filePath)
+	}
+
+	return backupFiles
 }
 
 // processDepends converts a slice of strings into a rpmpack.Relations object.
@@ -279,4 +391,33 @@ func processDepends(depends []string) rpmpack.Relations {
 	}
 
 	return relations
+}
+
+// walkPackageDirectory traverses the specified package directory and collects
+// file contents, including handling backup files and empty directories.
+// It returns a slice of FileContent and an error if any occurs during the traversal.
+func walkPackageDirectory(packageDir string, backupFiles []string) ([]*utils.FileContent, error) {
+	var contents []*utils.FileContent
+
+	err := filepath.WalkDir(packageDir, func(path string, dirEntry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if dirEntry.IsDir() {
+			if utils.IsEmptyDir(path, dirEntry) {
+				contents = append(contents, createContent(path, packageDir, utils.TypeDir))
+			}
+
+			return nil
+		}
+
+		return handleFileEntry(path, backupFiles, packageDir, &contents)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return contents, nil
 }

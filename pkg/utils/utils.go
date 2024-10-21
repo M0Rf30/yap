@@ -198,9 +198,9 @@ func GOSetup() error {
 
 // PullContainers pulls the specified container image.
 //
-// target: the name of the container image to pull.
+// distro: the name of the container image to pull.
 // error: returns an error if the container image cannot be pulled.
-func PullContainers(target string) error {
+func PullContainers(distro string) error {
 	var containerApp string
 
 	if Exists("/usr/bin/podman") {
@@ -213,7 +213,7 @@ func PullContainers(target string) error {
 
 	args := []string{
 		"pull",
-		constants.DockerOrg + target,
+		constants.DockerOrg + distro,
 	}
 
 	if _, err := os.Stat(containerApp); err == nil {
