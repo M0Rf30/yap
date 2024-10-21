@@ -72,6 +72,10 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
+	if err := r.addBackupFiles(rpm); err != nil {
+		return err
+	}
+
 	cleanFilePath := filepath.Clean(pkgFilePath)
 
 	rpmFile, err := os.Create(cleanFilePath)
@@ -178,6 +182,52 @@ func (r *RPM) Update() error {
 	return nil
 }
 
+// addBackupFiles adds backup files from the specified package directory to the RPM package.
+func (r *RPM) addBackupFiles(rpm *rpmpack.RPM) error {
+	for _, filePath := range r.PKGBUILD.Backup {
+		if !strings.HasPrefix(filePath, "/") {
+			filePath = "/" + filePath
+		}
+
+		cleanFilePath := filepath.Clean(
+			filepath.Join(r.PKGBUILD.PackageDir, filePath))
+
+		body, err := os.ReadFile(cleanFilePath)
+		if err != nil {
+			utils.Logger.Fatal("entry is a directory",
+				utils.Logger.Args("entry", filePath))
+		}
+
+		fileInfo, _ := os.Stat(cleanFilePath)
+
+		// Retrieve the file mode
+		fileMode := fileInfo.Mode()
+
+		// Retrieve modification time
+		mTime := fileInfo.ModTime().Unix()
+		if mTime < 0 || mTime > int64(^uint32(0)) { // Check for overflow
+			utils.Logger.Fatal("modification time is out of range for uint32",
+				utils.Logger.Args("time", mTime))
+		}
+
+		rpm.AddFile(rpmpack.RPMFile{
+			Body:  body,
+			Group: "root",
+			Mode:  uint(fileMode),
+			MTime: uint32(mTime),
+			Name:  strings.TrimPrefix(filePath, r.PKGBUILD.PackageDir),
+			Owner: "root",
+			Type:  rpmpack.ConfigFile,
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // addFiles adds files from the specified package directory to the RPM package.
 func (r *RPM) addFiles(rpm *rpmpack.RPM) error {
 	var files []string
@@ -207,9 +257,22 @@ func (r *RPM) addFiles(rpm *rpmpack.RPM) error {
 	for _, filePath := range files {
 		cleanFilePath := filepath.Clean(filePath)
 		body, _ := os.ReadFile(cleanFilePath)
+		fileInfo, _ := os.Stat(cleanFilePath)
+
+		// Retrieve modification time
+		mTime := fileInfo.ModTime().Unix()
+		if mTime < 0 || mTime > int64(^uint32(0)) { // Check for overflow
+			utils.Logger.Fatal("modification time is out of range for uint32",
+				utils.Logger.Args("time", mTime))
+		}
+
 		rpm.AddFile(rpmpack.RPMFile{
-			Name: strings.TrimPrefix(filePath, r.PKGBUILD.PackageDir),
-			Body: body,
+			Body:  body,
+			Group: "root",
+			Mode:  uint(fileInfo.Mode()),
+			MTime: uint32(mTime),
+			Name:  strings.TrimPrefix(filePath, r.PKGBUILD.PackageDir),
+			Owner: "root",
 		})
 	}
 
