@@ -15,17 +15,28 @@ import (
 var (
 	// buildCmd represents the command to build the entire project.
 	buildCmd = &cobra.Command{
-		Use:   "build [distro] [path]",
+		Use:   "build [distro] path",
 		Short: "Build multiple PKGBUILD definitions within a yap.json project",
-		Args:  cobra.MinimumNArgs(2),
+		Args:  cobra.RangeArgs(1, 2), // Allow 1 or 2 arguments
 		Run: func(_ *cobra.Command, args []string) {
-			fullJSONPath, _ := filepath.Abs(args[1])
-			split := strings.Split(args[0], "-")
-			distro := split[0]
-			release := ""
+			fullJSONPath, _ := filepath.Abs(args[len(args)-1]) // Always take the last argument as path
+			var distro, release string
 
-			if len(split) > 1 {
-				release = split[1]
+			if len(args) == 2 {
+				split := strings.Split(args[0], "-")
+				distro = split[0]
+
+				if len(split) > 1 {
+					release = split[1]
+				}
+			}
+
+			// Use the default distro if none is provided
+			if distro == "" {
+				osRelease, _ := utils.ParseOSRelease()
+				distro = osRelease.ID
+				utils.Logger.Warn("distro not specified, using detected",
+					utils.Logger.Args("distro", distro))
 			}
 
 			mpc := project.MultipleProject{}
