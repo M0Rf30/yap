@@ -14,31 +14,40 @@ const (
 )
 
 var (
+	// These values are not invented,
+	// but refer to /etc/os-release ID field values.
 	Releases = [...]string{
-		"alma",
+		"almalinux",
 		"alpine",
-		"amazon",
+		"amzn",
 		"arch",
 		"centos",
 		"debian",
 		"fedora",
+		"linuxmint",
+		"opensuse-leap",
+		"ol",
+		"pop",
 		"rhel",
 		"rocky",
 		"ubuntu",
 	}
 
 	DistroToPackageManager = map[string]string{
-		"alma":   "rpm",
-		"alpine": "apk",
-		"amazon": "rpm",
-		"arch":   "pacman",
-		"centos": "rpm",
-		"debian": "dpkg",
-		"fedora": "rpm",
-		"oracle": "rpm",
-		"rhel":   "rpm",
-		"rocky":  "rpm",
-		"ubuntu": "dpkg",
+		"almalinux":     "rpm",
+		"alpine":        "apk",
+		"amzn":          "rpm",
+		"arch":          "pacman",
+		"centos":        "rpm",
+		"debian":        "dpkg",
+		"fedora":        "rpm",
+		"linuxmint":     "dpkg",
+		"ol":            "rpm",
+		"opensuse-leap": "rpm",
+		"pop":           "dpkg",
+		"rhel":          "rpm",
+		"rocky":         "rpm",
+		"ubuntu":        "dpkg",
 	}
 
 	ReleasesSet          = set.NewSet()
