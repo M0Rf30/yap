@@ -31,6 +31,7 @@ RUN \
     bash-completion \
     ca-certificates \
     dnf-plugins-core \
+    epel-release \
     sudo; \
   dnf config-manager --enable devel; \
   dnf config-manager --enable powertools; \
