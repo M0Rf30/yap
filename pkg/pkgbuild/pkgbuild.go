@@ -1,6 +1,7 @@
 package pkgbuild
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/github/go-spdx/v2/spdxexp"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/rand"
 )
 
 // Verbose is a flag to enable verbose output.
@@ -383,9 +385,8 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 	case "alpine":
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
 	default:
-		pkgBuild.PackageDir, _ = os.MkdirTemp(
-			pkgBuild.StartDir,
-			pkgBuild.Distro)
+		randomString := fmt.Sprintf("%x", rand.Int31())
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, pkgBuild.Distro+randomString)
 	}
 
 	if err := os.Setenv("pkgdir", pkgBuild.PackageDir); err != nil {

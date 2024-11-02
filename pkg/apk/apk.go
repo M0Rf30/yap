@@ -1,6 +1,7 @@
 package apk
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
@@ -33,7 +34,7 @@ func (a *Apk) PrepareFakeroot(_ string) error {
 	a.PKGBUILD.ArchComputed = APKArchs[a.PKGBUILD.ArchComputed]
 	a.apkDir = filepath.Join(a.PKGBUILD.StartDir, "apk")
 
-	if err := utils.RemoveAll(a.apkDir); err != nil {
+	if err := os.RemoveAll(a.apkDir); err != nil {
 		return err
 	}
 

@@ -293,7 +293,7 @@ func (d *Deb) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	if err := utils.RemoveAll(d.debDir); err != nil {
+	if err := os.RemoveAll(d.debDir); err != nil {
 		return err
 	}
 
@@ -306,7 +306,7 @@ func (d *Deb) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	if err := utils.RemoveAll(d.PKGBUILD.PackageDir); err != nil {
+	if err := os.RemoveAll(d.PKGBUILD.PackageDir); err != nil {
 		return err
 	}
 
@@ -320,7 +320,7 @@ func (d *Deb) PrepareFakeroot(_ string) error {
 	d.getRelease()
 	d.PKGBUILD.ArchComputed = DebArchs[d.PKGBUILD.ArchComputed]
 
-	if err := utils.RemoveAll(d.debDir); err != nil {
+	if err := os.RemoveAll(d.debDir); err != nil {
 		return err
 	}
 

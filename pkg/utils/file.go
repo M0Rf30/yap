@@ -138,8 +138,8 @@ func Exists(path string) bool {
 // path: the path to the directory.
 // error: returns an error if the directory cannot be created or accessed.
 func ExistsMakeDir(path string) error {
+	// #nosec
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		//#nosec
 		if err := os.MkdirAll(path, os.ModePerm); err != nil {
 			return errors.Errorf("failed to create directory %s", path)
 		}
@@ -272,23 +272,6 @@ func IsStaticLibrary(binary string) bool {
 	return false
 }
 
-// MkdirAll creates a directory and all its parent directories.
-//
-// It takes a string parameter `path` which represents the path of the directory to be created.
-// The function returns an error if any error occurs during the directory creation process.
-func MkdirAll(path string) error {
-	//#nosec
-	err := os.MkdirAll(path, 0o755)
-	if err != nil {
-		Logger.Error("failed to make directory",
-			Logger.Args("path", path))
-
-		return err
-	}
-
-	return nil
-}
-
 // Open opens a file at the specified path and returns a pointer to the file and an error.
 //
 // The path parameter is a string representing the file path to be opened.
@@ -303,22 +286,6 @@ func Open(path string) (*os.File, error) {
 	}
 
 	return file, err
-}
-
-// RemoveAll removes a file or directory and any children it contains.
-//
-// path: the path of the file or directory to be removed.
-// error: an error if the removal fails.
-func RemoveAll(path string) error {
-	err := os.RemoveAll(path)
-	if err != nil {
-		Logger.Error("failed to remove",
-			Logger.Args("path", path))
-
-		return err
-	}
-
-	return nil
 }
 
 // StripFile strips the binary file using the strip command.
