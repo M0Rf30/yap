@@ -3,6 +3,7 @@ package project
 import (
 	"encoding/json"
 	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/M0Rf30/yap/pkg/builder"
@@ -155,13 +156,13 @@ func (mpc *MultipleProject) BuildAll() error {
 func (mpc *MultipleProject) Clean() error {
 	for _, project := range mpc.Projects {
 		if CleanBuild {
-			if err := utils.RemoveAll(project.Builder.PKGBUILD.SourceDir); err != nil {
+			if err := os.RemoveAll(project.Builder.PKGBUILD.SourceDir); err != nil {
 				return err
 			}
 		}
 
 		if Zap && !singleProject {
-			if err := utils.RemoveAll(project.Builder.PKGBUILD.StartDir); err != nil {
+			if err := os.RemoveAll(project.Builder.PKGBUILD.StartDir); err != nil {
 				return err
 			}
 		}
@@ -254,6 +255,8 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		mpc.Output = absOutput
 	}
 
+	defer os.RemoveAll(proj.Builder.PKGBUILD.PackageDir)
+
 	if err := utils.ExistsMakeDir(mpc.Output); err != nil {
 		return err
 	}
@@ -265,10 +268,6 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 	utils.Logger.Info("building resulting package")
 
 	if err := proj.PackageManager.BuildPackage(mpc.Output); err != nil {
-		return err
-	}
-
-	if err := utils.RemoveAll(proj.Builder.PKGBUILD.PackageDir); err != nil {
 		return err
 	}
 

@@ -186,7 +186,7 @@ func GOSetup() error {
 		return err
 	}
 
-	err = RemoveAll(goArchivePath)
+	err = os.RemoveAll(goArchivePath)
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func Unarchive(source, destination string) error {
 		if archiveFile.IsDir() {
 			dirMap[newPath] = true
 
-			return MkdirAll(newPath)
+			return os.MkdirAll(newPath, 0o755) // #nosec
 		}
 
 		fileDir := filepath.Dir(newPath)
@@ -288,7 +288,7 @@ func Unarchive(source, destination string) error {
 		if !seenDir {
 			dirMap[fileDir] = true
 
-			_ = MkdirAll(fileDir)
+			_ = os.MkdirAll(fileDir, 0o755) // #nosec
 		}
 
 		cleanNewPath := filepath.Clean(newPath)

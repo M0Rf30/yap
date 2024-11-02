@@ -15,6 +15,7 @@ require (
 	github.com/pterm/pterm v0.12.79
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
+	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
 	mvdan.cc/sh/v3 v3.10.0
 )
 
