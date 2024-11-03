@@ -3,6 +3,7 @@ package parser
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
@@ -36,6 +37,16 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 	copyOpt := copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Skip
+		},
+		Skip: func(_ os.FileInfo, src, _ string) (bool, error) {
+			if strings.HasSuffix(src, ".apk") ||
+				strings.HasSuffix(src, ".deb") ||
+				strings.HasSuffix(src, ".pkg.tar.zst") ||
+				strings.HasSuffix(src, ".rpm") {
+				return true, nil
+			}
+
+			return false, nil
 		},
 	}
 
