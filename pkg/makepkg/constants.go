@@ -1,4 +1,4 @@
-package pacman
+package makepkg
 
 var buildEnvironmentDeps = []string{
 	"base-devel",

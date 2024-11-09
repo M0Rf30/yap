@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/pkg/parser"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/project"
 	"github.com/M0Rf30/yap/pkg/source"
 	"github.com/M0Rf30/yap/pkg/utils"
@@ -74,8 +73,6 @@ func init() {
 		"from", "", "", "Build starting from a defined package name")
 	buildCmd.Flags().StringVarP(&project.ToPkgName,
 		"to", "", "", "Build until a defined package name")
-	buildCmd.PersistentFlags().BoolVarP(&pkgbuild.Verbose,
-		"verbose", "v", false, "Verbose output")
 	buildCmd.Flags().BoolVarP(&project.Zap,
 		"zap", "z", false, "Remove entire staging dir before building the package")
 }
