@@ -4,7 +4,7 @@ import (
 	"github.com/M0Rf30/yap/pkg/apk"
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/dpkg"
-	"github.com/M0Rf30/yap/pkg/pacman"
+	"github.com/M0Rf30/yap/pkg/makepkg"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/rpm"
 	"github.com/M0Rf30/yap/pkg/utils"
@@ -44,8 +44,8 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 		return &apk.Apk{
 			PKGBUILD: pkgBuild,
 		}
-	case "pacman":
-		return &pacman.Pacman{
+	case "makepkg":
+		return &makepkg.Makepkg{
 			PKGBUILD: pkgBuild,
 		}
 	case "dpkg":

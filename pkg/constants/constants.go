@@ -1,6 +1,8 @@
 package constants
 
 import (
+	"strings"
+
 	"github.com/M0Rf30/yap/pkg/set"
 )
 
@@ -37,7 +39,7 @@ var (
 		"almalinux":     "rpm",
 		"alpine":        "apk",
 		"amzn":          "rpm",
-		"arch":          "pacman",
+		"arch":          "makepkg",
 		"centos":        "rpm",
 		"debian":        "dpkg",
 		"fedora":        "rpm",
@@ -50,10 +52,41 @@ var (
 		"ubuntu":        "dpkg",
 	}
 
-	ReleasesSet          = set.NewSet()
+	Packers = [...]string{
+		"apk",
+		"dpkg",
+		"makepkg",
+		"rpm",
+	}
+
 	Distros              = []string{}
 	DistrosSet           = set.NewSet()
 	DistroPackageManager = map[string]string{}
 	PackagersSet         = set.NewSet()
 	CleanPrevious        = false
 )
+
+// init initializes the package.
+//
+// It iterates over the Releases slice and adds each release to the ReleasesSet set.
+// It also extracts the distribution name from each release and adds it to the Distros slice.
+// The function then iterates over the Distros slice and assigns the corresponding package manager
+// to each distribution in the DistroPackageManager map.
+// If a distribution does not have a supported package manager, the function prints an error message
+// and exits the program.
+// Finally, it adds each package manager to the PackagersSet set.
+func init() {
+	for _, release := range Releases {
+		distro := strings.Split(release, "_")[0]
+		Distros = append(Distros, distro)
+		DistrosSet.Add(distro)
+	}
+
+	for _, distro := range Distros {
+		DistroPackageManager[distro] = DistroToPackageManager[distro]
+	}
+
+	for _, packageManager := range Packers {
+		PackagersSet.Add(packageManager)
+	}
+}

@@ -14,9 +14,6 @@ import (
 	"golang.org/x/exp/rand"
 )
 
-// Verbose is a flag to enable verbose output.
-var Verbose bool
-
 // PKGBUILD defines all the fields accepted by the yap specfile (variables,
 // arrays, functions). It adds some exotics fields to manage debconfig
 // templating and other rpm/deb descriptors.
@@ -104,12 +101,6 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 		return err
 	}
 	defer file.Close()
-
-	if Verbose {
-		if err := tmpl.Execute(utils.MultiPrinter.Writer, pkgBuild); err != nil {
-			return err
-		}
-	}
 
 	return tmpl.Execute(file, pkgBuild)
 }

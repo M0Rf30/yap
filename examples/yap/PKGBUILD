@@ -21,7 +21,7 @@ url="https://github.com/M0Rf30/${pkgname}"
 makedepends=(
   'upx'
 )
-makedepends__apt=(
+makedepends__dpkg=(
   'upx-ucl'
 )
 source=(

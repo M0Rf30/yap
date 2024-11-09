@@ -31,12 +31,12 @@ func (builder *Builder) Compile(noBuild bool) error {
 		}
 
 		if err := processFunction(builder.PKGBUILD.Build,
-			"processing sources"); err != nil {
+			"building"); err != nil {
 			return err
 		}
 
 		if err := processFunction(builder.PKGBUILD.Package,
-			"preparing fakeroot"); err != nil {
+			"generating package"); err != nil {
 			return err
 		}
 	}

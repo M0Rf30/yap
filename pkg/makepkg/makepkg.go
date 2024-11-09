@@ -1,4 +1,4 @@
-package pacman
+package makepkg
 
 import (
 	"path/filepath"
@@ -7,49 +7,49 @@ import (
 	"github.com/M0Rf30/yap/pkg/utils"
 )
 
-// Pacman represents a package manager for the Pacman distribution.
+// Makepkg represents a package manager for the Makepkg distribution.
 //
 // It contains methods for building, installing, and updating packages.
-type Pacman struct {
+type Makepkg struct {
 	PKGBUILD  *pkgbuild.PKGBUILD
 	pacmanDir string
 }
 
-// BuildPackage initiates the package building process for the Pacman instance.
+// BuildPackage initiates the package building process for the Makepkg instance.
 //
 // It takes a single parameter:
 // - artifactsPath: a string representing the path where the build artifacts will be stored.
 //
 // The method calls the internal pacmanBuild function to perform the actual build process.
 // It returns an error if the build process encounters any issues.
-func (p *Pacman) BuildPackage(_ string) error {
-	return p.pacmanBuild()
+func (m *Makepkg) BuildPackage(_ string) error {
+	return m.pacmanBuild()
 }
 
-// PrepareFakeroot sets up the environment for building a package in a fakeroot context.
+// PrepareFakeroot sets um the environment for building a package in a fakeroot context.
 //
 // It takes an artifactsPath parameter, which specifies where to store build artifacts.
 // The method initializes the pacmanDir, resolves the package destination, and creates
 // the PKGBUILD and post-installation script files if necessary. It returns an error
-// if any step fails.
-func (p *Pacman) PrepareFakeroot(artifactsPath string) error {
-	p.pacmanDir = p.PKGBUILD.StartDir
+// if any stem fails.
+func (m *Makepkg) PrepareFakeroot(artifactsPath string) error {
+	m.pacmanDir = m.PKGBUILD.StartDir
 
-	p.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
+	m.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 
-	tmpl := p.PKGBUILD.RenderSpec(specFile)
+	tmpl := m.PKGBUILD.RenderSpec(specFile)
 
-	if p.PKGBUILD.Home != p.PKGBUILD.StartDir {
-		err := p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir,
+	if m.PKGBUILD.Home != m.PKGBUILD.StartDir {
+		err := m.PKGBUILD.CreateSpec(filepath.Join(m.pacmanDir,
 			"PKGBUILD"), tmpl)
 		if err != nil {
 			return err
 		}
 	}
 
-	tmpl = p.PKGBUILD.RenderSpec(postInstall)
-	err := p.PKGBUILD.CreateSpec(filepath.Join(p.pacmanDir,
-		p.PKGBUILD.PkgName+".install"), tmpl)
+	tmpl = m.PKGBUILD.RenderSpec(postInstall)
+	err := m.PKGBUILD.CreateSpec(filepath.Join(m.pacmanDir,
+		m.PKGBUILD.PkgName+".install"), tmpl)
 
 	if err != nil {
 		return err
@@ -62,13 +62,13 @@ func (p *Pacman) PrepareFakeroot(artifactsPath string) error {
 //
 // artifactsPath: the path where the package artifacts are located.
 // error: an error if the installation fails.
-func (p *Pacman) Install(artifactsPath string) error {
-	pkgName := p.PKGBUILD.PkgName + "-" +
-		p.PKGBUILD.PkgVer +
+func (m *Makepkg) Install(artifactsPath string) error {
+	pkgName := m.PKGBUILD.PkgName + "-" +
+		m.PKGBUILD.PkgVer +
 		"-" +
-		p.PKGBUILD.PkgRel +
+		m.PKGBUILD.PkgRel +
 		"-" +
-		p.PKGBUILD.ArchComputed +
+		m.PKGBUILD.ArchComputed +
 		".pkg.tar.zst"
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
@@ -84,24 +84,24 @@ func (p *Pacman) Install(artifactsPath string) error {
 	return nil
 }
 
-// Prepare prepares the Pacman package by getting the dependencies using the PKGBUILD.
+// Prepare prepares the Makepkg package by getting the dependencies using the PKGBUILD.
 //
 // makeDepends is a slice of strings representing the dependencies to be included.
 // It returns an error if there is any issue getting the dependencies.
-func (p *Pacman) Prepare(makeDepends []string) error {
+func (m *Makepkg) Prepare(makeDepends []string) error {
 	args := []string{
 		"-S",
 		"--noconfirm",
 	}
 
-	return p.PKGBUILD.GetDepends("pacman", args, makeDepends)
+	return m.PKGBUILD.GetDepends("pacman", args, makeDepends)
 }
 
-// PrepareEnvironment prepares the environment for the Pacman.
+// PrepareEnvironment prepares the environment for the Makepkg.
 //
 // It takes a boolean parameter `golang` which indicates whether the environment should be prepared for Golang.
 // It returns an error if there is any issue in preparing the environment.
-func (p *Pacman) PrepareEnvironment(golang bool) error {
+func (m *Makepkg) PrepareEnvironment(golang bool) error {
 	args := []string{
 		"-S",
 		"--noconfirm",
@@ -117,12 +117,12 @@ func (p *Pacman) PrepareEnvironment(golang bool) error {
 	return utils.Exec(false, "", "pacman", args...)
 }
 
-// Update updates the Pacman package manager.
+// Update updates the Makepkg package manager.
 //
 // It retrieves the updates using the GetUpdates method of the PKGBUILD struct.
 // It returns an error if there is any issue during the update process.
-func (p *Pacman) Update() error {
-	return p.PKGBUILD.GetUpdates("pacman", "-Sy")
+func (m *Makepkg) Update() error {
+	return m.PKGBUILD.GetUpdates("pacman", "-Sy")
 }
 
 // pacmanBuild builds the package using makepkg command.
@@ -131,6 +131,6 @@ func (p *Pacman) Update() error {
 // The error is returned as is.
 // Returns:
 // - error: An error if any occurred during the execution of the makepkg command.
-func (p *Pacman) pacmanBuild() error {
-	return utils.Exec(true, p.pacmanDir, "makepkg", "-ef")
+func (m *Makepkg) pacmanBuild() error {
+	return utils.Exec(true, m.pacmanDir, "makepkg", "-ef")
 }
