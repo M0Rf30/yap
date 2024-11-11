@@ -1,7 +1,7 @@
 package packer
 
 import (
-	"github.com/M0Rf30/yap/pkg/apk"
+	"github.com/M0Rf30/yap/pkg/abuild"
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/dpkg"
 	"github.com/M0Rf30/yap/pkg/makepkg"
@@ -41,18 +41,22 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	pkgManager := constants.DistroToPackageManager[distro]
 	switch pkgManager {
 	case "apk":
-		return &apk.Apk{
+		return &abuild.Apk{
 			PKGBUILD: pkgBuild,
 		}
-	case "makepkg":
-		return &makepkg.Makepkg{
-			PKGBUILD: pkgBuild,
-		}
-	case "dpkg":
+	case "apt":
 		return &dpkg.Deb{
 			PKGBUILD: pkgBuild,
 		}
-	case "rpm":
+	case "pacman":
+		return &makepkg.Pkg{
+			PKGBUILD: pkgBuild,
+		}
+	case "yum":
+		return &rpm.RPM{
+			PKGBUILD: pkgBuild,
+		}
+	case "zypper":
 		return &rpm.RPM{
 			PKGBUILD: pkgBuild,
 		}

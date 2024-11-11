@@ -36,27 +36,28 @@ var (
 	}
 
 	DistroToPackageManager = map[string]string{
-		"almalinux":     "rpm",
+		"almalinux":     "yum",
 		"alpine":        "apk",
-		"amzn":          "rpm",
-		"arch":          "makepkg",
-		"centos":        "rpm",
-		"debian":        "dpkg",
-		"fedora":        "rpm",
-		"linuxmint":     "dpkg",
-		"ol":            "rpm",
-		"opensuse-leap": "rpm",
-		"pop":           "dpkg",
-		"rhel":          "rpm",
-		"rocky":         "rpm",
-		"ubuntu":        "dpkg",
+		"amzn":          "yum",
+		"arch":          "pacman",
+		"centos":        "yum",
+		"debian":        "apt",
+		"fedora":        "yum",
+		"linuxmint":     "apt",
+		"ol":            "yum",
+		"opensuse-leap": "zypper",
+		"pop":           "apt",
+		"rhel":          "yum",
+		"rocky":         "yum",
+		"ubuntu":        "apt",
 	}
 
 	Packers = [...]string{
 		"apk",
-		"dpkg",
-		"makepkg",
-		"rpm",
+		"apt",
+		"pacman",
+		"yum",
+		"zypper",
 	}
 
 	Distros              = []string{}

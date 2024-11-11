@@ -7,10 +7,10 @@ import (
 	"github.com/M0Rf30/yap/pkg/utils"
 )
 
-// Makepkg represents a package manager for the Makepkg distribution.
+// Pkg represents a package manager for the Pkg distribution.
 //
 // It contains methods for building, installing, and updating packages.
-type Makepkg struct {
+type Pkg struct {
 	PKGBUILD  *pkgbuild.PKGBUILD
 	pacmanDir string
 }
@@ -22,7 +22,7 @@ type Makepkg struct {
 //
 // The method calls the internal pacmanBuild function to perform the actual build process.
 // It returns an error if the build process encounters any issues.
-func (m *Makepkg) BuildPackage(_ string) error {
+func (m *Pkg) BuildPackage(_ string) error {
 	return m.pacmanBuild()
 }
 
@@ -32,7 +32,7 @@ func (m *Makepkg) BuildPackage(_ string) error {
 // The method initializes the pacmanDir, resolves the package destination, and creates
 // the PKGBUILD and post-installation script files if necessary. It returns an error
 // if any stem fails.
-func (m *Makepkg) PrepareFakeroot(artifactsPath string) error {
+func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 	m.pacmanDir = m.PKGBUILD.StartDir
 
 	m.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
@@ -62,7 +62,7 @@ func (m *Makepkg) PrepareFakeroot(artifactsPath string) error {
 //
 // artifactsPath: the path where the package artifacts are located.
 // error: an error if the installation fails.
-func (m *Makepkg) Install(artifactsPath string) error {
+func (m *Pkg) Install(artifactsPath string) error {
 	pkgName := m.PKGBUILD.PkgName + "-" +
 		m.PKGBUILD.PkgVer +
 		"-" +
@@ -88,7 +88,7 @@ func (m *Makepkg) Install(artifactsPath string) error {
 //
 // makeDepends is a slice of strings representing the dependencies to be included.
 // It returns an error if there is any issue getting the dependencies.
-func (m *Makepkg) Prepare(makeDepends []string) error {
+func (m *Pkg) Prepare(makeDepends []string) error {
 	args := []string{
 		"-S",
 		"--noconfirm",
@@ -101,7 +101,7 @@ func (m *Makepkg) Prepare(makeDepends []string) error {
 //
 // It takes a boolean parameter `golang` which indicates whether the environment should be prepared for Golang.
 // It returns an error if there is any issue in preparing the environment.
-func (m *Makepkg) PrepareEnvironment(golang bool) error {
+func (m *Pkg) PrepareEnvironment(golang bool) error {
 	args := []string{
 		"-S",
 		"--noconfirm",
@@ -121,7 +121,7 @@ func (m *Makepkg) PrepareEnvironment(golang bool) error {
 //
 // It retrieves the updates using the GetUpdates method of the PKGBUILD struct.
 // It returns an error if there is any issue during the update process.
-func (m *Makepkg) Update() error {
+func (m *Pkg) Update() error {
 	return m.PKGBUILD.GetUpdates("pacman", "-Sy")
 }
 
@@ -131,6 +131,6 @@ func (m *Makepkg) Update() error {
 // The error is returned as is.
 // Returns:
 // - error: An error if any occurred during the execution of the makepkg command.
-func (m *Makepkg) pacmanBuild() error {
+func (m *Pkg) pacmanBuild() error {
 	return utils.Exec(true, m.pacmanDir, "makepkg", "-ef")
 }
