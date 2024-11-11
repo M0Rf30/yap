@@ -1,4 +1,4 @@
-package apk
+package abuild
 
 var (
 	APKArchs = map[string]string{
