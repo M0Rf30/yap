@@ -109,10 +109,10 @@ func (d *Deb) createDebconfFile(name, variable string) error {
 	return copy.Copy(assetPath, destPath)
 }
 
-// createScripts generates and writes the scripts for the Deb package.
+// addScriptlets generates and writes the scripts for the Deb package.
 // It takes no parameters and returns an error if there was an issue
 // generating or writing the scripts.
-func (d *Deb) createScripts() error {
+func (d *Deb) addScriptlets() error {
 	scripts := map[string]string{
 		"preinst":  d.PKGBUILD.PreInst,
 		"postinst": d.PKGBUILD.PostInst,
@@ -257,7 +257,7 @@ func (d *Deb) createDebResources() error {
 		return err
 	}
 
-	if err := d.createScripts(); err != nil {
+	if err := d.addScriptlets(); err != nil {
 		return err
 	}
 

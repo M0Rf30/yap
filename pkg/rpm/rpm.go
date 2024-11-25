@@ -70,6 +70,8 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
+	r.addScriptlets(rpm)
+
 	cleanFilePath := filepath.Clean(pkgFilePath)
 
 	rpmFile, err := os.Create(cleanFilePath)
@@ -211,6 +213,28 @@ func addContentsToRPM(contents []*utils.FileContent, rpm *rpmpack.RPM) error {
 
 	// Return nil indicating that all contents were added successfully.
 	return nil
+}
+
+// addScriptlets adds pre-install, post-install, pre-remove and post-remove
+// scripts from the PKGBUILD to the RPM package if they are defined.
+//
+// It takes a pointer to the rpmpack.RPM instance as a parameter.
+func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
+	if r.PKGBUILD.PreInst != "" {
+		rpm.AddPrein(r.PKGBUILD.PreInst)
+	}
+
+	if r.PKGBUILD.PostInst != "" {
+		rpm.AddPostin(r.PKGBUILD.PostInst)
+	}
+
+	if r.PKGBUILD.PreRm != "" {
+		rpm.AddPreun(r.PKGBUILD.PreRm)
+	}
+
+	if r.PKGBUILD.PostRm != "" {
+		rpm.AddPostun(r.PKGBUILD.PostRm)
+	}
 }
 
 // asRPMDirectory creates an RPMFile object for a directory based on the provided FileContent.
