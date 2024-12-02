@@ -12,7 +12,7 @@ require (
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20241018202043-264c9016644b
 	github.com/otiai10/copy v1.14.0
 	github.com/pkg/errors v0.9.1
-	github.com/pterm/pterm v0.12.79
+	github.com/pterm/pterm v0.12.80
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
@@ -61,7 +61,7 @@ require (
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
-	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.3 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
@@ -79,10 +79,10 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/term v0.25.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/sync v0.9.0 // indirect
+	golang.org/x/sys v0.27.0 // indirect
+	golang.org/x/term v0.26.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
