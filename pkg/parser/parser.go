@@ -3,11 +3,9 @@ package parser
 import (
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
-	"github.com/otiai10/copy"
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -34,21 +32,6 @@ var OverridePkgVer string
 // - error: an error if any occurred during parsing.
 func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
-	copyOpt := copy.Options{
-		OnSymlink: func(_ string) copy.SymlinkAction {
-			return copy.Skip
-		},
-		Skip: func(_ os.FileInfo, src, _ string) (bool, error) {
-			if strings.HasSuffix(src, ".apk") ||
-				strings.HasSuffix(src, ".deb") ||
-				strings.HasSuffix(src, ".pkg.tar.zst") ||
-				strings.HasSuffix(src, ".rpm") {
-				return true, nil
-			}
-
-			return false, nil
-		},
-	}
 
 	if err != nil {
 		utils.Logger.Error("failed to get root directory",
@@ -65,22 +48,9 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 		SourceDir: filepath.Join(startDir, "src"),
 	}
 
-	err = utils.ExistsMakeDir(startDir)
-	if err != nil {
-		return pkgBuild, err
-	}
-
-	if home != startDir {
-		err = copy.Copy(home, startDir, copyOpt)
-	}
-
-	if err != nil {
-		return pkgBuild, err
-	}
-
 	pkgBuild.Init()
 
-	pkgbuildSyntax, err := getSyntaxFile(startDir)
+	pkgbuildSyntax, err := getSyntaxFile(home)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +75,9 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 
 // getSyntaxFile returns a syntax.File and an error.
 //
-// It takes a startDir string as a parameter and returns a *syntax.File and an error.
-func getSyntaxFile(startDir string) (*syntax.File, error) {
-	filePath := filepath.Join(startDir, "PKGBUILD")
+// It takes a path string as a parameter and returns a *syntax.File and an error.
+func getSyntaxFile(path string) (*syntax.File, error) {
+	filePath := filepath.Join(path, "PKGBUILD")
 	file, err := utils.Open(filePath)
 
 	if err != nil {
