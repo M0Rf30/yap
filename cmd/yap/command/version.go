@@ -22,7 +22,7 @@ var versionCmd = &cobra.Command{
 		pterm.DefaultCenter.Print(
 			pterm.DefaultHeader.WithFullWidth().WithMargin(10).Sprint("Yet Another Packager"))
 
-		pterm.Println("Version v1.28")
+		pterm.Println("Version v1.29")
 		pterm.Println("Coded with \u2764 by M0Rf30")
 	},
 }
