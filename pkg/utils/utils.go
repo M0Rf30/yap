@@ -130,7 +130,7 @@ func GitClone(dloadFilePath, sourceItemURI, sshPassword string,
 	}
 
 	_, err := ggit.PlainClone(dloadFilePath, false, cloneOptions)
-	if err != nil && err.Error() == "authentication required" {
+	if err != nil && strings.Contains(err.Error(), "authentication required") {
 		sourceURL, _ := url.Parse(sourceItemURI)
 		sshKeyPath := os.Getenv("HOME") + "/.ssh/id_rsa"
 		publicKey, err := ssh.NewPublicKeysFromFile("git", sshKeyPath, sshPassword)
