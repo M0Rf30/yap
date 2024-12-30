@@ -387,6 +387,7 @@ func (mpc *MultipleProject) readProject(path string) error {
 		return err
 	}
 
+	//nolint:musttag
 	err = json.Unmarshal(prjContent, &mpc)
 	if err != nil {
 		return err
