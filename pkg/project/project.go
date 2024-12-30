@@ -132,7 +132,7 @@ func (mpc *MultipleProject) BuildAll() error {
 			}
 		}
 
-		if proj.HasToInstall {
+		if !NoBuild && proj.HasToInstall {
 			utils.Logger.Info("installing package", utils.Logger.Args("pkgname", proj.Builder.PKGBUILD.PkgName,
 				"pkgver", proj.Builder.PKGBUILD.PkgVer,
 				"pkgrel", proj.Builder.PKGBUILD.PkgRel))
