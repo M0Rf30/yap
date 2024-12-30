@@ -5,7 +5,6 @@ linters:
   disable:
     # here some dropped deprecated checks
     # reduce warning messages
-    - execinquery
     - mnd
     # here some custom dropped checks temporary disabled
     # they will be enabled
@@ -18,7 +17,6 @@ linters:
     - gochecknoglobals
     - gochecknoinits
     - gofumpt
-    - gomnd
     - ireturn
     - typecheck
     - wrapcheck
