@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/M0Rf30/yap/pkg/builder"
 	"github.com/M0Rf30/yap/pkg/packer"
@@ -12,6 +13,7 @@ import (
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/go-playground/validator/v10"
+	"github.com/otiai10/copy"
 )
 
 var (
@@ -154,15 +156,15 @@ func (mpc *MultipleProject) BuildAll() error {
 // source directories if the NoCache flag is set. It takes no parameters. It
 // returns an error if there was a problem removing the directories.
 func (mpc *MultipleProject) Clean() error {
-	for _, project := range mpc.Projects {
+	for _, proj := range mpc.Projects {
 		if CleanBuild {
-			if err := os.RemoveAll(project.Builder.PKGBUILD.SourceDir); err != nil {
+			if err := os.RemoveAll(proj.Builder.PKGBUILD.SourceDir); err != nil {
 				return err
 			}
 		}
 
 		if Zap && !singleProject {
-			if err := os.RemoveAll(project.Builder.PKGBUILD.StartDir); err != nil {
+			if err := os.RemoveAll(proj.Builder.PKGBUILD.StartDir); err != nil {
 				return err
 			}
 		}
@@ -208,6 +210,10 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		}
 	}
 
+	if err := mpc.copyProjects(); err != nil {
+		return err
+	}
+
 	if !NoMakeDeps {
 		mpc.getMakeDeps()
 
@@ -239,6 +245,48 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
 		utils.Logger.Fatal("invalid package order: %s should be built before %s",
 			utils.Logger.Args(fromPkgName, toPkgName))
 	}
+}
+
+// copyProjects copies PKGBUILD directories for all projects, creating the
+// target directory if it doesn't exist.
+// It skips files with extensions: .apk, .deb, .pkg.tar.zst, and .rpm,
+// as well as symlinks.
+// Returns an error if any operation fails; otherwise, returns nil.
+func (mpc *MultipleProject) copyProjects() error {
+	copyOpt := copy.Options{
+		OnSymlink: func(_ string) copy.SymlinkAction {
+			return copy.Skip
+		},
+		Skip: func(_ os.FileInfo, src, _ string) (bool, error) {
+			// Define a slice of file extensions to skip
+			skipExtensions := []string{".apk", ".deb", ".pkg.tar.zst", ".rpm"}
+			for _, ext := range skipExtensions {
+				if strings.HasSuffix(src, ext) {
+					return true, nil
+				}
+			}
+
+			return false, nil
+		},
+	}
+
+	for _, proj := range mpc.Projects {
+		// Ensure the target directory exists
+		err := utils.ExistsMakeDir(proj.Builder.PKGBUILD.StartDir)
+		if err != nil {
+			return err
+		}
+
+		// Only copy if the source and destination are different
+		if !singleProject {
+			err := copy.Copy(proj.Builder.PKGBUILD.Home, proj.Builder.PKGBUILD.StartDir, copyOpt)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil // Return nil if all operations succeed
 }
 
 // createPackage creates packages for the MultipleProject.
