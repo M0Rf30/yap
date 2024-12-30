@@ -27,7 +27,8 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	}
 
 	if err := utils.CheckWritable(binary); err != nil {
-		return err // Skip if not writable
+		//nolint:nilerr
+		return nil // Skip if not writable
 	}
 
 	fileType := utils.GetFileType(binary)
