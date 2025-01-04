@@ -51,12 +51,8 @@ package() {
 func TestBuildMultipleProjectFromJSON(t *testing.T) {
 	t.Parallel()
 
-	testDir, err := os.MkdirTemp("", "TestBuildProjectFromJSON")
-	if err != nil {
-		t.Fatal(err)
-	}
+	testDir := t.TempDir()
 
-	defer os.RemoveAll(testDir)
 	packageRaw := filepath.Join(testDir, "yap.json")
 	prj1 := filepath.Join(testDir, "project1", "PKGBUILD")
 	prj2 := filepath.Join(testDir, "project2", "PKGBUILD")
@@ -79,7 +75,7 @@ func TestBuildMultipleProjectFromJSON(t *testing.T) {
 }`), os.FileMode(0755)))
 
 	defer os.Remove(packageRaw)
-	err = os.MkdirAll(filepath.Dir(prj1), os.FileMode(0750))
+	err := os.MkdirAll(filepath.Dir(prj1), os.FileMode(0750))
 
 	if err != nil {
 		t.Error(err)
