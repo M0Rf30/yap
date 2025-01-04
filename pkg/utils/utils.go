@@ -14,7 +14,7 @@ import (
 	ggit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	"github.com/mholt/archiver/v4"
+	"github.com/mholt/archives"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 	"mvdan.cc/sh/v3/expand"
@@ -254,6 +254,8 @@ func RunScript(cmds string) error {
 //
 // Returns an error if there was a problem extracting the files.
 func Unarchive(source, destination string) error {
+	ctx := context.TODO()
+
 	// Open the source archive file
 	archive, err := Open(source)
 	if err != nil {
@@ -261,18 +263,18 @@ func Unarchive(source, destination string) error {
 	}
 
 	// Identify the archive file's format
-	format, archiveReader, _ := archiver.Identify("", archive)
+	format, archiveReader, _ := archives.Identify(ctx, "", archive)
 
 	dirMap := make(map[string]bool)
 
 	// Check if the format is an extractor. If not, skip the archive file.
-	extractor, ok := format.(archiver.Extractor)
+	extractor, ok := format.(archives.Extractor)
 
 	if !ok {
 		return nil
 	}
 
-	handler := func(_ context.Context, archiveFile archiver.File) error {
+	return extractor.Extract(ctx, archiveReader, func(_ context.Context, archiveFile archives.FileInfo) error {
 		fileName := archiveFile.NameInArchive
 		newPath := filepath.Join(destination, fileName)
 
@@ -310,10 +312,5 @@ func Unarchive(source, destination string) error {
 		_, err = io.Copy(newFile, archiveFileTemp)
 
 		return err
-	}
-
-	return extractor.Extract(context.Background(),
-		archiveReader,
-		nil,
-		handler)
+	})
 }
