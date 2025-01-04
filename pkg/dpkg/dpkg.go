@@ -12,7 +12,7 @@ import (
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/blakesmith/ar"
-	"github.com/mholt/archiver/v4"
+	"github.com/mholt/archives"
 	"github.com/otiai10/copy"
 )
 
@@ -28,10 +28,12 @@ type Deb struct {
 // createTarZst creates a compressed tar.zst archive from the specified source directory.
 // It takes the source directory and the output file path as arguments and returns an error if any occurs.
 func createTarZst(sourceDir, outputFile string) error {
+	ctx := context.TODO()
+
 	// Retrieve the list of files from the source directory on disk.
 	// The map specifies that the files should be read from the sourceDir
 	// and the output path in the archive should be empty.
-	files, err := archiver.FilesFromDisk(nil, map[string]string{
+	files, err := archives.FilesFromDisk(ctx, nil, map[string]string{
 		sourceDir + string(os.PathSeparator): "",
 	})
 
@@ -47,9 +49,9 @@ func createTarZst(sourceDir, outputFile string) error {
 	}
 	defer out.Close()
 
-	format := archiver.CompressedArchive{
-		Compression: archiver.Zstd{},
-		Archival:    archiver.Tar{},
+	format := archives.CompressedArchive{
+		Compression: archives.Zstd{},
+		Archival:    archives.Tar{},
 	}
 
 	return format.Archive(context.Background(), out, files)
