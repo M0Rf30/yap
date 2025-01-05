@@ -54,7 +54,7 @@ func createTarZst(sourceDir, outputFile string) error {
 		Archival:    archives.Tar{},
 	}
 
-	return format.Archive(context.Background(), out, files)
+	return format.Archive(ctx, out, files)
 }
 
 // createConfFiles creates the configuration files for the Debian package.
