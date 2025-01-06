@@ -10,7 +10,7 @@ require (
 	github.com/go-playground/validator/v10 v10.23.0
 	github.com/google/rpmpack v0.6.1-0.20241021120301-8407d9abd9f4
 	github.com/mholt/archives v0.1.0
-	github.com/otiai10/copy v1.14.0
+	github.com/otiai10/copy v1.14.1
 	github.com/pkg/errors v0.9.1
 	github.com/pterm/pterm v0.12.80
 	github.com/spf13/cobra v1.8.1
@@ -59,6 +59,7 @@ require (
 	github.com/mmcloughlin/avo v0.6.0 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/nwaples/rardecode/v2 v2.0.1 // indirect
+	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pjbgf/sha1cd v0.3.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
