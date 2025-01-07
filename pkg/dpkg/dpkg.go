@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/M0Rf30/yap/pkg/options"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
@@ -184,19 +185,37 @@ func (d *Deb) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	if err := addArFile(writer, binaryFilename, debianBinary); err != nil {
+	modtime := getModTime()
+
+	if err := addArFile(writer,
+		binaryFilename,
+		debianBinary,
+		modtime); err != nil {
 		return err
 	}
 
-	if err := addArFile(writer, controlFilename, controlArchive); err != nil {
+	if err := addArFile(writer,
+		controlFilename,
+		controlArchive,
+		modtime); err != nil {
 		return err
 	}
 
-	if err := addArFile(writer, dataFilename, dataArchive); err != nil {
+	if err := addArFile(writer,
+		dataFilename,
+		dataArchive,
+		modtime); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// getModTime returns the current local time.
+// It uses the time.Now() function from the time package to retrieve the
+// current time.
+func getModTime() time.Time {
+	return time.Now()
 }
 
 // Prepare prepares the Deb package by installing its dependencies using apt-get.
@@ -374,11 +393,12 @@ func (d *Deb) PrepareEnvironment(golang bool) error {
 	return nil
 }
 
-func addArFile(writer *ar.Writer, name string, body []byte) error {
+func addArFile(writer *ar.Writer, name string, body []byte, date time.Time) error {
 	header := ar.Header{
-		Name: name,
-		Size: int64(len(body)),
-		Mode: 0o644,
+		Name:    name,
+		Size:    int64(len(body)),
+		Mode:    0o644,
+		ModTime: date,
 	}
 
 	if err := writer.WriteHeader(&header); err != nil {
