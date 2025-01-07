@@ -244,7 +244,7 @@ func asRPMDirectory(content *utils.FileContent) *rpmpack.RPMFile {
 	fileInfo, _ := os.Stat(filepath.Clean(content.Source))
 
 	// Retrieve the modification time of the directory.
-	mTime := utils.GetModTime(fileInfo)
+	mTime := getModTime(fileInfo)
 
 	// Create and return an RPMFile object for the directory.
 	return &rpmpack.RPMFile{
@@ -269,7 +269,7 @@ func asRPMFile(content *utils.FileContent, fileType rpmpack.FileType) (*rpmpack.
 	fileInfo, _ := os.Stat(cleanFilePath)
 
 	// Retrieve the modification time of the file.
-	mTime := utils.GetModTime(fileInfo)
+	mTime := getModTime(fileInfo)
 
 	// Create and return an RPMFile object for the regular file.
 	return &rpmpack.RPMFile{
@@ -291,7 +291,7 @@ func asRPMSymlink(content *utils.FileContent) *rpmpack.RPMFile {
 	body, _ := os.Readlink(cleanFilePath)  // Read the target of the symlink.
 
 	// Retrieve the modification time of the symlink.
-	mTime := utils.GetModTime(fileInfo)
+	mTime := getModTime(fileInfo)
 
 	// Create and return an RPMFile object for the symlink.
 	return &rpmpack.RPMFile{
@@ -342,6 +342,19 @@ func createRPMFile(content *utils.FileContent) (*rpmpack.RPMFile, error) {
 // No return types.
 func (r *RPM) getGroup() {
 	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
+}
+
+// getModTime retrieves the modification time of a file and checks for overflow.
+// It returns the modification time as an uint32.
+func getModTime(fileInfo os.FileInfo) uint32 {
+	mTime := fileInfo.ModTime().Unix()
+	// Check for overflow in the modification time.
+	if mTime < 0 || mTime > int64(^uint32(0)) {
+		utils.Logger.Fatal("modification time is out of range for uint32",
+			utils.Logger.Args("time", mTime))
+	}
+
+	return uint32(mTime)
 }
 
 // getRelease updates the release information of the RPM struct.
