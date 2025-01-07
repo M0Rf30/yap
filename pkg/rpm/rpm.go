@@ -120,7 +120,7 @@ func (r *RPM) Install(artifactsPath string) error {
 		r.PKGBUILD.ArchComputed +
 		".rpm"
 
-	pkgFilePath := filepath.Join(artifactsPath, r.PKGBUILD.ArchComputed, pkgName)
+	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
 	if err := utils.Exec(false, "",
 		"dnf",
