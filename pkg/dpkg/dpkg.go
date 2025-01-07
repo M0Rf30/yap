@@ -26,36 +26,188 @@ type Deb struct {
 	PKGBUILD *pkgbuild.PKGBUILD
 }
 
-// createTarZst creates a compressed tar.zst archive from the specified source directory.
-// It takes the source directory and the output file path as arguments and returns an error if any occurs.
-func createTarZst(sourceDir, outputFile string) error {
-	ctx := context.TODO()
-
-	// Retrieve the list of files from the source directory on disk.
-	// The map specifies that the files should be read from the sourceDir
-	// and the output path in the archive should be empty.
-	files, err := archives.FilesFromDisk(ctx, nil, map[string]string{
-		sourceDir + string(os.PathSeparator): "",
-	})
-
+// BuildPackage builds the Debian package and cleans up afterward.
+// It takes artifactsPath to specify where to store the package.
+// The method calls dpkgDeb to create the package and removes the
+// package directory, returning an error if any step fails.
+func (d *Deb) BuildPackage(artifactsPath string) error {
+	debTemp, err := os.MkdirTemp(d.PKGBUILD.SourceDir, "tmp")
 	if err != nil {
 		return err
 	}
+	defer os.RemoveAll(debTemp)
 
-	cleanFilePath := filepath.Clean(outputFile)
+	controlArchive := filepath.Join(debTemp, controlFilename)
+	dataArchive := filepath.Join(debTemp, dataFilename)
 
-	out, err := os.Create(cleanFilePath)
-	if err != nil {
+	// Create control archive
+	if err := createTarZst(d.debDir, controlArchive); err != nil {
 		return err
 	}
-	defer out.Close()
 
-	format := archives.CompressedArchive{
-		Compression: archives.Zstd{},
-		Archival:    archives.Tar{},
+	if err := os.RemoveAll(d.debDir); err != nil {
+		return err
 	}
 
-	return format.Archive(ctx, out, files)
+	// Create data archive
+	if err := createTarZst(d.PKGBUILD.PackageDir, dataArchive); err != nil {
+		return err
+	}
+
+	if err := d.createDeb(artifactsPath, controlArchive, dataArchive); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(d.PKGBUILD.PackageDir); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Install installs a Debian package from the specified artifacts path. It
+// constructs the package file path using details from the PKGBUILD and
+// executes the `apt-get install` command. Returns an error if the
+// installation fails.
+func (d *Deb) Install(artifactsPath string) error {
+	artifactFilePath := filepath.Join(artifactsPath,
+		fmt.Sprintf("%s_%s-%s_%s.deb",
+			d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
+			d.PKGBUILD.ArchComputed))
+
+	if err := utils.Exec(false, "", "apt-get", "install", "-y", artifactFilePath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Prepare prepares the Deb package by installing its dependencies using apt-get.
+//
+// makeDepends: a slice of strings representing the dependencies to be installed.
+// Returns an error if there was a problem installing the dependencies.
+func (d *Deb) Prepare(makeDepends []string) error {
+	args := []string{
+		"--allow-downgrades",
+		"--assume-yes",
+		"install",
+	}
+
+	return d.PKGBUILD.GetDepends("apt-get", args, makeDepends)
+}
+
+// PrepareEnvironment prepares the environment for the Deb package.
+//
+// It takes a boolean parameter `golang` which indicates whether or not to set up Go.
+// It returns an error if there was a problem during the environment preparation.
+func (d *Deb) PrepareEnvironment(golang bool) error {
+	args := []string{
+		"--assume-yes",
+		"install",
+	}
+	args = append(args, buildEnvironmentDeps...)
+
+	if err := utils.Exec(false, "", "apt-get", args...); err != nil {
+		return err
+	}
+
+	if golang {
+		if err := utils.GOSetup(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// PrepareFakeroot sets up the environment for building a Debian package in a fakeroot context.
+// It retrieves architecture and release information, cleans up the debDir, creates necessary
+// resources, and strips binaries. The method returns an error if any step fails.
+func (d *Deb) PrepareFakeroot(_ string) error {
+	d.getRelease()
+	d.PKGBUILD.ArchComputed = DebArchs[d.PKGBUILD.ArchComputed]
+
+	if err := os.RemoveAll(d.debDir); err != nil {
+		return err
+	}
+
+	if err := d.createDebResources(); err != nil {
+		return err
+	}
+
+	if d.PKGBUILD.StripEnabled {
+		return options.Strip(d.PKGBUILD.PackageDir)
+	}
+
+	return nil
+}
+
+// Update updates the Deb package list.
+//
+// It calls the GetUpdates method of the PKGBUILD field of the Deb struct
+// to retrieve any updates using the "apt-get" command and the "update" argument.
+// If an error occurs during the update, it is returned.
+//
+// Returns:
+// - error: An error if the update fails.
+func (d *Deb) Update() error {
+	return d.PKGBUILD.GetUpdates("apt-get", "update")
+}
+
+// addArFile adds a file to an archive writer with the specified name, body,
+// and modification date. It constructs an ar.Header with the provided
+// parameters and writes it to the archive. If the header write fails,
+// the function returns the error. After writing the header, it writes
+// the file body to the archive and returns any error encountered.
+func addArFile(writer *ar.Writer, name string, body []byte, date time.Time) error {
+	header := ar.Header{
+		Name:    name,
+		Size:    int64(len(body)),
+		Mode:    0o644,
+		ModTime: date,
+	}
+
+	if err := writer.WriteHeader(&header); err != nil {
+		return err
+	}
+
+	_, err := writer.Write(body)
+
+	return err
+}
+
+// addScriptlets generates and writes the scripts for the Deb package.
+// It takes no parameters and returns an error if there was an issue
+// generating or writing the scripts.
+func (d *Deb) addScriptlets() error {
+	scripts := map[string]string{
+		"preinst":  d.PKGBUILD.PreInst,
+		"postinst": d.PKGBUILD.PostInst,
+		"prerm":    d.PKGBUILD.PreRm,
+		"postrm":   d.PKGBUILD.PostRm,
+	}
+
+	for name, script := range scripts {
+		if script == "" {
+			continue
+		}
+
+		if name == "prerm" || name == "postrm" {
+			script = removeHeader + script
+		}
+
+		path := filepath.Join(d.debDir, name)
+
+		if err := utils.CreateWrite(path, script); err != nil {
+			return err
+		}
+
+		if err := utils.Chmod(path, 0o755); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // createConfFiles creates the configuration files for the Debian package.
@@ -112,38 +264,37 @@ func (d *Deb) createDebconfFile(name, variable string) error {
 	return copy.Copy(assetPath, destPath)
 }
 
-// addScriptlets generates and writes the scripts for the Deb package.
-// It takes no parameters and returns an error if there was an issue
-// generating or writing the scripts.
-func (d *Deb) addScriptlets() error {
-	scripts := map[string]string{
-		"preinst":  d.PKGBUILD.PreInst,
-		"postinst": d.PKGBUILD.PostInst,
-		"prerm":    d.PKGBUILD.PreRm,
-		"postrm":   d.PKGBUILD.PostRm,
+// createTarZst creates a compressed tar.zst archive from the specified source
+// directory. It takes the source directory and the output file path as
+// arguments and returns an error if any occurs.
+func createTarZst(sourceDir, outputFile string) error {
+	ctx := context.TODO()
+
+	// Retrieve the list of files from the source directory on disk.
+	// The map specifies that the files should be read from the sourceDir
+	// and the output path in the archive should be empty.
+	files, err := archives.FilesFromDisk(ctx, nil, map[string]string{
+		sourceDir + string(os.PathSeparator): "",
+	})
+
+	if err != nil {
+		return err
 	}
 
-	for name, script := range scripts {
-		if script == "" {
-			continue
-		}
+	cleanFilePath := filepath.Clean(outputFile)
 
-		if name == "prerm" || name == "postrm" {
-			script = removeHeader + script
-		}
+	out, err := os.Create(cleanFilePath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
 
-		path := filepath.Join(d.debDir, name)
-
-		if err := utils.CreateWrite(path, script); err != nil {
-			return err
-		}
-
-		if err := utils.Chmod(path, 0o755); err != nil {
-			return err
-		}
+	format := archives.CompressedArchive{
+		Compression: archives.Zstd{},
+		Archival:    archives.Tar{},
 	}
 
-	return nil
+	return format.Archive(ctx, out, files)
 }
 
 // createDeb generates Deb package files from the given artifact path.
@@ -211,39 +362,6 @@ func (d *Deb) createDeb(artifactPath, control, data string) error {
 	return nil
 }
 
-// getModTime returns the current local time.
-// It uses the time.Now() function from the time package to retrieve the
-// current time.
-func getModTime() time.Time {
-	return time.Now()
-}
-
-// Prepare prepares the Deb package by installing its dependencies using apt-get.
-//
-// makeDepends: a slice of strings representing the dependencies to be installed.
-// Returns an error if there was a problem installing the dependencies.
-func (d *Deb) Prepare(makeDepends []string) error {
-	args := []string{
-		"--allow-downgrades",
-		"--assume-yes",
-		"install",
-	}
-
-	return d.PKGBUILD.GetDepends("apt-get", args, makeDepends)
-}
-
-// Update updates the Deb package list.
-//
-// It calls the GetUpdates method of the PKGBUILD field of the Deb struct
-// to retrieve any updates using the "apt-get" command and the "update" argument.
-// If an error occurs during the update, it is returned.
-//
-// Returns:
-// - error: An error if the update fails.
-func (d *Deb) Update() error {
-	return d.PKGBUILD.GetUpdates("apt-get", "update")
-}
-
 // createDebResources creates the Deb package resources.
 //
 // It creates the necessary directories and files for the Deb package.
@@ -295,119 +413,10 @@ func (d *Deb) createDebResources() error {
 	return nil
 }
 
-// BuildPackage builds the Debian package and cleans up afterward.
-// It takes artifactsPath to specify where to store the package.
-// The method calls dpkgDeb to create the package and removes the
-// package directory, returning an error if any step fails.
-func (d *Deb) BuildPackage(artifactsPath string) error {
-	debTemp, err := os.MkdirTemp(d.PKGBUILD.SourceDir, "tmp")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(debTemp)
-
-	controlArchive := filepath.Join(debTemp, controlFilename)
-	dataArchive := filepath.Join(debTemp, dataFilename)
-
-	// Create control archive
-	if err := createTarZst(d.debDir, controlArchive); err != nil {
-		return err
-	}
-
-	if err := os.RemoveAll(d.debDir); err != nil {
-		return err
-	}
-
-	// Create data archive
-	if err := createTarZst(d.PKGBUILD.PackageDir, dataArchive); err != nil {
-		return err
-	}
-
-	if err := d.createDeb(artifactsPath, controlArchive, dataArchive); err != nil {
-		return err
-	}
-
-	if err := os.RemoveAll(d.PKGBUILD.PackageDir); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// PrepareFakeroot sets up the environment for building a Debian package in a fakeroot context.
-// It retrieves architecture and release information, cleans up the debDir, creates necessary
-// resources, and strips binaries. The method returns an error if any step fails.
-func (d *Deb) PrepareFakeroot(_ string) error {
-	d.getRelease()
-	d.PKGBUILD.ArchComputed = DebArchs[d.PKGBUILD.ArchComputed]
-
-	if err := os.RemoveAll(d.debDir); err != nil {
-		return err
-	}
-
-	if err := d.createDebResources(); err != nil {
-		return err
-	}
-
-	if d.PKGBUILD.StripEnabled {
-		return options.Strip(d.PKGBUILD.PackageDir)
-	}
-
-	return nil
-}
-
-func (d *Deb) Install(artifactsPath string) error {
-	artifactFilePath := filepath.Join(artifactsPath,
-		fmt.Sprintf("%s_%s-%s_%s.deb",
-			d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
-			d.PKGBUILD.ArchComputed))
-
-	if err := utils.Exec(false, "", "apt-get", "install", "-y", artifactFilePath); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// PrepareEnvironment prepares the environment for the Deb package.
-//
-// It takes a boolean parameter `golang` which indicates whether or not to set up Go.
-// It returns an error if there was a problem during the environment preparation.
-func (d *Deb) PrepareEnvironment(golang bool) error {
-	args := []string{
-		"--assume-yes",
-		"install",
-	}
-	args = append(args, buildEnvironmentDeps...)
-
-	if err := utils.Exec(false, "", "apt-get", args...); err != nil {
-		return err
-	}
-
-	if golang {
-		if err := utils.GOSetup(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func addArFile(writer *ar.Writer, name string, body []byte, date time.Time) error {
-	header := ar.Header{
-		Name:    name,
-		Size:    int64(len(body)),
-		Mode:    0o644,
-		ModTime: date,
-	}
-
-	if err := writer.WriteHeader(&header); err != nil {
-		return err
-	}
-
-	_, err := writer.Write(body)
-
-	return err
+// getModTime returns the current local time. It uses the time.Now() function
+// from the time package to retrieve the current time.
+func getModTime() time.Time {
+	return time.Now()
 }
 
 func (d *Deb) getRelease() {
