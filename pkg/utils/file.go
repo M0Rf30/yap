@@ -208,19 +208,6 @@ func GetFileType(binary string) string {
 	return elfFile.Type.String()
 }
 
-// GetModTime retrieves the modification time of a file and checks for overflow.
-// It returns the modification time as an uint32.
-func GetModTime(fileInfo os.FileInfo) uint32 {
-	mTime := fileInfo.ModTime().Unix()
-	// Check for overflow in the modification time.
-	if mTime < 0 || mTime > int64(^uint32(0)) {
-		Logger.Fatal("modification time is out of range for uint32",
-			Logger.Args("time", mTime))
-	}
-
-	return uint32(mTime)
-}
-
 // IsEmptyDir checks if a directory is empty.
 //
 // It takes in two parameters: path, a string representing the directory path,
