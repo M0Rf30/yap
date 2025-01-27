@@ -5,8 +5,8 @@ LABEL org.opencontainers.image.vendor="M0Rf30"
 
 RUN \
   apk add --no-cache upx; \
-  wget https://go.dev/dl/go1.23.4.linux-amd64.tar.gz -O go.tar.gz; \
-  echo "6924efde5de86fe277676e929dc9917d466efa02fb934197bc2eba35d5680971 go.tar.gz" | sha256sum -c - ; \
+  wget https://go.dev/dl/go1.23.5.linux-amd64.tar.gz -O go.tar.gz; \
+  echo "cbcad4a6482107c7c7926df1608106c189417163428200ce357695cc7e01d091 go.tar.gz" | sha256sum -c - ; \
   tar -C /usr/lib -xf go.tar.gz; \
   ln -sf /usr/lib/go/bin/go /usr/bin/go; \
   ln -sf /usr/lib/go/bin/gofmt /usr/bin/gofmt; \
