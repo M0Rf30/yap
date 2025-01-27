@@ -9,7 +9,7 @@ require (
 	github.com/go-git/go-git/v5 v5.13.2
 	github.com/go-playground/validator/v10 v10.24.0
 	github.com/google/rpmpack v0.6.1-0.20241021120301-8407d9abd9f4
-	github.com/mholt/archives v0.1.0
+	github.com/mholt/archives v0.1.1-0.20250127134140-94f0fc3c1e31
 	github.com/otiai10/copy v1.14.1
 	github.com/pkg/errors v0.9.1
 	github.com/pterm/pterm v0.12.80
