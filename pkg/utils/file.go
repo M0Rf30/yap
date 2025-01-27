@@ -191,6 +191,17 @@ func GetDirSize(path string) (int64, error) {
 func GetFileType(binary string) string {
 	cleanFilePath := filepath.Clean(binary)
 
+	// Check if the file is a symlink
+	fileInfo, err := os.Lstat(cleanFilePath)
+	if err != nil {
+		Logger.Fatal("fatal error", Logger.Args("error", err))
+	}
+
+	// Skip if it's a symbolic link
+	if fileInfo.Mode()&os.ModeSymlink != 0 {
+		return ""
+	}
+
 	// Open the ELF binary
 	file, err := os.Open(cleanFilePath)
 	if err != nil {
