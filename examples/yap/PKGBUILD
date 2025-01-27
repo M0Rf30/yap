@@ -1,5 +1,5 @@
 pkgname=yap
-pkgver=1.33
+pkgver=1.34
 pkgrel=1
 pkgdesc="Package software with ease"
 pkgdesc__alpine="Package software with ease for Alpine"
