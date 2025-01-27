@@ -291,7 +291,9 @@ func createTarZst(sourceDir, outputFile string) error {
 
 	format := archives.CompressedArchive{
 		Compression: archives.Zstd{},
-		Archival:    archives.Tar{},
+		Archival: archives.Tar{
+			FormatGNU: true,
+		},
 	}
 
 	return format.Archive(ctx, out, files)
