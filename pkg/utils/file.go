@@ -301,22 +301,10 @@ func StripLTO(binary string, args ...string) error {
 // The strip command removes any symbol table from the binary executable.
 // This can be useful for smaller binary sizes, but makes debugging and
 // analysis more difficult.
-//
-// The original file is replaced with the stripped one.
 func strip(binary string, args ...string) error {
-	tempFile, err := os.CreateTemp("", filepath.Base(binary))
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tempFile.Name()) // Ensure the temp file is removed
-
-	args = append(args, "-o", tempFile.Name(), binary)
+	args = append(args, binary)
 
 	if err := Exec(false, "", "strip", args...); err != nil {
-		return err
-	}
-
-	if err := os.Rename(tempFile.Name(), binary); err != nil {
 		return err
 	}
 
