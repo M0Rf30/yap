@@ -22,6 +22,8 @@ type PKGBUILD struct {
 	ArchComputed   string
 	Backup         []string
 	Build          string
+	BuildDate      int64
+	Checksum       string
 	Codename       string
 	Conflicts      []string
 	Copyright      []string
@@ -32,6 +34,7 @@ type PKGBUILD struct {
 	Epoch          string
 	Files          []string
 	FullDistroName string
+	Group          string
 	HashSums       []string
 	Home           string
 	Install        string
@@ -47,6 +50,7 @@ type PKGBUILD struct {
 	PkgDest        string
 	PkgName        string
 	PkgRel         string
+	PkgType        string
 	PkgVer         string
 	PostInst       string
 	PostRm         string
@@ -65,6 +69,7 @@ type PKGBUILD struct {
 	URL            string
 	StaticEnabled  bool
 	StripEnabled   bool
+	YAPVersion     string
 }
 
 // AddItem adds an item to the PKGBUILD.
@@ -371,8 +376,6 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 // It does not return anything.
 func (pkgBuild *PKGBUILD) SetMainFolders() {
 	switch pkgBuild.Distro {
-	case "arch":
-		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "pkg", pkgBuild.PkgName)
 	case "alpine":
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
 	default:

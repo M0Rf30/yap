@@ -1,11 +1,12 @@
 package utils
 
 import (
+	"crypto/sha256"
 	"debug/elf"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 )
@@ -21,9 +22,14 @@ const (
 	// TypeDir is the type of a directory that is explicitly added in order to
 	// declare ownership or non-standard permission.
 	TypeDir = "dir"
+	// TypeImplicitDir is the type of a directory that is implicitly added as a
+	// parent of a file.
+	TypeImplicitDir = "implicit dir"
 	// TypeSymlink is the type of a symlink that is created at the destination
 	// path and points to the source path.
 	TypeSymlink = "symlink"
+	// TypeTree is the type of a whole directory tree structure.
+	TypeTree = "tree"
 	// TypeConfig is the type of a configuration file that may be changed by the
 	// user of the package.
 	TypeConfig = "config"
@@ -36,18 +42,35 @@ const (
 // FileContent describes the source and destination
 // of one file to copy into a package.
 type FileContent struct {
-	Source      string
 	Destination string
-	Type        string
 	FileInfo    *FileInfo
+	SHA256      []byte
+	Source      string
+	Type        string
 }
 
 type FileInfo struct {
-	Owner string
-	Group string
-	Mode  os.FileMode
-	MTime time.Time
-	Size  int64
+	Owner   string
+	Group   string
+	Mode    uint32
+	ModTime int64
+	Size    int64
+}
+
+// CalculateSHA256 calculates the SHA-256 checksum of a file.
+func CalculateSHA256(filePath string) ([]byte, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return nil, err
+	}
+
+	return hash.Sum(nil), nil
 }
 
 // CheckWritable checks if a binary file is writeable.
@@ -165,7 +188,7 @@ func Filename(path string) string {
 
 // GetDirSize calculates the size of a directory in kilobytes.
 //
-// It takes a path as a parameter and returns the size of the directory in kilobytes and an error if any.
+// It takes a path as a parameter and returns the size of the directory in bytes and an error if any.
 func GetDirSize(path string) (int64, error) {
 	var size int64
 
@@ -181,8 +204,6 @@ func GetDirSize(path string) (int64, error) {
 
 		return err
 	})
-
-	size /= 1024
 
 	return size, err
 }
