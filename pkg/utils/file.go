@@ -59,6 +59,7 @@ type FileInfo struct {
 
 type MtreeEntry struct {
 	Destination string
+	FileInfo    *FileInfo
 	LinkSource  string
 	Mode        uint32
 	SHA256      []byte

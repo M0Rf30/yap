@@ -207,8 +207,14 @@ func (m *Pkg) Update() error {
 // createContent creates a new FileContent object with the specified source path,
 // destination path (relative to the package directory), and content type.
 func createContent(linkSource, path, packageDir, contentType string, modTime, size int64, fileInfoMode uint32, sha256 []byte) *utils.MtreeEntry {
+	fileInfo := &utils.FileInfo{
+		Owner: "root",
+		Group: "root",
+	}
+
 	return &utils.MtreeEntry{
 		Destination: strings.TrimPrefix(path, packageDir),
+		FileInfo:    fileInfo,
 		LinkSource:  linkSource,
 		Mode:        fileInfoMode,
 		SHA256:      sha256,
