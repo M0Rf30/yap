@@ -1,8 +1,6 @@
 module github.com/M0Rf30/yap
 
-go 1.22
-
-toolchain go1.22.1
+go 1.24
 
 require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
