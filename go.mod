@@ -7,7 +7,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.3.2
 	github.com/go-git/go-git/v5 v5.13.2
-	github.com/go-playground/validator/v10 v10.24.0
+	github.com/go-playground/validator/v10 v10.25.0
 	github.com/google/rpmpack v0.6.1-0.20241021120301-8407d9abd9f4
 	github.com/mholt/archives v0.1.1-0.20250127134140-94f0fc3c1e31
 	github.com/otiai10/copy v1.14.1
