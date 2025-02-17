@@ -15,6 +15,7 @@ linters:
     - funlen
     - gochecknoglobals
     - gochecknoinits
+    - gomoddirectives
     - gofumpt
     - ireturn
     - tenv

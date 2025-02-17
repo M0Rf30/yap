@@ -95,6 +95,7 @@ arch = {{.ArchComputed}}
 {{- end }}
 `
 
+//nolint:lll
 const dotMtree = `#mtree
 /set type=file uid=0 gid=0 mode=644
 {{- range . }}

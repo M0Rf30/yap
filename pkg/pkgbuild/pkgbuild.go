@@ -1,7 +1,8 @@
 package pkgbuild
 
 import (
-	"fmt"
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/github/go-spdx/v2/spdxexp"
 	"github.com/pkg/errors"
-	"golang.org/x/exp/rand"
 )
 
 // PKGBUILD defines all the fields accepted by the yap specfile (variables,
@@ -379,8 +379,16 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 	case "alpine":
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
 	default:
-		randomString := fmt.Sprintf("%x", rand.Int31())
-		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, pkgBuild.Distro+randomString)
+		key := make([]byte, 32)
+		_, err := rand.Read(key)
+
+		if err != nil {
+			utils.Logger.Fatal("fatal error",
+				utils.Logger.Args("error", err))
+		}
+
+		randomString := hex.EncodeToString(key)
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, pkgBuild.Distro+"-"+randomString)
 	}
 
 	if err := os.Setenv("pkgdir", pkgBuild.PackageDir); err != nil {

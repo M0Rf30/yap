@@ -50,16 +50,16 @@ type FileContent struct {
 }
 
 type FileInfo struct {
-	Owner   string
-	Group   string
 	Mode    uint32
 	ModTime int64
 	Size    int64
 }
 
 // CalculateSHA256 calculates the SHA-256 checksum of a file.
-func CalculateSHA256(filePath string) ([]byte, error) {
-	file, err := os.Open(filePath)
+func CalculateSHA256(path string) ([]byte, error) {
+	cleanFilePath := filepath.Clean(path)
+
+	file, err := os.Create(cleanFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func CalculateSHA256(filePath string) ([]byte, error) {
 // It checks if the file exists and if write permission is granted.
 // If the file does not exist or does not have write permission,
 // an error is returned.
-func CheckWritable(binary string) error {
-	info, err := os.Stat(binary)
+func CheckWritable(path string) error {
+	info, err := os.Stat(path)
 	if err != nil || info.Mode().Perm()&0200 == 0 {
 		return err
 	}
@@ -209,8 +209,8 @@ func GetDirSize(path string) (int64, error) {
 }
 
 // GetFileType uses readelf to determine the type of the binary file.
-func GetFileType(binary string) string {
-	cleanFilePath := filepath.Clean(binary)
+func GetFileType(path string) string {
+	cleanFilePath := filepath.Clean(path)
 
 	// Check if the file is a symlink
 	fileInfo, err := os.Lstat(cleanFilePath)
@@ -261,13 +261,13 @@ func IsEmptyDir(path string, dirEntry os.DirEntry) bool {
 }
 
 // isStaticLibrary checks if the binary is a static library.
-func IsStaticLibrary(binary string) bool {
+func IsStaticLibrary(path string) bool {
 	// Check the file extension
-	if strings.HasSuffix(binary, ".a") {
+	if strings.HasSuffix(path, ".a") {
 		return true
 	}
 
-	cleanFilePath := filepath.Clean(binary)
+	cleanFilePath := filepath.Clean(path)
 
 	file, err := os.Open(cleanFilePath)
 	if err != nil {
@@ -308,13 +308,13 @@ func Open(path string) (*os.File, error) {
 }
 
 // StripFile strips the binary file using the strip command.
-func StripFile(binary string, args ...string) error {
-	return strip(binary, args...)
+func StripFile(path string, args ...string) error {
+	return strip(path, args...)
 }
 
 // StripLTO strips LTO-related sections from the binary file.
-func StripLTO(binary string, args ...string) error {
-	return strip(binary, append(args, "-R", ".gnu.lto_*", "-R", ".gnu.debuglto_*", "-N", "__gnu_lto_v1")...)
+func StripLTO(path string, args ...string) error {
+	return strip(path, append(args, "-R", ".gnu.lto_*", "-R", ".gnu.debuglto_*", "-N", "__gnu_lto_v1")...)
 }
 
 // strip performs a strip operation on the specified binary file.
@@ -322,8 +322,8 @@ func StripLTO(binary string, args ...string) error {
 // The strip command removes any symbol table from the binary executable.
 // This can be useful for smaller binary sizes, but makes debugging and
 // analysis more difficult.
-func strip(binary string, args ...string) error {
-	args = append(args, binary)
+func strip(path string, args ...string) error {
+	args = append(args, path)
 
 	if err := Exec(false, "", "strip", args...); err != nil {
 		return err
