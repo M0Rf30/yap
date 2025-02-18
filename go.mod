@@ -81,3 +81,5 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/mholt/archives => github.com/M0Rf30/archives v0.0.0-20250218190737-87983e2186c0
