@@ -49,6 +49,44 @@ func CheckGO() bool {
 	return false
 }
 
+// CreateTarZst creates a compressed tar.zst archive from the specified source
+// directory. It takes the source directory and the output file path as
+// arguments and returns an error if any occurs.
+func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
+	ctx := context.TODO()
+	options := &archives.FromDiskOptions{
+		FollowSymlinks: false,
+	}
+
+	// Retrieve the list of files from the source directory on disk.
+	// The map specifies that the files should be read from the sourceDir
+	// and the output path in the archive should be empty.
+	files, err := archives.FilesFromDisk(ctx, options, map[string]string{
+		sourceDir + string(os.PathSeparator): "",
+	})
+
+	if err != nil {
+		return err
+	}
+
+	cleanFilePath := filepath.Clean(outputFile)
+
+	out, err := os.Create(cleanFilePath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	format := archives.CompressedArchive{
+		Compression: archives.Zstd{},
+		Archival: archives.Tar{
+			FormatGNU: formatGNU,
+		},
+	}
+
+	return format.Archive(ctx, out, files)
+}
+
 // Download downloads a file from the given URL and saves it to the specified destination.
 //
 // Parameters:

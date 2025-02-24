@@ -84,6 +84,8 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
+	utils.Logger.Info("", utils.Logger.Args("artifact", cleanFilePath))
+
 	return nil
 }
 

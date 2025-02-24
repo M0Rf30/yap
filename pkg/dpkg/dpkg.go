@@ -1,7 +1,6 @@
 package dpkg
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +12,6 @@ import (
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/blakesmith/ar"
-	"github.com/mholt/archives"
 	"github.com/otiai10/copy"
 )
 
@@ -41,7 +39,7 @@ func (d *Deb) BuildPackage(artifactsPath string) error {
 	dataArchive := filepath.Join(debTemp, dataFilename)
 
 	// Create control archive
-	if err := createTarZst(d.debDir, controlArchive); err != nil {
+	if err := utils.CreateTarZst(d.debDir, controlArchive, true); err != nil {
 		return err
 	}
 
@@ -50,7 +48,7 @@ func (d *Deb) BuildPackage(artifactsPath string) error {
 	}
 
 	// Create data archive
-	if err := createTarZst(d.PKGBUILD.PackageDir, dataArchive); err != nil {
+	if err := utils.CreateTarZst(d.PKGBUILD.PackageDir, dataArchive, true); err != nil {
 		return err
 	}
 
@@ -264,41 +262,6 @@ func (d *Deb) createDebconfFile(name, variable string) error {
 	return copy.Copy(assetPath, destPath)
 }
 
-// createTarZst creates a compressed tar.zst archive from the specified source
-// directory. It takes the source directory and the output file path as
-// arguments and returns an error if any occurs.
-func createTarZst(sourceDir, outputFile string) error {
-	ctx := context.TODO()
-
-	// Retrieve the list of files from the source directory on disk.
-	// The map specifies that the files should be read from the sourceDir
-	// and the output path in the archive should be empty.
-	files, err := archives.FilesFromDisk(ctx, nil, map[string]string{
-		sourceDir + string(os.PathSeparator): "",
-	})
-
-	if err != nil {
-		return err
-	}
-
-	cleanFilePath := filepath.Clean(outputFile)
-
-	out, err := os.Create(cleanFilePath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	format := archives.CompressedArchive{
-		Compression: archives.Zstd{},
-		Archival: archives.Tar{
-			FormatGNU: true,
-		},
-	}
-
-	return format.Archive(ctx, out, files)
-}
-
 // createDeb generates Deb package files from the given artifact path.
 // It takes a string parameter `artifactPath` which represents the path
 // where the Deb package files will be generated. The function returns
@@ -361,6 +324,8 @@ func (d *Deb) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
+	utils.Logger.Info("", utils.Logger.Args("artifact", artifactFilePath))
+
 	return nil
 }
 
@@ -383,7 +348,8 @@ func (d *Deb) createDebResources() error {
 		return err
 	}
 
-	d.PKGBUILD.InstalledSize, _ = utils.GetDirSize(d.PKGBUILD.PackageDir)
+	size, _ := utils.GetDirSize(d.PKGBUILD.PackageDir)
+	d.PKGBUILD.InstalledSize = size / 1024
 	d.PKGBUILD.Depends = d.processDepends(d.PKGBUILD.Depends)
 	d.PKGBUILD.MakeDepends = d.processDepends(d.PKGBUILD.MakeDepends)
 	d.PKGBUILD.OptDepends = d.processDepends(d.PKGBUILD.OptDepends)
