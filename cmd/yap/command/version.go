@@ -1,6 +1,7 @@
 package command
 
 import (
+	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 	"github.com/spf13/cobra"
@@ -22,7 +23,7 @@ var versionCmd = &cobra.Command{
 		pterm.DefaultCenter.Print(
 			pterm.DefaultHeader.WithFullWidth().WithMargin(10).Sprint("Yet Another Packager"))
 
-		pterm.Println("Version v1.35")
+		pterm.Println("Version " + constants.YAPVersion)
 		pterm.Println("Coded with \u2764 by M0Rf30")
 	},
 }

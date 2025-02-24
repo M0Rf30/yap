@@ -10,14 +10,15 @@ linters:
     # they will be enabled
     - depguard
     - exhaustruct
-    - exportloopref
     - forbidigo
     - forcetypeassert
     - funlen
     - gochecknoglobals
     - gochecknoinits
+    - gomoddirectives
     - gofumpt
     - ireturn
+    - tenv
     - typecheck
     - wrapcheck
   # Enable specific linter
