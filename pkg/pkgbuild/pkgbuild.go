@@ -1,7 +1,8 @@
 package pkgbuild
 
 import (
-	"fmt"
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/github/go-spdx/v2/spdxexp"
 	"github.com/pkg/errors"
-	"golang.org/x/exp/rand"
 )
 
 // PKGBUILD defines all the fields accepted by the yap specfile (variables,
@@ -22,6 +22,8 @@ type PKGBUILD struct {
 	ArchComputed   string
 	Backup         []string
 	Build          string
+	BuildDate      int64
+	Checksum       string
 	Codename       string
 	Conflicts      []string
 	Copyright      []string
@@ -32,6 +34,7 @@ type PKGBUILD struct {
 	Epoch          string
 	Files          []string
 	FullDistroName string
+	Group          string
 	HashSums       []string
 	Home           string
 	Install        string
@@ -47,6 +50,7 @@ type PKGBUILD struct {
 	PkgDest        string
 	PkgName        string
 	PkgRel         string
+	PkgType        string
 	PkgVer         string
 	PostInst       string
 	PostRm         string
@@ -65,6 +69,7 @@ type PKGBUILD struct {
 	URL            string
 	StaticEnabled  bool
 	StripEnabled   bool
+	YAPVersion     string
 }
 
 // AddItem adds an item to the PKGBUILD.
@@ -371,13 +376,19 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 // It does not return anything.
 func (pkgBuild *PKGBUILD) SetMainFolders() {
 	switch pkgBuild.Distro {
-	case "arch":
-		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "pkg", pkgBuild.PkgName)
 	case "alpine":
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
 	default:
-		randomString := fmt.Sprintf("%x", rand.Int31())
-		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, pkgBuild.Distro+randomString)
+		key := make([]byte, 5)
+		_, err := rand.Read(key)
+
+		if err != nil {
+			utils.Logger.Fatal("fatal error",
+				utils.Logger.Args("error", err))
+		}
+
+		randomString := hex.EncodeToString(key)
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, pkgBuild.Distro+"-"+randomString)
 	}
 
 	if err := os.Setenv("pkgdir", pkgBuild.PackageDir); err != nil {
