@@ -242,6 +242,7 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 // asRPMDirectory creates an RPMFile object for a directory based on the provided FileContent.
 // It retrieves the directory's modification time and sets the appropriate fields in the RPMFile.
 func asRPMDirectory(content *utils.FileContent) *rpmpack.RPMFile {
+
 	// Get file information for the directory specified in the content.
 	fileInfo, _ := os.Stat(filepath.Clean(content.Source))
 
@@ -250,11 +251,11 @@ func asRPMDirectory(content *utils.FileContent) *rpmpack.RPMFile {
 
 	// Create and return an RPMFile object for the directory.
 	return &rpmpack.RPMFile{
-		Name:  content.Destination,      // Set the destination name.
-		Mode:  uint(utils.TagDirectory), // Set the mode to indicate it's a directory.
-		MTime: mTime,                    // Set the modification time.
-		Owner: "root",                   // Set the owner to "root".
-		Group: "root",                   // Set the group to "root".
+		Name:  content.Destination,                        // Set the destination name.
+		Mode:  uint(fileInfo.Mode()) | utils.TagDirectory, // Set the mode to indicate it's a directory.
+		MTime: mTime,                                      // Set the modification time.
+		Owner: "root",                                     // Set the owner to "root".
+		Group: "root",                                     // Set the group to "root".
 	}
 }
 
