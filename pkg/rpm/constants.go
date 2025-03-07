@@ -11,6 +11,7 @@ const (
 var buildEnvironmentDeps = []string{
 	"autoconf",
 	"automake",
+	"diffutils",
 	"expect",
 	"gcc",
 	"gcc-c++",
@@ -18,6 +19,7 @@ var buildEnvironmentDeps = []string{
 	"libtool-ltdl-devel",
 	"make",
 	"openssl",
+	"patch",
 	"pkgconf",
 	"which",
 }
