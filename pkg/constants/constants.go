@@ -13,7 +13,7 @@ const (
 	DockerOrg    = "docker.io/m0rf30/yap-"
 	Git          = "git"
 	GoArchiveURL = "https://go.dev/dl/go1.24.0.linux-amd64.tar.gz"
-	YAPVersion   = "v1.37"
+	YAPVersion   = "v1.38"
 )
 
 var (
