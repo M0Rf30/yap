@@ -277,6 +277,12 @@ func (mpc *MultipleProject) copyProjects() error {
 			return err
 		}
 
+		// Ensure the pkgdir directory exists
+		err = utils.ExistsMakeDir(proj.Builder.PKGBUILD.PackageDir)
+		if err != nil {
+			return err
+		}
+
 		// Only copy if the source and destination are different
 		if !singleProject {
 			err := copy.Copy(proj.Builder.PKGBUILD.Home, proj.Builder.PKGBUILD.StartDir, copyOpt)
