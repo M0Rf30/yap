@@ -31,6 +31,7 @@ RUN \
     dnf -y install \
     bash-completion \
     ca-certificates \
+    findutils \
     sudo; \
     yap completion bash > /etc/bash_completion.d/yap; \
     echo "source /usr/share/bash-completion/bash_completion" >> /etc/bashrc; \

@@ -32,6 +32,7 @@ RUN \
     ca-certificates \
     dnf-plugins-core \
     epel-release \
+    findutils \
     sudo; \
     dnf config-manager --enable crb; \
     dnf config-manager --enable devel; \
