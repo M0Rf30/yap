@@ -81,6 +81,10 @@ func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
 		Compression: archives.Zstd{},
 		Archival: archives.Tar{
 			FormatGNU: formatGNU,
+			Uid:       0,
+			Gid:       0,
+			Uname:     "root",
+			Gname:     "root",
 		},
 	}
 
