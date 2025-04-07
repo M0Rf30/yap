@@ -169,12 +169,7 @@ func (m *Pkg) Install(artifactsPath string) error {
 // makeDepends is a slice of strings representing the dependencies to be included.
 // It returns an error if there is any issue getting the dependencies.
 func (m *Pkg) Prepare(makeDepends []string) error {
-	args := []string{
-		"-S",
-		"--noconfirm",
-	}
-
-	return m.PKGBUILD.GetDepends("pacman", args, makeDepends)
+	return m.PKGBUILD.GetDepends("pacman", installArgs, makeDepends)
 }
 
 // PrepareEnvironment prepares the environment for the Makepkg.
@@ -182,11 +177,7 @@ func (m *Pkg) Prepare(makeDepends []string) error {
 // It takes a boolean parameter `golang` which indicates whether the environment should be prepared for Golang.
 // It returns an error if there is any issue in preparing the environment.
 func (m *Pkg) PrepareEnvironment(golang bool) error {
-	args := []string{
-		"-S",
-		"--noconfirm",
-	}
-	args = append(args, buildEnvironmentDeps...)
+	args := append(installArgs, buildEnvironmentDeps...)
 
 	if golang {
 		utils.CheckGO()

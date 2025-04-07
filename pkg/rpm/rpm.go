@@ -123,12 +123,9 @@ func (r *RPM) Install(artifactsPath string) error {
 		".rpm"
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
+	args := append(installArgs, pkgFilePath)
 
-	if err := utils.Exec(false, "",
-		"dnf",
-		"install",
-		"-y",
-		pkgFilePath); err != nil {
+	if err := utils.Exec(false, "", "dnf", args...); err != nil {
 		return err
 	}
 
@@ -140,12 +137,7 @@ func (r *RPM) Install(artifactsPath string) error {
 // makeDepends is a slice of strings representing the dependencies to be installed.
 // It returns an error if there is any issue during the installation process.
 func (r *RPM) Prepare(makeDepends []string) error {
-	args := []string{
-		"-y",
-		"install",
-	}
-
-	return r.PKGBUILD.GetDepends("dnf", args, makeDepends)
+	return r.PKGBUILD.GetDepends("dnf", installArgs, makeDepends)
 }
 
 // PrepareEnvironment prepares the environment for the RPM struct.
@@ -153,11 +145,7 @@ func (r *RPM) Prepare(makeDepends []string) error {
 // It takes a boolean parameter `golang` which indicates whether or not to set up the Go environment.
 // It returns an error if there was an issue with the environment preparation.
 func (r *RPM) PrepareEnvironment(golang bool) error {
-	args := []string{
-		"-y",
-		"install",
-	}
-	args = append(args, buildEnvironmentDeps...)
+	args := append(installArgs, buildEnvironmentDeps...)
 
 	if err := utils.Exec(false, "", "dnf", args...); err != nil {
 		return err
