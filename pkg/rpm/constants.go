@@ -24,6 +24,11 @@ var buildEnvironmentDeps = []string{
 	"which",
 }
 
+var installArgs = []string{
+	"-y",
+	"install",
+}
+
 var (
 	RPMArchs = map[string]string{
 		"x86_64":  "x86_64",

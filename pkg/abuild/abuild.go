@@ -73,12 +73,9 @@ func (a *Apk) Install(artifactsPath string) error {
 		".apk"
 
 	pkgFilePath := filepath.Join(artifactsPath, a.PKGBUILD.PkgName, a.PKGBUILD.ArchComputed, pkgName)
+	args := append(installArgs, pkgFilePath)
 
-	if err := utils.Exec(true,
-		"apk",
-		"add",
-		"--allow-untrusted",
-		pkgFilePath); err != nil {
+	if err := utils.Exec(true, "", "apk", args...); err != nil {
 		return err
 	}
 
@@ -90,21 +87,14 @@ func (a *Apk) Install(artifactsPath string) error {
 // makeDepends is a slice of strings representing the dependencies to be added.
 // It returns an error if there is any issue with adding the dependencies.
 func (a *Apk) Prepare(makeDepends []string) error {
-	args := []string{
-		"add",
-	}
-
-	return a.PKGBUILD.GetDepends("apk", args, makeDepends)
+	return a.PKGBUILD.GetDepends("apk", installArgs, makeDepends)
 }
 
 // PrepareEnvironment prepares the build environment for APK packaging.
 // It installs requested Go tools if 'golang' is true.
 // It returns an error if any step fails.
 func (a *Apk) PrepareEnvironment(golang bool) error {
-	args := []string{
-		"add",
-	}
-	args = append(args, buildEnvironmentDeps...)
+	args := append(installArgs, buildEnvironmentDeps...)
 
 	if golang {
 		utils.CheckGO()

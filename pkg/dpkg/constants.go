@@ -16,6 +16,12 @@ var buildEnvironmentDeps = []string{
 	"tzdata",
 }
 
+var installArgs = []string{
+	"--allow-downgrades",
+	"--assume-yes",
+	"install",
+}
+
 var DebArchs = map[string]string{
 	"any":     "all",
 	"x86_64":  "amd64",

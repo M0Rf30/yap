@@ -73,7 +73,9 @@ func (d *Deb) Install(artifactsPath string) error {
 			d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
 			d.PKGBUILD.ArchComputed))
 
-	if err := utils.Exec(false, "", "apt-get", "install", "-y", artifactFilePath); err != nil {
+	args := append(installArgs, artifactFilePath)
+
+	if err := utils.Exec(false, "", "apt-get", args...); err != nil {
 		return err
 	}
 
@@ -85,13 +87,7 @@ func (d *Deb) Install(artifactsPath string) error {
 // makeDepends: a slice of strings representing the dependencies to be installed.
 // Returns an error if there was a problem installing the dependencies.
 func (d *Deb) Prepare(makeDepends []string) error {
-	args := []string{
-		"--allow-downgrades",
-		"--assume-yes",
-		"install",
-	}
-
-	return d.PKGBUILD.GetDepends("apt-get", args, makeDepends)
+	return d.PKGBUILD.GetDepends("apt-get", installArgs, makeDepends)
 }
 
 // PrepareEnvironment prepares the environment for the Deb package.
@@ -99,11 +95,7 @@ func (d *Deb) Prepare(makeDepends []string) error {
 // It takes a boolean parameter `golang` which indicates whether or not to set up Go.
 // It returns an error if there was a problem during the environment preparation.
 func (d *Deb) PrepareEnvironment(golang bool) error {
-	args := []string{
-		"--assume-yes",
-		"install",
-	}
-	args = append(args, buildEnvironmentDeps...)
+	args := append(installArgs, buildEnvironmentDeps...)
 
 	if err := utils.Exec(false, "", "apt-get", args...); err != nil {
 		return err

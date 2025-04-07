@@ -1,5 +1,10 @@
 package abuild
 
+var installArgs = []string{
+	"add",
+	"--allow-untrusted",
+}
+
 var (
 	APKArchs = map[string]string{
 		"x86_64":  "x86_64",
@@ -67,7 +72,7 @@ arch="{{.ArchComputed}}"
 {{- end}}
 {{- if .Depends}}
 depends="
-{{ range .Depends }}{{ . }} 
+{{ range .Depends }}{{ . }}
 {{ end }}"
 {{- end }}
 {{- if .URL}}

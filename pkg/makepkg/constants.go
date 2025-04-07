@@ -101,6 +101,11 @@ const dotMtree = `#mtree
 {{- end }}
 `
 
+var installArgs = []string{
+	"-S",
+	"--noconfirm",
+}
+
 const postInstall = `
 {{- if .PreInst}}
 pre_install() {
