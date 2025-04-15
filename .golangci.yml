@@ -1,13 +1,7 @@
-# Options for analysis running.
+version: "2"
 linters:
-  # Disable specific linter
-  # https://golangci-lint.run/usage/linters/#disabled-by-default-linters--e--enable
+  default: all
   disable:
-    # here some dropped deprecated checks
-    # reduce warning messages
-    - mnd
-    # here some custom dropped checks temporary disabled
-    # they will be enabled
     - depguard
     - exhaustruct
     - forbidigo
@@ -16,43 +10,60 @@ linters:
     - gochecknoglobals
     - gochecknoinits
     - gomoddirectives
-    - gofumpt
     - ireturn
-    - tenv
-    - typecheck
+    - mnd
     - wrapcheck
-  # Enable specific linter
-  # https://golangci-lint.run/usage/linters/#enabled-by-default-linters
-  enable-all: true
-linters-settings:
-  cyclop:
-    max-complexity: 15
-  dupl:
-    threshold: 100
-  funlen:
-    lines: -1
-    statements: 50
-  goconst:
-    min-len: 2
-    min-occurrences: 3
-  gocritic:
-    disabled-checks:
-      - dupImport
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-      - unnamedResult
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-  gofmt:
-    rewrite-rules:
-      - pattern: interface{}
-        replacement: any
-  goimports:
-    local-prefixes: github.com/golangci/golangci-lint
-run:
-  timeout: 5m
+  settings:
+    cyclop:
+      max-complexity: 15
+    dupl:
+      threshold: 100
+    funlen:
+      lines: -1
+      statements: 50
+    goconst:
+      min-len: 2
+      min-occurrences: 3
+    gocritic:
+      disabled-checks:
+        - dupImport
+        - ifElseChain
+        - octalLiteral
+        - whyNoLint
+        - unnamedResult
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      rewrite-rules:
+        - pattern: interface{}
+          replacement: any
+    goimports:
+      local-prefixes:
+        - github.com/golangci/golangci-lint
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
