@@ -58,6 +58,7 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		Group:       r.PKGBUILD.Section,
 		Compressor:  "zstd",
 		Licence:     license,
+		Obsoletes:   processDepends(r.PKGBUILD.Replaces),
 		Provides:    processDepends(r.PKGBUILD.Provides),
 		Requires:    processDepends(r.PKGBUILD.Depends),
 		Conflicts:   processDepends(r.PKGBUILD.Conflicts),
