@@ -5,7 +5,7 @@ go 1.24
 require (
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/github/go-spdx/v2 v2.3.2
+	github.com/github/go-spdx/v2 v2.3.3
 	github.com/go-git/go-git/v5 v5.16.0
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/google/rpmpack v0.6.1-0.20241030124532-252102844c23
