@@ -211,6 +211,10 @@ func addContentsToRPM(contents []*utils.FileContent, rpm *rpmpack.RPM) error {
 //
 // It takes a pointer to the rpmpack.RPM instance as a parameter.
 func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
+	// This string is appended to preun and postun directives
+	// to have a similar behaviour between deb and rpm.
+	var onlyOnUninstall = "if [ $1 -ne 0 ]; then exit 0; fi\n"
+
 	if r.PKGBUILD.PreTrans != "" {
 		rpm.AddPretrans(r.PKGBUILD.PreTrans)
 	}
@@ -224,11 +228,11 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 	}
 
 	if r.PKGBUILD.PreRm != "" {
-		rpm.AddPreun(r.PKGBUILD.PreRm)
+		rpm.AddPreun(onlyOnUninstall + r.PKGBUILD.PreRm)
 	}
 
 	if r.PKGBUILD.PostRm != "" {
-		rpm.AddPostun(r.PKGBUILD.PostRm)
+		rpm.AddPostun(onlyOnUninstall + r.PKGBUILD.PostRm)
 	}
 
 	if r.PKGBUILD.PostTrans != "" {
