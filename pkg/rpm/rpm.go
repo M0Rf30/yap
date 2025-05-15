@@ -211,6 +211,10 @@ func addContentsToRPM(contents []*utils.FileContent, rpm *rpmpack.RPM) error {
 //
 // It takes a pointer to the rpmpack.RPM instance as a parameter.
 func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
+	if r.PKGBUILD.PreTrans != "" {
+		rpm.AddPretrans(r.PKGBUILD.PreTrans)
+	}
+
 	if r.PKGBUILD.PreInst != "" {
 		rpm.AddPrein(r.PKGBUILD.PreInst)
 	}
@@ -225,6 +229,10 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 
 	if r.PKGBUILD.PostRm != "" {
 		rpm.AddPostun(r.PKGBUILD.PostRm)
+	}
+
+	if r.PKGBUILD.PostTrans != "" {
+		rpm.AddPosttrans(r.PKGBUILD.PostTrans)
 	}
 }
 
