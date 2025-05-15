@@ -54,10 +54,12 @@ type PKGBUILD struct {
 	PkgVer         string
 	PostInst       string
 	PostRm         string
+	PostTrans      string
 	PreInst        string
 	Prepare        string
 	PreRelease     string
 	PreRm          string
+	PreTrans       string
 	priorities     map[string]int
 	Priority       string
 	Provides       []string
@@ -93,6 +95,30 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	pkgBuild.processOptions()
 
 	return nil
+}
+
+// ComputeArchitecture checks if the specified architecture is supported.
+// If "any", sets to "any". Otherwise, checks if current architecture is supported.
+// Logs error if not supported, then sets to current architecture if supported.
+func (pkgBuild *PKGBUILD) ComputeArchitecture() {
+	isSupported := utils.Contains(pkgBuild.Arch, "any")
+	if isSupported {
+		pkgBuild.ArchComputed = "any"
+
+		return
+	}
+
+	currentArch := utils.GetArchitecture()
+
+	isSupported = utils.Contains(pkgBuild.Arch, currentArch)
+	if !isSupported {
+		utils.Logger.Fatal("unsupported architecture",
+			utils.Logger.Args(
+				"pkgname", pkgBuild.PkgName,
+				"arch", strings.Join(pkgBuild.Arch, " ")))
+	}
+
+	pkgBuild.ArchComputed = currentArch
 }
 
 // CreateSpec reads the filepath where the specfile will be written and the
@@ -168,6 +194,36 @@ func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
 	return tmpl
 }
 
+// SetMainFolders sets the main folders for the PKGBUILD.
+//
+// It takes no parameters.
+// It does not return anything.
+func (pkgBuild *PKGBUILD) SetMainFolders() {
+	switch pkgBuild.Distro {
+	case "alpine":
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
+	default:
+		key := make([]byte, 5)
+		_, err := rand.Read(key)
+
+		if err != nil {
+			utils.Logger.Fatal("fatal error",
+				utils.Logger.Args("error", err))
+		}
+
+		randomString := hex.EncodeToString(key)
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, pkgBuild.Distro+"-"+randomString)
+	}
+
+	if err := os.Setenv("pkgdir", pkgBuild.PackageDir); err != nil {
+		utils.Logger.Fatal("failed to set variable pkgdir")
+	}
+
+	if err := os.Setenv("srcdir", pkgBuild.SourceDir); err != nil {
+		utils.Logger.Fatal("failed to set variable srcdir")
+	}
+}
+
 // ValidateGeneral checks that mandatory items are correctly provided by the PKGBUILD
 // file.
 func (pkgBuild *PKGBUILD) ValidateGeneral() {
@@ -205,28 +261,33 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() {
 	}
 }
 
-// ComputeArchitecture checks if the specified architecture is supported.
-// If "any", sets to "any". Otherwise, checks if current architecture is supported.
-// Logs error if not supported, then sets to current architecture if supported.
-func (pkgBuild *PKGBUILD) ComputeArchitecture() {
-	isSupported := utils.Contains(pkgBuild.Arch, "any")
-	if isSupported {
-		pkgBuild.ArchComputed = "any"
+// ValidateMandatoryItems checks that mandatory items are correctly provided by the PKGBUILD
+// file.
+func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
+	var validationErrors []string
 
-		return
+	// Check mandatory variables
+	mandatoryChecks := map[string]string{
+		"pkgdesc": pkgBuild.PkgDesc,
+		"pkgname": pkgBuild.PkgName,
+		"pkgrel":  pkgBuild.PkgRel,
+		"pkgver":  pkgBuild.PkgVer,
 	}
 
-	currentArch := utils.GetArchitecture()
+	for variable, value := range mandatoryChecks {
+		if value == "" {
+			validationErrors = append(validationErrors, variable)
+		}
+	}
 
-	isSupported = utils.Contains(pkgBuild.Arch, currentArch)
-	if !isSupported {
-		utils.Logger.Fatal("unsupported architecture",
+	// Exit if there are validation errors
+	if len(validationErrors) > 0 {
+		utils.Logger.Fatal(
+			"failed to set variables",
 			utils.Logger.Args(
-				"pkgname", pkgBuild.PkgName,
-				"arch", strings.Join(pkgBuild.Arch, " ")))
+				"variables",
+				strings.Join(validationErrors, " ")))
 	}
-
-	pkgBuild.ArchComputed = currentArch
 }
 
 // mapArrays reads an array name and its content and maps them to the PKGBUILD
@@ -278,8 +339,12 @@ func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 		pkgBuild.Prepare = os.ExpandEnv(data.(string))
 	case "postinst":
 		pkgBuild.PostInst = data.(string)
+	case "posttrans":
+		pkgBuild.PostTrans = data.(string)
 	case "prerm":
 		pkgBuild.PreRm = data.(string)
+	case "pretrans":
+		pkgBuild.PreTrans = data.(string)
 	case "postrm":
 		pkgBuild.PostRm = data.(string)
 	}
@@ -370,36 +435,6 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 	return key, priority, nil
 }
 
-// setMainFolders sets the main folders for the PKGBUILD.
-//
-// It takes no parameters.
-// It does not return anything.
-func (pkgBuild *PKGBUILD) SetMainFolders() {
-	switch pkgBuild.Distro {
-	case "alpine":
-		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
-	default:
-		key := make([]byte, 5)
-		_, err := rand.Read(key)
-
-		if err != nil {
-			utils.Logger.Fatal("fatal error",
-				utils.Logger.Args("error", err))
-		}
-
-		randomString := hex.EncodeToString(key)
-		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, pkgBuild.Distro+"-"+randomString)
-	}
-
-	if err := os.Setenv("pkgdir", pkgBuild.PackageDir); err != nil {
-		utils.Logger.Fatal("failed to set variable pkgdir")
-	}
-
-	if err := os.Setenv("srcdir", pkgBuild.SourceDir); err != nil {
-		utils.Logger.Fatal("failed to set variable srcdir")
-	}
-}
-
 // checkLicense checks if the license of the PKGBUILD is valid.
 //
 // This function takes no parameters.
@@ -436,34 +471,5 @@ func (pkgBuild *PKGBUILD) processOptions() {
 		case strings.HasPrefix(option, "!staticlibs"):
 			pkgBuild.StaticEnabled = false
 		}
-	}
-}
-
-// ValidateMandatoryItems checks that mandatory items are correctly provided by the PKGBUILD
-// file.
-func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
-	var validationErrors []string
-
-	// Check mandatory variables
-	mandatoryChecks := map[string]string{
-		"pkgdesc": pkgBuild.PkgDesc,
-		"pkgname": pkgBuild.PkgName,
-		"pkgrel":  pkgBuild.PkgRel,
-		"pkgver":  pkgBuild.PkgVer,
-	}
-
-	for variable, value := range mandatoryChecks {
-		if value == "" {
-			validationErrors = append(validationErrors, variable)
-		}
-	}
-
-	// Exit if there are validation errors
-	if len(validationErrors) > 0 {
-		utils.Logger.Fatal(
-			"failed to set variables",
-			utils.Logger.Args(
-				"variables",
-				strings.Join(validationErrors, " ")))
 	}
 }
