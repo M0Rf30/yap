@@ -222,6 +222,10 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 	if err := os.Setenv("srcdir", pkgBuild.SourceDir); err != nil {
 		utils.Logger.Fatal("failed to set variable srcdir")
 	}
+
+	if err := os.Setenv("startdir", pkgBuild.StartDir); err != nil {
+		utils.Logger.Fatal("failed to set variable startdir")
+	}
 }
 
 // ValidateGeneral checks that mandatory items are correctly provided by the PKGBUILD

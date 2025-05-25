@@ -124,9 +124,9 @@ func (r *RPM) Install(artifactsPath string) error {
 		".rpm"
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
-	args := append(installArgs, pkgFilePath)
+	installArgs = append(installArgs, pkgFilePath)
 
-	if err := utils.Exec(false, "", "dnf", args...); err != nil {
+	if err := utils.Exec(false, "", "dnf", installArgs...); err != nil {
 		return err
 	}
 
@@ -146,9 +146,9 @@ func (r *RPM) Prepare(makeDepends []string) error {
 // It takes a boolean parameter `golang` which indicates whether or not to set up the Go environment.
 // It returns an error if there was an issue with the environment preparation.
 func (r *RPM) PrepareEnvironment(golang bool) error {
-	args := append(installArgs, buildEnvironmentDeps...)
+	installArgs = append(installArgs, buildEnvironmentDeps...)
 
-	if err := utils.Exec(false, "", "dnf", args...); err != nil {
+	if err := utils.Exec(false, "", "dnf", installArgs...); err != nil {
 		return err
 	}
 
@@ -243,7 +243,6 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 // asRPMDirectory creates an RPMFile object for a directory based on the provided FileContent.
 // It retrieves the directory's modification time and sets the appropriate fields in the RPMFile.
 func asRPMDirectory(content *utils.FileContent) *rpmpack.RPMFile {
-
 	// Get file information for the directory specified in the content.
 	fileInfo, _ := os.Stat(filepath.Clean(content.Source))
 
