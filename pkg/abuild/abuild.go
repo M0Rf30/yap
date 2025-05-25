@@ -73,9 +73,9 @@ func (a *Apk) Install(artifactsPath string) error {
 		".apk"
 
 	pkgFilePath := filepath.Join(artifactsPath, a.PKGBUILD.PkgName, a.PKGBUILD.ArchComputed, pkgName)
-	args := append(installArgs, pkgFilePath)
+	installArgs = append(installArgs, pkgFilePath)
 
-	if err := utils.Exec(true, "", "apk", args...); err != nil {
+	if err := utils.Exec(true, "", "apk", installArgs...); err != nil {
 		return err
 	}
 
@@ -94,15 +94,15 @@ func (a *Apk) Prepare(makeDepends []string) error {
 // It installs requested Go tools if 'golang' is true.
 // It returns an error if any step fails.
 func (a *Apk) PrepareEnvironment(golang bool) error {
-	args := append(installArgs, buildEnvironmentDeps...)
+	installArgs = append(installArgs, buildEnvironmentDeps...)
 
 	if golang {
 		utils.CheckGO()
 
-		args = append(args, "go")
+		installArgs = append(installArgs, "go")
 	}
 
-	return utils.Exec(true, "", "apk", args...)
+	return utils.Exec(true, "", "apk", installArgs...)
 }
 
 // Update updates the APK package manager's package database.

@@ -7,6 +7,19 @@ type Set struct {
 	m map[string]struct{}
 }
 
+// NewSet creates a new Set.
+//
+// It initializes a new Set with an empty map and returns a pointer to it.
+// The returned Set is ready to use.
+// Returns a pointer to the newly created Set.
+func NewSet() *Set {
+	s := &Set{
+		m: make(map[string]struct{}),
+	}
+
+	return s
+}
+
 // Add adds a value to the Set.
 //
 // value: the value to be added.
@@ -39,19 +52,6 @@ func (s *Set) Iter() <-chan string {
 	}()
 
 	return iter
-}
-
-// NewSet creates a new Set.
-//
-// It initializes a new Set with an empty map and returns a pointer to it.
-// The returned Set is ready to use.
-// Returns a pointer to the newly created Set.
-func NewSet() *Set {
-	s := &Set{
-		m: make(map[string]struct{}),
-	}
-
-	return s
 }
 
 // Remove removes the specified value from the set.

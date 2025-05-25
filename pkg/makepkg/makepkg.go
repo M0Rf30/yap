@@ -177,15 +177,15 @@ func (m *Pkg) Prepare(makeDepends []string) error {
 // It takes a boolean parameter `golang` which indicates whether the environment should be prepared for Golang.
 // It returns an error if there is any issue in preparing the environment.
 func (m *Pkg) PrepareEnvironment(golang bool) error {
-	args := append(installArgs, buildEnvironmentDeps...)
+	installArgs = append(installArgs, buildEnvironmentDeps...)
 
 	if golang {
 		utils.CheckGO()
 
-		args = append(args, "go")
+		installArgs = append(installArgs, "go")
 	}
 
-	return utils.Exec(false, "", "pacman", args...)
+	return utils.Exec(false, "", "pacman", installArgs...)
 }
 
 // Update updates the Makepkg package manager.

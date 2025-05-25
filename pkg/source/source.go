@@ -94,10 +94,10 @@ func (src *Source) Get() error {
 // It takes no parameters.
 // It returns a plumbing.ReferenceName.
 func (src *Source) getReferenceType() plumbing.ReferenceName {
-	switch {
-	case src.RefKey == "branch":
+	switch src.RefKey {
+	case "branch":
 		return plumbing.NewBranchReferenceName(src.RefValue)
-	case src.RefKey == "tag":
+	case "tag":
 		return plumbing.NewTagReferenceName(src.RefValue)
 	}
 
