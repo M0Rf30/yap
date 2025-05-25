@@ -12,7 +12,7 @@ const (
 	ColorWhite   = "\033[37m"
 	DockerOrg    = "docker.io/m0rf30/yap-"
 	Git          = "git"
-	GoArchiveURL = "https://go.dev/dl/go1.24.2.linux-amd64.tar.gz"
+	GoArchiveURL = "https://go.dev/dl/go1.24.3.linux-amd64.tar.gz"
 	YAPVersion   = "v1.44"
 )
 
