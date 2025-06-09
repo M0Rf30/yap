@@ -13,7 +13,7 @@ require (
 	github.com/mholt/archives v0.1.2
 	github.com/otiai10/copy v1.14.1
 	github.com/pkg/errors v0.9.1
-	github.com/pterm/pterm v0.12.80
+	github.com/pterm/pterm v0.12.81
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	mvdan.cc/sh/v3 v3.11.0
@@ -72,10 +72,10 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sync v0.14.0 // indirect
+	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
