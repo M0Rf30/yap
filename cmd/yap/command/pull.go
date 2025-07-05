@@ -16,7 +16,7 @@ var pullCmd = &cobra.Command{
 		split := strings.Split(args[0], "-")
 
 		if len(split) == 1 && split[0] != "alpine" && split[0] != "arch" {
-			utils.Logger.Fatal("except for alpine and arch, specify also the codename (i. e. rocky-9, ubuntu-focal)")
+			utils.Logger.Fatal("except for alpine and arch, specify also the codename (i. e. rocky-9, ubuntu-jammy)")
 		}
 
 		if err := utils.PullContainers(args[0]); err != nil {
