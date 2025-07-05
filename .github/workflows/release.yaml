@@ -28,7 +28,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -36,7 +36,16 @@ jobs:
   distro_matrix:
     strategy:
       matrix:
-        os: [alpine, rocky-8, rocky-9, ubuntu-focal, ubuntu-jammy, ubuntu-noble]
+        os:
+          [
+            alpine,
+            rocky-8,
+            rocky-9,
+            rocky-10,
+            ubuntu-focal,
+            ubuntu-jammy,
+            ubuntu-noble,
+          ]
 
     runs-on: ubuntu-latest
 

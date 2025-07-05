@@ -8,7 +8,16 @@ jobs:
   distro_matrix:
     strategy:
       matrix:
-        os: [alpine, rocky-8, rocky-9, ubuntu-focal, ubuntu-jammy, ubuntu-noble]
+        os:
+          [
+            alpine,
+            rocky-8,
+            rocky-9,
+            rocky-10,
+            ubuntu-focal,
+            ubuntu-jammy,
+            ubuntu-noble,
+          ]
 
     runs-on: ubuntu-latest
 

@@ -37,6 +37,6 @@ RUN \
     yum clean all
 
 ENV GOROOT=/usr/lib/go
-ENV PATH /usr/lib/go/bin:$PATH:/go/bin
+ENV PATH=/usr/lib/go/bin:$PATH:/go/bin
 
 ENTRYPOINT ["yap"]
