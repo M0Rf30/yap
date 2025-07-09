@@ -1,4 +1,4 @@
-package utils
+package osutils
 
 import (
 	"bufio"
@@ -47,7 +47,8 @@ func ParseOSRelease() (OSRelease, error) {
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
+	err = scanner.Err()
+	if err != nil {
 		return OSRelease{}, err
 	}
 

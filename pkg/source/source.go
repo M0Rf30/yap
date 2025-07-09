@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/utils"
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/pkg/errors"
 )
@@ -62,7 +62,7 @@ func (src *Source) Get() error {
 	switch sourceType {
 	case "http", "https", "ftp", constants.Git:
 		var err error
-		if !utils.Exists(sourceFilePath) {
+		if !osutils.Exists(sourceFilePath) {
 			err = src.getURL(sourceType, sourceFilePath, SSHPassword)
 		}
 
@@ -74,15 +74,18 @@ func (src *Source) Get() error {
 		return errors.Errorf("unsupported source type")
 	}
 
-	if err := src.validateSource(sourceFilePath); err != nil {
+	err := src.validateSource(sourceFilePath)
+	if err != nil {
 		return err
 	}
 
-	if err := src.symlinkSources(sourceFilePath); err != nil {
+	err = src.symlinkSources(sourceFilePath)
+	if err != nil {
 		return err
 	}
 
-	if err := utils.Unarchive(sourceFilePath, src.SrcDir); err != nil {
+	err = osutils.Unarchive(sourceFilePath, src.SrcDir)
+	if err != nil {
 		return err
 	}
 
@@ -135,9 +138,9 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 	case constants.Git:
 		referenceName := src.getReferenceType()
 
-		return utils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName)
+		return osutils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName)
 	default:
-		return utils.Download(dloadFilePath, normalizedURI)
+		return osutils.Download(dloadFilePath, normalizedURI)
 	}
 }
 
@@ -147,7 +150,7 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 // No parameters.
 // No return types.
 func (src *Source) parseURI() {
-	src.SourceItemPath = utils.Filename(src.SourceItemURI)
+	src.SourceItemPath = osutils.Filename(src.SourceItemURI)
 
 	if strings.Contains(src.SourceItemURI, "::") {
 		split := strings.SplitN(src.SourceItemURI, "::", 2)
@@ -170,7 +173,7 @@ func (src *Source) parseURI() {
 // It returns an error if the symlink creation fails.
 func (src *Source) symlinkSources(symlinkSource string) error {
 	symlinkTarget := filepath.Join(src.SrcDir, src.SourceItemPath)
-	if !utils.Exists(symlinkTarget) {
+	if !osutils.Exists(symlinkTarget) {
 		return os.Symlink(symlinkSource, symlinkTarget)
 	}
 
@@ -182,13 +185,12 @@ func (src *Source) symlinkSources(symlinkSource string) error {
 // It takes the source file path as a parameter and returns an error if any.
 func (src *Source) validateSource(sourceFilePath string) error {
 	info, err := os.Stat(sourceFilePath)
-
 	if err != nil {
 		return errors.Errorf("failed to open file for hash %s", sourceFilePath)
 	}
 
 	if src.Hash == "SKIP" || info.IsDir() {
-		utils.Logger.Info("skip integrity check for", utils.Logger.Args("source", src.SourceItemURI))
+		osutils.Logger.Info("skip integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
 
 		return nil
 	}
@@ -204,13 +206,14 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return errors.Errorf("unsupported hash length %d", len(src.Hash))
 	}
 
-	file, err := utils.Open(filepath.Clean(sourceFilePath))
+	file, err := osutils.Open(filepath.Clean(sourceFilePath))
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	if _, err := io.Copy(hashSum, file); err != nil {
+	_, err = io.Copy(hashSum, file)
+	if err != nil {
 		return errors.Errorf("failed to copy file %s", sourceFilePath)
 	}
 
@@ -221,7 +224,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return errors.Errorf("hash verification failed %s", src.SourceItemPath)
 	}
 
-	utils.Logger.Info("integrity check for", utils.Logger.Args("source", src.SourceItemURI))
+	osutils.Logger.Info("integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
 
 	return nil
 }

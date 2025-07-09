@@ -3,10 +3,10 @@ package command
 import (
 	"strings"
 
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/packer"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/project"
-	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -24,21 +24,22 @@ var (
 
 			packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
 			if !project.SkipSyncDeps {
-				if err := packageManager.Update(); err != nil {
-					utils.Logger.Error(err.Error(),
-						utils.Logger.Args("error", err))
+				err := packageManager.Update()
+				if err != nil {
+					osutils.Logger.Error(err.Error(),
+						osutils.Logger.Args("error", err))
 				}
 			}
 
 			err := packageManager.PrepareEnvironment(GoLang)
 			if err != nil {
-				utils.Logger.Error(err.Error())
+				osutils.Logger.Error(err.Error())
 			}
 
-			utils.Logger.Info("basic build environment successfully prepared")
+			osutils.Logger.Info("basic build environment successfully prepared")
 
 			if GoLang {
-				utils.Logger.Info("go successfully installed")
+				osutils.Logger.Info("go successfully installed")
 			}
 		},
 	}

@@ -1,4 +1,4 @@
-package utils
+package osutils
 
 import (
 	"context"
@@ -40,7 +40,8 @@ var (
 // It does not take any parameters.
 // It returns a boolean value indicating whether the GO executable is already installed.
 func CheckGO() bool {
-	if _, err := os.Stat(goExecutable); err == nil {
+	_, err := os.Stat(goExecutable)
+	if err == nil {
 		Logger.Info("go is already installed")
 
 		return true
@@ -64,7 +65,6 @@ func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
 	files, err := archives.FilesFromDisk(ctx, options, map[string]string{
 		sourceDir + string(os.PathSeparator): "",
 	})
-
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,9 @@ Loop:
 		select {
 		case <-resp.Done:
 			progressBar.Current = 100
-			if _, err = progressBar.Stop(); err != nil {
+
+			_, err = progressBar.Stop()
+			if err != nil {
 				Logger.Fatal("failed to stop progress bar", Logger.Args("error", err))
 			}
 
@@ -175,8 +177,8 @@ func GitClone(dloadFilePath, sourceItemURI, sshPassword string,
 	if err != nil && strings.Contains(err.Error(), "authentication required") {
 		sourceURL, _ := url.Parse(sourceItemURI)
 		sshKeyPath := os.Getenv("HOME") + "/.ssh/id_rsa"
-		publicKey, err := ssh.NewPublicKeysFromFile("git", sshKeyPath, sshPassword)
 
+		publicKey, err := ssh.NewPublicKeysFromFile("git", sshKeyPath, sshPassword)
 		if err != nil {
 			Logger.Error("failed to load ssh key")
 			Logger.Warn("try to use an ssh-password with the -p")
@@ -188,8 +190,8 @@ func GitClone(dloadFilePath, sourceItemURI, sshPassword string,
 			strings.Replace(sourceURL.EscapedPath(), "/", ":", 1)
 		cloneOptions.Auth = publicKey
 		cloneOptions.URL = sshURL
-		_, err = ggit.PlainClone(dloadFilePath, false, cloneOptions)
 
+		_, err = ggit.PlainClone(dloadFilePath, false, cloneOptions)
 		if err != nil {
 			return err
 		}
@@ -258,7 +260,8 @@ func PullContainers(distro string) error {
 		constants.DockerOrg + distro,
 	}
 
-	if _, err := os.Stat(containerApp); err == nil {
+	_, err := os.Stat(containerApp)
+	if err == nil {
 		return Exec(false, "", containerApp, args...)
 	}
 
@@ -272,7 +275,8 @@ func PullContainers(distro string) error {
 func RunScript(cmds string) error {
 	script, _ := syntax.NewParser().Parse(strings.NewReader(cmds), "")
 
-	if _, err := MultiPrinter.Start(); err != nil {
+	_, err := MultiPrinter.Start()
+	if err != nil {
 		return err
 	}
 
@@ -281,9 +285,8 @@ func RunScript(cmds string) error {
 		interp.StdIO(nil, MultiPrinter.Writer, MultiPrinter.Writer),
 	)
 
-	err := runner.Run(context.TODO(), script)
-
-	if _, err := MultiPrinter.Stop(); err != nil {
+	err = runner.Run(context.TODO(), script)
+	if err != nil {
 		return err
 	}
 

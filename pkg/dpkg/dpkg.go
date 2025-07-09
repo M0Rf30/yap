@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/pkg/options"
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/blakesmith/ar"
 	"github.com/otiai10/copy"
 )
@@ -39,24 +39,29 @@ func (d *Deb) BuildPackage(artifactsPath string) error {
 	dataArchive := filepath.Join(debTemp, dataFilename)
 
 	// Create control archive
-	if err := utils.CreateTarZst(d.debDir, controlArchive, true); err != nil {
+	err = osutils.CreateTarZst(d.debDir, controlArchive, true)
+	if err != nil {
 		return err
 	}
 
-	if err := os.RemoveAll(d.debDir); err != nil {
+	err = os.RemoveAll(d.debDir)
+	if err != nil {
 		return err
 	}
 
 	// Create data archive
-	if err := utils.CreateTarZst(d.PKGBUILD.PackageDir, dataArchive, true); err != nil {
+	err = osutils.CreateTarZst(d.PKGBUILD.PackageDir, dataArchive, true)
+	if err != nil {
 		return err
 	}
 
-	if err := d.createDeb(artifactsPath, controlArchive, dataArchive); err != nil {
+	err = d.createDeb(artifactsPath, controlArchive, dataArchive)
+	if err != nil {
 		return err
 	}
 
-	if err := os.RemoveAll(d.PKGBUILD.PackageDir); err != nil {
+	err = os.RemoveAll(d.PKGBUILD.PackageDir)
+	if err != nil {
 		return err
 	}
 
@@ -75,7 +80,8 @@ func (d *Deb) Install(artifactsPath string) error {
 
 	installArgs = append(installArgs, artifactFilePath)
 
-	if err := utils.Exec(false, "", "apt-get", installArgs...); err != nil {
+	err := osutils.Exec(false, "", "apt-get", installArgs...)
+	if err != nil {
 		return err
 	}
 
@@ -97,12 +103,14 @@ func (d *Deb) Prepare(makeDepends []string) error {
 func (d *Deb) PrepareEnvironment(golang bool) error {
 	installArgs = append(installArgs, buildEnvironmentDeps...)
 
-	if err := utils.Exec(false, "", "apt-get", installArgs...); err != nil {
+	err := osutils.Exec(false, "", "apt-get", installArgs...)
+	if err != nil {
 		return err
 	}
 
 	if golang {
-		if err := utils.GOSetup(); err != nil {
+		err := osutils.GOSetup()
+		if err != nil {
 			return err
 		}
 	}
@@ -117,11 +125,13 @@ func (d *Deb) PrepareFakeroot(_ string) error {
 	d.getRelease()
 	d.PKGBUILD.ArchComputed = DebArchs[d.PKGBUILD.ArchComputed]
 
-	if err := os.RemoveAll(d.debDir); err != nil {
+	err := os.RemoveAll(d.debDir)
+	if err != nil {
 		return err
 	}
 
-	if err := d.createDebResources(); err != nil {
+	err = d.createDebResources()
+	if err != nil {
 		return err
 	}
 
@@ -157,11 +167,12 @@ func addArFile(writer *ar.Writer, name string, body []byte, date time.Time) erro
 		ModTime: date,
 	}
 
-	if err := writer.WriteHeader(&header); err != nil {
+	err := writer.WriteHeader(&header)
+	if err != nil {
 		return err
 	}
 
-	_, err := writer.Write(body)
+	_, err = writer.Write(body)
 
 	return err
 }
@@ -188,11 +199,13 @@ func (d *Deb) addScriptlets() error {
 
 		path := filepath.Join(d.debDir, name)
 
-		if err := utils.CreateWrite(path, script); err != nil {
+		err := osutils.CreateWrite(path, script)
+		if err != nil {
 			return err
 		}
 
-		if err := utils.Chmod(path, 0o755); err != nil {
+		err = osutils.Chmod(path, 0o755)
+		if err != nil {
 			return err
 		}
 	}
@@ -221,7 +234,7 @@ func (d *Deb) createConfFiles() error {
 		data += name + "\n"
 	}
 
-	return utils.CreateWrite(path, data)
+	return osutils.CreateWrite(path, data)
 }
 
 // createCopyrightFile generates a copyright file for the Debian package.
@@ -289,34 +302,39 @@ func (d *Deb) createDeb(artifactPath, control, data string) error {
 	}
 
 	writer := ar.NewWriter(debPackage)
-	if err := writer.WriteGlobalHeader(); err != nil {
+
+	err = writer.WriteGlobalHeader()
+	if err != nil {
 		return err
 	}
 
 	modtime := getModTime()
 
-	if err := addArFile(writer,
+	err = addArFile(writer,
 		binaryFilename,
 		debianBinary,
-		modtime); err != nil {
+		modtime)
+	if err != nil {
 		return err
 	}
 
-	if err := addArFile(writer,
+	err = addArFile(writer,
 		controlFilename,
 		controlArchive,
-		modtime); err != nil {
+		modtime)
+	if err != nil {
 		return err
 	}
 
-	if err := addArFile(writer,
+	err = addArFile(writer,
 		dataFilename,
 		dataArchive,
-		modtime); err != nil {
+		modtime)
+	if err != nil {
 		return err
 	}
 
-	utils.Logger.Info("", utils.Logger.Args("artifact", artifactFilePath))
+	osutils.Logger.Info("", osutils.Logger.Args("artifact", artifactFilePath))
 
 	return nil
 }
@@ -332,41 +350,50 @@ func (d *Deb) createDeb(artifactPath, control, data string) error {
 // It returns an error if any of the operations fail.
 func (d *Deb) createDebResources() error {
 	d.debDir = filepath.Join(d.PKGBUILD.PackageDir, "DEBIAN")
-	if err := utils.ExistsMakeDir(d.debDir); err != nil {
+
+	err := osutils.ExistsMakeDir(d.debDir)
+	if err != nil {
 		return err
 	}
 
-	if err := d.createConfFiles(); err != nil {
+	err = d.createConfFiles()
+	if err != nil {
 		return err
 	}
 
-	size, _ := utils.GetDirSize(d.PKGBUILD.PackageDir)
+	size, _ := osutils.GetDirSize(d.PKGBUILD.PackageDir)
 	d.PKGBUILD.InstalledSize = size / 1024
 	d.PKGBUILD.Depends = d.processDepends(d.PKGBUILD.Depends)
 	d.PKGBUILD.MakeDepends = d.processDepends(d.PKGBUILD.MakeDepends)
 	d.PKGBUILD.OptDepends = d.processDepends(d.PKGBUILD.OptDepends)
 
 	tmpl := d.PKGBUILD.RenderSpec(specFile)
-	if err := d.PKGBUILD.CreateSpec(filepath.Join(d.debDir,
-		"control"), tmpl); err != nil {
+
+	err = d.PKGBUILD.CreateSpec(filepath.Join(d.debDir,
+		"control"), tmpl)
+	if err != nil {
 		return err
 	}
 
-	if err := d.createCopyrightFile(); err != nil {
+	err = d.createCopyrightFile()
+	if err != nil {
 		return err
 	}
 
-	if err := d.addScriptlets(); err != nil {
+	err = d.addScriptlets()
+	if err != nil {
 		return err
 	}
 
-	if err := d.createDebconfFile("config",
-		d.PKGBUILD.DebConfig); err != nil {
+	err = d.createDebconfFile("config",
+		d.PKGBUILD.DebConfig)
+	if err != nil {
 		return err
 	}
 
-	if err := d.createDebconfFile("templates",
-		d.PKGBUILD.DebTemplate); err != nil {
+	err = d.createDebconfFile("templates",
+		d.PKGBUILD.DebTemplate)
+	if err != nil {
 		return err
 	}
 

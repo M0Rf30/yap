@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/utils"
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -32,10 +32,9 @@ var OverridePkgVer string
 // - error: an error if any occurred during parsing.
 func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
-
 	if err != nil {
-		utils.Logger.Error("failed to get root directory",
-			utils.Logger.Args("path", home))
+		osutils.Logger.Error("failed to get root directory",
+			osutils.Logger.Args("path", home))
 
 		return nil, err
 	}
@@ -78,8 +77,8 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 // It takes a path string as a parameter and returns a *syntax.File and an error.
 func getSyntaxFile(path string) (*syntax.File, error) {
 	filePath := filepath.Join(path, "PKGBUILD")
-	file, err := utils.Open(filePath)
 
+	file, err := osutils.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -113,17 +112,17 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) e
 		switch nodeType := node.(type) {
 		case *syntax.Assign:
 			if nodeType.Array != nil {
-				for _, line := range utils.StringifyArray(nodeType) {
+				for _, line := range osutils.StringifyArray(nodeType) {
 					arrayDecl, _ = shell.Fields(line, os.Getenv)
 				}
 
 				err = pkgBuild.AddItem(nodeType.Name.Value, arrayDecl)
 			} else {
-				varDecl, _ = shell.Expand(utils.StringifyAssign(nodeType), os.Getenv)
+				varDecl, _ = shell.Expand(osutils.StringifyAssign(nodeType), os.Getenv)
 				err = pkgBuild.AddItem(nodeType.Name.Value, varDecl)
 			}
 		case *syntax.FuncDecl:
-			funcDecl = utils.StringifyFuncDecl(nodeType)
+			funcDecl = osutils.StringifyFuncDecl(nodeType)
 			err = pkgBuild.AddItem(nodeType.Name.Value, funcDecl)
 		}
 

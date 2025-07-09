@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/pkg/options"
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/google/rpmpack"
 )
 
@@ -67,7 +67,8 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		BuildTime:   time.Now(),
 	})
 
-	if err := r.createFilesInsideRPM(rpm); err != nil {
+	err := r.createFilesInsideRPM(rpm)
+	if err != nil {
 		return err
 	}
 
@@ -81,11 +82,12 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 	}
 	defer rpmFile.Close()
 
-	if err := rpm.Write(rpmFile); err != nil {
+	err = rpm.Write(rpmFile)
+	if err != nil {
 		return err
 	}
 
-	utils.Logger.Info("", utils.Logger.Args("artifact", cleanFilePath))
+	osutils.Logger.Info("", osutils.Logger.Args("artifact", cleanFilePath))
 
 	return nil
 }
@@ -126,7 +128,8 @@ func (r *RPM) Install(artifactsPath string) error {
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 	installArgs = append(installArgs, pkgFilePath)
 
-	if err := utils.Exec(false, "", "dnf", installArgs...); err != nil {
+	err := osutils.Exec(false, "", "dnf", installArgs...)
+	if err != nil {
 		return err
 	}
 
@@ -148,12 +151,14 @@ func (r *RPM) Prepare(makeDepends []string) error {
 func (r *RPM) PrepareEnvironment(golang bool) error {
 	installArgs = append(installArgs, buildEnvironmentDeps...)
 
-	if err := utils.Exec(false, "", "dnf", installArgs...); err != nil {
+	err := osutils.Exec(false, "", "dnf", installArgs...)
+	if err != nil {
 		return err
 	}
 
 	if golang {
-		if err := utils.GOSetup(); err != nil {
+		err = osutils.GOSetup()
+		if err != nil {
 			return err
 		}
 	}
@@ -187,7 +192,7 @@ func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
 
 // addContentsToRPM adds a slice of FileContent objects to the specified RPM object.
 // It creates RPMFile objects from the FileContent and adds them to the RPM.
-func addContentsToRPM(contents []*utils.FileContent, rpm *rpmpack.RPM) error {
+func addContentsToRPM(contents []*osutils.FileContent, rpm *rpmpack.RPM) error {
 	// Iterate over each FileContent in the provided slice.
 	for _, content := range contents {
 		// Create an RPMFile from the FileContent.
@@ -242,7 +247,7 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 
 // asRPMDirectory creates an RPMFile object for a directory based on the provided FileContent.
 // It retrieves the directory's modification time and sets the appropriate fields in the RPMFile.
-func asRPMDirectory(content *utils.FileContent) *rpmpack.RPMFile {
+func asRPMDirectory(content *osutils.FileContent) *rpmpack.RPMFile {
 	// Get file information for the directory specified in the content.
 	fileInfo, _ := os.Stat(filepath.Clean(content.Source))
 
@@ -251,17 +256,17 @@ func asRPMDirectory(content *utils.FileContent) *rpmpack.RPMFile {
 
 	// Create and return an RPMFile object for the directory.
 	return &rpmpack.RPMFile{
-		Name:  content.Destination,                        // Set the destination name.
-		Mode:  uint(fileInfo.Mode()) | utils.TagDirectory, // Set the mode to indicate it's a directory.
-		MTime: mTime,                                      // Set the modification time.
-		Owner: "root",                                     // Set the owner to "root".
-		Group: "root",                                     // Set the group to "root".
+		Name:  content.Destination,                          // Set the destination name.
+		Mode:  uint(fileInfo.Mode()) | osutils.TagDirectory, // Set the mode to indicate it's a directory.
+		MTime: mTime,                                        // Set the modification time.
+		Owner: "root",                                       // Set the owner to "root".
+		Group: "root",                                       // Set the group to "root".
 	}
 }
 
 // asRPMFile creates an RPMFile object for a regular file based on the provided FileContent.
 // It reads the file's data and retrieves its modification time.
-func asRPMFile(content *utils.FileContent, fileType rpmpack.FileType) (*rpmpack.RPMFile, error) {
+func asRPMFile(content *osutils.FileContent, fileType rpmpack.FileType) (*rpmpack.RPMFile, error) {
 	// Read the file data from the source path.
 	data, err := os.ReadFile(content.Source)
 	if err != nil {
@@ -288,7 +293,7 @@ func asRPMFile(content *utils.FileContent, fileType rpmpack.FileType) (*rpmpack.
 
 // asRPMSymlink creates an RPMFile object for a symbolic link based on the provided FileContent.
 // It retrieves the link's target and modification time.
-func asRPMSymlink(content *utils.FileContent) *rpmpack.RPMFile {
+func asRPMSymlink(content *osutils.FileContent) *rpmpack.RPMFile {
 	cleanFilePath := filepath.Clean(content.Source)
 	fileInfo, _ := os.Lstat(cleanFilePath) // Use Lstat to get information about the symlink.
 	body, _ := os.Readlink(cleanFilePath)  // Read the target of the symlink.
@@ -298,19 +303,19 @@ func asRPMSymlink(content *utils.FileContent) *rpmpack.RPMFile {
 
 	// Create and return an RPMFile object for the symlink.
 	return &rpmpack.RPMFile{
-		Name:  content.Destination, // Set the destination name.
-		Body:  []byte(body),        // Set the target of the symlink as the body.
-		Mode:  uint(utils.TagLink), // Set the mode to indicate it's a symlink.
-		MTime: mTime,               // Set the modification time.
-		Owner: "root",              // Set the owner to "root".
-		Group: "root",              // Set the group to "root".
+		Name:  content.Destination,   // Set the destination name.
+		Body:  []byte(body),          // Set the target of the symlink as the body.
+		Mode:  uint(osutils.TagLink), // Set the mode to indicate it's a symlink.
+		MTime: mTime,                 // Set the modification time.
+		Owner: "root",                // Set the owner to "root".
+		Group: "root",                // Set the group to "root".
 	}
 }
 
 // createContent creates a new FileContent object with the specified source path,
 // destination path (relative to the package directory), and content type.
-func createContent(path, packageDir, contentType string) *utils.FileContent {
-	return &utils.FileContent{
+func createContent(path, packageDir, contentType string) *osutils.FileContent {
+	return &osutils.FileContent{
 		Source:      path,
 		Destination: strings.TrimPrefix(path, packageDir),
 		Type:        contentType,
@@ -319,19 +324,19 @@ func createContent(path, packageDir, contentType string) *utils.FileContent {
 
 // createRPMFile converts a FileContent object into an RPMFile object based on its type.
 // It returns the created RPMFile and any error encountered during the conversion.
-func createRPMFile(content *utils.FileContent) (*rpmpack.RPMFile, error) {
+func createRPMFile(content *osutils.FileContent) (*rpmpack.RPMFile, error) {
 	var file *rpmpack.RPMFile
 
 	var err error
 
 	switch content.Type {
-	case utils.TypeConfigNoReplace:
+	case osutils.TypeConfigNoReplace:
 		file, err = asRPMFile(content, rpmpack.ConfigFile|rpmpack.NoReplaceFile)
-	case utils.TypeSymlink:
+	case osutils.TypeSymlink:
 		file = asRPMSymlink(content)
-	case utils.TypeDir:
+	case osutils.TypeDir:
 		file = asRPMDirectory(content)
-	case utils.TypeFile:
+	case osutils.TypeFile:
 		file, err = asRPMFile(content, rpmpack.GenericFile)
 	}
 
@@ -353,8 +358,8 @@ func getModTime(fileInfo os.FileInfo) uint32 {
 	mTime := fileInfo.ModTime().Unix()
 	// Check for overflow in the modification time.
 	if mTime < 0 || mTime > int64(^uint32(0)) {
-		utils.Logger.Fatal("modification time is out of range for uint32",
-			utils.Logger.Args("time", mTime))
+		osutils.Logger.Fatal("modification time is out of range for uint32",
+			osutils.Logger.Args("time", mTime))
 	}
 
 	return uint32(mTime)
@@ -375,18 +380,18 @@ func (r *RPM) getRelease() {
 // handleFileEntry processes a file entry at the given path, checking if it is a backup file,
 // and appending its content to the provided slice based on its type (config, symlink, or regular file).
 func handleFileEntry(path string, backupFiles []string,
-	packageDir string, contents *[]*utils.FileContent) error {
+	packageDir string, contents *[]*osutils.FileContent) error {
 	fileInfo, err := os.Lstat(path)
 	if err != nil {
 		return err // Handle error from os.Lstat
 	}
 
 	if fileInfo.Mode()&os.ModeSymlink != 0 {
-		*contents = append(*contents, createContent(path, packageDir, utils.TypeSymlink))
-	} else if utils.Contains(backupFiles, strings.TrimPrefix(path, packageDir)) {
-		*contents = append(*contents, createContent(path, packageDir, utils.TypeConfigNoReplace))
+		*contents = append(*contents, createContent(path, packageDir, osutils.TypeSymlink))
+	} else if osutils.Contains(backupFiles, strings.TrimPrefix(path, packageDir)) {
+		*contents = append(*contents, createContent(path, packageDir, osutils.TypeConfigNoReplace))
 	} else {
-		*contents = append(*contents, createContent(path, packageDir, utils.TypeFile))
+		*contents = append(*contents, createContent(path, packageDir, osutils.TypeFile))
 	}
 
 	return nil
@@ -425,7 +430,8 @@ func processDepends(depends []string) rpmpack.Relations {
 			depends[index] = name + " " + operator + " " + version
 		}
 
-		if err := relations.Set(depends[index]); err != nil {
+		err := relations.Set(depends[index])
+		if err != nil {
 			return nil
 		}
 	}
@@ -436,8 +442,8 @@ func processDepends(depends []string) rpmpack.Relations {
 // walkPackageDirectory traverses the specified package directory and collects
 // file contents, including handling backup files and empty directories.
 // It returns a slice of FileContent and an error if any occurs during the traversal.
-func walkPackageDirectory(packageDir string, backupFiles []string) ([]*utils.FileContent, error) {
-	var contents []*utils.FileContent
+func walkPackageDirectory(packageDir string, backupFiles []string) ([]*osutils.FileContent, error) {
+	var contents []*osutils.FileContent
 
 	err := filepath.WalkDir(packageDir, func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
@@ -445,8 +451,8 @@ func walkPackageDirectory(packageDir string, backupFiles []string) ([]*utils.Fil
 		}
 
 		if dirEntry.IsDir() {
-			if utils.IsEmptyDir(path, dirEntry) {
-				contents = append(contents, createContent(path, packageDir, utils.TypeDir))
+			if osutils.IsEmptyDir(path, dirEntry) {
+				contents = append(contents, createContent(path, packageDir, osutils.TypeDir))
 			}
 
 			return nil
@@ -454,7 +460,6 @@ func walkPackageDirectory(packageDir string, backupFiles []string) ([]*utils.Fil
 
 		return handleFileEntry(path, backupFiles, packageDir, &contents)
 	})
-
 	if err != nil {
 		return nil, err
 	}

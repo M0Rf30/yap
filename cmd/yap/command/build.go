@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/parser"
 	"github.com/M0Rf30/yap/pkg/project"
 	"github.com/M0Rf30/yap/pkg/source"
-	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -32,22 +32,23 @@ var (
 
 			// Use the default distro if none is provided
 			if distro == "" {
-				osRelease, _ := utils.ParseOSRelease()
+				osRelease, _ := osutils.ParseOSRelease()
 				distro = osRelease.ID
-				utils.Logger.Warn("distro not specified, using detected",
-					utils.Logger.Args("distro", distro))
+				osutils.Logger.Warn("distro not specified, using detected",
+					osutils.Logger.Args("distro", distro))
 			}
 
 			mpc := project.MultipleProject{}
 			err := mpc.MultiProject(distro, release, fullJSONPath)
 			if err != nil {
-				utils.Logger.Fatal("fatal error",
-					utils.Logger.Args("error", err))
+				osutils.Logger.Fatal("fatal error",
+					osutils.Logger.Args("error", err))
 			}
 
-			if err := mpc.BuildAll(); err != nil {
-				utils.Logger.Fatal("fatal error",
-					utils.Logger.Args("error", err))
+			err = mpc.BuildAll()
+			if err != nil {
+				osutils.Logger.Fatal("fatal error",
+					osutils.Logger.Args("error", err))
 			}
 		},
 	}

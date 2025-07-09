@@ -5,9 +5,9 @@ import (
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/dpkg"
 	"github.com/M0Rf30/yap/pkg/makepkg"
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/rpm"
-	"github.com/M0Rf30/yap/pkg/utils"
 )
 
 // Packer is the common interface implemented by all package managers.
@@ -61,8 +61,8 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 			PKGBUILD: pkgBuild,
 		}
 	default:
-		utils.Logger.Fatal("unsupported linux distro",
-			utils.Logger.Args("distro", distro))
+		osutils.Logger.Fatal("unsupported linux distro",
+			osutils.Logger.Args("distro", distro))
 	}
 
 	return nil

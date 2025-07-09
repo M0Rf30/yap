@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/pkg/builder"
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/packer"
 	"github.com/M0Rf30/yap/pkg/parser"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/go-playground/validator/v10"
 	"github.com/otiai10/copy"
 )
@@ -120,26 +120,29 @@ func (mpc *MultipleProject) BuildAll() error {
 			continue
 		}
 
-		utils.Logger.Info("making package", utils.Logger.Args("pkgname", proj.Builder.PKGBUILD.PkgName,
+		osutils.Logger.Info("making package", osutils.Logger.Args("pkgname", proj.Builder.PKGBUILD.PkgName,
 			"pkgver", proj.Builder.PKGBUILD.PkgVer,
 			"pkgrel", proj.Builder.PKGBUILD.PkgRel))
 
-		if err := proj.Builder.Compile(NoBuild); err != nil {
+		err := proj.Builder.Compile(NoBuild)
+		if err != nil {
 			return err
 		}
 
 		if !NoBuild {
-			if err := mpc.createPackage(proj); err != nil {
+			err := mpc.createPackage(proj)
+			if err != nil {
 				return err
 			}
 		}
 
 		if !NoBuild && proj.HasToInstall {
-			utils.Logger.Info("installing package", utils.Logger.Args("pkgname", proj.Builder.PKGBUILD.PkgName,
+			osutils.Logger.Info("installing package", osutils.Logger.Args("pkgname", proj.Builder.PKGBUILD.PkgName,
 				"pkgver", proj.Builder.PKGBUILD.PkgVer,
 				"pkgrel", proj.Builder.PKGBUILD.PkgRel))
 
-			if err := proj.PackageManager.Install(mpc.Output); err != nil {
+			err := proj.PackageManager.Install(mpc.Output)
+			if err != nil {
 				return err
 			}
 		}
@@ -158,13 +161,15 @@ func (mpc *MultipleProject) BuildAll() error {
 func (mpc *MultipleProject) Clean() error {
 	for _, proj := range mpc.Projects {
 		if CleanBuild {
-			if err := os.RemoveAll(proj.Builder.PKGBUILD.SourceDir); err != nil {
+			err := os.RemoveAll(proj.Builder.PKGBUILD.SourceDir)
+			if err != nil {
 				return err
 			}
 		}
 
 		if Zap && !singleProject {
-			if err := os.RemoveAll(proj.Builder.PKGBUILD.StartDir); err != nil {
+			err := os.RemoveAll(proj.Builder.PKGBUILD.StartDir)
+			if err != nil {
 				return err
 			}
 		}
@@ -182,18 +187,20 @@ func (mpc *MultipleProject) Clean() error {
 //
 // It returns an error.
 func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
-	if err := mpc.readProject(path); err != nil {
+	err := mpc.readProject(path)
+	if err != nil {
 		return err
 	}
 
-	err := utils.ExistsMakeDir(mpc.BuildDir)
+	err = osutils.ExistsMakeDir(mpc.BuildDir)
 	if err != nil {
 		return err
 	}
 
 	packageManager = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
 	if !SkipSyncDeps {
-		if err := packageManager.Update(); err != nil {
+		err := packageManager.Update()
+		if err != nil {
 			return err
 		}
 	}
@@ -204,20 +211,23 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	}
 
 	if CleanBuild || Zap {
-		if err := mpc.Clean(); err != nil {
-			utils.Logger.Fatal("fatal error",
-				utils.Logger.Args("error", err))
+		err := mpc.Clean()
+		if err != nil {
+			osutils.Logger.Fatal("fatal error",
+				osutils.Logger.Args("error", err))
 		}
 	}
 
-	if err := mpc.copyProjects(); err != nil {
+	err = mpc.copyProjects()
+	if err != nil {
 		return err
 	}
 
 	if !NoMakeDeps {
 		mpc.getMakeDeps()
 
-		if err := packageManager.Prepare(makeDepends); err != nil {
+		err := packageManager.Prepare(makeDepends)
+		if err != nil {
 			return err
 		}
 	}
@@ -242,8 +252,8 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
 	}
 
 	if fromPkgName != "" && toPkgName != "" && firstIndex > lastIndex {
-		utils.Logger.Fatal("invalid package order: %s should be built before %s",
-			utils.Logger.Args(fromPkgName, toPkgName))
+		osutils.Logger.Fatal("invalid package order: %s should be built before %s",
+			osutils.Logger.Args(fromPkgName, toPkgName))
 	}
 }
 
@@ -272,13 +282,13 @@ func (mpc *MultipleProject) copyProjects() error {
 
 	for _, proj := range mpc.Projects {
 		// Ensure the target directory exists
-		err := utils.ExistsMakeDir(proj.Builder.PKGBUILD.StartDir)
+		err := osutils.ExistsMakeDir(proj.Builder.PKGBUILD.StartDir)
 		if err != nil {
 			return err
 		}
 
 		// Ensure the pkgdir directory exists
-		err = utils.ExistsMakeDir(proj.Builder.PKGBUILD.PackageDir)
+		err = osutils.ExistsMakeDir(proj.Builder.PKGBUILD.PackageDir)
 		if err != nil {
 			return err
 		}
@@ -311,17 +321,20 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 
 	defer os.RemoveAll(proj.Builder.PKGBUILD.PackageDir)
 
-	if err := utils.ExistsMakeDir(mpc.Output); err != nil {
+	err := osutils.ExistsMakeDir(mpc.Output)
+	if err != nil {
 		return err
 	}
 
-	if err := proj.PackageManager.PrepareFakeroot(mpc.Output); err != nil {
+	err = proj.PackageManager.PrepareFakeroot(mpc.Output)
+	if err != nil {
 		return err
 	}
 
-	utils.Logger.Info("building resulting package")
+	osutils.Logger.Info("building resulting package")
 
-	if err := proj.PackageManager.BuildPackage(mpc.Output); err != nil {
+	err = proj.PackageManager.BuildPackage(mpc.Output)
+	if err != nil {
 		return err
 	}
 
@@ -345,8 +358,8 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 	}
 
 	if !matchFound {
-		utils.Logger.Fatal("package not found",
-			utils.Logger.Args("pkgname", pkgName))
+		osutils.Logger.Fatal("package not found",
+			osutils.Logger.Args("pkgname", pkgName))
 	}
 
 	return index
@@ -416,21 +429,21 @@ func (mpc *MultipleProject) readProject(path string) error {
 
 	var projectFilePath string
 
-	if utils.Exists(jsonFilePath) {
+	if osutils.Exists(jsonFilePath) {
 		projectFilePath = jsonFilePath
-		utils.Logger.Info("multi-project file found",
-			utils.Logger.Args("path", projectFilePath))
+		osutils.Logger.Info("multi-project file found",
+			osutils.Logger.Args("path", projectFilePath))
 	}
 
-	if utils.Exists(pkgbuildFilePath) {
+	if osutils.Exists(pkgbuildFilePath) {
 		projectFilePath = pkgbuildFilePath
-		utils.Logger.Info("single-project file found",
-			utils.Logger.Args("path", projectFilePath))
+		osutils.Logger.Info("single-project file found",
+			osutils.Logger.Args("path", projectFilePath))
 
 		mpc.setSingleProject(path)
 	}
 
-	filePath, err := utils.Open(projectFilePath)
+	filePath, err := osutils.Open(projectFilePath)
 	if err != nil || singleProject {
 		return err
 	}

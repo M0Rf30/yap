@@ -1,9 +1,9 @@
 package builder
 
 import (
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/source"
-	"github.com/M0Rf30/yap/pkg/utils"
 )
 
 // Builder maps PKGBUILD to generic functions aimed at artifacts generation.
@@ -14,29 +14,34 @@ type Builder struct {
 // Compile manages all the instructions that lead to a single project artifact.
 // It returns any error if occurred.
 func (builder *Builder) Compile(noBuild bool) error {
-	if err := builder.initDirs(); err != nil {
+	err := builder.initDirs()
+	if err != nil {
 		return err
 	}
 
-	utils.Logger.Info("retrieving sources")
+	osutils.Logger.Info("retrieving sources")
 
-	if err := builder.getSources(); err != nil {
+	err = builder.getSources()
+	if err != nil {
 		return err
 	}
 
 	if !noBuild {
-		if err := processFunction(builder.PKGBUILD.Prepare,
-			"preparing sources"); err != nil {
+		err := processFunction(builder.PKGBUILD.Prepare,
+			"preparing sources")
+		if err != nil {
 			return err
 		}
 
-		if err := processFunction(builder.PKGBUILD.Build,
-			"building"); err != nil {
+		err = processFunction(builder.PKGBUILD.Build,
+			"building")
+		if err != nil {
 			return err
 		}
 
-		if err := processFunction(builder.PKGBUILD.Package,
-			"generating package"); err != nil {
+		err = processFunction(builder.PKGBUILD.Package,
+			"generating package")
+		if err != nil {
 			return err
 		}
 	}
@@ -53,9 +58,9 @@ func processFunction(pkgbuildFunction, message string) error {
 		return nil
 	}
 
-	utils.Logger.Info(message)
+	osutils.Logger.Info(message)
 
-	return utils.RunScript("  set -e\n" + pkgbuildFunction)
+	return osutils.RunScript("  set -e\n" + pkgbuildFunction)
 }
 
 // getSources detects sources provided by a single project source array and
@@ -70,7 +75,8 @@ func (builder *Builder) getSources() error {
 			SourceItemPath: "",
 		}
 
-		if err := sourceObj.Get(); err != nil {
+		err := sourceObj.Get()
+		if err != nil {
 			return err
 		}
 	}
@@ -81,5 +87,5 @@ func (builder *Builder) getSources() error {
 // initDirs creates mandatory fakeroot folders (src, pkg) for a single project.
 // It returns any error if occurred.
 func (builder *Builder) initDirs() error {
-	return utils.ExistsMakeDir(builder.PKGBUILD.SourceDir)
+	return osutils.ExistsMakeDir(builder.PKGBUILD.SourceDir)
 }
