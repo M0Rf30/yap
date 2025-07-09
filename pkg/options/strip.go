@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/M0Rf30/yap/pkg/utils"
+	"github.com/M0Rf30/yap/pkg/osutils"
 )
 
 // Strip walks through the directory to process each file.
 func Strip(packageDir string) error {
-	utils.Logger.Info("stripping binaries")
+	osutils.Logger.Info("stripping binaries")
 
 	return filepath.WalkDir(packageDir, processFile)
 }
@@ -26,24 +26,27 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 		return nil
 	}
 
-	if err := utils.CheckWritable(binary); err != nil {
+	err = osutils.CheckWritable(binary)
+	if err != nil {
 		//nolint:nilerr
 		return nil // Skip if not writable
 	}
 
-	fileType := utils.GetFileType(binary)
+	fileType := osutils.GetFileType(binary)
 	if fileType == "" || fileType == "ET_NONE" {
 		return err
 	}
 
 	stripFlags, stripLTO := determineStripFlags(fileType, binary)
 
-	if err := utils.StripFile(binary, stripFlags); err != nil {
+	err = osutils.StripFile(binary, stripFlags)
+	if err != nil {
 		return err
 	}
 
 	if stripLTO {
-		if err := utils.StripLTO(binary); err != nil {
+		err := osutils.StripLTO(binary)
+		if err != nil {
 			return err
 		}
 	}
@@ -66,7 +69,7 @@ func determineStripFlags(fileType, binary string) (string, bool) {
 	case strings.Contains(fileType, "ET_EXEC"):
 		return stripBinaries, false
 	case strings.Contains(fileType, "ET_REL"):
-		isStatic := utils.IsStaticLibrary(binary)
+		isStatic := osutils.IsStaticLibrary(binary)
 		if isStatic {
 			return stripStatic, true
 		} else if strings.HasSuffix(binary, ".ko") || strings.HasSuffix(binary, ".o") {

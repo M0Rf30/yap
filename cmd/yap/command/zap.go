@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/project"
-	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -33,16 +33,17 @@ var (
 
 			err := mpc.MultiProject(distro, release, fullJSONPath)
 			if err != nil {
-				utils.Logger.Fatal("fatal error",
-					utils.Logger.Args("error", err))
+				osutils.Logger.Fatal("fatal error",
+					osutils.Logger.Args("error", err))
 			}
 
-			if err := mpc.Clean(); err != nil {
-				utils.Logger.Fatal("fatal error",
-					utils.Logger.Args("error", err))
+			err = mpc.Clean()
+			if err != nil {
+				osutils.Logger.Fatal("fatal error",
+					osutils.Logger.Args("error", err))
 			}
 
-			utils.Logger.Info("zap done", utils.Logger.Args("distro", distro, "release", release))
+			osutils.Logger.Info("zap done", osutils.Logger.Args("distro", distro, "release", release))
 		},
 	}
 )

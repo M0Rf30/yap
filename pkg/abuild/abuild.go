@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/utils"
 )
 
 // Apk represents the APK package manager.
@@ -34,25 +34,29 @@ func (a *Apk) PrepareFakeroot(_ string) error {
 	a.PKGBUILD.ArchComputed = APKArchs[a.PKGBUILD.ArchComputed]
 	a.apkDir = filepath.Join(a.PKGBUILD.StartDir, "apk")
 
-	if err := os.RemoveAll(a.apkDir); err != nil {
+	err := os.RemoveAll(a.apkDir)
+	if err != nil {
 		return err
 	}
 
-	if err := a.makePackerDir(); err != nil {
+	err = a.makePackerDir()
+	if err != nil {
 		return err
 	}
 
 	tmpl := a.PKGBUILD.RenderSpec(specFile)
 
-	if err := a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir,
-		"APKBUILD"), tmpl); err != nil {
+	err = a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir,
+		"APKBUILD"), tmpl)
+	if err != nil {
 		return err
 	}
 
 	tmpl = a.PKGBUILD.RenderSpec(postInstall)
 
-	if err := a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir,
-		a.PKGBUILD.PkgName+".install"), tmpl); err != nil {
+	err = a.PKGBUILD.CreateSpec(filepath.Join(a.apkDir,
+		a.PKGBUILD.PkgName+".install"), tmpl)
+	if err != nil {
 		return err
 	}
 
@@ -75,7 +79,8 @@ func (a *Apk) Install(artifactsPath string) error {
 	pkgFilePath := filepath.Join(artifactsPath, a.PKGBUILD.PkgName, a.PKGBUILD.ArchComputed, pkgName)
 	installArgs = append(installArgs, pkgFilePath)
 
-	if err := utils.Exec(true, "", "apk", installArgs...); err != nil {
+	err := osutils.Exec(true, "", "apk", installArgs...)
+	if err != nil {
 		return err
 	}
 
@@ -97,12 +102,12 @@ func (a *Apk) PrepareEnvironment(golang bool) error {
 	installArgs = append(installArgs, buildEnvironmentDeps...)
 
 	if golang {
-		utils.CheckGO()
+		osutils.CheckGO()
 
 		installArgs = append(installArgs, "go")
 	}
 
-	return utils.Exec(true, "", "apk", installArgs...)
+	return osutils.Exec(true, "", "apk", installArgs...)
 }
 
 // Update updates the APK package manager's package database.
@@ -114,19 +119,21 @@ func (a *Apk) Update() error {
 // apkBuild compiles the APK package using 'abuild-keygen' and 'abuild'.
 // It returns an error if any compilation step fails.
 func (a *Apk) apkBuild(artifactsPath string) error {
-	if err := utils.Exec(true, a.apkDir,
+	err := osutils.Exec(true, a.apkDir,
 		"abuild-keygen",
 		"-n",
-		"-a"); err != nil {
+		"-a")
+	if err != nil {
 		return err
 	}
 
-	if err := utils.Exec(true, a.apkDir,
+	err = osutils.Exec(true, a.apkDir,
 		"abuild",
 		"-F",
 		"-K",
 		"-P",
-		artifactsPath); err != nil {
+		artifactsPath)
+	if err != nil {
 		return err
 	}
 
@@ -138,13 +145,15 @@ func (a *Apk) apkBuild(artifactsPath string) error {
 // It does not take any parameters.
 // It returns an error if any of the directory operations fail.
 func (a *Apk) makePackerDir() error {
-	if err := utils.ExistsMakeDir(a.apkDir); err != nil {
+	err := osutils.ExistsMakeDir(a.apkDir)
+	if err != nil {
 		return err
 	}
 
-	if err := utils.ExistsMakeDir(a.apkDir +
+	err = osutils.ExistsMakeDir(a.apkDir +
 		"/pkg/" +
-		a.PKGBUILD.PkgName); err != nil {
+		a.PKGBUILD.PkgName)
+	if err != nil {
 		return err
 	}
 

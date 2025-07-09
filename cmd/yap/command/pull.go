@@ -3,7 +3,7 @@ package command
 import (
 	"strings"
 
-	"github.com/M0Rf30/yap/pkg/utils"
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/spf13/cobra"
 )
 
@@ -16,12 +16,13 @@ var pullCmd = &cobra.Command{
 		split := strings.Split(args[0], "-")
 
 		if len(split) == 1 && split[0] != "alpine" && split[0] != "arch" {
-			utils.Logger.Fatal("except for alpine and arch, specify also the codename (i. e. rocky-9, ubuntu-jammy)")
+			osutils.Logger.Fatal("except for alpine and arch, specify also the codename (i. e. rocky-9, ubuntu-jammy)")
 		}
 
-		if err := utils.PullContainers(args[0]); err != nil {
-			utils.Logger.Fatal("failed to pull image",
-				utils.Logger.Args("error", err))
+		err := osutils.PullContainers(args[0])
+		if err != nil {
+			osutils.Logger.Fatal("failed to pull image",
+				osutils.Logger.Args("error", err))
 		}
 	},
 }

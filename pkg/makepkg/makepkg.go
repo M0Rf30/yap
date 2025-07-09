@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/pkg/constants"
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/utils"
 	"github.com/klauspost/pgzip"
 )
 
@@ -51,11 +51,12 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-	if err := utils.CreateTarZst(m.PKGBUILD.PackageDir, pkgFilePath, false); err != nil {
+	err := osutils.CreateTarZst(m.PKGBUILD.PackageDir, pkgFilePath, false)
+	if err != nil {
 		return err
 	}
 
-	utils.Logger.Info("", utils.Logger.Args("artifact", pkgFilePath))
+	osutils.Logger.Info("", osutils.Logger.Args("artifact", pkgFilePath))
 
 	return nil
 }
@@ -68,7 +69,7 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 // if any stem fails.
 func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 	m.pacmanDir = m.PKGBUILD.StartDir
-	m.PKGBUILD.InstalledSize, _ = utils.GetDirSize(m.PKGBUILD.PackageDir)
+	m.PKGBUILD.InstalledSize, _ = osutils.GetDirSize(m.PKGBUILD.PackageDir)
 	m.PKGBUILD.BuildDate = time.Now().Unix()
 	m.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 	m.PKGBUILD.PkgType = "pkg" // can be pkg, split, debug, src
@@ -86,7 +87,7 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 		}
 	}
 
-	checksumBytes, err := utils.CalculateSHA256(pkgBuildFile)
+	checksumBytes, err := osutils.CalculateSHA256(pkgBuildFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -109,7 +110,7 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 		return err
 	}
 
-	var mtreeEntries []utils.FileContent
+	var mtreeEntries []osutils.FileContent
 
 	// Walk through the package directory and retrieve the contents.
 	err = walkPackageDirectory(m.PKGBUILD.PackageDir, &mtreeEntries)
@@ -122,15 +123,16 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 		log.Fatal(err)
 	}
 
-	if err := createMTREEGzip(mtreeFile,
-		filepath.Join(m.PKGBUILD.PackageDir, ".MTREE")); err != nil {
+	err = createMTREEGzip(mtreeFile,
+		filepath.Join(m.PKGBUILD.PackageDir, ".MTREE"))
+	if err != nil {
 		return err
 	}
 
 	tmpl = m.PKGBUILD.RenderSpec(postInstall)
+
 	err = m.PKGBUILD.CreateSpec(filepath.Join(m.pacmanDir,
 		m.PKGBUILD.PkgName+".install"), tmpl)
-
 	if err != nil {
 		return err
 	}
@@ -153,11 +155,12 @@ func (m *Pkg) Install(artifactsPath string) error {
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-	if err := utils.Exec(false, "",
+	err := osutils.Exec(false, "",
 		"pacman",
 		"-U",
 		"--noconfirm",
-		pkgFilePath); err != nil {
+		pkgFilePath)
+	if err != nil {
 		return err
 	}
 
@@ -180,12 +183,12 @@ func (m *Pkg) PrepareEnvironment(golang bool) error {
 	installArgs = append(installArgs, buildEnvironmentDeps...)
 
 	if golang {
-		utils.CheckGO()
+		osutils.CheckGO()
 
 		installArgs = append(installArgs, "go")
 	}
 
-	return utils.Exec(false, "", "pacman", installArgs...)
+	return osutils.Exec(false, "", "pacman", installArgs...)
 }
 
 // Update updates the Makepkg package manager.
@@ -205,14 +208,14 @@ func createContent(
 	contentType string,
 	modTime, size int64,
 	fileInfoMode uint32,
-	sha256 []byte) utils.FileContent {
-	fileInfo := &utils.FileInfo{
+	sha256 []byte) osutils.FileContent {
+	fileInfo := &osutils.FileInfo{
 		Mode:    fileInfoMode,
 		Size:    size,
 		ModTime: modTime,
 	}
 
-	return utils.FileContent{
+	return osutils.FileContent{
 		Destination: strings.TrimPrefix(path, packageDir),
 		FileInfo:    fileInfo,
 		Source:      linkSource,
@@ -223,7 +226,7 @@ func createContent(
 
 // handleFileEntry processes a file entry at the given path, checking if it is a backup file,
 // and appending its content to the provided slice based on its type (config, symlink, or regular file).
-func handleFileEntry(path, packageDir string, contents *[]utils.FileContent) error {
+func handleFileEntry(path, packageDir string, contents *[]osutils.FileContent) error {
 	fileInfo, err := os.Lstat(path)
 	if err != nil {
 		return err
@@ -240,13 +243,13 @@ func handleFileEntry(path, packageDir string, contents *[]utils.FileContent) err
 				readlink,
 				path,
 				packageDir,
-				utils.TypeSymlink,
+				osutils.TypeSymlink,
 				fileInfo.ModTime().Unix(),
 				fileInfo.Size(),
 				uint32(fileInfo.Mode().Perm()),
 				nil))
 	} else {
-		sha256, err := utils.CalculateSHA256(path)
+		sha256, err := osutils.CalculateSHA256(path)
 		if err != nil {
 			return err
 		}
@@ -256,7 +259,7 @@ func handleFileEntry(path, packageDir string, contents *[]utils.FileContent) err
 				"",
 				path,
 				packageDir,
-				utils.TypeFile,
+				osutils.TypeFile,
 				fileInfo.ModTime().Unix(),
 				fileInfo.Size(),
 				uint32(fileInfo.Mode().Perm()),
@@ -269,7 +272,7 @@ func handleFileEntry(path, packageDir string, contents *[]utils.FileContent) err
 // walkPackageDirectory traverses the specified package directory and collects
 // file contents, including handling backup files and empty directories.
 // It returns a slice of FileContent and an error if any occurs during the traversal.
-func walkPackageDirectory(packageDir string, entries *[]utils.FileContent) error {
+func walkPackageDirectory(packageDir string, entries *[]osutils.FileContent) error {
 	err := filepath.WalkDir(packageDir, func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -290,7 +293,7 @@ func walkPackageDirectory(packageDir string, entries *[]utils.FileContent) error
 					"",
 					path,
 					packageDir,
-					utils.TypeDir,
+					osutils.TypeDir,
 					fileInfo.ModTime().Unix(),
 					fileInfo.Size(),
 					uint32(fileInfo.Mode().Perm()),
@@ -301,7 +304,6 @@ func walkPackageDirectory(packageDir string, entries *[]utils.FileContent) error
 
 		return handleFileEntry(path, packageDir, entries)
 	})
-
 	if err != nil {
 		return err
 	}
@@ -309,7 +311,7 @@ func walkPackageDirectory(packageDir string, entries *[]utils.FileContent) error
 	return nil
 }
 
-func renderMtree(entries []utils.FileContent) (string, error) {
+func renderMtree(entries []osutils.FileContent) (string, error) {
 	tmpl, err := template.New("mtree").Parse(dotMtree)
 	if err != nil {
 		return "", err

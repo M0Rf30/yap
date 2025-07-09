@@ -1,6 +1,7 @@
-package utils
+package osutils
 
 import (
+	"slices"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -21,7 +22,8 @@ func StringifyArray(node *syntax.Assign) []string {
 	}
 
 	for index := range node.Array.Elems {
-		if err := printer.Print(out, node.Array.Elems[index].Value); err != nil {
+		err := printer.Print(out, node.Array.Elems[index].Value)
+		if err != nil {
 			Logger.Error("unable to parse array element",
 				Logger.Args("name", out.String()))
 		}
@@ -46,7 +48,8 @@ func StringifyAssign(node *syntax.Assign) string {
 			Logger.Args("variable", node.Name.Value))
 	}
 
-	if err := printer.Print(out, node.Value); err != nil {
+	err := printer.Print(out, node.Value)
+	if err != nil {
 		return ""
 	}
 
@@ -61,7 +64,6 @@ func StringifyFuncDecl(node *syntax.FuncDecl) string {
 	printer := syntax.NewPrinter(syntax.Indent(2))
 
 	err := printer.Print(out, node.Body)
-
 	if err != nil {
 		Logger.Error("unable to parse function",
 			Logger.Args("name", out.String()))
@@ -79,11 +81,5 @@ func StringifyFuncDecl(node *syntax.FuncDecl) string {
 
 // Contains checks if a string is present in an array of strings.
 func Contains(array []string, str string) bool {
-	for _, item := range array {
-		if item == str {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(array, str)
 }

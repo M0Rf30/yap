@@ -1,7 +1,7 @@
 package command
 
 import (
-	"github.com/M0Rf30/yap/pkg/utils"
+	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/spf13/cobra"
 )
 
@@ -46,22 +46,22 @@ $ yap completion zsh > "${fpath[1]}/_yap"
 	Run: func(cmd *cobra.Command, args []string) {
 		switch args[0] {
 		case "bash":
-			err := cmd.Root().GenBashCompletion(utils.MultiPrinter.Writer)
+			err := cmd.Root().GenBashCompletion(osutils.MultiPrinter.Writer)
 			if err != nil {
-				utils.Logger.Fatal("failed to generate bash completion",
-					utils.Logger.Args("error", err))
+				osutils.Logger.Fatal("failed to generate bash completion",
+					osutils.Logger.Args("error", err))
 			}
 		case "fish":
-			err := cmd.Root().GenFishCompletion(utils.MultiPrinter.Writer, true)
+			err := cmd.Root().GenFishCompletion(osutils.MultiPrinter.Writer, true)
 			if err != nil {
-				utils.Logger.Fatal("failed to generate fish completion",
-					utils.Logger.Args("error", err))
+				osutils.Logger.Fatal("failed to generate fish completion",
+					osutils.Logger.Args("error", err))
 			}
 		case "zsh":
-			err := cmd.Root().GenZshCompletion(utils.MultiPrinter.Writer)
+			err := cmd.Root().GenZshCompletion(osutils.MultiPrinter.Writer)
 			if err != nil {
-				utils.Logger.Fatal("failed to generate zsh completion",
-					utils.Logger.Args("error", err))
+				osutils.Logger.Fatal("failed to generate zsh completion",
+					osutils.Logger.Args("error", err))
 			}
 		}
 	},

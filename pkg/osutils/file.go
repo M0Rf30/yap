@@ -1,4 +1,4 @@
-package utils
+package osutils
 
 import (
 	"crypto/sha256"
@@ -66,7 +66,9 @@ func CalculateSHA256(path string) ([]byte, error) {
 	defer file.Close()
 
 	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
+
+	_, err = io.Copy(hash, file)
+	if err != nil {
 		return nil, err
 	}
 
@@ -114,7 +116,6 @@ func Create(path string) (*os.File, error) {
 	cleanFilePath := filepath.Clean(path)
 
 	file, err := os.Create(cleanFilePath)
-
 	if err != nil {
 		Logger.Error("failed to create path", Logger.Args("path", path))
 	}
@@ -161,9 +162,10 @@ func Exists(path string) bool {
 // path: the path to the directory.
 // error: returns an error if the directory cannot be created or accessed.
 func ExistsMakeDir(path string) error {
-	// #nosec
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		err := os.MkdirAll(path, os.ModePerm) // #nosec
+		if err != nil {
 			return errors.Errorf("failed to create directory %s", path)
 		}
 	} else if err != nil {
@@ -277,8 +279,8 @@ func IsStaticLibrary(path string) bool {
 
 	// Read the first few bytes to check the format
 	header := make([]byte, 8)
-	_, err = file.Read(header)
 
+	_, err = file.Read(header)
 	if err != nil {
 		return false
 	}
@@ -325,7 +327,8 @@ func StripLTO(path string, args ...string) error {
 func strip(path string, args ...string) error {
 	args = append(args, path)
 
-	if err := Exec(false, "", "strip", args...); err != nil {
+	err := Exec(false, "", "strip", args...)
+	if err != nil {
 		return err
 	}
 
