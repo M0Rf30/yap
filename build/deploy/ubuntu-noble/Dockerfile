@@ -13,7 +13,7 @@ RUN \
     curl \
     tar \
     upx-ucl; \
-    curl -sL https://go.dev/dl/go1.24.3.linux-amd64.tar.gz --output go.tar.gz; \
+    curl -sL https://go.dev/dl/go1.24.5.linux-amd64.tar.gz --output go.tar.gz; \
     echo "3333f6ea53afa971e9078895eaa4ac7204a8c6b5c68c10e6bc9a33e8e391bdd8 go.tar.gz" | sha256sum -c - ; \
     tar -C /usr/lib -xf go.tar.gz; \
     ln -sf /usr/lib/go/bin/go /usr/bin/go; \
