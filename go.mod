@@ -8,7 +8,7 @@ require (
 	github.com/github/go-spdx/v2 v2.3.3
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/go-playground/validator/v10 v10.27.0
-	github.com/google/rpmpack v0.7.0
+	github.com/google/rpmpack v0.7.1
 	github.com/klauspost/pgzip v1.2.6
 	github.com/mholt/archives v0.1.3
 	github.com/otiai10/copy v1.14.1
