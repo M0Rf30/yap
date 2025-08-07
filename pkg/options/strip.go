@@ -1,3 +1,5 @@
+// Package options provides build and packaging option utilities,
+// including binary stripping functionality.
 package options
 
 import (
@@ -28,25 +30,33 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	}
 
 	// Always try to ensure the file is writable before stripping
-	osutils.Logger.Debug("ensuring file is writable before stripping", osutils.Logger.Args("file", binary))
+	osutils.Logger.Debug(
+		"ensuring file is writable before stripping",
+		osutils.Logger.Args("file", binary))
 
 	info, err := os.Stat(binary)
 	if err != nil {
-		osutils.Logger.Warn("failed to get file info", osutils.Logger.Args("file", binary, "error", err))
+		osutils.Logger.Warn(
+			"failed to get file info",
+			osutils.Logger.Args("file", binary, "error", err))
 
 		return nil
 	}
 
 	chmodErr := osutils.Chmod(binary, info.Mode().Perm()|0o200)
 	if chmodErr != nil {
-		osutils.Logger.Warn("failed to make file writable", osutils.Logger.Args("file", binary, "error", chmodErr))
+		osutils.Logger.Warn(
+			"failed to make file writable",
+			osutils.Logger.Args("file", binary, "error", chmodErr))
 
 		return nil // Skip if we can't change permissions
 	}
 
 	err = osutils.CheckWritable(binary)
 	if err != nil {
-		osutils.Logger.Warn("file still not writable after chmod", osutils.Logger.Args("file", binary, "error", err))
+		osutils.Logger.Warn(
+			"file still not writable after chmod",
+			osutils.Logger.Args("file", binary, "error", err))
 
 		return nil // Skip if not writable
 	}
@@ -58,11 +68,15 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 
 	stripFlags, stripLTO := determineStripFlags(fileType, binary)
 
-	osutils.Logger.Debug("about to strip binary", osutils.Logger.Args("file", binary, "flags", stripFlags))
+	osutils.Logger.Debug(
+		"about to strip binary",
+		osutils.Logger.Args("file", binary, "flags", stripFlags))
 
 	err = osutils.StripFile(binary, stripFlags)
 	if err != nil {
-		osutils.Logger.Error("strip command failed", osutils.Logger.Args("file", binary, "flags", stripFlags, "error", err))
+		osutils.Logger.Error(
+			"strip command failed",
+			osutils.Logger.Args("file", binary, "flags", stripFlags, "error", err))
 
 		return err
 	}

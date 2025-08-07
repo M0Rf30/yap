@@ -284,7 +284,8 @@ func (pdw *PackageDecoratedWriter) writeLine(line []byte) error {
 	var decoratedLine string
 	if IsColorDisabled() {
 		// Plain text format without colors
-		decoratedLine = fmt.Sprintf("%s %s  [%s] %s\n", timestamp, logLevelInfo, pdw.packageName, lineContent)
+		decoratedLine = fmt.Sprintf("%s %s  [%s] %s\n", timestamp, logLevelInfo,
+			pdw.packageName, lineContent)
 	} else {
 		// Colored format
 		decoratedLine = pterm.Sprintf("%s %s  [%s] %s\n",
@@ -348,7 +349,8 @@ func DownloadWithResume(destination, uri string, logger *ComponentLogger, maxRet
 	return errors.Errorf("download failed after %d attempts: %v", maxRetries+1, lastErr)
 }
 
-// DownloadWithResumeContext downloads a file with context information for enhanced progress reporting.
+// DownloadWithResumeContext downloads a file with context information for enhanced
+// progress reporting.
 //
 // Parameters:
 //   - destination: local file path where the downloaded content will be saved.
@@ -386,7 +388,9 @@ func DownloadWithResumeContext(
 			time.Sleep(backoff)
 		}
 
-		err := downloadWithResumeInternal(context.Background(), destination, uri, logger, packageName, sourceName)
+		err := downloadWithResumeInternal(
+			context.Background(),
+			destination, uri, logger, packageName, sourceName)
 		if err == nil {
 			return nil
 		}
@@ -404,7 +408,8 @@ func DownloadWithResumeContext(
 
 // downloadWithResumeInternal performs the actual download with resume capability.
 func downloadWithResumeInternal(
-	ctx context.Context, destination, uri string, logger *ComponentLogger, packageName, sourceName string,
+	ctx context.Context, destination, uri string, logger *ComponentLogger,
+	packageName, sourceName string,
 ) error {
 	client, req, err := prepareDownloadRequest(ctx, destination, uri, logger)
 	if err != nil {
@@ -448,7 +453,8 @@ func prepareDownloadRequest(
 }
 
 // configureResumeIfPossible checks for partial files and enables resume.
-func configureResumeIfPossible(req *grab.Request, destination, uri string, logger *ComponentLogger) {
+func configureResumeIfPossible(req *grab.Request, destination, uri string,
+	logger *ComponentLogger) {
 	info, err := os.Stat(destination)
 	if err == nil && info.Size() > 0 {
 		req.NoResume = false // Enable resume
@@ -522,7 +528,8 @@ func determineSourceName(sourceName, uri string) string {
 
 // monitorDownload handles the download monitoring loop.
 func monitorDownload(
-	resp *grab.Response, progressBar *EnhancedProgressBar, activeLogger *ComponentLogger, destination string,
+	resp *grab.Response, progressBar *EnhancedProgressBar,
+	activeLogger *ComponentLogger, destination string,
 ) error {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -766,17 +773,18 @@ func (gpw *GitProgressWriter) Write(p []byte) (int, error) {
 
 		var isCarriageReturn bool
 
-		if crIndex != -1 && (nlIndex == -1 || crIndex < nlIndex) {
+		switch {
+		case crIndex != -1 && (nlIndex == -1 || crIndex < nlIndex):
 			// Found \r before \n (or no \n)
 			lineEnd = crIndex
 			isCarriageReturn = true
-		} else if nlIndex != -1 {
+		case nlIndex != -1:
 			// Found \n
 			lineEnd = nlIndex
 			isCarriageReturn = false
-		} else {
+		default:
 			// No complete line found
-			break
+			return originalLen, nil
 		}
 
 		// Extract line
@@ -789,13 +797,11 @@ func (gpw *GitProgressWriter) Write(p []byte) (int, error) {
 			return originalLen, err
 		}
 	}
-
-	return originalLen, nil
 }
 
 // handleLine processes a single line from git progress output.
 func (gpw *GitProgressWriter) handleLine(line []byte, isCarriageReturn bool) error {
-	lineContent := strings.TrimSpace(string(line))
+	lineContent := string(line)
 
 	// Skip empty lines
 	if lineContent == "" {
@@ -821,7 +827,8 @@ func (gpw *GitProgressWriter) writeDecoratedLine(lineContent string) error {
 	var decoratedLine string
 	if IsColorDisabled() {
 		// Plain text format without colors
-		decoratedLine = fmt.Sprintf("%s %s  [%s] %s\n", timestamp, logLevelInfo, gpw.packageName, lineContent)
+		decoratedLine = fmt.Sprintf("%s %s  [%s] %s\n", timestamp, logLevelInfo,
+			gpw.packageName, lineContent)
 	} else {
 		// Colored format
 		decoratedLine = pterm.Sprintf("%s %s  %s %s\n",
@@ -939,7 +946,8 @@ type EnhancedProgressBar struct {
 }
 
 // NewEnhancedProgressBar creates a new enhanced progress bar.
-func NewEnhancedProgressBar(writer io.Writer, packageName, title string, total int64) *EnhancedProgressBar {
+func NewEnhancedProgressBar(writer io.Writer, packageName, title string,
+	total int64) *EnhancedProgressBar {
 	return &EnhancedProgressBar{
 		writer:      writer,
 		packageName: packageName,
@@ -1409,11 +1417,12 @@ func GOSetup() error {
 func PullContainers(distro string) error {
 	var containerApp string
 
-	if Exists("/usr/bin/podman") {
+	switch {
+	case Exists("/usr/bin/podman"):
 		containerApp = "/usr/bin/podman"
-	} else if Exists("/usr/bin/docker") {
+	case Exists("/usr/bin/docker"):
 		containerApp = "/usr/bin/docker"
-	} else {
+	default:
 		return errors.Errorf("no container application found")
 	}
 
@@ -1441,7 +1450,8 @@ func RunScript(cmds string) error {
 // RunScriptWithPackage runs a shell script with package-specific decorations.
 //
 // It takes a string parameter `cmds` which represents the shell script to be executed
-// and an optional `packageName` to decorate output lines with timestamps and package identification.
+// and an optional `packageName` to decorate output lines with timestamps and package
+// identification.
 // The function returns an error if there was an issue running the script.
 func RunScriptWithPackage(cmds, packageName string) error {
 	start := time.Now()
@@ -1548,55 +1558,58 @@ func Unarchive(source, destination string) error {
 		return nil
 	}
 
-	return extractor.Extract(ctx, archiveReader, func(_ context.Context, archiveFile archives.FileInfo) error {
-		fileName := archiveFile.NameInArchive
-		newPath := filepath.Join(destination, fileName)
+	return extractor.Extract(
+		ctx,
+		archiveReader,
+		func(_ context.Context, archiveFile archives.FileInfo) error {
+			fileName := archiveFile.NameInArchive
+			newPath := filepath.Join(destination, fileName)
 
-		if archiveFile.IsDir() {
-			dirMap[newPath] = true
+			if archiveFile.IsDir() {
+				dirMap[newPath] = true
 
-			return os.MkdirAll(newPath, 0o755) // #nosec
-		}
-
-		fileDir := filepath.Dir(newPath)
-		_, seenDir := dirMap[fileDir]
-
-		if !seenDir {
-			dirMap[fileDir] = true
-
-			_ = os.MkdirAll(fileDir, 0o755) // #nosec
-		}
-
-		cleanNewPath := filepath.Clean(newPath)
-
-		newFile, err := os.OpenFile(cleanNewPath,
-			os.O_CREATE|os.O_WRONLY,
-			archiveFile.Mode())
-		if err != nil {
-			return err
-		}
-
-		defer func() {
-			err := newFile.Close()
-			if err != nil {
-				Logger.Warn("failed to close new file", Logger.Args("path", cleanNewPath, "error", err))
+				return os.MkdirAll(newPath, 0o755) // #nosec
 			}
-		}()
 
-		archiveFileTemp, err := archiveFile.Open()
-		if err != nil {
-			return err
-		}
+			fileDir := filepath.Dir(newPath)
+			_, seenDir := dirMap[fileDir]
 
-		defer func() {
-			err := archiveFileTemp.Close()
-			if err != nil {
-				Logger.Warn("failed to close archive file", Logger.Args("error", err))
+			if !seenDir {
+				dirMap[fileDir] = true
+
+				_ = os.MkdirAll(fileDir, 0o755) // #nosec
 			}
-		}()
 
-		_, err = io.Copy(newFile, archiveFileTemp)
+			cleanNewPath := filepath.Clean(newPath)
 
-		return err
-	})
+			newFile, err := os.OpenFile(cleanNewPath,
+				os.O_CREATE|os.O_WRONLY,
+				archiveFile.Mode())
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				err := newFile.Close()
+				if err != nil {
+					Logger.Warn("failed to close new file", Logger.Args("path", cleanNewPath, "error", err))
+				}
+			}()
+
+			archiveFileTemp, err := archiveFile.Open()
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				err := archiveFileTemp.Close()
+				if err != nil {
+					Logger.Warn("failed to close archive file", Logger.Args("error", err))
+				}
+			}()
+
+			_, err = io.Copy(newFile, archiveFileTemp)
+
+			return err
+		})
 }

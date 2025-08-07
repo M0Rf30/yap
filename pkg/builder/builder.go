@@ -1,3 +1,4 @@
+// Package builder provides build orchestration functionality for YAP packages.
 package builder
 
 import (
