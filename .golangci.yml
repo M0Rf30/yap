@@ -35,6 +35,7 @@ linters:
     - dupl
     - nestif
     - lll
+    - wsl_v5
 
   disable:
     - depguard
@@ -46,7 +47,6 @@ linters:
     - gomoddirectives
     - mnd
     - wrapcheck
-    - wsl_v5
 
   settings:
     cyclop:

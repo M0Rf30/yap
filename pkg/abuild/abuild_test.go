@@ -304,8 +304,6 @@ func TestApk_Prepare(t *testing.T) {
 }
 
 func TestApk_PrepareEnvironment(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name   string
 		golang bool
@@ -322,8 +320,6 @@ func TestApk_PrepareEnvironment(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
 			testApk := &pkgbuild.PKGBUILD{
 				PkgName: "test-env-apk",
 				PkgVer:  "1.0.0",
