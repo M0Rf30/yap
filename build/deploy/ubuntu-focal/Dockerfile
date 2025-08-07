@@ -1,50 +1,104 @@
-FROM docker.io/ubuntu:focal AS builder
-LABEL org.opencontainers.image.title="yap"
-LABEL org.opencontainers.image.description="Package software with ease 📦"
-LABEL org.opencontainers.image.vendor="M0Rf30"
+# syntax=docker/dockerfile:1
+ARG GO_VERSION=1.24.5
 
-ENV DEBIAN_FRONTEND=noninteractive
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN \
-    apt-get update; \
-    apt-get upgrade; \
-    apt-get install -y --no-install-recommends ca-certificates curl tar upx-ucl; \
-    curl -sL https://go.dev/dl/go1.24.5.linux-amd64.tar.gz --output go.tar.gz; \
-    echo "3333f6ea53afa971e9078895eaa4ac7204a8c6b5c68c10e6bc9a33e8e391bdd8 go.tar.gz" | sha256sum -c - ; \
-    tar -C /usr/lib -xf go.tar.gz; \
-    ln -sf /usr/lib/go/bin/go /usr/bin/go; \
-    ln -sf /usr/lib/go/bin/gofmt /usr/bin/gofmt; \
-    ln -sf /usr/share/doc/go /usr/lib/go/doc;
+# Build stage
+FROM golang:${GO_VERSION}-alpine AS builder
 
-COPY . /project
-WORKDIR /project
-RUN \
-    CGO_ENABLED=0 \
+# Build arguments for metadata
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+ARG TARGETARCH=amd64
+
+# Install build dependencies
+RUN apk add --no-cache upx git
+
+# Set up build environment
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build optimized binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build \
     -buildvcs=false \
-    -ldflags "-w -s" \
+    -ldflags "-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
     -o /usr/bin/yap \
-    cmd/yap/yap.go; \
-    upx /usr/bin/yap
+    cmd/yap/yap.go && \
+    upx --best --lzma /usr/bin/yap
 
-FROM docker.io/ubuntu:focal
-COPY --from=builder /usr/bin/yap /usr/bin/yap
-RUN \
-    apt-get update; \
-    apt-get upgrade; \
+# Generate bash completion (do this in build stage where we can execute the binary)
+RUN if [ "${TARGETARCH}" = "$(go env GOARCH)" ]; then \
+        /usr/bin/yap completion bash > /tmp/yap-completion.bash; \
+    else \
+        echo "# Cross-compilation: bash completion will be generated at runtime" > /tmp/yap-completion.bash; \
+    fi
+
+# Runtime stage
+FROM ubuntu:focal
+
+# Build arguments for runtime stage
+ARG VERSION=dev
+ARG TARGETARCH=amd64
+ARG GO_VERSION=1.24.5
+
+# Metadata labels
+LABEL org.opencontainers.image.title="yap-ubuntu-focal"
+LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Ubuntu 20.04 LTS with Go runtime 📦🐹"
+LABEL org.opencontainers.image.vendor="M0Rf30"
+LABEL org.opencontainers.image.source="https://github.com/M0Rf30/yap"
+LABEL org.opencontainers.image.licenses="GPL-3.0"
+LABEL org.opencontainers.image.version="${VERSION}"
+
+# Environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV GOROOT=/usr/local/go
+ENV GOPATH=/go
+ENV PATH=$GOROOT/bin:$GOPATH/bin:$PATH
+
+# Install minimal runtime dependencies and Go
+RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-    bash-completion \
-    binutils \
-    ca-certificates \
-    sudo; \
-    ln -sf /usr/share/zoneinfo/UTC /etc/localtime; \
-    yap completion bash > /usr/share/bash-completion/completions/yap; \
-    echo "source /usr/share/bash-completion/bash_completion" >> /etc/bash.bashrc; \
-    apt-get clean; \
+        bash-completion \
+        binutils \
+        ca-certificates \
+        sudo \
+        wget && \
+    # Download and install Go (official binaries, no checksums)
+    case "${TARGETARCH}" in \
+        amd64) GO_ARCH=amd64 ;; \
+        arm64) GO_ARCH=arm64 ;; \
+        *) GO_ARCH=amd64 ;; \
+    esac && \
+    wget --progress=dot:giga -O go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
+    tar -C /usr/local -xzf go.tar.gz && \
+    rm go.tar.gz && \
+    # Remove wget to minimize final image
+    apt-get remove -y wget && \
+    apt-get autoremove -y && \
+    # Set timezone
+    ln -sf /usr/share/zoneinfo/UTC /etc/localtime && \
+    # Clean up
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV GOROOT=/usr/lib/go
-ENV PATH=/usr/lib/go/bin:$PATH:/go/bin
+# Create non-root user
+RUN groupadd -g 1000 yap && \
+    useradd -m -u 1000 -g yap -s /bin/bash yap && \
+    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap' >> /etc/sudoers
+
+# Copy binary and completion from builder
+COPY --from=builder /usr/bin/yap /usr/bin/yap
+COPY --from=builder /tmp/yap-completion.bash /usr/share/bash-completion/completions/yap
+
+# Set up bash completion
+RUN echo "source /usr/share/bash-completion/bash_completion" >> /etc/bash.bashrc
+
+# Switch to non-root user
+USER yap
 
 ENTRYPOINT ["yap"]

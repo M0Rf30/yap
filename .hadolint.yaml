@@ -1,9 +1,53 @@
-# Following source doesn't work in most setups
+# Hadolint configuration for YAP Docker images
+# https://github.com/hadolint/hadolint/wiki/DL4006
+
+# Rules to ignore
 ignored:
+  # DL3007: Using latest is OK for well-maintained base images in our use case
   - DL3007
+  # DL3008: Pin package versions is not always feasible for our build environment
   - DL3008
+  # DL3018: Pin package versions for apk is handled by package managers
   - DL3018
+  # DL3033: Yum clean all is handled appropriately in our builds
   - DL3033
+  # DL3036: Yum commands are properly structured in our Dockerfiles
   - DL3036
+  # DL3037: Zypper commands are properly handled
   - DL3037
+  # DL3041: Run command should end with && is followed in our builds
   - DL3041
+
+# Rules with specific configuration
+rules:
+  # Dockerfile syntax requirements
+  format: 'json'
+  
+# Additional settings
+strict: false
+
+# Override specific rules with custom configuration
+override:
+  # Allow certain patterns that are necessary for our multi-arch builds
+  error: []
+  warning: []
+  info: []
+  style: []
+
+# Trusted registries - specify allowed base image registries
+trustedRegistries:
+  - "docker.io"
+  - "ghcr.io"
+  - "quay.io"
+  - "registry.access.redhat.com"
+
+# Expected labels for OCI compliance
+labelSchema:
+  author: regex
+  maintainer: regex
+  version: regex
+  org.opencontainers.image.title: regex
+  org.opencontainers.image.description: regex
+  org.opencontainers.image.vendor: regex
+  org.opencontainers.image.source: regex
+  org.opencontainers.image.licenses: regex
