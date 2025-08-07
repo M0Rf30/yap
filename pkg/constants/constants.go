@@ -13,7 +13,7 @@ const (
 	DockerOrg    = "docker.io/m0rf30/yap-"
 	Git          = "git"
 	GoArchiveURL = "https://go.dev/dl/go1.24.5.linux-amd64.tar.gz"
-	YAPVersion   = "v1.44"
+	YAPVersion   = "v2.0.0"
 )
 
 var (
@@ -77,8 +77,10 @@ var (
 // If a distribution does not have a supported package manager, the function prints an error message
 // and exits the program.
 // Finally, it adds each package manager to the PackagersSet set.
+//
+//nolint:gochecknoinits // Required for initialization of package constants and data structures
 func init() {
-	for _, release := range Releases {
+	for _, release := range &Releases {
 		distro := strings.Split(release, "_")[0]
 		Distros = append(Distros, distro)
 		DistrosSet.Add(distro)

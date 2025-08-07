@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blakesmith/ar"
+	"github.com/otiai10/copy"
+
 	"github.com/M0Rf30/yap/pkg/options"
 	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/blakesmith/ar"
-	"github.com/otiai10/copy"
 )
 
 // Deb represents a Deb package.
@@ -33,7 +34,13 @@ func (d *Deb) BuildPackage(artifactsPath string) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(debTemp)
+
+	defer func() {
+		err := os.RemoveAll(debTemp)
+		if err != nil {
+			osutils.Logger.Warn("failed to remove temporary directory", osutils.Logger.Args("path", debTemp, "error", err))
+		}
+	}()
 
 	controlArchive := filepath.Join(debTemp, controlFilename)
 	dataArchive := filepath.Join(debTemp, dataFilename)
@@ -285,7 +292,13 @@ func (d *Deb) createDeb(artifactPath, control, data string) error {
 	if err != nil {
 		return err
 	}
-	defer debPackage.Close()
+
+	defer func() {
+		err := debPackage.Close()
+		if err != nil {
+			osutils.Logger.Warn("failed to close debian package file", osutils.Logger.Args("error", err))
+		}
+	}()
 
 	cleanFilePath = filepath.Clean(control)
 
@@ -334,7 +347,10 @@ func (d *Deb) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	osutils.Logger.Info("", osutils.Logger.Args("artifact", artifactFilePath))
+	pkgLogger := osutils.WithComponent(d.PKGBUILD.PkgName)
+	pkgLogger.Info("package artifact created", osutils.Logger.Args("pkgver", d.PKGBUILD.PkgVer,
+		"pkgrel", d.PKGBUILD.PkgRel,
+		"artifact", artifactFilePath))
 
 	return nil
 }

@@ -8,14 +8,15 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/github/go-spdx/v2/spdxexp"
 	"github.com/pkg/errors"
+
+	"github.com/M0Rf30/yap/pkg/constants"
+	"github.com/M0Rf30/yap/pkg/osutils"
 )
 
 // PKGBUILD defines all the fields accepted by the yap specfile (variables,
-// arrays, functions). It adds some exotics fields to manage debconfig
+// arrays, functions).
 // templating and other rpm/deb descriptors.
 type PKGBUILD struct {
 	Arch           []string
@@ -27,6 +28,7 @@ type PKGBUILD struct {
 	Codename       string
 	Conflicts      []string
 	Copyright      []string
+	DataHash       string
 	DebConfig      string
 	DebTemplate    string
 	Depends        []string
@@ -131,7 +133,13 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			osutils.Logger.Warn("failed to close pkgbuild file", osutils.Logger.Args("path", cleanFilePath, "error", err))
+		}
+	}()
 
 	return tmpl.Execute(file, pkgBuild)
 }
@@ -337,13 +345,19 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 	switch key {
 	case "build":
-		pkgBuild.Build = os.ExpandEnv(data.(string))
+		// Don't use os.ExpandEnv here as it removes runtime variables like ${bin}
+		// Variable expansion is now handled properly in the parser
+		pkgBuild.Build = data.(string)
 	case "package":
-		pkgBuild.Package = os.ExpandEnv(data.(string))
+		// Don't use os.ExpandEnv here as it removes runtime variables
+		// Variable expansion is now handled properly in the parser
+		pkgBuild.Package = data.(string)
 	case "preinst":
 		pkgBuild.PreInst = data.(string)
 	case "prepare":
-		pkgBuild.Prepare = os.ExpandEnv(data.(string))
+		// Don't use os.ExpandEnv here as it removes runtime variables
+		// Variable expansion is now handled properly in the parser
+		pkgBuild.Prepare = data.(string)
 	case "postinst":
 		pkgBuild.PostInst = data.(string)
 	case "posttrans":
