@@ -1,3 +1,4 @@
+---
 name: 🐳 Docker Build & Push
 
 on:
@@ -10,6 +11,8 @@ on:
 permissions:
   contents: read
   packages: write
+  security-events: write
+  actions: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,7 +20,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.24.5"
 
 jobs:
   docker:
@@ -41,6 +44,23 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: 🔍 Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
+          config: .hadolint.yaml
+          output-file: hadolint-${{ matrix.os }}.sarif
+          format: sarif
+
+      - name: 📋 Upload Hadolint results
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: hadolint-${{ matrix.os }}.sarif
+          wait-for-processing: true
+          category: hadolint-${{ matrix.os }}
 
       - name: 🐳 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -94,9 +114,28 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
+            GO_VERSION=${{ env.GO_VERSION }}
             VERSION=${{ github.ref_name }}
             BUILD_TIME=${{ github.run_id }}
             COMMIT=${{ github.sha }}
+
+      - name: 🔒 Run Trivy vulnerability scanner
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.os }}:latest'
+          format: 'sarif'
+          output: 'trivy-${{ matrix.os }}.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+      - name: 📋 Upload Trivy scan results
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-${{ matrix.os }}.sarif'
+          category: trivy-${{ matrix.os }}
 
       - name: 📝 Output image details
         run: |
