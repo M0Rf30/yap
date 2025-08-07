@@ -63,7 +63,13 @@ func CalculateSHA256(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			Logger.Warn("failed to close file", Logger.Args("path", cleanFilePath, "error", err))
+		}
+	}()
 
 	hash := sha256.New()
 
@@ -82,7 +88,7 @@ func CalculateSHA256(path string) ([]byte, error) {
 // an error is returned.
 func CheckWritable(path string) error {
 	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm()&0200 == 0 {
+	if err != nil || info.Mode().Perm()&0o200 == 0 {
 		return err
 	}
 
@@ -135,7 +141,13 @@ func CreateWrite(path, data string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			Logger.Warn("failed to close file", Logger.Args("path", path, "error", err))
+		}
+	}()
 
 	_, err = file.WriteString(data)
 	if err != nil {
@@ -231,7 +243,13 @@ func GetFileType(path string) string {
 		Logger.Fatal("fatal error",
 			Logger.Args("error", err))
 	}
-	defer file.Close()
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			Logger.Warn("failed to close file", Logger.Args("path", cleanFilePath, "error", err))
+		}
+	}()
 
 	// Parse the ELF file
 	elfFile, err := elf.NewFile(file)
@@ -275,7 +293,13 @@ func IsStaticLibrary(path string) bool {
 	if err != nil {
 		return false
 	}
-	defer file.Close()
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			Logger.Warn("failed to close file", Logger.Args("path", cleanFilePath, "error", err))
+		}
+	}()
 
 	// Read the first few bytes to check the format
 	header := make([]byte, 8)
