@@ -10,7 +10,7 @@ import (
 	"github.com/pterm/pterm/putils"
 	"github.com/spf13/cobra"
 
-	"github.com/M0Rf30/yap/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 )
 
 var versionCmd = &cobra.Command{
