@@ -23,8 +23,8 @@ import (
 	"mvdan.cc/sh/v3/interp"
 	"mvdan.cc/sh/v3/syntax"
 
-	"github.com/M0Rf30/yap/pkg/constants"
-	ycontext "github.com/M0Rf30/yap/pkg/context"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+	ycontext "github.com/M0Rf30/yap/v2/pkg/context"
 )
 
 const (

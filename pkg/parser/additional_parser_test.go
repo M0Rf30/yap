@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/M0Rf30/yap/pkg/parser"
+	"github.com/M0Rf30/yap/v2/pkg/parser"
 )
 
 func TestOverrideVariables(t *testing.T) {

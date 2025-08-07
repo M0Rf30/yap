@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/M0Rf30/yap/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // contextKey is a custom type for context keys to avoid collisions.

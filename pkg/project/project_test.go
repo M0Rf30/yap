@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/M0Rf30/yap/pkg/project"
+	"github.com/M0Rf30/yap/v2/pkg/project"
 )
 
 const examplePkgbuild = `

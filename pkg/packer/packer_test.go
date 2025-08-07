@@ -3,11 +3,11 @@ package packer
 import (
 	"testing"
 
-	"github.com/M0Rf30/yap/pkg/abuild"
-	"github.com/M0Rf30/yap/pkg/dpkg"
-	"github.com/M0Rf30/yap/pkg/makepkg"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/rpm"
+	"github.com/M0Rf30/yap/v2/pkg/abuild"
+	"github.com/M0Rf30/yap/v2/pkg/dpkg"
+	"github.com/M0Rf30/yap/v2/pkg/makepkg"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/rpm"
 )
 
 func TestGetPackageManager_APK(t *testing.T) {

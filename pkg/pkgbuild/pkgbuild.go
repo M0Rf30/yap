@@ -11,8 +11,8 @@ import (
 	"github.com/github/go-spdx/v2/spdxexp"
 	"github.com/pkg/errors"
 
-	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
 // PKGBUILD defines all the fields accepted by the yap specfile (variables,

@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/project"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/project"
 )
 
 // zapCmd represents the command to deeply clean build environments.

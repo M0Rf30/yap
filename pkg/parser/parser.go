@@ -9,8 +9,8 @@ import (
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
 // OverridePkgRel is a variable that allows overriding the Pkgrel field in

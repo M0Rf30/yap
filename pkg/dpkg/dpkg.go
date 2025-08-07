@@ -11,9 +11,9 @@ import (
 	"github.com/blakesmith/ar"
 	"github.com/otiai10/copy"
 
-	"github.com/M0Rf30/yap/pkg/options"
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/options"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
 // Deb represents a Deb package.

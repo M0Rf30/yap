@@ -1,13 +1,13 @@
 package packer
 
 import (
-	"github.com/M0Rf30/yap/pkg/abuild"
-	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/dpkg"
-	"github.com/M0Rf30/yap/pkg/makepkg"
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/rpm"
+	"github.com/M0Rf30/yap/v2/pkg/abuild"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/dpkg"
+	"github.com/M0Rf30/yap/v2/pkg/makepkg"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/rpm"
 )
 
 // Packer is the common interface implemented by all package managers.

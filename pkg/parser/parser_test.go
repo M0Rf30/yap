@@ -5,7 +5,7 @@ import (
 
 	"mvdan.cc/sh/v3/shell"
 
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
 const (

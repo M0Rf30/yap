@@ -3,7 +3,7 @@ package constants
 import (
 	"strings"
 
-	"github.com/M0Rf30/yap/pkg/set"
+	"github.com/M0Rf30/yap/v2/pkg/set"
 )
 
 const (

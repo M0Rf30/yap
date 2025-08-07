@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"time"
 
-	yaperrors "github.com/M0Rf30/yap/pkg/errors"
+	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // LogLevel represents the severity level of log messages.

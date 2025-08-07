@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/rpmpack"
 
-	"github.com/M0Rf30/yap/pkg/options"
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/options"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
 // RPM represents a RPM package.

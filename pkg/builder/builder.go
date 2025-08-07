@@ -3,10 +3,10 @@ package builder
 import (
 	"sync"
 
-	"github.com/M0Rf30/yap/pkg/errors"
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/source"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/source"
 )
 
 // Builder maps PKGBUILD to generic functions aimed at artifacts generation.

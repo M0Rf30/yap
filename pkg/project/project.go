@@ -15,11 +15,11 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/otiai10/copy"
 
-	"github.com/M0Rf30/yap/pkg/builder"
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/packer"
-	"github.com/M0Rf30/yap/pkg/parser"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/builder"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/packer"
+	"github.com/M0Rf30/yap/v2/pkg/parser"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
 var (

@@ -3,7 +3,7 @@ package command
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/M0Rf30/yap/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
 // completionCmd represents the completion command.
