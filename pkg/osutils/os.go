@@ -18,7 +18,13 @@ func ParseOSRelease() (OSRelease, error) {
 	if err != nil {
 		return OSRelease{}, err
 	}
-	defer file.Close()
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			Logger.Warn("failed to close os-release file", Logger.Args("error", err))
+		}
+	}()
 
 	var osRelease OSRelease
 

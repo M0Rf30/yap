@@ -1,7 +1,24 @@
 version: "2"
 linters:
-  default: all
   enable:
+    - asciicheck
+    - bodyclose
+    - copyloopvar
+    - dogsled
+    - durationcheck
+    - errorlint
+    - ginkgolinter
+    - gochecknoinits
+    - gosec
+    - importas
+    - misspell
+    - nakedret
+    - nolintlint
+    - revive
+    - testifylint
+    - unconvert
+    - unparam
+    - wastedassign
     - wsl_v5
   disable:
     - depguard
@@ -10,7 +27,6 @@ linters:
     - forcetypeassert
     - funlen
     - gochecknoglobals
-    - gochecknoinits
     - gomoddirectives
     - ireturn
     - mnd
@@ -40,6 +56,26 @@ linters:
         - opinionated
         - performance
         - style
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        - G401 # Weak cryptographic primitive - justified for APK format compatibility
+        - G304 # File path provided as taint input - controlled within package build process
+    revive:
+      rules:
+        - name: dot-imports
+          disabled: true
+        - name: filename-format
+          arguments:
+            - ^[a-z][_a-z0-9]*.go$
+        - name: redefines-builtin-id
+    staticcheck:
+      checks:
+        - all
+        - -SA1019
+    testifylint:
+      enable-all: true
     wsl_v5:
       allow-first-in-block: true
       allow-whole-block: false
@@ -59,15 +95,21 @@ formatters:
   enable:
     - gci
     - gofmt
+    - gofumpt
     - goimports
   settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/M0Rf30/yap)
     gofmt:
       rewrite-rules:
         - pattern: interface{}
           replacement: any
     goimports:
       local-prefixes:
-        - github.com/golangci/golangci-lint
+        - github.com/M0Rf30/yap
   exclusions:
     generated: lax
     paths:
