@@ -451,7 +451,11 @@ func TestMTREEFormat(t *testing.T) {
 	file, err := os.Open(mtreeFile)
 	require.NoError(t, err)
 
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			t.Logf("failed to close file: %v", err)
+		}
+	}()
 
 	// Read first two bytes to check gzip magic number
 	header := make([]byte, 2)
@@ -505,13 +509,17 @@ func readMTREEFile(filename string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Ignore close errors in tests
+	}()
 
 	gzipReader, err := gzip.NewReader(file)
 	if err != nil {
 		return "", err
 	}
-	defer gzipReader.Close()
+	defer func() {
+		_ = gzipReader.Close() // Ignore close errors in tests
+	}()
 
 	var content strings.Builder
 

@@ -25,14 +25,16 @@ func SetupEnhancedHelp() {
 {{.Example}}{{end}}{{if .HasAvailableSubCommands}}{{$cmds := .Commands}}{{if eq (len .Groups) 0}}
 
 {{styleAvailableCommands}}{{range $cmds}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
-  {{rpad .Name .NamePadding | styleCommand}} {{.Short | styleShort}}{{end}}{{end}}{{else}}{{range $group := .Groups}}
+  {{rpad .Name .NamePadding | styleCommand}} ` +
+		`{{.Short | styleShort}}{{end}}{{end}}{{else}}{{range $group := .Groups}}
 
 {{$group.Title | styleGroupTitle}}{{range $cmds}}{{if (and (eq .GroupID $group.ID) ` +
-		`(or .IsAvailableCommand (eq .Name "help")))}}
+		`{{if (and (eq .GroupID $group.ID) (or .IsAvailableCommand (eq .Name "help")))}}
   {{rpad .Name .NamePadding | styleCommand}} {{.Short | styleShort}}{{end}}{{end}}{{end}}` +
 		`{{if not .AllChildCommandsHaveGroup}}
 
-{{styleAdditionalCommands}}{{range $cmds}}{{if (and (eq .GroupID "") (or .IsAvailableCommand (eq .Name "help")))}}
+{{styleAdditionalCommands}}{{range $cmds}}` +
+		`{{if (and (eq .GroupID "") (or .IsAvailableCommand (eq .Name "help")))}}
   {{rpad .Name .NamePadding | styleCommand}} {{.Short | styleShort}}{{end}}{{end}}{{end}}` +
 		`{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
@@ -43,7 +45,8 @@ func SetupEnhancedHelp() {
 {{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
 
 {{styleAdditionalHelp}}{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
-  {{rpad .Name .NamePadding | styleCommand}} {{.Short | styleShort}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+  {{rpad .Name .NamePadding | styleCommand}} {{.Short | styleShort}}{{end}}{{end}}{{end}}{{if 
+  .HasAvailableSubCommands}}
 
 {{styleMoreInfo}}{{end}}
 
@@ -132,10 +135,11 @@ func CustomErrorHandler(cmd *cobra.Command, err error) error {
 	if err != nil {
 		// Style the error message
 		styledError := pterm.NewStyle(pterm.FgRed, pterm.Bold).Sprintf("Error: %s", err.Error())
-		fmt.Fprintln(cmd.ErrOrStderr(), styledError)
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), styledError)
 
 		// Add helpful suggestion
-		if strings.Contains(err.Error(), "unknown command") || strings.Contains(err.Error(), "unsupported distribution") {
+		if strings.Contains(err.Error(), "unknown command") ||
+			strings.Contains(err.Error(), "unsupported distribution") {
 			osutils.Logger.Tips("💡 Use '" + cmd.CommandPath() + " --help' to see available options")
 		}
 

@@ -1,3 +1,4 @@
+// Package makepkg provides Arch Linux package building functionality and constants.
 package makepkg
 
 var buildEnvironmentDeps = []string{
