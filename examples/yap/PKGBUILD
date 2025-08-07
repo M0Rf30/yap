@@ -41,7 +41,7 @@ build() {
     -o "${pkgname}" \
     ./cmd/yap
 
-  upx "${pkgname}"
+  upx --best --lzma "${pkgname}"
 }
 
 package() {
