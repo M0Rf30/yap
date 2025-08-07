@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/M0Rf30/yap/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
 const nonexistentFilePath = "/nonexistent/file.txt"

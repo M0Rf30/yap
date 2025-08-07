@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
 // Static error definitions to satisfy err113 linter.
