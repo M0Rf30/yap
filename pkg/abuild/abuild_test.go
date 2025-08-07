@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/M0Rf30/yap/pkg/abuild"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/abuild"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
 func TestApk_BuildPackage(t *testing.T) {

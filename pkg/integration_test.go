@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	yapcontext "github.com/M0Rf30/yap/pkg/context"
-	"github.com/M0Rf30/yap/pkg/errors"
-	"github.com/M0Rf30/yap/pkg/logger"
+	yapcontext "github.com/M0Rf30/yap/v2/pkg/context"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // Static errors for err113 compliance.

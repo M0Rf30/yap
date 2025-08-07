@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/M0Rf30/yap/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 func TestNewBuildContext(t *testing.T) {

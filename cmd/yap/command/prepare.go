@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/packer"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/project"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/packer"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/project"
 )
 
 var (
