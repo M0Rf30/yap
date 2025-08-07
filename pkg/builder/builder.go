@@ -1,6 +1,9 @@
 package builder
 
 import (
+	"sync"
+
+	"github.com/M0Rf30/yap/pkg/errors"
 	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/pkg/source"
@@ -14,33 +17,44 @@ type Builder struct {
 // Compile manages all the instructions that lead to a single project artifact.
 // It returns any error if occurred.
 func (builder *Builder) Compile(noBuild bool) error {
+	pkgName := builder.PKGBUILD.PkgName
+	pkgVer := builder.PKGBUILD.PkgVer
+	pkgRel := builder.PKGBUILD.PkgRel
+
 	err := builder.initDirs()
 	if err != nil {
-		return err
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to initialize directories").
+			WithContext("package", pkgName).
+			WithContext("version", pkgVer).
+			WithContext("release", pkgRel).
+			WithOperation("initDirs")
 	}
 
-	osutils.Logger.Info("retrieving sources")
+	pkgLogger := osutils.WithComponent(builder.PKGBUILD.PkgName)
+	pkgLogger.Info("retrieving sources", osutils.Logger.Args("pkgver", builder.PKGBUILD.PkgVer,
+		"pkgrel", builder.PKGBUILD.PkgRel))
 
 	err = builder.getSources()
 	if err != nil {
-		return err
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to retrieve sources").
+			WithContext("package", pkgName).
+			WithContext("version", pkgVer).
+			WithContext("release", pkgRel).
+			WithOperation("getSources")
 	}
 
 	if !noBuild {
-		err := processFunction(builder.PKGBUILD.Prepare,
-			"preparing sources")
+		err := builder.processFunction(builder.PKGBUILD.Prepare, "preparing sources", "prepare")
 		if err != nil {
 			return err
 		}
 
-		err = processFunction(builder.PKGBUILD.Build,
-			"building")
+		err = builder.processFunction(builder.PKGBUILD.Build, "building", "build")
 		if err != nil {
 			return err
 		}
 
-		err = processFunction(builder.PKGBUILD.Package,
-			"generating package")
+		err = builder.processFunction(builder.PKGBUILD.Package, "generating package", "package")
 		if err != nil {
 			return err
 		}
@@ -49,33 +63,115 @@ func (builder *Builder) Compile(noBuild bool) error {
 	return nil
 }
 
-// processFunction processes the given pkgbuildFunction and message.
+// processFunction processes the given pkgbuildFunction with consistent logging and error handling.
 //
-// It takes two parameters: pkgbuildFunction string, message string.
-// It returns an error.
-func processFunction(pkgbuildFunction, message string) error {
+// It takes three parameters: pkgbuildFunction string, message string, stage string.
+// It returns an error if the build stage fails.
+func (builder *Builder) processFunction(pkgbuildFunction, message, stage string) error {
 	if pkgbuildFunction == "" {
 		return nil
 	}
 
-	osutils.Logger.Info(message)
+	pkgName := builder.PKGBUILD.PkgName
+	pkgVer := builder.PKGBUILD.PkgVer
+	pkgRel := builder.PKGBUILD.PkgRel
 
-	return osutils.RunScript("  set -e\n" + pkgbuildFunction)
+	// Use component logger for consistent formatting
+	pkgLogger := osutils.WithComponent(pkgName)
+	pkgLogger.Info(message, pkgLogger.Args("pkgver", pkgVer, "pkgrel", pkgRel))
+
+	// Execute script with package decoration
+	err := osutils.RunScriptWithPackage("  set -e\n"+pkgbuildFunction, pkgName)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "build stage failed").
+			WithContext("package", pkgName).
+			WithContext("version", pkgVer).
+			WithContext("release", pkgRel).
+			WithContext("stage", stage).
+			WithOperation(stage)
+	}
+
+	return nil
 }
 
 // getSources detects sources provided by a single project source array and
-// downloads them if occurred. It returns any error if occurred.
+// downloads them in parallel with enhanced progress tracking. It returns any error if occurred.
 func (builder *Builder) getSources() error {
-	for index, sourceURI := range builder.PKGBUILD.SourceURI {
-		sourceObj := source.Source{
-			StartDir:       builder.PKGBUILD.StartDir,
-			Hash:           builder.PKGBUILD.HashSums[index],
-			SourceItemURI:  sourceURI,
-			SrcDir:         builder.PKGBUILD.SourceDir,
-			SourceItemPath: "",
-		}
+	if len(builder.PKGBUILD.SourceURI) == 0 {
+		return nil
+	}
 
-		err := sourceObj.Get()
+	pkgName := builder.PKGBUILD.PkgName
+	pkgVer := builder.PKGBUILD.PkgVer
+	pkgRel := builder.PKGBUILD.PkgRel
+
+	// Process all sources using the original method with enhanced downloads
+	maxWorkers := min(len(builder.PKGBUILD.SourceURI), 4)
+
+	type sourceTask struct {
+		index  int
+		source source.Source
+	}
+
+	sourceChan := make(chan sourceTask, len(builder.PKGBUILD.SourceURI))
+	errorChan := make(chan error, len(builder.PKGBUILD.SourceURI))
+
+	var waitGroup sync.WaitGroup
+
+	// Start workers for source processing (including enhanced downloads)
+	for range maxWorkers {
+		waitGroup.Add(1)
+
+		go func() {
+			defer waitGroup.Done()
+
+			for task := range sourceChan {
+				err := task.source.Get()
+				if err != nil {
+					wrappedErr := errors.Wrap(err, errors.ErrTypeBuild, "failed to retrieve source").
+						WithContext("package", pkgName).
+						WithContext("version", pkgVer).
+						WithContext("release", pkgRel).
+						WithContext("source_index", task.index).
+						WithContext("source_uri", task.source.SourceItemURI).
+						WithOperation("source_processing")
+					errorChan <- wrappedErr
+
+					return
+				}
+			}
+		}()
+	}
+
+	// Send tasks to workers
+	go func() {
+		defer close(sourceChan)
+
+		for index, sourceURI := range builder.PKGBUILD.SourceURI {
+			sourceObj := source.Source{
+				StartDir:       builder.PKGBUILD.StartDir,
+				Hash:           builder.PKGBUILD.HashSums[index],
+				PkgName:        builder.PKGBUILD.PkgName,
+				SourceItemURI:  sourceURI,
+				SrcDir:         builder.PKGBUILD.SourceDir,
+				SourceItemPath: "",
+			}
+
+			sourceChan <- sourceTask{
+				index:  index,
+				source: sourceObj,
+			}
+		}
+	}()
+
+	// Wait for completion
+	go func() {
+		waitGroup.Wait()
+		close(errorChan)
+	}()
+
+	// Check for errors
+	for err := range errorChan {
 		if err != nil {
 			return err
 		}

@@ -13,13 +13,20 @@ import (
 //
 // It returns an error if the command execution fails.
 func Exec(excludeStdout bool, dir, name string, args ...string) error {
+	//nolint:noctx // Legacy function without context support
 	cmd := exec.Command(name, args...)
-	cmd.Stdout = MultiPrinter.Writer
-	cmd.Stderr = MultiPrinter.Writer
 
-	if excludeStdout {
-		cmd.Stderr = nil
-		cmd.Stdout = nil
+	if !excludeStdout {
+		// Start multiprinter for consistent output handling
+		_, err := MultiPrinter.Start()
+		if err != nil {
+			return err
+		}
+
+		// Create decorated writer for command output
+		decoratedWriter := NewPackageDecoratedWriter(MultiPrinter.Writer, "yap")
+		cmd.Stdout = decoratedWriter
+		cmd.Stderr = decoratedWriter
 	}
 
 	if dir != "" {
