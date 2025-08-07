@@ -244,7 +244,7 @@ jobs:
 
       - name: 🚀 Create Pull Request
         if: steps.update.outputs.has-changes == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ steps.update.outputs.branch-name }}
