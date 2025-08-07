@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	yaperrors "github.com/M0Rf30/yap/pkg/errors"
+	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 func TestLogLevel_String(t *testing.T) {

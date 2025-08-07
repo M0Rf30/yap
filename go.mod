@@ -1,6 +1,8 @@
-module github.com/M0Rf30/yap
+module github.com/M0Rf30/yap/v2
 
 go 1.24
+
+toolchain go1.24.6
 
 require (
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
