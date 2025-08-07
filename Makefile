@@ -22,7 +22,7 @@ GOLINT=golangci-lint
 LDFLAGS=-ldflags="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.Commit=${COMMIT}"
 BUILD_FLAGS=-trimpath $(LDFLAGS)
 
-.PHONY: all build clean test deps fmt lint help install run dev doc doc-serve doc-package doc-deps
+.PHONY: all build clean test deps fmt lint help install run dev doc doc-serve doc-package doc-deps doc-generate doc-serve-static
 
 # Default target
 all: clean deps fmt lint test build
@@ -177,7 +177,11 @@ example: build
 # Documentation
 doc:
 	@echo "Viewing documentation for all packages..."
-	@$(GOCMD) doc -all ./...
+	@for pkg in $$(find ./pkg -name "*.go" -exec dirname {} \; | sort -u); do \
+		echo "=== $$pkg ==="; \
+		$(GOCMD) doc $$pkg || true; \
+		echo; \
+	done
 
 doc-serve:
 	@echo "Starting documentation server on http://localhost:8080..."
@@ -205,6 +209,25 @@ doc-deps:
 	@$(GOCMD) install golang.org/x/pkgsite/cmd/pkgsite@latest
 	@echo "Documentation tools installed"
 
+# Generate static documentation files
+doc-generate:
+	@echo "Generating static documentation files..."
+	@mkdir -p docs/api
+	@for pkg in $$(find ./pkg -name "*.go" -exec dirname {} \; | sort -u); do \
+		pkg_name=$$(basename $$pkg); \
+		echo "Generating docs for $$pkg_name..."; \
+		$(GOCMD) doc -all $$pkg > docs/api/$$pkg_name.txt 2>/dev/null || true; \
+	done
+	@echo "Documentation files generated in docs/api/"
+
+# Serve static documentation files
+doc-serve-static:
+	@echo "Generating documentation files..."
+	@$(MAKE) doc-generate
+	@echo "Starting HTTP server for static docs on http://localhost:8081..."
+	@echo "Navigate to http://localhost:8081/api/ to browse documentation files"
+	@cd docs && python3 -m http.server 8081 2>/dev/null || python -m SimpleHTTPServer 8081
+
 # Help
 help:
 	@echo "Available targets:"
@@ -231,4 +254,6 @@ help:
 	@echo "  doc-serve    - Start documentation server on localhost:8080"
 	@echo "  doc-package  - View specific package docs (use PKG=<path>)"
 	@echo "  doc-deps     - Install documentation tools"
+	@echo "  doc-generate - Generate static documentation files in docs/api/"
+	@echo "  doc-serve-static - Serve static documentation files on localhost:8081"
 	@echo "  help         - Show this help"

@@ -36,6 +36,9 @@ coverage.html
 go.work
 go.work.sum
 
+# Documentation artifacts
+docs/api/
+
 # YAP specific
 /yap
 examples/yap/pkg
