@@ -28,7 +28,7 @@ func SetupEnhancedHelp() {
   {{rpad .Name .NamePadding | styleCommand}} ` +
 		`{{.Short | styleShort}}{{end}}{{end}}{{else}}{{range $group := .Groups}}
 
-{{$group.Title | styleGroupTitle}}{{range $cmds}}{{if (and (eq .GroupID $group.ID) ` +
+{{$group.Title | styleGroupTitle}}{{range $cmds}}` +
 		`{{if (and (eq .GroupID $group.ID) (or .IsAvailableCommand (eq .Name "help")))}}
   {{rpad .Name .NamePadding | styleCommand}} {{.Short | styleShort}}{{end}}{{end}}{{end}}` +
 		`{{if not .AllChildCommandsHaveGroup}}

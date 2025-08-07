@@ -13,7 +13,6 @@ GOCMD=go
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 GOFMT=gofmt
 GOLINT=golangci-lint
@@ -22,10 +21,19 @@ GOLINT=golangci-lint
 LDFLAGS=-ldflags="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.Commit=${COMMIT}"
 BUILD_FLAGS=-trimpath $(LDFLAGS)
 
-.PHONY: all build clean test deps fmt lint help install run dev doc doc-serve doc-package doc-deps doc-generate doc-serve-static
+# Docker parameters
+DOCKER_CMD=docker
+DOCKER_REGISTRY ?= yap
+DOCKER_TAG ?= latest
+DOCKER_BUILD_FLAGS = --progress=plain --no-cache
+
+# Available distributions (dynamically retrieved from build/deploy folder)
+DISTROS = $(shell find build/deploy -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+
+.PHONY: all build clean test deps fmt lint help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static
 
 # Default target
-all: clean deps fmt lint test build
+all: clean deps fmt lint test doc build
 
 # Build the application
 build:
@@ -39,7 +47,6 @@ clean:
 	@echo "Cleaning..."
 	$(GOCLEAN)
 	@rm -rf $(BUILD_DIR)
-	@echo "Clean complete"
 
 # Run tests
 test:
@@ -51,7 +58,7 @@ test-coverage:
 	@echo "Running tests with coverage..."
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
+	@echo "Coverage report: coverage.html"
 
 # Download dependencies
 deps:
@@ -73,116 +80,12 @@ lint:
 		echo "golangci-lint not installed, skipping lint"; \
 	fi
 
-# Run the application
-run:
-	@echo "Running $(BINARY_NAME)..."
-	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
-	$(BUILD_DIR)/$(BINARY_NAME)
-
-# Build for different architectures
-build-linux-amd64:
-	@echo "Building for Linux AMD64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 $(MAIN_PATH)
-
-build-linux-arm64:
-	@echo "Building for Linux ARM64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 $(MAIN_PATH)
-
-build-darwin-amd64:
-	@echo "Building for macOS AMD64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 $(MAIN_PATH)
-
-build-darwin-arm64:
-	@echo "Building for macOS ARM64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 $(MAIN_PATH)
-
-build-windows-amd64:
-	@echo "Building for Windows AMD64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PATH)
-
-# Build for all supported architectures
-build-all: build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64 build-windows-amd64
-
-# Security scan
-security:
-	@echo "Running security scan..."
-	@if command -v $(GOLINT) > /dev/null; then \
-		$(GOLINT) run --enable-only gosec ./...; \
-	else \
-		echo "golangci-lint not installed, skipping security scan"; \
-	fi
-
-# Benchmark tests
-benchmark:
-	@echo "Running benchmarks..."
-	$(GOTEST) -bench=. -benchmem ./...
-
-# Update dependencies
-update-deps:
-	@echo "Updating dependencies..."
-	$(GOMOD) get -u ./...
-	$(GOMOD) tidy
-
-# Verify dependencies
-verify:
-	@echo "Verifying dependencies..."
-	$(GOMOD) verify
-
-# Check for outdated dependencies
-outdated:
-	@echo "Checking for outdated dependencies..."
-	@$(GOCMD) list -u -m all
-
-# Create a release
-release: clean deps fmt lint test build-all
-	@echo "Creating release..."
-	@mkdir -p releases
-	@tar -czf releases/$(BINARY_NAME)-linux-amd64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-linux-amd64
-	@tar -czf releases/$(BINARY_NAME)-linux-arm64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-linux-arm64
-	@tar -czf releases/$(BINARY_NAME)-darwin-amd64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-darwin-amd64
-	@tar -czf releases/$(BINARY_NAME)-darwin-arm64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-darwin-arm64
-	@zip -j releases/$(BINARY_NAME)-windows-amd64.zip $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe
-	@echo "Release packages created in releases/"
-
-# Development server with auto-reload (requires air)
-dev:
-	@echo "Starting development server..."
-	@if command -v air > /dev/null; then \
-		air; \
-	else \
-		echo "air not installed. Install with: go install github.com/cosmtrek/air@latest"; \
-		echo "Falling back to regular run..."; \
-		$(MAKE) run; \
-	fi
-
-# List supported distributions
-list-distros: build
-	@echo "Listing supported distributions..."
-	$(BUILD_DIR)/$(BINARY_NAME) list-distros
-
-# Run example build
-example: build
-	@echo "Running example build..."
-	@if [ -f examples/yap/PKGBUILD ]; then \
-		cd examples/yap && ../../$(BUILD_DIR)/$(BINARY_NAME) build; \
-	else \
-		echo "Example PKGBUILD not found"; \
-	fi
-
-# Documentation
+# Generate documentation
 doc:
-	@echo "Viewing documentation for all packages..."
-	@for pkg in $$(find ./pkg -name "*.go" -exec dirname {} \; | sort -u); do \
-		echo "=== $$pkg ==="; \
-		$(GOCMD) doc $$pkg || true; \
-		echo; \
-	done
+	@echo "Viewing all package documentation..."
+	@$(GOCMD) doc -all ./...
 
+# Start documentation server
 doc-serve:
 	@echo "Starting documentation server on http://localhost:8080..."
 	@if command -v pkgsite > /dev/null; then \
@@ -195,6 +98,7 @@ doc-serve:
 		$(MAKE) doc; \
 	fi
 
+# View specific package documentation
 doc-package:
 	@echo "Usage: make doc-package PKG=<package_path>"
 	@if [ -z "$(PKG)" ]; then \
@@ -203,7 +107,7 @@ doc-package:
 		$(GOCMD) doc -all $(PKG); \
 	fi
 
-# Install documentation tools
+# Install documentation dependencies
 doc-deps:
 	@echo "Installing documentation dependencies..."
 	@$(GOCMD) install golang.org/x/pkgsite/cmd/pkgsite@latest
@@ -228,32 +132,89 @@ doc-serve-static:
 	@echo "Navigate to http://localhost:8081/api/ to browse documentation files"
 	@cd docs && python3 -m http.server 8081 2>/dev/null || python -m SimpleHTTPServer 8081
 
+# Run the application
+run:
+	@echo "Running $(BINARY_NAME)..."
+	CGO_ENABLED=0 $(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	$(BUILD_DIR)/$(BINARY_NAME)
+
+# Build for all architectures
+build-all:
+	@echo "Building for all architectures..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 $(MAIN_PATH)
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 $(MAIN_PATH)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 $(MAIN_PATH)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 $(MAIN_PATH)
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PATH)
+
+# Create release packages
+release: clean deps fmt lint test doc build-all
+	@echo "Creating release packages..."
+	@mkdir -p releases
+	@tar -czf releases/$(BINARY_NAME)-linux-amd64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-linux-amd64
+	@tar -czf releases/$(BINARY_NAME)-linux-arm64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-linux-arm64
+	@tar -czf releases/$(BINARY_NAME)-darwin-amd64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-darwin-amd64
+	@tar -czf releases/$(BINARY_NAME)-darwin-arm64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-darwin-arm64
+	@zip -j releases/$(BINARY_NAME)-windows-amd64.zip $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe
+	@echo "Release packages created in releases/"
+
+# Build Docker image for specific distribution
+# Usage: make docker-build DISTRO=alpine
+docker-build:
+	@if [ -z "$(DISTRO)" ]; then \
+		echo "Error: DISTRO parameter required"; \
+		echo "Usage: make docker-build DISTRO=<distro>"; \
+		echo "Available: $(DISTROS)"; \
+		exit 1; \
+	fi
+	@if [ ! -d "build/deploy/$(DISTRO)" ]; then \
+		echo "Error: Distribution '$(DISTRO)' not found"; \
+		echo "Available: $(DISTROS)"; \
+		exit 1; \
+	fi
+	@echo "Building Docker image for $(DISTRO)..."
+	$(DOCKER_CMD) build $(DOCKER_BUILD_FLAGS) \
+		-t $(DOCKER_REGISTRY):$(DISTRO)-$(DOCKER_TAG) \
+		-f build/deploy/$(DISTRO)/Dockerfile .
+
+# Build Docker images for all distributions
+docker-build-all:
+	@echo "Building Docker images for all distributions..."
+	@for distro in $(DISTROS); do \
+		echo "Building $$distro..."; \
+		$(MAKE) docker-build DISTRO=$$distro || exit 1; \
+	done
+
+# List available Docker distributions
+docker-list-distros:
+	@echo "Available distributions:"
+	@for distro in $(DISTROS); do echo "  $$distro"; done
+	@echo "\nUsage:"
+	@echo "  make docker-build DISTRO=<distro>"
+	@echo "  make docker-build-all"
+
 # Help
 help:
 	@echo "Available targets:"
-	@echo "  all          - Clean, deps, fmt, lint, test, and build"
-	@echo "  build        - Build the application"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  test         - Run tests"
-	@echo "  test-coverage- Run tests with coverage report"
-	@echo "  deps         - Download dependencies"
-	@echo "  fmt          - Format code"
-	@echo "  lint         - Lint code"
-	@echo "  run          - Build and run the application"
-	@echo "  build-all    - Build for all supported architectures"
-	@echo "  security     - Run security scan"
-	@echo "  benchmark    - Run benchmark tests"
-	@echo "  update-deps  - Update dependencies"
-	@echo "  verify       - Verify dependencies"
-	@echo "  outdated     - Check for outdated dependencies"
-	@echo "  release      - Create release packages"
-	@echo "  dev          - Start development server with auto-reload"
-	@echo "  list-distros - List supported distributions"
-	@echo "  example      - Run example build"
-	@echo "  doc          - View all package documentation"
-	@echo "  doc-serve    - Start documentation server on localhost:8080"
-	@echo "  doc-package  - View specific package docs (use PKG=<path>)"
-	@echo "  doc-deps     - Install documentation tools"
-	@echo "  doc-generate - Generate static documentation files in docs/api/"
+	@echo "  all              - Clean, deps, fmt, lint, test, doc, and build"
+	@echo "  build            - Build the application"
+	@echo "  clean            - Clean build artifacts"
+	@echo "  test             - Run tests"
+	@echo "  test-coverage    - Run tests with coverage report"
+	@echo "  deps             - Download dependencies"
+	@echo "  fmt              - Format code"
+	@echo "  lint             - Lint code"
+	@echo "  doc              - View all package documentation"
+	@echo "  doc-serve        - Start documentation server on localhost:8080"
+	@echo "  doc-package      - View specific package docs (use PKG=<path>)"
+	@echo "  doc-deps         - Install documentation tools"
+	@echo "  doc-generate     - Generate static documentation files in docs/api/"
 	@echo "  doc-serve-static - Serve static documentation files on localhost:8081"
-	@echo "  help         - Show this help"
+	@echo "  run              - Build and run the application"
+	@echo "  build-all        - Build for all architectures"
+	@echo "  release          - Create release packages"
+	@echo "  docker-build DISTRO=<name> - Build Docker image for distribution"
+	@echo "  docker-build-all - Build Docker images for all distributions"
+	@echo "  docker-list-distros - List available distributions"
+	@echo "  help             - Show this help"
