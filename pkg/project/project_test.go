@@ -5,8 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/M0Rf30/yap/pkg/project"
 	"github.com/stretchr/testify/require"
+
+	"github.com/M0Rf30/yap/pkg/project"
 )
 
 const examplePkgbuild = `
@@ -72,41 +73,66 @@ func TestBuildMultipleProjectFromJSON(t *testing.T) {
 			"install": false
         }
     ]
-}`), os.FileMode(0755)))
+}`), os.FileMode(0o755)))
 
-	defer os.Remove(packageRaw)
+	defer func() {
+		err := os.Remove(packageRaw)
+		if err != nil {
+			t.Logf("Failed to remove file %s: %v", packageRaw, err)
+		}
+	}()
 
-	err := os.MkdirAll(filepath.Dir(prj1), os.FileMode(0750))
+	err := os.MkdirAll(filepath.Dir(prj1), os.FileMode(0o750))
 	if err != nil {
 		t.Error(err)
 	}
 
-	defer os.RemoveAll(filepath.Dir(prj1))
+	defer func() {
+		err := os.RemoveAll(filepath.Dir(prj1))
+		if err != nil {
+			t.Logf("Failed to remove directory %s: %v", filepath.Dir(prj1), err)
+		}
+	}()
 
-	err = os.MkdirAll(filepath.Dir(prj2), os.FileMode(0750))
+	err = os.MkdirAll(filepath.Dir(prj2), os.FileMode(0o750))
 	if err != nil {
 		t.Error(err)
 	}
 
-	defer os.Remove(filepath.Dir(prj2))
+	defer func() {
+		err := os.Remove(filepath.Dir(prj2))
+		if err != nil {
+			t.Logf("Failed to remove directory %s: %v", filepath.Dir(prj2), err)
+		}
+	}()
 
-	err = os.WriteFile(prj1, []byte(examplePkgbuild), os.FileMode(0750))
+	err = os.WriteFile(prj1, []byte(examplePkgbuild), os.FileMode(0o750))
 	if err != nil {
 		t.Error(err)
 	}
 
-	defer os.Remove(prj1)
+	defer func() {
+		err := os.Remove(prj1)
+		if err != nil {
+			t.Logf("Failed to remove file %s: %v", prj1, err)
+		}
+	}()
 
-	err = os.WriteFile(prj2, []byte(examplePkgbuild), os.FileMode(0750))
+	err = os.WriteFile(prj2, []byte(examplePkgbuild), os.FileMode(0o750))
 	if err != nil {
 		t.Error(err)
 	}
 
-	defer os.Remove(prj2)
+	defer func() {
+		err := os.Remove(prj2)
+		if err != nil {
+			t.Logf("Failed to remove file %s: %v", prj2, err)
+		}
+	}()
 
 	project.SkipSyncDeps = true
 
-	var mpc = project.MultipleProject{}
+	mpc := project.MultipleProject{}
 
 	err = mpc.MultiProject("ubuntu", "", testDir)
 	require.NoError(t, err)

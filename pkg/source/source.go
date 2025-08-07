@@ -9,21 +9,32 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/pkg/errors"
+)
+
+const (
+	fileProtocol = "file"
 )
 
 var (
 	SSHPassword string
+	// downloadMutexes tracks ongoing downloads to prevent duplicate downloads.
+	downloadMutexes  = make(map[string]*sync.Mutex)
+	downloadMapMutex = sync.Mutex{}
 )
 
 // Source defines all the fields accepted by a source item.
 type Source struct {
 	// Hash is the integrity hashsum for a source item
 	Hash string
+	// PkgName is the package name for component logging
+	PkgName string
 	// RefKey is the reference name for a VCS fragment (branch, tag) declared in the
 	// URI. i.e: "myfile::git+https://example.com/example.git#branch=example"
 	RefKey string
@@ -62,6 +73,23 @@ func (src *Source) Get() error {
 	switch sourceType {
 	case "http", "https", "ftp", constants.Git:
 		var err error
+
+		// Use mutex to prevent duplicate downloads of the same file
+		downloadMapMutex.Lock()
+
+		mutex, exists := downloadMutexes[sourceFilePath]
+		if !exists {
+			mutex = &sync.Mutex{}
+			downloadMutexes[sourceFilePath] = mutex
+		}
+
+		downloadMapMutex.Unlock()
+
+		// Lock this specific file's download
+		mutex.Lock()
+		defer mutex.Unlock()
+
+		// Check again after acquiring the lock (double-checked locking pattern)
 		if !osutils.Exists(sourceFilePath) {
 			err = src.getURL(sourceType, sourceFilePath, SSHPassword)
 		}
@@ -69,7 +97,7 @@ func (src *Source) Get() error {
 		if err != nil {
 			return err
 		}
-	case "file":
+	case fileProtocol:
 	default:
 		return errors.Errorf("unsupported source type")
 	}
@@ -110,7 +138,7 @@ func (src *Source) getReferenceType() plumbing.ReferenceName {
 // getProtocol returns the protocol of the source item URI.
 func (src *Source) getProtocol() string {
 	if !strings.Contains(src.SourceItemURI, "://") {
-		return "file"
+		return fileProtocol
 	}
 
 	switch {
@@ -134,13 +162,20 @@ func (src *Source) getProtocol() string {
 func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 	normalizedURI := strings.TrimPrefix(src.SourceItemURI, constants.Git+"+")
 
+	// Create component logger for this package
+	var logger *osutils.ComponentLogger
+	if src.PkgName != "" {
+		logger = osutils.WithComponent(src.PkgName)
+	}
+
 	switch protocol {
 	case constants.Git:
 		referenceName := src.getReferenceType()
 
-		return osutils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName)
+		return osutils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName, logger)
 	default:
-		return osutils.Download(dloadFilePath, normalizedURI)
+		// Use enhanced download with resume capability and 3 retries, with context information
+		return osutils.DownloadWithResumeContext(dloadFilePath, normalizedURI, logger, 3, src.PkgName, src.SourceItemPath)
 	}
 }
 
@@ -165,6 +200,11 @@ func (src *Source) parseURI() {
 		splitFragment := strings.SplitN(fragment, "=", 2)
 		src.RefKey = splitFragment[0]
 		src.RefValue = splitFragment[1]
+
+		// Update SourceItemPath to remove the fragment only if no custom name was used
+		if src.SourceItemPath == osutils.Filename(split[0]+"#"+fragment) {
+			src.SourceItemPath = osutils.Filename(src.SourceItemURI)
+		}
 	}
 }
 
@@ -184,13 +224,21 @@ func (src *Source) symlinkSources(symlinkSource string) error {
 //
 // It takes the source file path as a parameter and returns an error if any.
 func (src *Source) validateSource(sourceFilePath string) error {
+	// Create component logger for this package
+	var logger *osutils.ComponentLogger
+	if src.PkgName != "" {
+		logger = osutils.WithComponent(src.PkgName)
+	} else {
+		logger = osutils.ServiceLogger()
+	}
+
 	info, err := os.Stat(sourceFilePath)
 	if err != nil {
 		return errors.Errorf("failed to open file for hash %s", sourceFilePath)
 	}
 
 	if src.Hash == "SKIP" || info.IsDir() {
-		osutils.Logger.Info("skip integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
+		logger.Info("skip integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
 
 		return nil
 	}
@@ -210,7 +258,13 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			osutils.Logger.Warn("failed to close source file", osutils.Logger.Args("path", sourceFilePath, "error", err))
+		}
+	}()
 
 	_, err = io.Copy(hashSum, file)
 	if err != nil {
@@ -224,7 +278,149 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return errors.Errorf("hash verification failed %s", src.SourceItemPath)
 	}
 
-	osutils.Logger.Info("integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
+	logger.Info("integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
 
 	return nil
+}
+
+// GetConcurrently retrieves multiple source files concurrently with enhanced progress tracking.
+// This function downloads all remote sources (http/https/ftp) in parallel while maintaining
+// proper progress reporting and error handling.
+//
+// Parameters:
+// - sources: slice of Source structs to download
+// - maxConcurrent: maximum number of concurrent downloads (0 = default)
+//
+// Returns an error if any critical download fails.
+func GetConcurrently(sources []*Source, maxConcurrent int) error {
+	if len(sources) == 0 {
+		return nil
+	}
+
+	// Separate sources by type for optimal processing
+	var (
+		downloadSources []*Source
+		localSources    []*Source
+	)
+
+	for _, src := range sources {
+		src.parseURI()
+		sourceType := src.getProtocol()
+
+		switch sourceType {
+		case "http", "https", "ftp":
+			downloadSources = append(downloadSources, src)
+		case constants.Git, fileProtocol:
+			localSources = append(localSources, src)
+		}
+	}
+
+	// Process local sources (git/file) sequentially first
+	// These typically need to be processed in order and don't benefit from concurrency
+	for _, src := range localSources {
+		err := src.Get()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Process download sources concurrently if there are multiple
+	if len(downloadSources) > 1 && maxConcurrent > 0 {
+		return processConcurrentDownloads(downloadSources, maxConcurrent)
+	}
+
+	// Process download sources sequentially if only one or concurrency disabled
+	for _, src := range downloadSources {
+		err := src.Get()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// processConcurrentDownloads handles multiple downloads concurrently.
+func processConcurrentDownloads(sources []*Source, maxConcurrent int) error {
+	downloads, sourceMap := prepareDownloadMap(sources)
+	if len(downloads) == 0 {
+		return nil // All files already exist
+	}
+
+	logger := createSourceLogger(sources)
+	results := osutils.DownloadConcurrently(downloads, logger, maxConcurrent, 3)
+
+	return processDownloadResults(results, sourceMap)
+}
+
+// prepareDownloadMap builds the download map and source mapping.
+func prepareDownloadMap(sources []*Source) (map[string]string, map[string]*Source) {
+	downloads := make(map[string]string)
+	sourceMap := make(map[string]*Source)
+
+	for _, src := range sources {
+		sourceFilePath := filepath.Join(src.StartDir, src.SourceItemPath)
+
+		// Skip if file already exists (respecting existing duplicate download prevention)
+		if osutils.Exists(sourceFilePath) {
+			continue
+		}
+
+		normalizedURI := strings.TrimPrefix(src.SourceItemURI, constants.Git+"+")
+		downloads[sourceFilePath] = normalizedURI
+		sourceMap[sourceFilePath] = src
+	}
+
+	return downloads, sourceMap
+}
+
+// createSourceLogger creates a component logger from the first source if available.
+func createSourceLogger(sources []*Source) *osutils.ComponentLogger {
+	if len(sources) > 0 && sources[0].PkgName != "" {
+		return osutils.WithComponent(sources[0].PkgName)
+	}
+
+	return nil
+}
+
+// processDownloadResults processes download results and performs post-download operations.
+func processDownloadResults(results map[string]error, sourceMap map[string]*Source) error {
+	var firstError error
+
+	for destination, err := range results {
+		if err != nil {
+			if firstError == nil {
+				firstError = errors.Errorf("download failed for %s: %v", destination, err)
+			}
+
+			continue
+		}
+
+		// Perform validation, symlinking, and extraction for successful downloads
+		processErr := processSuccessfulDownload(destination, sourceMap[destination])
+		if processErr != nil && firstError == nil {
+			firstError = processErr
+		}
+	}
+
+	return firstError
+}
+
+// processSuccessfulDownload handles post-download processing for a successful download.
+func processSuccessfulDownload(destination string, src *Source) error {
+	if src == nil {
+		return nil
+	}
+
+	err := src.validateSource(destination)
+	if err != nil {
+		return err
+	}
+
+	err = src.symlinkSources(destination)
+	if err != nil {
+		return err
+	}
+
+	return osutils.Unarchive(destination, src.SrcDir)
 }

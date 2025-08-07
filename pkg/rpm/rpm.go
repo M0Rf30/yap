@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/rpmpack"
+
 	"github.com/M0Rf30/yap/pkg/options"
 	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/google/rpmpack"
 )
 
 // RPM represents a RPM package.
@@ -80,14 +81,23 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 	if err != nil {
 		return err
 	}
-	defer rpmFile.Close()
+
+	defer func() {
+		err := rpmFile.Close()
+		if err != nil {
+			osutils.Logger.Warn("failed to close RPM file", osutils.Logger.Args("path", cleanFilePath, "error", err))
+		}
+	}()
 
 	err = rpm.Write(rpmFile)
 	if err != nil {
 		return err
 	}
 
-	osutils.Logger.Info("", osutils.Logger.Args("artifact", cleanFilePath))
+	pkgLogger := osutils.WithComponent(r.PKGBUILD.PkgName)
+	pkgLogger.Info("package artifact created", osutils.Logger.Args("pkgver", r.PKGBUILD.PkgVer,
+		"pkgrel", r.PKGBUILD.PkgRel,
+		"artifact", cleanFilePath))
 
 	return nil
 }
@@ -218,7 +228,7 @@ func addContentsToRPM(contents []*osutils.FileContent, rpm *rpmpack.RPM) error {
 func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 	// This string is appended to preun and postun directives
 	// to have a similar behaviour between deb and rpm.
-	var onlyOnUninstall = "if [ $1 -ne 0 ]; then exit 0; fi\n"
+	onlyOnUninstall := "if [ $1 -ne 0 ]; then exit 0; fi\n"
 
 	if r.PKGBUILD.PreTrans != "" {
 		rpm.AddPretrans(r.PKGBUILD.PreTrans)
@@ -380,7 +390,8 @@ func (r *RPM) getRelease() {
 // handleFileEntry processes a file entry at the given path, checking if it is a backup file,
 // and appending its content to the provided slice based on its type (config, symlink, or regular file).
 func handleFileEntry(path string, backupFiles []string,
-	packageDir string, contents *[]*osutils.FileContent) error {
+	packageDir string, contents *[]*osutils.FileContent,
+) error {
 	fileInfo, err := os.Lstat(path)
 	if err != nil {
 		return err // Handle error from os.Lstat
