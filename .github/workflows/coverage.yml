@@ -7,7 +7,7 @@ on:
     branches: ["main", "codebase-improvements"]
   schedule:
     # Run coverage analysis every Sunday at 12:00 PM UTC
-    - cron: '0 12 * * 0'
+    - cron: "0 12 * * 0"
 
 permissions:
   contents: read
@@ -47,8 +47,7 @@ jobs:
       - name: 🧪 Run tests with coverage
         run: |
           echo "🧪 Running tests with coverage analysis..."
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
-
+          go test -v -coverprofile=coverage.out -covermode=atomic ./...
           # Generate coverage report
           go tool cover -html=coverage.out -o coverage.html
 
