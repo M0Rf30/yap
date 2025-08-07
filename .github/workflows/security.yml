@@ -307,7 +307,7 @@ jobs:
 
     steps:
       - name: 📥 Download security artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: "*-results"
           merge-multiple: true
