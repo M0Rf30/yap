@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	// GoLang indicates whether to prepare Go language environment.
 	GoLang bool
 
 	// prepareCmd represents the prepare command.

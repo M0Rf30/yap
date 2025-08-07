@@ -85,7 +85,8 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 	defer func() {
 		err := rpmFile.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close RPM file", osutils.Logger.Args("path", cleanFilePath, "error", err))
+			osutils.Logger.Warn("failed to close RPM file", osutils.Logger.Args("path", cleanFilePath,
+				"error", err))
 		}
 	}()
 
@@ -156,7 +157,8 @@ func (r *RPM) Prepare(makeDepends []string) error {
 
 // PrepareEnvironment prepares the environment for the RPM struct.
 //
-// It takes a boolean parameter `golang` which indicates whether or not to set up the Go environment.
+// It takes a boolean parameter `golang` which indicates whether or not to set up the
+// Go environment.
 // It returns an error if there was an issue with the environment preparation.
 func (r *RPM) PrepareEnvironment(golang bool) error {
 	installArgs = append(installArgs, buildEnvironmentDeps...)
@@ -388,7 +390,8 @@ func (r *RPM) getRelease() {
 }
 
 // handleFileEntry processes a file entry at the given path, checking if it is a backup file,
-// and appending its content to the provided slice based on its type (config, symlink, or regular file).
+// and appending its content to the provided slice based on its type (config, symlink, or
+// egular file).
 func handleFileEntry(path string, backupFiles []string,
 	packageDir string, contents *[]*osutils.FileContent,
 ) error {
@@ -397,11 +400,12 @@ func handleFileEntry(path string, backupFiles []string,
 		return err // Handle error from os.Lstat
 	}
 
-	if fileInfo.Mode()&os.ModeSymlink != 0 {
+	switch {
+	case fileInfo.Mode()&os.ModeSymlink != 0:
 		*contents = append(*contents, createContent(path, packageDir, osutils.TypeSymlink))
-	} else if osutils.Contains(backupFiles, strings.TrimPrefix(path, packageDir)) {
+	case osutils.Contains(backupFiles, strings.TrimPrefix(path, packageDir)):
 		*contents = append(*contents, createContent(path, packageDir, osutils.TypeConfigNoReplace))
-	} else {
+	default:
 		*contents = append(*contents, createContent(path, packageDir, osutils.TypeFile))
 	}
 

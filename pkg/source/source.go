@@ -1,3 +1,4 @@
+// Package source provides source file download and management functionality.
 package source
 
 import (
@@ -23,6 +24,7 @@ const (
 )
 
 var (
+	// SSHPassword contains the SSH password for authentication.
 	SSHPassword string
 	// downloadMutexes tracks ongoing downloads to prevent duplicate downloads.
 	downloadMutexes  = make(map[string]*sync.Mutex)
@@ -42,6 +44,7 @@ type Source struct {
 	// myfile::git+https://example.com/example.git#branch=refvalue
 	RefValue string
 	// SSHPassword is used to store the password for SSH authentication.
+	// SSHPassword contains the SSH password for authentication.
 	SSHPassword string
 	// SourceItemPath is the absolute path to a source item (folder or file)
 	SourceItemPath string
@@ -175,7 +178,13 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 		return osutils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName, logger)
 	default:
 		// Use enhanced download with resume capability and 3 retries, with context information
-		return osutils.DownloadWithResumeContext(dloadFilePath, normalizedURI, logger, 3, src.PkgName, src.SourceItemPath)
+		return osutils.DownloadWithResumeContext(
+			dloadFilePath,
+			normalizedURI,
+			logger,
+			3,
+			src.PkgName,
+			src.SourceItemPath)
 	}
 }
 
@@ -262,7 +271,9 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close source file", osutils.Logger.Args("path", sourceFilePath, "error", err))
+			osutils.Logger.Warn(
+				"failed to close source file",
+				osutils.Logger.Args("path", sourceFilePath, "error", err))
 		}
 	}()
 
@@ -354,9 +365,10 @@ func processConcurrentDownloads(sources []*Source, maxConcurrent int) error {
 }
 
 // prepareDownloadMap builds the download map and source mapping.
-func prepareDownloadMap(sources []*Source) (map[string]string, map[string]*Source) {
-	downloads := make(map[string]string)
-	sourceMap := make(map[string]*Source)
+func prepareDownloadMap(sources []*Source) (
+	downloads map[string]string, sourceMap map[string]*Source) {
+	downloads = make(map[string]string)
+	sourceMap = make(map[string]*Source)
 
 	for _, src := range sources {
 		sourceFilePath := filepath.Join(src.StartDir, src.SourceItemPath)
