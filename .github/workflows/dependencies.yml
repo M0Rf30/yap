@@ -3,19 +3,19 @@ name: 🔄 Dependency Management
 on:
   schedule:
     # Run every Monday at 9:00 AM UTC
-    - cron: '0 9 * * 1'
+    - cron: "0 9 * * 1"
   workflow_dispatch:
     inputs:
       update_type:
-        description: 'Type of update to perform'
+        description: "Type of update to perform"
         required: true
-        default: 'minor'
+        default: "minor"
         type: choice
         options:
-          - 'patch'
-          - 'minor'
-          - 'major'
-          - 'all'
+          - "patch"
+          - "minor"
+          - "major"
+          - "all"
 
 permissions:
   contents: write
@@ -244,7 +244,7 @@ jobs:
 
       - name: 🚀 Create Pull Request
         if: steps.update.outputs.has-changes == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ steps.update.outputs.branch-name }}
@@ -302,7 +302,7 @@ jobs:
     steps:
       - name: 📥 Download analysis results
         if: needs.analyze.outputs.has-updates == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: dependency-analysis
 
