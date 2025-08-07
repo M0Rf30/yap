@@ -8,11 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	yapErrors "github.com/M0Rf30/yap/pkg/errors"
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/parser"
-	"github.com/M0Rf30/yap/pkg/project"
-	"github.com/M0Rf30/yap/pkg/source"
+	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/parser"
+	"github.com/M0Rf30/yap/v2/pkg/project"
+	"github.com/M0Rf30/yap/v2/pkg/source"
 )
 
 // buildCmd represents the command to build the entire project.
