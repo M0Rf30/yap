@@ -509,6 +509,7 @@ func readMTREEFile(filename string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	defer func() {
 		_ = file.Close() // Ignore close errors in tests
 	}()
@@ -517,6 +518,7 @@ func readMTREEFile(filename string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	defer func() {
 		_ = gzipReader.Close() // Ignore close errors in tests
 	}()
