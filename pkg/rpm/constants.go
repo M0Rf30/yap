@@ -1,11 +1,17 @@
+// Package rpm provides RPM package building functionality and constants.
 package rpm
 
 const (
+	// Communications represents the applications/communications RPM group.
 	Communications = "Applications/Communications"
-	Engineering    = "Applications/Engineering"
-	Internet       = "Applications/Internet"
-	Multimedia     = "Applications/Multimedia"
-	Tools          = "Development/Tools"
+	// Engineering represents the applications/engineering RPM group.
+	Engineering = "Applications/Engineering"
+	// Internet represents the applications/internet RPM group.
+	Internet = "Applications/Internet"
+	// Multimedia represents the applications/multimedia RPM group.
+	Multimedia = "Applications/Multimedia"
+	// Tools represents the development/tools RPM group.
+	Tools = "Development/Tools"
 )
 
 var buildEnvironmentDeps = []string{
@@ -30,6 +36,7 @@ var installArgs = []string{
 }
 
 var (
+	// RPMArchs maps standard architecture names to RPM package architecture names.
 	RPMArchs = map[string]string{
 		"x86_64":  "x86_64",
 		"i686":    "i686",
@@ -40,6 +47,7 @@ var (
 		"any":     "noarch",
 	}
 
+	// RPMGroups maps common group names to RPM group categories.
 	RPMGroups = map[string]string{
 		"admin":        "Applications/System",
 		"any":          "noarch",
@@ -75,6 +83,7 @@ var (
 		"x11":          "User Interface/X",
 	}
 
+	// RPMDistros maps distribution names to their RPM suffix.
 	RPMDistros = map[string]string{
 		"almalinux": ".el",
 		"amzn":      ".amzn",

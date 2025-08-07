@@ -62,10 +62,12 @@ This command provides comprehensive system information useful for:
 %s %s`,
 			pterm.FgLightBlue.Sprint("Version:"),
 			pterm.NewStyle(pterm.FgWhite, pterm.Bold).Sprint(strings.TrimPrefix(constants.YAPVersion, "v")),
-			pterm.FgLightMagenta.Sprint("Runtime:"), pterm.FgWhite.Sprintf("%s %s", runtime.GOOS, runtime.GOARCH),
+			pterm.FgLightMagenta.Sprint("Runtime:"),
+			pterm.FgWhite.Sprintf("%s %s", runtime.GOOS, runtime.GOARCH),
 			pterm.FgLightGreen.Sprint("Go Version:"), pterm.FgWhite.Sprint(runtime.Version()),
 			pterm.FgYellow.Sprint("Build Time:"), pterm.FgWhite.Sprint(getCurrentTime()),
-			pterm.FgLightRed.Sprint("Platform:"), pterm.FgWhite.Sprintf("%s on %s", runtime.Compiler, runtime.GOOS))
+			pterm.FgLightRed.Sprint("Platform:"),
+			pterm.FgWhite.Sprintf("%s on %s", runtime.Compiler, runtime.GOOS))
 
 		pterm.DefaultCenter.Print(versionInfo.Sprint(versionContent))
 
@@ -101,7 +103,8 @@ This command provides comprehensive system information useful for:
 		// Fun footer with animated-like border
 		border := pterm.FgCyan.Sprint("════════════════════════════════════════════════")
 		pterm.DefaultCenter.Println(border)
-		pterm.DefaultCenter.Println(pterm.NewStyle(pterm.FgLightBlue, pterm.Italic).Sprint("Thank you for using YAP! 🎉"))
+		pterm.DefaultCenter.Println(
+			pterm.NewStyle(pterm.FgLightBlue, pterm.Italic).Sprint("Thank you for using YAP! 🎉"))
 		pterm.DefaultCenter.Println(border)
 	},
 }

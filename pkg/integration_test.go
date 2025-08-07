@@ -83,7 +83,7 @@ func testErrorHandling() {
 
 func testStructuredLogging() {
 	// Create logger with JSON format
-	logConfig := &logger.LoggerConfig{
+	logConfig := &logger.Config{
 		Level:      logger.LevelDebug,
 		Format:     "json",
 		Output:     os.Stdout,
@@ -134,7 +134,7 @@ func testContextSupport() {
 
 	// Test timeout manager
 	timeoutMgr := yapcontext.NewTimeoutManager()
-	timedCtx := timeoutMgr.AddTimeout("test", context.Background(), 50*time.Millisecond)
+	timedCtx := timeoutMgr.AddTimeout(context.Background(), "test", 50*time.Millisecond)
 
 	select {
 	case <-timedCtx.Done():
