@@ -112,7 +112,8 @@ func init() {
 	rootCmd.AddGroup(&cobra.Group{ID: "utility", Title: "Utility Commands"})
 
 	// Global flags
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output with detailed logging")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false,
+		"enable verbose output with detailed logging")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 
 	// Configure completion options

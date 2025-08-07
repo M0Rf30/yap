@@ -1,3 +1,4 @@
+// Package context provides context utilities and management for build operations.
 package context
 
 import (
@@ -12,17 +13,26 @@ import (
 type contextKey string
 
 const (
-	// Context keys for common values.
-	BuildIDKey   contextKey = "build_id"
-	ProjectKey   contextKey = "project"
-	PackageKey   contextKey = "package"
-	DistroKey    contextKey = "distro"
-	ReleaseKey   contextKey = "release"
+	// BuildIDKey is the context key for build identifiers.
+	BuildIDKey contextKey = "build_id"
+	// ProjectKey is the context key for project identifiers.
+	ProjectKey contextKey = "project"
+	// PackageKey is the context key for package identifiers.
+	PackageKey contextKey = "package"
+	// DistroKey is the context key for distribution identifiers.
+	DistroKey contextKey = "distro"
+	// ReleaseKey is the context key for release identifiers.
+	ReleaseKey contextKey = "release"
+	// OperationKey is the context key for operation identifiers.
 	OperationKey contextKey = "operation"
-	UserKey      contextKey = "user"
+	// UserKey is the context key for user identifiers.
+	UserKey contextKey = "user"
+	// RequestIDKey is the context key for request identifiers.
 	RequestIDKey contextKey = "request_id"
-	TraceIDKey   contextKey = "trace_id"
-	LoggerKey    contextKey = "logger"
+	// TraceIDKey is the context key for trace identifiers.
+	TraceIDKey contextKey = "trace_id"
+	// LoggerKey is the context key for logger instances.
+	LoggerKey contextKey = "logger"
 )
 
 // BuildContext contains information specific to a build operation.
@@ -91,17 +101,20 @@ func GetBuildContext(ctx context.Context) *BuildContext {
 }
 
 // WithTimeout creates a context with timeout and proper cleanup.
-func WithTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+func WithTimeout(
+	parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(parent, timeout)
 }
 
 // WithDeadline creates a context with deadline and proper cleanup.
-func WithDeadline(parent context.Context, deadline time.Time) (context.Context, context.CancelFunc) {
+func WithDeadline(
+	parent context.Context, deadline time.Time) (context.Context, context.CancelFunc) {
 	return context.WithDeadline(parent, deadline)
 }
 
 // WithCancel creates a context with cancellation.
-func WithCancel(parent context.Context) (context.Context, context.CancelFunc) {
+func WithCancel(
+	parent context.Context) (context.Context, context.CancelFunc) {
 	return context.WithCancel(parent)
 }
 
@@ -185,9 +198,8 @@ func NewTimeoutManager() *TimeoutManager {
 }
 
 // AddTimeout adds a named timeout to the manager.
-//
-
-func (tm *TimeoutManager) AddTimeout(name string, parent context.Context, timeout time.Duration) context.Context {
+func (tm *TimeoutManager) AddTimeout(
+	parent context.Context, name string, timeout time.Duration) context.Context {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
@@ -248,16 +260,17 @@ func (tm *TimeoutManager) ListActive() []string {
 	return names
 }
 
-// ContextPool manages a pool of reusable contexts for performance.
+// Pool manages a pool of reusable contexts for performance.
 //
 
-type ContextPool struct {
+// Pool provides a pool of reusable contexts for performance optimization.
+type Pool struct {
 	pool sync.Pool
 }
 
-// NewContextPool creates a new context pool.
-func NewContextPool() *ContextPool {
-	return &ContextPool{
+// NewPool creates a new context pool.
+func NewPool() *Pool {
+	return &Pool{
 		pool: sync.Pool{
 			New: func() any {
 				return context.Background()
@@ -267,12 +280,12 @@ func NewContextPool() *ContextPool {
 }
 
 // Get retrieves a context from the pool.
-func (cp *ContextPool) Get() context.Context {
+func (cp *Pool) Get() context.Context {
 	return cp.pool.Get().(context.Context)
 }
 
 // Put returns a context to the pool (only useful for custom context types).
-func (cp *ContextPool) Put(ctx context.Context) {
+func (cp *Pool) Put(ctx context.Context) {
 	// Only put back if it's a clean background context
 	if ctx == context.Background() {
 		cp.pool.Put(ctx)
