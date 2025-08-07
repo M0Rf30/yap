@@ -46,4 +46,4 @@
 //   - pkg/osutils: Operating system utilities and helpers
 //
 // For detailed documentation and examples, visit https://github.com/M0Rf30/yap
-package main
+package yap

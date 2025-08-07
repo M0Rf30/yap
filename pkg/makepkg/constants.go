@@ -101,9 +101,11 @@ const dotMtree = `#mtree
 {{- end }}
 `
 
-var installArgs = []string{
-	"-S",
-	"--noconfirm",
+func getBaseInstallArgs() []string {
+	return []string{
+		"-S",
+		"--noconfirm",
+	}
 }
 
 const postInstall = `
