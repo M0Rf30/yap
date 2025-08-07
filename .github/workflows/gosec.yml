@@ -1,4 +1,4 @@
-name: gosec
+name: Security Scan
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
   pull_request:
 
 jobs:
-  tests:
+  security:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -17,7 +17,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: run gosec
-        uses: securego/gosec@master
+      - name: setup go
+        uses: actions/setup-go@v5
         with:
-          args: ./...
+          go-version-file: go.mod
+
+      - name: run security scan
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.3
+          args: --enable-only gosec ./...
