@@ -1,3 +1,4 @@
+// Package main provides the yap command-line package management tool.
 package main
 
 import (

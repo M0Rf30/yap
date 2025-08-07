@@ -1,3 +1,4 @@
+// Package abuild provides functionality for building Alpine Linux APK packages.
 package abuild
 
 import (
@@ -33,7 +34,8 @@ import (
 // It contains the PKGBUILD struct, which contains the metadata and build
 // instructions for the package.
 type Apk struct {
-	// PKGBUILD is a pointer to the pkgbuild.PKGBUILD struct, which contains information about the package being built.
+	// PKGBUILD is a pointer to the pkgbuild.PKGBUILD struct, which contains
+	// information about the package being built.
 	PKGBUILD *pkgbuild.PKGBUILD
 }
 
@@ -81,7 +83,8 @@ func (a *Apk) PrepareFakeroot(artifactsPath string) error {
 	}
 
 	// Create install scripts if needed
-	if a.PKGBUILD.PreInst != "" || a.PKGBUILD.PostInst != "" || a.PKGBUILD.PreRm != "" || a.PKGBUILD.PostRm != "" {
+	if a.PKGBUILD.PreInst != "" || a.PKGBUILD.PostInst != "" ||
+		a.PKGBUILD.PreRm != "" || a.PKGBUILD.PostRm != "" {
 		err = a.createInstallScript()
 		if err != nil {
 			return err
@@ -93,7 +96,8 @@ func (a *Apk) PrepareFakeroot(artifactsPath string) error {
 
 // Install installs the APK package to the specified artifacts path.
 //
-// It takes a string parameter `artifactsPath` which specifies the path where the artifacts are located.
+// It takes a string parameter `artifactsPath` which specifies the path where the
+// artifacts are located.
 // It returns an error if there was an error during the installation process.
 func (a *Apk) Install(artifactsPath string) error {
 	pkgName := a.PKGBUILD.PkgName + "-" +
@@ -249,7 +253,8 @@ func (a *Apk) createAPKPackage(pkgFilePath, artifactsPath string) error {
 	err = a.savePublicKey(privateKey, keyName)
 	if err != nil {
 		// Log warning but continue - this is expected in test environments without root permissions
-		osutils.Logger.Warn("Failed to save public key (continuing without key installation): " + err.Error())
+		osutils.Logger.Warn("Failed to save public key (continuing without key installation): " +
+			err.Error())
 	}
 
 	// Also save the public key file alongside the APK for distribution
@@ -260,11 +265,15 @@ func (a *Apk) createAPKPackage(pkgFilePath, artifactsPath string) error {
 
 	// Step 4: Create the final APK file
 	// G304: Package file paths are controlled within package build process
-	outFile, err := os.Create(pkgFilePath)
+	outFile, err := os.Create(pkgFilePath) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("failed to create APK file: %w", err)
 	}
-	defer outFile.Close()
+	defer func() {
+		if err := outFile.Close(); err != nil {
+			osutils.Logger.Warn("failed to close output file", osutils.Logger.Args("error", err))
+		}
+	}()
 
 	// Step 5: Create data tar.gz archive first (needed for control)
 	var dataBuf bytes.Buffer
@@ -303,52 +312,57 @@ func (a *Apk) createAPKPackage(pkgFilePath, artifactsPath string) error {
 func (a *Apk) calculateDataHash() (string, error) {
 	hasher := sha256.New()
 
-	err := filepath.WalkDir(a.PKGBUILD.PackageDir, func(path string, dirEntry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if path == a.PKGBUILD.PackageDir {
-			return nil
-		}
-
-		// Skip control files - only hash data files
-		fileName := filepath.Base(path)
-		if fileName == ".PKGINFO" || fileName[0] == '.' {
-			return nil
-		}
-
-		relPath, err := filepath.Rel(a.PKGBUILD.PackageDir, path)
-		if err != nil {
-			return err
-		}
-
-		fileInfo, err := dirEntry.Info()
-		if err != nil {
-			return err
-		}
-
-		// Write file path and metadata to hasher
-		hasher.Write([]byte(relPath))
-		hasher.Write([]byte{byte(fileInfo.Mode())})
-
-		// Hash file content if it's a regular file
-		if fileInfo.Mode().IsRegular() {
-			// G304: File paths are controlled within package build process
-			file, err := os.Open(path)
+	err := filepath.WalkDir(a.PKGBUILD.PackageDir,
+		func(path string, dirEntry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			defer file.Close()
 
-			_, err = io.Copy(hasher, file)
+			if path == a.PKGBUILD.PackageDir {
+				return nil
+			}
+
+			// Skip control files - only hash data files
+			fileName := filepath.Base(path)
+			if fileName == ".PKGINFO" || fileName[0] == '.' {
+				return nil
+			}
+
+			relPath, err := filepath.Rel(a.PKGBUILD.PackageDir, path)
 			if err != nil {
 				return err
 			}
-		}
 
-		return nil
-	})
+			fileInfo, err := dirEntry.Info()
+			if err != nil {
+				return err
+			}
+
+			// Write file path and metadata to hasher
+			hasher.Write([]byte(relPath))
+			hasher.Write([]byte{byte(fileInfo.Mode())})
+
+			// Hash file content if it's a regular file
+			if fileInfo.Mode().IsRegular() {
+				// G304: File paths are controlled within package build process
+				file, err := os.Open(path) //nolint:gosec
+				if err != nil {
+					return err
+				}
+				defer func() {
+					if err := file.Close(); err != nil {
+						osutils.Logger.Warn("failed to close file", osutils.Logger.Args("path", path, "error", err))
+					}
+				}()
+
+				_, err = io.Copy(hasher, file)
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		})
 	if err != nil {
 		return "", err
 	}
@@ -393,11 +407,16 @@ func (a *Apk) savePublicKey(privateKey *rsa.PrivateKey, keyName string) error {
 	keyPath := filepath.Join(apkKeysDir, keyName+".rsa.pub")
 
 	// G304: Key file paths are controlled within package build process
-	keyFile, err := os.Create(keyPath)
+	keyFile, err := os.Create(keyPath) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("failed to create public key file: %w", err)
 	}
-	defer keyFile.Close()
+	defer func() {
+		if err := keyFile.Close(); err != nil {
+			osutils.Logger.Warn("failed to close key file",
+				osutils.Logger.Args("path", keyPath, "error", err))
+		}
+	}()
 
 	err = pem.Encode(keyFile, pemBlock)
 	if err != nil {
@@ -408,7 +427,8 @@ func (a *Apk) savePublicKey(privateKey *rsa.PrivateKey, keyName string) error {
 }
 
 // savePublicKeyToArtifacts saves the public key to the artifacts directory for distribution.
-func (a *Apk) savePublicKeyToArtifacts(privateKey *rsa.PrivateKey, keyName, artifactsPath string) error {
+func (a *Apk) savePublicKeyToArtifacts(privateKey *rsa.PrivateKey, keyName,
+	artifactsPath string) error {
 	publicKey := &privateKey.PublicKey
 
 	// For APK compatibility, save the key in PEM format (like official Alpine keys)
@@ -427,11 +447,16 @@ func (a *Apk) savePublicKeyToArtifacts(privateKey *rsa.PrivateKey, keyName, arti
 	keyPath := filepath.Join(artifactsPath, keyName+".rsa.pub")
 
 	// G304: Key file paths are controlled within package build process
-	keyFile, err := os.Create(keyPath)
+	keyFile, err := os.Create(keyPath) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("failed to create public key file in artifacts: %w", err)
 	}
-	defer keyFile.Close()
+	defer func() {
+		if err := keyFile.Close(); err != nil {
+			osutils.Logger.Warn("failed to close artifacts key file",
+				osutils.Logger.Args("path", keyPath, "error", err))
+		}
+	}()
 
 	err = pem.Encode(keyFile, pemBlock)
 	if err != nil {
@@ -453,7 +478,8 @@ func (a *Apk) createPkgInfo() error {
 
 // createInstallScript creates install scripts for the APK package.
 func (a *Apk) createInstallScript() error {
-	if a.PKGBUILD.PreInst == "" && a.PKGBUILD.PostInst == "" && a.PKGBUILD.PreRm == "" && a.PKGBUILD.PostRm == "" {
+	if a.PKGBUILD.PreInst == "" && a.PKGBUILD.PostInst == "" &&
+		a.PKGBUILD.PreRm == "" && a.PKGBUILD.PostRm == "" {
 		return nil
 	}
 
@@ -602,11 +628,12 @@ func (a *Apk) createDataArchive(dataTgz io.Writer) ([]byte, error) {
 }
 
 // createControlArchive creates the control tar.gz archive.
-func (a *Apk) createControlArchive(controlTgz io.Writer, size int64, dataDigest []byte) ([]byte, error) {
+func (a *Apk) createControlArchive(controlTgz io.Writer, size int64,
+	dataDigest []byte) ([]byte, error) {
 	builderControl := a.createBuilderControl(size, dataDigest)
 
 	// G401: SHA1 required for APK format compatibility
-	controlDigest, err := a.writeTgz(controlTgz, tarCut, builderControl, sha1.New())
+	controlDigest, err := a.writeTgz(controlTgz, tarCut, builderControl, sha1.New()) // #nosec G401
 	if err != nil {
 		return nil, err
 	}
@@ -621,7 +648,7 @@ func (a *Apk) createSignatureArchive(signatureTgz io.Writer, privateKey *rsa.Pri
 	signatureBuilder := a.CreateSignatureBuilder(controlSHA1Digest, privateKey, keyName)
 
 	// G401: SHA1 required for APK format compatibility
-	_, err := a.writeTgz(signatureTgz, tarCut, signatureBuilder, sha1.New())
+	_, err := a.writeTgz(signatureTgz, tarCut, signatureBuilder, sha1.New()) // #nosec G401
 	if err != nil {
 		return fmt.Errorf("signing failure: %w", err)
 	}
@@ -685,32 +712,34 @@ func (a *Apk) createBuilderControl(_ int64, _ []byte) func(tarWriter *tar.Writer
 
 // addDataFilesToTarWriter adds all data files to the tar writer with SHA1 checksums.
 func (a *Apk) addDataFilesToTarWriter(tarWriter *tar.Writer) error {
-	return filepath.WalkDir(a.PKGBUILD.PackageDir, func(path string, dirEntry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
+	return filepath.WalkDir(
+		a.PKGBUILD.PackageDir,
+		func(path string, dirEntry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
 
-		if path == a.PKGBUILD.PackageDir {
-			return nil
-		}
+			if path == a.PKGBUILD.PackageDir {
+				return nil
+			}
 
-		// Skip control files - they were already added
-		if a.isControlFile(filepath.Base(path)) {
-			return nil
-		}
+			// Skip control files - they were already added
+			if a.isControlFile(filepath.Base(path)) {
+				return nil
+			}
 
-		relPath, err := filepath.Rel(a.PKGBUILD.PackageDir, path)
-		if err != nil {
-			return err
-		}
+			relPath, err := filepath.Rel(a.PKGBUILD.PackageDir, path)
+			if err != nil {
+				return err
+			}
 
-		fileInfo, err := dirEntry.Info()
-		if err != nil {
-			return err
-		}
+			fileInfo, err := dirEntry.Info()
+			if err != nil {
+				return err
+			}
 
-		return a.addFileToTarWithChecksum(tarWriter, path, relPath, fileInfo)
-	})
+			return a.addFileToTarWithChecksum(tarWriter, path, relPath, fileInfo)
+		})
 }
 
 // isControlFile checks if a file is a control file that should be skipped.
@@ -734,7 +763,8 @@ func (a *Apk) isControlFile(fileName string) bool {
 }
 
 // addFileToTarWithChecksum adds a single file to the tar archive with proper headers and checksums.
-func (a *Apk) addFileToTarWithChecksum(tarWriter *tar.Writer, path, relPath string, fileInfo fs.FileInfo) error {
+func (a *Apk) addFileToTarWithChecksum(
+	tarWriter *tar.Writer, path, relPath string, fileInfo fs.FileInfo) error {
 	// Create tar header
 	header, err := tar.FileInfoHeader(fileInfo, "")
 	if err != nil {
@@ -787,15 +817,20 @@ func (a *Apk) handleSymlink(tarWriter *tar.Writer, path string, header *tar.Head
 	return tarWriter.WriteHeader(header)
 }
 
-// handleRegularFile processes a regular file, calculates its checksum, and adds it to the tar archive.
+// handleRegularFile processes a regular file, calculates its checksum,
+// and adds it to the tar archive.
 func (a *Apk) handleRegularFile(tarWriter *tar.Writer, path string, header *tar.Header) error {
 	// Read file content to calculate SHA1 checksum
 	// G304: File paths are controlled within package build process
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			osutils.Logger.Warn("failed to close file", osutils.Logger.Args("path", path, "error", err))
+		}
+	}()
 
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
@@ -831,11 +866,15 @@ func (a *Apk) handleRegularFile(tarWriter *tar.Writer, path string, header *tar.
 // addFileToTarWriter adds a file to a tar writer with SHA1 checksum in extended headers.
 func (a *Apk) addFileToTarWriter(tarWriter *tar.Writer, filePath, tarPath string) error {
 	// G304: File paths are controlled within package build process
-	file, err := os.Open(filePath)
+	file, err := os.Open(filePath) // #nosec G304
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			osutils.Logger.Warn("failed to close file", osutils.Logger.Args("path", filePath, "error", err))
+		}
+	}()
 
 	fileInfo, err := file.Stat()
 	if err != nil {

@@ -1,25 +1,41 @@
 version: "2"
+
+run:
+  timeout: 10m
+  issues-exit-code: 1
+  tests: true
+
 linters:
   enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosec
+    - errorlint
+    - nilerr
     - asciicheck
     - bodyclose
     - copyloopvar
-    - dogsled
     - durationcheck
-    - errorlint
-    - ginkgolinter
     - gochecknoinits
-    - gosec
-    - importas
     - misspell
     - nakedret
-    - nolintlint
     - revive
-    - testifylint
     - unconvert
     - unparam
     - wastedassign
-    - wsl_v5
+    - whitespace
+    - predeclared
+    - cyclop
+    - gocyclo
+    - goconst
+    - gocritic
+    - dupl
+    - nestif
+    - lll
+
   disable:
     - depguard
     - exhaustruct
@@ -28,91 +44,187 @@ linters:
     - funlen
     - gochecknoglobals
     - gomoddirectives
-    - ireturn
     - mnd
     - wrapcheck
-    - wsl
+    - wsl_v5
+
   settings:
     cyclop:
       max-complexity: 15
+
     dupl:
-      threshold: 100
-    funlen:
-      lines: -1
-      statements: 50
+      threshold: 80
+
     goconst:
-      min-len: 2
+      min-len: 3
       min-occurrences: 3
+
     gocritic:
-      disabled-checks:
-        - dupImport
-        - ifElseChain
-        - octalLiteral
-        - whyNoLint
-        - unnamedResult
       enabled-tags:
         - diagnostic
-        - experimental
-        - opinionated
         - performance
         - style
+      disabled-checks:
+        - paramTypeCombine
+        - whyNoLint
+
+    gocyclo:
+      min-complexity: 15
+
     gosec:
       severity: medium
       confidence: medium
       excludes:
-        - G401 # Weak cryptographic primitive - justified for APK format compatibility
-        - G304 # File path provided as taint input - controlled within package build process
+        - G204
+        - G301
+        - G302
+
+    lll:
+      line-length: 100
+
     revive:
       rules:
+        - name: blank-imports
+        - name: context-as-argument
         - name: dot-imports
-          disabled: true
-        - name: filename-format
-          arguments:
-            - ^[a-z][_a-z0-9]*.go$
-        - name: redefines-builtin-id
+        - name: error-return
+        - name: error-strings
+        - name: exported
+        - name: increment-decrement
+        - name: var-naming
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+
     staticcheck:
       checks:
         - all
-        - -SA1019
-    testifylint:
-      enable-all: true
-    wsl_v5:
-      allow-first-in-block: true
-      allow-whole-block: false
-      branch-max-lines: 2
+
   exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+    generated: strict
+
+    rules:
+      - path: "(docs|dist|bin)/"
+        linters:
+          - gosec
+          - govet
+          - staticcheck
+          - unused
+          - errcheck
+          - ineffassign
+          - revive
+          - gocritic
+          - dupl
+          - goconst
+          - cyclop
+          - gocyclo
+          - lll
+          - nestif
+          - asciicheck
+          - bodyclose
+          - copyloopvar
+          - durationcheck
+          - gochecknoinits
+          - misspell
+          - nakedret
+          - unconvert
+          - unparam
+          - wastedassign
+          - whitespace
+          - predeclared
+          - errorlint
+          - nilerr
+
+      - path: ".*\\.pb\\.go$"
+        linters:
+          - gosec
+          - govet
+          - staticcheck
+          - unused
+          - errcheck
+          - ineffassign
+          - revive
+          - gocritic
+          - dupl
+          - goconst
+          - cyclop
+          - gocyclo
+          - lll
+          - nestif
+          - asciicheck
+          - bodyclose
+          - copyloopvar
+          - durationcheck
+          - gochecknoinits
+          - misspell
+          - nakedret
+          - unconvert
+          - unparam
+          - wastedassign
+          - whitespace
+          - predeclared
+          - errorlint
+          - nilerr
+
+      - path: ".*_generated\\.go$"
+        linters:
+          - gosec
+          - govet
+          - staticcheck
+          - unused
+          - errcheck
+          - ineffassign
+          - revive
+          - gocritic
+          - dupl
+          - goconst
+          - cyclop
+          - gocyclo
+          - lll
+          - nestif
+          - asciicheck
+          - bodyclose
+          - copyloopvar
+          - durationcheck
+          - gochecknoinits
+          - misspell
+          - nakedret
+          - unconvert
+          - unparam
+          - wastedassign
+          - whitespace
+          - predeclared
+          - errorlint
+          - nilerr
+
+      - path: "_test\\.go"
+        linters:
+          - gosec
+          - dupl
+          - goconst
+          - lll
+          - cyclop
+          - gocyclo
+
+      - path: "_test\\.go"
+        text: "G30[12]:"
+        linters:
+          - gosec
+
 formatters:
   enable:
-    - gci
-    - gofmt
-    - gofumpt
     - goimports
+
   settings:
-    gci:
-      sections:
-        - standard
-        - default
-        - prefix(github.com/M0Rf30/yap)
-    gofmt:
-      rewrite-rules:
-        - pattern: interface{}
-          replacement: any
     goimports:
       local-prefixes:
         - github.com/M0Rf30/yap
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false

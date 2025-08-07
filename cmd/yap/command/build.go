@@ -1,3 +1,4 @@
+// Package command provides CLI commands for the yap package management tool.
 package command
 
 import (
@@ -81,9 +82,11 @@ DEPENDENCY RESOLUTION:
 		if distro == "" {
 			osRelease, _ := osutils.ParseOSRelease()
 			distro = osRelease.ID
-			osutils.Logger.Warn("No distribution specified, using detected", osutils.Logger.Args("distro", distro))
+			osutils.Logger.Warn("No distribution specified, using detected",
+				osutils.Logger.Args("distro", distro))
 		} else {
-			osutils.Logger.Info("Building for distribution", osutils.Logger.Args("distro", distro, "release", release))
+			osutils.Logger.Info("Building for distribution",
+				osutils.Logger.Args("distro", distro, "release", release))
 		}
 
 		// Show project path

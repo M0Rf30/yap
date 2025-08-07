@@ -1,3 +1,4 @@
+// Package parser provides PKGBUILD parsing and processing functionality.
 package parser
 
 import (
@@ -89,7 +90,9 @@ func getSyntaxFile(path string) (*syntax.File, error) {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close PKGBUILD file", osutils.Logger.Args("path", filePath, "error", err))
+			osutils.Logger.Warn(
+				"failed to close PKGBUILD file",
+				osutils.Logger.Args("path", filePath, "error", err))
 		}
 	}()
 
@@ -154,7 +157,8 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 	return err
 }
 
-func processFunctions(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD, customVars map[string]string) error {
+func processFunctions(
+	pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD, customVars map[string]string) error {
 	var err error
 
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
@@ -192,7 +196,8 @@ func preprocessArrayExpansions(funcDecl string, customVars map[string]string) st
 }
 
 // expandKnownVariables expands only variables we know about, leaving runtime variables intact.
-func expandKnownVariables(funcDecl string, customVars map[string]string, pkgBuild *pkgbuild.PKGBUILD) string {
+func expandKnownVariables(
+	funcDecl string, customVars map[string]string, pkgBuild *pkgbuild.PKGBUILD) string {
 	// Create a map of all known variables
 	knownVars := make(map[string]string)
 

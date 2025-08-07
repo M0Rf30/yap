@@ -181,7 +181,8 @@ func (m *Pkg) Prepare(makeDepends []string) error {
 
 // PrepareEnvironment prepares the environment for the Makepkg.
 //
-// It takes a boolean parameter `golang` which indicates whether the environment should be prepared for Golang.
+// It takes a boolean parameter `golang` which indicates whether the environment
+// should be prepared for Golang.
 // It returns an error if there is any issue in preparing the environment.
 func (m *Pkg) PrepareEnvironment(golang bool) error {
 	installArgs = append(installArgs, buildEnvironmentDeps...)
@@ -230,7 +231,8 @@ func createContent(
 }
 
 // handleFileEntry processes a file entry at the given path, checking if it is a backup file,
-// and appending its content to the provided slice based on its type (config, symlink, or regular file).
+// and appending its content to the provided slice based on its type (config, symlink, or
+// regular file).
 func handleFileEntry(path, packageDir string, contents *[]osutils.FileContent) error {
 	fileInfo, err := os.Lstat(path)
 	if err != nil {

@@ -1,3 +1,4 @@
+// Package errors provides custom error types and error handling utilities for YAP.
 package errors
 
 import (
@@ -9,15 +10,22 @@ import (
 type ErrorType string
 
 const (
-	// Core error types.
-	ErrTypeValidation    ErrorType = "validation"
-	ErrTypeFileSystem    ErrorType = "filesystem"
-	ErrTypeNetwork       ErrorType = "network"
-	ErrTypePackaging     ErrorType = "packaging"
+	// ErrTypeValidation represents validation errors.
+	ErrTypeValidation ErrorType = "validation"
+	// ErrTypeFileSystem represents filesystem errors.
+	ErrTypeFileSystem ErrorType = "filesystem"
+	// ErrTypeNetwork represents network errors.
+	ErrTypeNetwork ErrorType = "network"
+	// ErrTypePackaging represents packaging errors.
+	ErrTypePackaging ErrorType = "packaging"
+	// ErrTypeConfiguration represents configuration errors.
 	ErrTypeConfiguration ErrorType = "configuration"
-	ErrTypeBuild         ErrorType = "build"
-	ErrTypeParser        ErrorType = "parser"
-	ErrTypeInternal      ErrorType = "internal"
+	// ErrTypeBuild represents build errors.
+	ErrTypeBuild ErrorType = "build"
+	// ErrTypeParser represents parser errors.
+	ErrTypeParser ErrorType = "parser"
+	// ErrTypeInternal represents internal errors.
+	ErrTypeInternal ErrorType = "internal"
 )
 
 // YapError represents a structured error with context.
@@ -162,7 +170,7 @@ func GetContext(err error) map[string]any {
 	return nil
 }
 
-// Chain creates an error chain for related operations.
+// ChainError creates an error chain for related operations.
 type ChainError struct {
 	errors []error
 }

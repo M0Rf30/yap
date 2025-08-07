@@ -1,3 +1,4 @@
+// Package logger provides structured logging functionality with configurable levels and formats.
 package logger
 
 import (
@@ -44,10 +45,15 @@ func (h *yapHandler) WithGroup(name string) slog.Handler {
 }
 
 const (
+	// LevelDebug represents debug log level.
 	LevelDebug LogLevel = iota
+	// LevelInfo represents info log level.
 	LevelInfo
+	// LevelWarn represents warning log level.
 	LevelWarn
+	// LevelError represents error log level.
 	LevelError
+	// LevelFatal represents fatal log level.
 	LevelFatal
 )
 
@@ -87,10 +93,8 @@ func (l LogLevel) ToSlogLevel() slog.Level {
 	}
 }
 
-// LoggerConfig holds configuration for the logger.
-//
-
-type LoggerConfig struct {
+// Config holds configuration for the logger.
+type Config struct {
 	Level      LogLevel
 	Format     string    // "json" or "text"
 	Output     io.Writer // defaults to os.Stdout
@@ -99,8 +103,8 @@ type LoggerConfig struct {
 }
 
 // DefaultConfig returns a default logger configuration.
-func DefaultConfig() *LoggerConfig {
-	return &LoggerConfig{
+func DefaultConfig() *Config {
+	return &Config{
 		Level:      LevelInfo,
 		Format:     "text",
 		Output:     os.Stdout,
@@ -112,11 +116,11 @@ func DefaultConfig() *LoggerConfig {
 // Logger wraps slog.Logger with additional functionality.
 type Logger struct {
 	slog   *slog.Logger
-	config *LoggerConfig
+	config *Config
 }
 
 // New creates a new Logger with the given configuration.
-func New(config *LoggerConfig) *Logger {
+func New(config *Config) *Logger {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -294,7 +298,8 @@ func (l *Logger) LogOperation(name string, fn func() error) error {
 }
 
 // LogOperationContext logs the start and completion of an operation with context.
-func (l *Logger) LogOperationContext(ctx context.Context, name string, fn func(context.Context) error) error {
+func (l *Logger) LogOperationContext(
+	ctx context.Context, name string, fn func(context.Context) error) error {
 	start := time.Now()
 	l.InfoContext(ctx, "operation started", "name", name, "timestamp", start)
 

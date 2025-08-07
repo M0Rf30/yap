@@ -35,6 +35,7 @@ For most distributions, this includes both the base name and release codename.`,
 	},
 }
 
+// ListDistros prints all available distribution releases.
 func ListDistros() {
 	for _, release := range &constants.Releases {
 		pterm.Println(release)

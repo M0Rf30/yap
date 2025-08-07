@@ -1,3 +1,4 @@
+// Package set provides generic set data structure implementation.
 package set
 
 var exists = struct{}{}

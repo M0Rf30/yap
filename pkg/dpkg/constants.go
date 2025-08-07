@@ -1,3 +1,4 @@
+// Package dpkg provides Debian package building functionality and constants.
 package dpkg
 
 var buildEnvironmentDeps = []string{
@@ -22,6 +23,7 @@ var installArgs = []string{
 	"install",
 }
 
+// DebArchs maps standard architecture names to Debian package architecture names.
 var DebArchs = map[string]string{
 	"any":     "all",
 	"x86_64":  "amd64",

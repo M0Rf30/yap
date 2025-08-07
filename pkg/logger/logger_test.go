@@ -44,7 +44,7 @@ func TestNewLogger(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:      LevelDebug,
 		Format:     "json",
 		Output:     &buf,
@@ -71,7 +71,7 @@ func TestLogger_With(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:  LevelDebug,
 		Format: "json",
 		Output: &buf,
@@ -95,7 +95,7 @@ func TestLogger_WithError(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:  LevelDebug,
 		Format: "json",
 		Output: &buf,
@@ -132,7 +132,7 @@ func TestLogger_WithFields(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:  LevelDebug,
 		Format: "json",
 		Output: &buf,
@@ -178,8 +178,7 @@ func TestLogger_LogLevels(t *testing.T) {
 
 			var buf bytes.Buffer
 
-			config := &LoggerConfig{
-				Level:  LevelDebug,
+			config := &Config{Level: LevelDebug,
 				Format: "json",
 				Output: &buf,
 			}
@@ -207,7 +206,7 @@ func TestLogger_LogOperation(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:  LevelDebug,
 		Format: "json",
 		Output: &buf,
@@ -252,7 +251,7 @@ func TestLogger_LogOperationContext(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:  LevelDebug,
 		Format: "json",
 		Output: &buf,
@@ -283,7 +282,7 @@ func TestLogger_ContextMethods(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:  LevelDebug,
 		Format: "json",
 		Output: &buf,
@@ -309,7 +308,7 @@ func TestLogger_Trace(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:  LevelDebug,
 		Format: "json",
 		Output: &buf,
@@ -358,7 +357,7 @@ func TestGlobalLogger(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:  LevelDebug,
 		Format: "text",
 		Output: &buf,
@@ -387,7 +386,7 @@ func TestLoggerLevelFiltering(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	config := &LoggerConfig{
+	config := &Config{
 		Level:  LevelWarn, // Only warn and above should be logged
 		Format: "text",
 		Output: &buf,
@@ -413,12 +412,12 @@ func TestTextVsJSONFormat(t *testing.T) {
 	// Test text format
 	var textBuf bytes.Buffer
 
-	textConfig := &LoggerConfig{
+	textLoggerConfig := &Config{
 		Level:  LevelInfo,
 		Format: "text",
 		Output: &textBuf,
 	}
-	textLogger := New(textConfig)
+	textLogger := New(textLoggerConfig)
 	textLogger.Info("test message", "key", "value")
 
 	textOutput := textBuf.String()
@@ -428,12 +427,12 @@ func TestTextVsJSONFormat(t *testing.T) {
 	// Test JSON format
 	var jsonBuf bytes.Buffer
 
-	jsonConfig := &LoggerConfig{
+	jsonLoggerConfig := &Config{
 		Level:  LevelInfo,
 		Format: "json",
 		Output: &jsonBuf,
 	}
-	jsonLogger := New(jsonConfig)
+	jsonLogger := New(jsonLoggerConfig)
 	jsonLogger.Info("test message", "key", "value")
 
 	jsonOutput := jsonBuf.String()

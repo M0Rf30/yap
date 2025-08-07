@@ -23,7 +23,8 @@ var (
 )
 
 // ValidDistrosCompletion provides completion for valid distributions.
-func ValidDistrosCompletion(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func ValidDistrosCompletion(_ *cobra.Command, args []string, toComplete string) (
+	[]string, cobra.ShellCompDirective) {
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -51,7 +52,8 @@ func ValidDistrosCompletion(_ *cobra.Command, args []string, toComplete string) 
 }
 
 // ProjectPathCompletion provides completion for project paths (directories with yap.json).
-func ProjectPathCompletion(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+func ProjectPathCompletion(_ *cobra.Command, _ []string, _ string) (
+	[]string, cobra.ShellCompDirective) {
 	return nil, cobra.ShellCompDirectiveFilterDirs
 }
 
@@ -140,7 +142,8 @@ func formatDistroSuggestions(input string) string {
 func createValidateDistroArgs(minArgs int) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
 		if len(args) < minArgs {
-			return fmt.Errorf("requires at least %d argument(s), only received %d\n\nUse '%s --help' for usage information: %w",
+			return fmt.Errorf("requires at least %d argument(s), only received %d\n\n"+
+				"Use '%s --help' for usage information: %w",
 				minArgs, len(args), cmd.CommandPath(), ErrInsufficientArgs)
 		}
 

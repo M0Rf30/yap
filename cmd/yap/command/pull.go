@@ -41,7 +41,8 @@ Re-running this command will update to the latest image versions.`,
 		split := strings.Split(args[0], "-")
 
 		if len(split) == 1 && split[0] != "alpine" && split[0] != "arch" {
-			osutils.Logger.Fatal("except for alpine and arch, specify also the codename (i. e. rocky-9, ubuntu-jammy)")
+			osutils.Logger.Fatal("except for alpine and arch, specify also the codename " +
+				"(i. e. rocky-9, ubuntu-jammy)")
 		}
 
 		err := osutils.PullContainers(args[0])

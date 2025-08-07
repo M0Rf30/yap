@@ -60,7 +60,8 @@ func CustomUsageFunc(cmd *cobra.Command) error {
 
 	// Footer
 	pterm.Printf("\n%s\n",
-		pterm.FgGray.Sprintf("Use \"%s [command] --help\" for more information about a command.", cmd.CommandPath()))
+		pterm.FgGray.Sprintf("Use \"%s [command] --help\" for more information about a command.",
+			cmd.CommandPath()))
 
 	return nil
 }

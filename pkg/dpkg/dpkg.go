@@ -38,7 +38,8 @@ func (d *Deb) BuildPackage(artifactsPath string) error {
 	defer func() {
 		err := os.RemoveAll(debTemp)
 		if err != nil {
-			osutils.Logger.Warn("failed to remove temporary directory", osutils.Logger.Args("path", debTemp, "error", err))
+			osutils.Logger.Warn("failed to remove temporary directory",
+				osutils.Logger.Args("path", debTemp, "error", err))
 		}
 	}()
 

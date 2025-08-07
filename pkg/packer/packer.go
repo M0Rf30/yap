@@ -1,3 +1,4 @@
+// Package packer provides unified package building interface for multiple formats.
 package packer
 
 import (
@@ -25,7 +26,8 @@ type Packer interface {
 	// build machine. It returns any error if encountered.
 	PrepareEnvironment(flag bool) error
 	// PrepareFakeroot sets up the environment for building the final artifact in a fakeroot context.
-	// It takes an output path where the artifact will be written and returns an error if any issues occur.
+	// It takes an output path where the artifact will be written and returns an error if any issues
+	// occur.
 	PrepareFakeroot(output string) error
 	// Update performs a package manager update operation. It returns any error if
 	// encountered.

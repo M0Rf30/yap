@@ -702,7 +702,11 @@ func TestAddArFile(t *testing.T) {
 	file, err := os.Create(tempFile)
 	require.NoError(t, err)
 
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			t.Logf("failed to close file: %v", err)
+		}
+	}()
 
 	writer := ar.NewWriter(file)
 	err = writer.WriteGlobalHeader()

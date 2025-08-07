@@ -1,3 +1,4 @@
+// Package pkgbuild provides PKGBUILD structure and manipulation functionality.
 package pkgbuild
 
 import (
@@ -137,7 +138,8 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close pkgbuild file", osutils.Logger.Args("path", cleanFilePath, "error", err))
+			osutils.Logger.Warn("failed to close pkgbuild file", osutils.Logger.Args("path", cleanFilePath,
+				"error", err))
 		}
 	}()
 
@@ -179,10 +181,11 @@ func (pkgBuild *PKGBUILD) Init() {
 
 // RenderSpec initializes a new template with custom functions and parses the provided script.
 // It adds two custom functions to the template:
-//  1. "join": Takes a slice of strings and joins them into a single string, separated by commas,
-//     while also trimming any leading or trailing spaces.
-//  2. "multiline": Takes a string and replaces newline characters with a newline followed by a space,
-//     effectively formatting the string for better readability in multi-line contexts.
+//
+//	"join": Takes a slice of strings and joins them into a single string, separated by commas,
+//	while also trimming any leading or trailing spaces.
+//	"multiline": Takes a string and replaces newline characters with a newline followed by a space,
+//	effectively formatting the string for better readability in multi-line contexts.
 //
 // The method returns the parsed template, which can be used for rendering with data.
 func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
@@ -417,10 +420,10 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 
 // parseDirective is a function that takes an input string and returns a key,
 // priority, and an error.
-func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
+func (pkgBuild *PKGBUILD) parseDirective(input string) (key string, priority int, err error) {
 	// Split the input string by "__" to separate the key and the directive.
 	split := strings.Split(input, "__")
-	key := split[0]
+	key = split[0]
 
 	// If there is only one element in the split array, return the key and a priority of 0.
 	if len(split) == 1 {
@@ -439,16 +442,17 @@ func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
 
 	// Set the directive to the second element in the split array.
 	directive := split[1]
-	priority := -1
+	priority = -1
 
 	// Check if the directive matches the FullDistroName and set the priority accordingly.
-	if directive == pkgBuild.FullDistroName {
+	switch {
+	case directive == pkgBuild.FullDistroName:
 		priority = 3
-	} else if constants.DistrosSet.Contains(directive) &&
-		directive == pkgBuild.Distro {
+	case constants.DistrosSet.Contains(directive) &&
+		directive == pkgBuild.Distro:
 		priority = 2
-	} else if constants.PackagersSet.Contains(directive) &&
-		directive == constants.DistroPackageManager[pkgBuild.Distro] {
+	case constants.PackagersSet.Contains(directive) &&
+		directive == constants.DistroPackageManager[pkgBuild.Distro]:
 		priority = 1
 	}
 

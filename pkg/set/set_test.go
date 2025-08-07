@@ -191,10 +191,10 @@ func TestSet_ConcurrentAccess(t *testing.T) {
 	done := make(chan bool)
 
 	go func() {
-		for range s.Iter() {
-			// Simulate some processing time
+		for item := range s.Iter() {
+			// Process each item - required for test concurrency verification
+			_ = item // Use the item to satisfy the linter
 		}
-
 		done <- true
 	}()
 

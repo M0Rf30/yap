@@ -143,7 +143,7 @@ func TestTimeoutManager(t *testing.T) {
 		t.Fatal("Expected TimeoutManager to be created")
 	}
 
-	ctx := timeoutManager.AddTimeout("test", context.Background(), 100*time.Millisecond)
+	ctx := timeoutManager.AddTimeout(context.Background(), "test", 100*time.Millisecond)
 	if ctx == nil {
 		t.Fatal("Expected context to be returned")
 	}
