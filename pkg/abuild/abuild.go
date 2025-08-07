@@ -265,10 +265,11 @@ func (a *Apk) createAPKPackage(pkgFilePath, artifactsPath string) error {
 
 	// Step 4: Create the final APK file
 	// G304: Package file paths are controlled within package build process
-	outFile, err := os.Create(pkgFilePath) //nolint:gosec
+	outFile, err := os.Create(pkgFilePath) // #nosec G304
 	if err != nil {
 		return fmt.Errorf("failed to create APK file: %w", err)
 	}
+
 	defer func() {
 		if err := outFile.Close(); err != nil {
 			osutils.Logger.Warn("failed to close output file", osutils.Logger.Args("error", err))
@@ -345,10 +346,11 @@ func (a *Apk) calculateDataHash() (string, error) {
 			// Hash file content if it's a regular file
 			if fileInfo.Mode().IsRegular() {
 				// G304: File paths are controlled within package build process
-				file, err := os.Open(path) //nolint:gosec
+				file, err := os.Open(path) // #nosec G304
 				if err != nil {
 					return err
 				}
+
 				defer func() {
 					if err := file.Close(); err != nil {
 						osutils.Logger.Warn("failed to close file", osutils.Logger.Args("path", path, "error", err))
@@ -407,10 +409,11 @@ func (a *Apk) savePublicKey(privateKey *rsa.PrivateKey, keyName string) error {
 	keyPath := filepath.Join(apkKeysDir, keyName+".rsa.pub")
 
 	// G304: Key file paths are controlled within package build process
-	keyFile, err := os.Create(keyPath) //nolint:gosec
+	keyFile, err := os.Create(keyPath) // #nosec G304
 	if err != nil {
 		return fmt.Errorf("failed to create public key file: %w", err)
 	}
+
 	defer func() {
 		if err := keyFile.Close(); err != nil {
 			osutils.Logger.Warn("failed to close key file",
@@ -447,10 +450,11 @@ func (a *Apk) savePublicKeyToArtifacts(privateKey *rsa.PrivateKey, keyName,
 	keyPath := filepath.Join(artifactsPath, keyName+".rsa.pub")
 
 	// G304: Key file paths are controlled within package build process
-	keyFile, err := os.Create(keyPath) //nolint:gosec
+	keyFile, err := os.Create(keyPath) // #nosec G304
 	if err != nil {
 		return fmt.Errorf("failed to create public key file in artifacts: %w", err)
 	}
+
 	defer func() {
 		if err := keyFile.Close(); err != nil {
 			osutils.Logger.Warn("failed to close artifacts key file",
@@ -822,10 +826,11 @@ func (a *Apk) handleSymlink(tarWriter *tar.Writer, path string, header *tar.Head
 func (a *Apk) handleRegularFile(tarWriter *tar.Writer, path string, header *tar.Header) error {
 	// Read file content to calculate SHA1 checksum
 	// G304: File paths are controlled within package build process
-	file, err := os.Open(path) //nolint:gosec
+	file, err := os.Open(path) // #nosec G304
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		if err := file.Close(); err != nil {
 			osutils.Logger.Warn("failed to close file", osutils.Logger.Args("path", path, "error", err))
@@ -870,6 +875,7 @@ func (a *Apk) addFileToTarWriter(tarWriter *tar.Writer, filePath, tarPath string
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		if err := file.Close(); err != nil {
 			osutils.Logger.Warn("failed to close file", osutils.Logger.Args("path", filePath, "error", err))
