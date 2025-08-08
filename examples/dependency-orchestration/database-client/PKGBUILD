@@ -1,0 +1,170 @@
+pkgname="database-client"
+pkgver="2.0.0"
+pkgrel="1"
+pkgdesc="Database client library providing connection pooling and query execution"
+arch=('x86_64')
+maintainer="YAP Team <maintainer@yap.dev>"
+url="https://github.com/example/database-client"
+
+# Runtime dependency on foundation library
+depends=('foundation-lib')
+
+build() {
+  # Create local foundation.h for build-time
+  cat > foundation.h << 'EOF'
+#ifndef FOUNDATION_H
+#define FOUNDATION_H
+#include <stddef.h>
+#define FOUNDATION_VERSION "1.0.0"
+void foundation_init();
+void foundation_log(const char* level, const char* message);
+void* foundation_malloc(size_t size);
+void foundation_free(void* ptr);
+int foundation_string_compare(const char* str1, const char* str2);
+#endif
+EOF
+
+  # Create database client implementation
+  cat > database.c << 'EOF'
+#include "foundation.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+typedef struct {
+    char* host;
+    int port;
+    char* database;
+    int connected;
+} db_connection_t;
+
+// Database client functions
+void database_init() {
+    foundation_init();
+    foundation_log("INFO", "Database client initialized");
+}
+
+db_connection_t* database_connect(const char* host, int port, const char* database) {
+    foundation_log("INFO", "Connecting to database");
+    
+    db_connection_t* conn = (db_connection_t*)foundation_malloc(sizeof(db_connection_t));
+    if (!conn) {
+        foundation_log("ERROR", "Failed to allocate connection");
+        return NULL;
+    }
+    
+    conn->host = (char*)foundation_malloc(strlen(host) + 1);
+    strcpy(conn->host, host);
+    conn->port = port;
+    conn->database = (char*)foundation_malloc(strlen(database) + 1);
+    strcpy(conn->database, database);
+    conn->connected = 1;
+    
+    foundation_log("INFO", "Database connection established");
+    return conn;
+}
+
+int database_execute_query(db_connection_t* conn, const char* query) {
+    if (!conn || !conn->connected) {
+        foundation_log("ERROR", "No database connection");
+        return -1;
+    }
+    
+    foundation_log("DEBUG", "Executing database query");
+    
+    // Simulate query execution
+    if (strstr(query, "SELECT")) {
+        foundation_log("DEBUG", "SELECT query executed");
+        return 1; // Number of rows
+    } else if (strstr(query, "INSERT") || strstr(query, "UPDATE") || strstr(query, "DELETE")) {
+        foundation_log("DEBUG", "DML query executed");
+        return 0; // Affected rows
+    }
+    
+    foundation_log("WARN", "Unknown query type");
+    return -1;
+}
+
+void database_disconnect(db_connection_t* conn) {
+    if (conn) {
+        foundation_log("INFO", "Disconnecting from database");
+        if (conn->host) foundation_free(conn->host);
+        if (conn->database) foundation_free(conn->database);
+        foundation_free(conn);
+    }
+}
+EOF
+
+  # Create header file
+  cat > database.h << 'EOF'
+#ifndef DATABASE_H
+#define DATABASE_H
+
+// Database client version
+#define DATABASE_VERSION "2.0.0"
+
+// Forward declaration
+typedef struct db_connection_t db_connection_t;
+
+// Function declarations
+void database_init();
+db_connection_t* database_connect(const char* host, int port, const char* database);
+int database_execute_query(db_connection_t* conn, const char* query);
+void database_disconnect(db_connection_t* conn);
+
+#endif // DATABASE_H
+EOF
+
+  # Compile as shared library
+  gcc -fPIC -shared -o libdatabase.so.2.0.0 database.c
+  
+  # Create symlinks
+  rm -f libdatabase.so.2 libdatabase.so
+  ln -s libdatabase.so.2.0.0 libdatabase.so.2
+  ln -s libdatabase.so.2 libdatabase.so
+}
+
+package() {
+  # Install shared library
+  install -Dm755 libdatabase.so.2.0.0 "$pkgdir/usr/lib/libdatabase.so.2.0.0"
+  ln -s libdatabase.so.2.0.0 "$pkgdir/usr/lib/libdatabase.so.2"
+  ln -s libdatabase.so.2 "$pkgdir/usr/lib/libdatabase.so"
+  
+  # Install header files
+  install -Dm644 database.h "$pkgdir/usr/include/database.h"
+  
+  # Install database schemas and configuration
+  mkdir -p "$pkgdir/usr/share/database-client/schemas"
+  cat > "$pkgdir/usr/share/database-client/schemas/init.sql" << 'EOF'
+-- Database initialization schema
+CREATE TABLE IF NOT EXISTS app_config (
+    id INTEGER PRIMARY KEY,
+    key VARCHAR(255) NOT NULL,
+    value TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS app_logs (
+    id INTEGER PRIMARY KEY,
+    level VARCHAR(10),
+    message TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+EOF
+
+  # Install connection configuration
+  mkdir -p "$pkgdir/etc/database-client"
+  cat > "$pkgdir/etc/database-client/connection.conf" << 'EOF'
+# Database Client Configuration
+[connection]
+host=localhost
+port=5432
+database=application_db
+pool_size=10
+timeout=30
+
+[ssl]
+enabled=true
+verify_ca=true
+EOF
+}

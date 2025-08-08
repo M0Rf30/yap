@@ -316,6 +316,7 @@ yap prepare <distro>             # Prepare build environment
 yap pull <distro>                # Pull container images
 
 # Utility Commands
+yap graph [path]                 # Generate dependency graph visualization
 yap completion <shell>           # Generate shell completion
 yap list-distros                 # List supported distributions
 yap status                       # Show system status
@@ -366,6 +367,40 @@ yap completion fish > ~/.config/fish/completions/yap.fish
 
 # PowerShell
 yap completion powershell > yap.ps1
+```
+
+#### Dependency Graph Visualization
+
+YAP can generate beautiful dependency graph visualizations to help understand project structure and build dependencies:
+
+```bash
+# Generate SVG graph for current project
+yap graph .
+
+# Generate graph with dark theme
+yap graph --theme dark --output project-deps.svg .
+
+# Generate PNG format (requires external conversion tools)
+yap graph --format png --output docs/dependencies.png .
+
+# Include external dependencies in visualization
+yap graph --show-external --output complete-graph.svg .
+```
+
+**Graph Features:**
+- **Interactive SVG**: Hover effects and tooltips with package information
+- **Modern Themes**: Choose from modern, classic, or dark themes
+- **Hierarchical Layout**: Packages arranged by dependency levels and build order
+- **Color Coding**: Different colors for internal packages, external dependencies, and popular packages
+- **Multiple Formats**: SVG (native) and PNG (via external conversion)
+- **Documentation Ready**: High-quality output suitable for project documentation
+
+**Graph Elements:**
+- **Node Size**: Reflects dependency popularity (how many packages depend on it)
+- **Node Colors**: Green for internal packages, orange for external, blue for popular packages
+- **Arrows**: Show dependency direction (runtime vs make dependencies)
+- **Levels**: Indicate build order and dependency hierarchy
+- **Tooltips**: Display detailed package information on hover
 ```
 
 ## 🔧 Advanced Usage
@@ -683,7 +718,32 @@ package() {
 }
 ```
 
-More examples are available in the [examples](examples) directory.
+## 📁 Example Projects
+
+The [examples](examples) directory contains complete, ready-to-build projects demonstrating YAP's capabilities:
+
+### [Circular Dependency Detection](examples/circular-deps)
+Demonstrates YAP's ability to detect and handle circular dependencies:
+- **Purpose**: Tests circular dependency detection and error handling
+- **Structure**: Two packages that depend on each other
+- **Expected Outcome**: YAP detects the circular dependency and fails with a clear error message
+- **Run**: `yap build examples/circular-deps`
+
+### [Dependency Orchestration](examples/dependency-orchestration)
+Complex multi-package project showcasing advanced dependency management:
+- **Purpose**: Demonstrates automatic dependency resolution and build orchestration
+- **Structure**: 5 interconnected packages with runtime dependencies
+- **Features**: Automatic installation detection, topological build ordering, parallel builds
+- **Run**: `yap build examples/dependency-orchestration`
+
+### [YAP Self-Build](examples/yap)
+Real-world example of packaging YAP itself:
+- **Purpose**: Shows how to package a Go application with YAP
+- **Structure**: Complete package definition for YAP with install scripts
+- **Features**: Go module building, binary installation, systemd integration
+- **Run**: `yap build examples/yap`
+
+Each example includes detailed README files explaining the concepts, expected behavior, and learning objectives.
 
 ## 🐛 Troubleshooting
 
