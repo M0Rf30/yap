@@ -62,6 +62,11 @@ jobs:
         with:
           version: latest
 
+      - name: 📝 Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v20
+        with:
+          globs: "**/*.md"
+
   # ===================================
   # Security Scanning
   # ===================================

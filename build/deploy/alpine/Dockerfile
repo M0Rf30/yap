@@ -53,32 +53,15 @@ LABEL org.opencontainers.image.source="https://github.com/M0Rf30/yap"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${VERSION}"
 
-# Go environment variables
-ENV GOROOT=/usr/local/go
-ENV GOPATH=/go
-ENV PATH=$GOROOT/bin:$GOPATH/bin:$PATH
-
-# Install minimal runtime dependencies and Go
+# Install minimal runtime dependencies
 RUN apk add --no-cache \
         bash-completion \
         ca-certificates \
-        sudo \
-        wget && \
-    # Download and install Go (official binaries, no checksums)
-    case "${TARGETARCH}" in \
-        amd64) GO_ARCH=amd64 ;; \
-        arm64) GO_ARCH=arm64 ;; \
-        *) GO_ARCH=amd64 ;; \
-    esac && \
-    wget --progress=dot:giga -O go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
-    tar -C /usr/local -xzf go.tar.gz && \
-    rm go.tar.gz && \
-    # Remove wget to minimize final image
-    apk del wget
+        sudo
 
 # Create non-root user
-RUN addgroup -g 1000 yap && \
-    adduser -D -u 1000 -G yap -s /bin/bash yap && \
+RUN addgroup -g 1001 yap && \
+    adduser -D -u 1001 -G yap -s /bin/bash yap && \
     echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap' >> /etc/sudoers
 
 # Copy binary and completion from builder
