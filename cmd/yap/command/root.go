@@ -66,6 +66,9 @@ var rootCmd = &cobra.Command{
   # Build for specific distribution and release
   yap build ubuntu-jammy /path/to/project
 
+  # Install a package artifact
+  yap install /path/to/package.deb
+
   # Prepare build environment for Rocky Linux 9
   yap prepare rocky-9
 
