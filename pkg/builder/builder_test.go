@@ -154,6 +154,185 @@ func TestBuilder_getSources(t *testing.T) {
 	}
 }
 
+func TestBuilder_CompileWithSources(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		sourceURI []string
+		hashSums  []string
+		noBuild   bool
+		wantErr   bool
+	}{
+		{
+			name:      "No sources, no build",
+			sourceURI: []string{},
+			hashSums:  []string{},
+			noBuild:   true,
+			wantErr:   false,
+		},
+		{
+			name:      "Single existing source, no build",
+			sourceURI: []string{},
+			hashSums:  []string{},
+			noBuild:   true,
+			wantErr:   false,
+		},
+		{
+			name:      "Multiple existing sources, no build",
+			sourceURI: []string{},
+			hashSums:  []string{},
+			noBuild:   true,
+			wantErr:   false,
+		},
+		{
+			name:      "Non-existent source should fail",
+			sourceURI: []string{"/nonexistent/file.txt"},
+			hashSums:  []string{"SKIP"},
+			noBuild:   true,
+			wantErr:   true,
+		},
+		{
+			name:      "Mixed existing and non-existing sources",
+			sourceURI: []string{},
+			hashSums:  []string{},
+			noBuild:   true,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create unique temp directory for each test case
+			tempDir := t.TempDir()
+			sourceDir := filepath.Join(tempDir, "src")
+			require.NoError(t, os.MkdirAll(sourceDir, 0o755))
+
+			// Create test source files for each test case
+			var sourceURI []string
+
+			var hashSums []string
+
+			switch tt.name {
+			case "Single existing source, no build":
+				testFile := filepath.Join(tempDir, "source1.txt")
+				require.NoError(t, os.WriteFile(testFile, []byte("test content 1"), 0o644))
+				sourceURI = []string{testFile}
+				hashSums = []string{"SKIP"}
+			case "Multiple existing sources, no build":
+				testFile1 := filepath.Join(tempDir, "source1.txt")
+				testFile2 := filepath.Join(tempDir, "source2.tar.gz")
+
+				require.NoError(t, os.WriteFile(testFile1, []byte("test content 1"), 0o644))
+				require.NoError(t, os.WriteFile(testFile2, []byte("test content 2"), 0o644))
+				sourceURI = []string{testFile1, testFile2}
+				hashSums = []string{"SKIP", "SKIP"}
+			case "Mixed existing and non-existing sources":
+				testFile := filepath.Join(tempDir, "source1.txt")
+				require.NoError(t, os.WriteFile(testFile, []byte("test content"), 0o644))
+				sourceURI = []string{testFile, "/nonexistent/file.txt"}
+				hashSums = []string{"SKIP", "SKIP"}
+			default:
+				sourceURI = tt.sourceURI
+				hashSums = tt.hashSums
+			}
+
+			pkgDir := filepath.Join(tempDir, "pkg")
+			require.NoError(t, os.MkdirAll(pkgDir, 0o755))
+
+			bldr := &builder.Builder{
+				PKGBUILD: &pkgbuild.PKGBUILD{
+					PkgName:    "test-pkg",
+					PkgVer:     "1.0.0",
+					PkgRel:     "1",
+					StartDir:   tempDir,
+					SourceDir:  sourceDir,
+					PackageDir: pkgDir,
+					SourceURI:  sourceURI,
+					HashSums:   hashSums,
+					Prepare:    "",
+					Build:      "",
+					Package:    "",
+				},
+			}
+
+			err := bldr.Compile(tt.noBuild)
+			if tt.wantErr {
+				assert.Error(t, err, "Expected error for test case: %s", tt.name)
+			} else {
+				assert.NoError(t, err, "Unexpected error for test case: %s", tt.name)
+			}
+		})
+	}
+}
+func TestBuilder_CompileWithHTTPSources(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	sourceDir := filepath.Join(tempDir, "src")
+	require.NoError(t, os.MkdirAll(sourceDir, 0o755))
+
+	pkgDir := filepath.Join(tempDir, "pkg")
+	require.NoError(t, os.MkdirAll(pkgDir, 0o755))
+
+	tests := []struct {
+		name      string
+		sourceURI []string
+		hashSums  []string
+		noBuild   bool
+		wantErr   bool
+	}{
+		{
+			name:      "Invalid HTTP URL should fail",
+			sourceURI: []string{"http://nonexistent.invalid.domain/file.txt"},
+			hashSums:  []string{"SKIP"},
+			noBuild:   true,
+			wantErr:   true,
+		},
+		{
+			name:      "Invalid HTTPS URL should fail",
+			sourceURI: []string{"https://definitely.not.a.real.domain.invalid/archive.tar.gz"},
+			hashSums:  []string{"SKIP"},
+			noBuild:   true,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			bldr := &builder.Builder{
+				PKGBUILD: &pkgbuild.PKGBUILD{
+					PkgName:    "test-pkg",
+					PkgVer:     "1.0.0",
+					PkgRel:     "1",
+					StartDir:   tempDir,
+					SourceDir:  sourceDir,
+					PackageDir: pkgDir,
+					SourceURI:  tt.sourceURI,
+					HashSums:   tt.hashSums,
+					Prepare:    "",
+					Build:      "",
+					Package:    "",
+				},
+			}
+
+			err := bldr.Compile(tt.noBuild)
+			if tt.wantErr {
+				assert.Error(t, err, "Expected error for test case: %s", tt.name)
+				// Check for error context - the error might not contain the package name directly
+				// but should be a meaningful error message
+				assert.NotEmpty(t, err.Error(), "Error message should not be empty")
+			} else {
+				assert.NoError(t, err, "Unexpected error for test case: %s", tt.name)
+			}
+		})
+	}
+}
+
 func TestBuilder_Compile(t *testing.T) {
 	t.Parallel()
 

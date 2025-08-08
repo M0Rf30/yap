@@ -30,10 +30,10 @@ DOCKER_BUILD_FLAGS = --progress=plain --no-cache
 # Available distributions (dynamically retrieved from build/deploy folder)
 DISTROS = $(shell find build/deploy -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
-.PHONY: all build clean test deps fmt lint help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static
+.PHONY: all build clean test deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static
 
 # Default target
-all: clean deps fmt lint test doc build
+all: clean deps fmt lint lint-md test doc build
 
 # Build the application
 build:
@@ -78,6 +78,18 @@ lint:
 		$(GOLINT) run ./...; \
 	else \
 		echo "golangci-lint not installed, skipping lint"; \
+	fi
+
+# Lint markdown files
+lint-md:
+	@echo "Linting markdown files..."
+	@if command -v markdownlint-cli2 > /dev/null; then \
+		markdownlint-cli2 "**/*.md"; \
+	elif command -v markdownlint > /dev/null; then \
+		markdownlint .; \
+	else \
+		echo "markdownlint not installed, skipping markdown lint"; \
+		echo "Install with: npm install -g markdownlint-cli2"; \
 	fi
 
 # Generate documentation
@@ -149,7 +161,7 @@ build-all:
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PATH)
 
 # Create release packages
-release: clean deps fmt lint test doc build-all
+release: clean deps fmt lint lint-md test doc build-all
 	@echo "Creating release packages..."
 	@mkdir -p releases
 	@tar -czf releases/$(BINARY_NAME)-linux-amd64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-linux-amd64
@@ -205,6 +217,7 @@ help:
 	@echo "  deps             - Download dependencies"
 	@echo "  fmt              - Format code"
 	@echo "  lint             - Lint code"
+	@echo "  lint-md          - Lint markdown files"
 	@echo "  doc              - View all package documentation"
 	@echo "  doc-serve        - Start documentation server on localhost:8080"
 	@echo "  doc-package      - View specific package docs (use PKG=<path>)"
