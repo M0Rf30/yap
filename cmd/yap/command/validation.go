@@ -153,28 +153,61 @@ func createValidateDistroArgs(minArgs int) cobra.PositionalArgs {
 				minArgs, len(args), cmd.CommandPath(), ErrInsufficientArgs)
 		}
 
-		// For commands with distro as first argument
-		if minArgs > 0 {
-			distro := args[0]
-
-			err := validateDistroArg(distro)
-			if err != nil {
-				return err
-			}
+		if err := validateDistroForCommand(cmd, args); err != nil {
+			return err
 		}
 
-		// For commands with path as last argument (build, zap)
-		if len(args) >= 2 || (len(args) == 1 && cmd.Name() == "build") {
-			pathArg := args[len(args)-1]
+		return validatePathForCommand(cmd, args)
+	}
+}
 
-			err := validateProjectPath(pathArg)
-			if err != nil {
-				return err
-			}
-		}
+// validateDistroForCommand validates distro argument based on command type.
+func validateDistroForCommand(cmd *cobra.Command, args []string) error {
+	if cmd.Name() == "build" && len(args) >= 1 {
+		return validateDistroForBuildCommand(args[0])
+	}
 
+	if len(args) >= 1 {
+		return validateDistroArg(args[0])
+	}
+
+	return nil
+}
+
+// validateDistroForBuildCommand handles distro validation for build command.
+func validateDistroForBuildCommand(firstArg string) error {
+	// If first argument looks like a path, don't validate as distro
+	if isPathLike(firstArg) {
 		return nil
 	}
+
+	// Try to validate as distro
+	if err := validateDistroArg(firstArg); err != nil {
+		// If distro validation fails, check if it might be a path
+		if validateProjectPath(firstArg) == nil {
+			return nil // It's a valid path
+		}
+
+		return err // Not a valid path either, return original distro error
+	}
+
+	return nil
+}
+
+// isPathLike checks if a string looks like a file path.
+func isPathLike(arg string) bool {
+	return strings.Contains(arg, "/") || arg == "." || arg == ".."
+}
+
+// validatePathForCommand validates path arguments for commands.
+func validatePathForCommand(cmd *cobra.Command, args []string) error {
+	// For commands with path as last argument (build, zap)
+	if len(args) >= 2 || (len(args) == 1 && cmd.Name() == "build") {
+		pathArg := args[len(args)-1]
+		return validateProjectPath(pathArg)
+	}
+
+	return nil
 }
 
 // PreRunValidation provides pre-run validation with interactive prompts for missing arguments.
