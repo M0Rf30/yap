@@ -1,0 +1,91 @@
+# Multi-Architecture PKGBUILD Example
+# Demonstrates YAP's new architecture-specific variable support
+
+pkgname="multi-arch-example"
+pkgver="1.0.0"
+pkgrel="1"
+pkgdesc="Example package demonstrating multi-architecture support"
+arch=('x86_64' 'aarch64' 'armv7h' 'i686')
+url="https://example.com"
+license=('MIT')
+
+# Base dependencies (Priority 0 - fallback)
+depends=('glibc')
+makedepends=('gcc' 'make')
+source=("https://example.com/generic-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+# Architecture-specific dependencies (Priority 4 - highest)
+depends_x86_64=('glibc' 'lib32-glibc')
+depends_aarch64=('glibc' 'aarch64-linux-gnu-binutils')
+depends_armv7h=('glibc' 'arm-linux-gnueabihf-binutils')
+depends_i686=('glibc' 'gcc-multilib')
+
+# Architecture-specific build dependencies
+makedepends_x86_64=('gcc' 'make' 'nasm')
+makedepends_aarch64=('gcc' 'make' 'aarch64-linux-gnu-gcc')
+makedepends_armv7h=('gcc' 'make' 'arm-linux-gnueabihf-gcc')
+
+# Architecture-specific sources with optimization
+source_x86_64=("https://example.com/x86_64-optimized-${pkgver}.tar.gz")
+source_aarch64=("https://example.com/aarch64-${pkgver}.tar.gz")
+source_armv7h=("https://example.com/armv7h-${pkgver}.tar.gz")
+
+# Architecture-specific checksums
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+sha256sums_armv7h=('SKIP')
+
+# Distribution-specific overrides (still work with architecture support)
+depends__ubuntu=('libc6-dev')
+depends__debian=('libc6-dev')
+depends__fedora=('glibc-devel')
+
+# Combined architecture + distribution (architecture wins with Priority 4)
+depends__ubuntu_noble=('libc6-dev' 'ubuntu-noble-specific')
+depends_x86_64=('glibc' 'lib32-glibc' 'x86_64-optimized-lib')
+
+# Combined architecture + distribution specific (Priority 4+ - highest)
+depends_x86_64__ubuntu_focal=('glibc' 'lib32-glibc' 'ubuntu-focal-specific')
+depends_x86_64__fedora_39=('glibc' 'lib32-glibc' 'fedora-39-specific')
+makedepends_x86_64__ubuntu=('gcc' 'make' 'nasm' 'ubuntu-build-tools')
+
+build() {
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    
+    # Architecture-specific build flags
+    case "${CARCH}" in
+        x86_64)
+            export CFLAGS="${CFLAGS} -march=x86-64 -mtune=generic"
+            ;;
+        aarch64)
+            export CFLAGS="${CFLAGS} -march=armv8-a"
+            ;;
+        armv7h)
+            export CFLAGS="${CFLAGS} -march=armv7-a -mfpu=vfpv3-d16"
+            ;;
+        i686)
+            export CFLAGS="${CFLAGS} -march=i686 -mtune=generic"
+            ;;
+    esac
+    
+    make
+}
+
+package() {
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    make DESTDIR="${pkgdir}" install
+    
+    # Install architecture-specific files
+    case "${CARCH}" in
+        x86_64)
+            install -Dm644 "arch-specific/x86_64/config" "${pkgdir}/etc/${pkgname}/config"
+            ;;
+        aarch64)
+            install -Dm644 "arch-specific/aarch64/config" "${pkgdir}/etc/${pkgname}/config"
+            ;;
+        armv7h)
+            install -Dm644 "arch-specific/armv7h/config" "${pkgdir}/etc/${pkgname}/config"
+            ;;
+    esac
+}
