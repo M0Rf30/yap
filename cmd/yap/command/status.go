@@ -157,23 +157,37 @@ yap build --help    - Get help with building packages`)
 func getDistroFamily(release string) string {
 	switch {
 	case contains(release, "ubuntu") || contains(release, "debian"):
-		return "Debian-based"
+		return "debian"
 	case contains(release, "fedora") || contains(release, "rhel") ||
 		contains(release, "centos") || contains(release, "rocky"):
-		return "Red Hat-based"
+		return "redhat"
 	case contains(release, "opensuse") || contains(release, "suse"):
-		return "SUSE-based"
+		return "suse"
 	case contains(release, "arch"):
-		return "Arch-based"
+		return "arch"
 	case contains(release, "alpine"):
-		return "Alpine-based"
+		return "alpine"
 	default:
-		return "Other"
+		return "unknown"
 	}
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr
+	if substr == "" {
+		return true
+	}
+
+	if len(s) < len(substr) {
+		return false
+	}
+
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+
+	return false
 }
 
 func checkContainerRuntime() string {

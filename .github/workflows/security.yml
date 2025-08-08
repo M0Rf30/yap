@@ -100,30 +100,36 @@ jobs:
 
           # Run govulncheck and capture output
           if govulncheck -json ./... > vulncheck.json 2>&1; then
-            echo "result=success" >> $GITHUB_OUTPUT
+            echo "result=success" >> "$GITHUB_OUTPUT"
             echo "✅ No vulnerabilities found"
           else
-            echo "result=vulnerabilities_found" >> $GITHUB_OUTPUT
+            echo "result=vulnerabilities_found" >> "$GITHUB_OUTPUT"
             echo "⚠️ Vulnerabilities detected"
           fi
 
           # Generate human-readable report
-          echo "## 🛡️ Vulnerability Scan Report" > vulncheck-report.md
-          echo "" >> vulncheck-report.md
-          echo "**Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> vulncheck-report.md
-          echo "**Scanner:** govulncheck" >> vulncheck-report.md
-          echo "" >> vulncheck-report.md
+          {
+            echo "## 🛡️ Vulnerability Scan Report"
+            echo ""
+            echo "**Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "**Scanner:** govulncheck"
+            echo ""
+          } > vulncheck-report.md
 
           if [[ -f vulncheck.json ]]; then
             if jq -e '.vulnerabilities | length > 0' vulncheck.json >/dev/null 2>&1; then
-              echo "### ⚠️ Vulnerabilities Found" >> vulncheck-report.md
-              echo "" >> vulncheck-report.md
-              # Extract vulnerability details using jq
-              jq -r '.vulnerabilities[] | "- **\(.osv.id)**: \(.osv.summary // "No summary available")"' vulncheck.json >> vulncheck-report.md 2>/dev/null || echo "- See vulncheck.json for details" >> vulncheck-report.md
+              {
+                echo "### ⚠️ Vulnerabilities Found"
+                echo ""
+                # Extract vulnerability details using jq
+                jq -r '.vulnerabilities[] | "- **\(.osv.id)**: \(.osv.summary // "No summary available")"' vulncheck.json 2>/dev/null || echo "- See vulncheck.json for details"
+              } >> vulncheck-report.md
             else
-              echo "### ✅ No Vulnerabilities Found" >> vulncheck-report.md
-              echo "" >> vulncheck-report.md
-              echo "All dependencies are secure according to the Go vulnerability database." >> vulncheck-report.md
+              {
+                echo "### ✅ No Vulnerabilities Found"
+                echo ""
+                echo "All dependencies are secure according to the Go vulnerability database."
+              } >> vulncheck-report.md
             fi
           fi
 
@@ -189,27 +195,35 @@ jobs:
           mkdir -p licenses
 
           # Generate license report
-          echo "## 📜 License Compliance Report" > licenses/report.md
-          echo "" >> licenses/report.md
-          echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> licenses/report.md
-          echo "" >> licenses/report.md
+          {
+            echo "## 📜 License Compliance Report"
+            echo ""
+            echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+          } > licenses/report.md
 
-          # Check for forbidden licenses
-          FORBIDDEN_LICENSES="GPL-2.0,GPL-3.0,AGPL-1.0,AGPL-3.0"
+          # Check for forbidden licenses (variable defined for future use)
+          # FORBIDDEN_LICENSES="GPL-2.0,GPL-3.0,AGPL-1.0,AGPL-3.0"
 
           if go-licenses check ./...; then
-            echo "result=compliant" >> $GITHUB_OUTPUT
-            echo "### ✅ License Compliance" >> licenses/report.md
-            echo "All dependencies use compatible licenses." >> licenses/report.md
+            echo "result=compliant" >> "$GITHUB_OUTPUT"
+            {
+              echo "### ✅ License Compliance"
+              echo "All dependencies use compatible licenses."
+            } >> licenses/report.md
           else
-            echo "result=issues_found" >> $GITHUB_OUTPUT
-            echo "### ⚠️ License Issues Found" >> licenses/report.md
-            echo "Some dependencies may have licensing issues. Review required." >> licenses/report.md
+            echo "result=issues_found" >> "$GITHUB_OUTPUT"
+            {
+              echo "### ⚠️ License Issues Found"
+              echo "Some dependencies may have licensing issues. Review required."
+            } >> licenses/report.md
           fi
 
-          echo "" >> licenses/report.md
-          echo "### 📋 Dependency Licenses" >> licenses/report.md
-          echo "" >> licenses/report.md
+          {
+            echo ""
+            echo "### 📋 Dependency Licenses"
+            echo ""
+          } >> licenses/report.md
 
           # List all licenses
           go-licenses report ./... >> licenses/report.md 2>/dev/null || echo "Unable to generate detailed license report" >> licenses/report.md
@@ -313,36 +327,43 @@ jobs:
 
       - name: 📝 Generate security summary
         run: |
-          echo "## 🔒 Security Analysis Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Analysis Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          echo "### 📋 Security Checks" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status | Details |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔍 Static Analysis | ${{ needs.sast.result }} | Gosec security scanner |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🛡️ Vulnerability Scan | ${{ needs.vulnerability-scan.result }} | Go vulnerability database |" >> $GITHUB_STEP_SUMMARY
-          echo "| 📜 License Compliance | ${{ needs.license-check.result }} | Dependency license check |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔐 Secrets Detection | ${{ needs.secrets-detection.result }} | TruffleHog scan |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🔒 Security Analysis Summary"
+            echo ""
+            echo "**Analysis Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "**Trigger:** ${{ github.event_name }}"
+            echo ""
+            echo "### 📋 Security Checks"
+            echo "| Check | Status | Details |"
+            echo "|-------|--------|---------|"
+            echo "| 🔍 Static Analysis | ${{ needs.sast.result }} | Gosec security scanner |"
+            echo "| 🛡️ Vulnerability Scan | ${{ needs.vulnerability-scan.result }} | Go vulnerability database |"
+            echo "| 📜 License Compliance | ${{ needs.license-check.result }} | Dependency license check |"
+            echo "| 🔐 Secrets Detection | ${{ needs.secrets-detection.result }} | TruffleHog scan |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
 
           # Overall security status
           if [[ "${{ needs.sast.result }}" == "success" && \
                 "${{ needs.vulnerability-scan.result }}" == "success" && \
                 "${{ needs.license-check.result }}" == "success" && \
                 "${{ needs.secrets-detection.result }}" == "success" ]]; then
-            echo "### ✅ Overall Security Status: PASS" >> $GITHUB_STEP_SUMMARY
-            echo "All security checks completed successfully." >> $GITHUB_STEP_SUMMARY
+            {
+              echo "### ✅ Overall Security Status: PASS"
+              echo "All security checks completed successfully."
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### ⚠️ Overall Security Status: REVIEW REQUIRED" >> $GITHUB_STEP_SUMMARY
-            echo "Some security checks require attention. Please review the failed checks above." >> $GITHUB_STEP_SUMMARY
+            {
+              echo "### ⚠️ Overall Security Status: REVIEW REQUIRED"
+              echo "Some security checks require attention. Please review the failed checks above."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔗 Security Resources" >> $GITHUB_STEP_SUMMARY
-          echo "- [Security Policy](https://github.com/${{ github.repository }}/security/policy)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Security Advisories](https://github.com/${{ github.repository }}/security/advisories)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Dependency Graph](https://github.com/${{ github.repository }}/network/dependencies)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Go Vulnerability Database](https://vuln.go.dev/)" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "### 🔗 Security Resources"
+            echo "- [Security Policy](https://github.com/${{ github.repository }}/security/policy)"
+            echo "- [Security Advisories](https://github.com/${{ github.repository }}/security/advisories)"
+            echo "- [Dependency Graph](https://github.com/${{ github.repository }}/network/dependencies)"
+            echo "- [Go Vulnerability Database](https://vuln.go.dev/)"
+          } >> "$GITHUB_STEP_SUMMARY"
