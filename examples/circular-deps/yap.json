@@ -1,0 +1,16 @@
+{
+  "name": "circular-dependency-test",
+  "description": "Example demonstrating YAP's circular dependency detection and error handling",
+  "buildDir": "/tmp/yap-circular-deps",
+  "output": "artifacts",
+  "projects": [
+    {
+      "name": "package-a",
+      "description": "Package A with circular dependency on Package B"
+    },
+    {
+      "name": "package-b",
+      "description": "Package B with circular dependency on Package A"
+    }
+  ]
+}
