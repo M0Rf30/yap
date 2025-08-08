@@ -57,22 +57,23 @@ jobs:
       - name: 🔍 Check for dependency updates
         id: check
         run: |
-          echo "📋 Current dependencies:" > update_summary.txt
-          go list -m all >> update_summary.txt
-          echo "" >> update_summary.txt
-
-          echo "🔍 Checking for available updates..." >> update_summary.txt
+          {
+            echo "📋 Current dependencies:"
+            go list -m all
+            echo ""
+            echo "🔍 Checking for available updates..."
+          } > update_summary.txt
 
           # Get list of modules that can be updated
           go list -u -m all > current_deps.txt
 
           # Check if there are any updates available
           if grep -q '\[' current_deps.txt; then
-            echo "has-updates=true" >> $GITHUB_OUTPUT
+            echo "has-updates=true" >> "$GITHUB_OUTPUT"
             echo "✅ Updates available" >> update_summary.txt
             grep '\[' current_deps.txt >> update_summary.txt
           else
-            echo "has-updates=false" >> $GITHUB_OUTPUT
+            echo "has-updates=false" >> "$GITHUB_OUTPUT"
             echo "ℹ️ No updates available" >> update_summary.txt
           fi
 
@@ -81,12 +82,14 @@ jobs:
             echo 'update-summary<<EOF'
             cat update_summary.txt
             echo EOF
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
       - name: 🛡️ Security audit
         run: |
-          echo "" >> update_summary.txt
-          echo "🛡️ Security audit results:" >> update_summary.txt
+          {
+            echo ""
+            echo "🛡️ Security audit results:"
+          } >> update_summary.txt
 
           # Install govulncheck if not available
           go install golang.org/x/vuln/cmd/govulncheck@latest
@@ -135,7 +138,7 @@ jobs:
           # Create update branch
           BRANCH_NAME="deps/auto-update-$(date +%Y%m%d-%H%M%S)"
           git checkout -b "$BRANCH_NAME"
-          echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "branch-name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
           # Backup current go.mod
           cp go.mod go.mod.backup
@@ -171,22 +174,22 @@ jobs:
           # Check if there are actually changes
           if git diff --quiet go.mod go.sum; then
             echo "No dependency changes found"
-            echo "has-changes=false" >> $GITHUB_OUTPUT
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "has-changes=true" >> $GITHUB_OUTPUT
+          echo "has-changes=true" >> "$GITHUB_OUTPUT"
 
           # Generate update summary
-          echo "📋 Dependency updates applied:" > update_changes.txt
-          echo "" >> update_changes.txt
-
-          echo "### Changed dependencies:" >> update_changes.txt
-          git diff go.mod >> update_changes.txt
-
-          echo "" >> update_changes.txt
-          echo "### go.sum changes:" >> update_changes.txt
-          git diff --stat go.sum >> update_changes.txt
+          {
+            echo "📋 Dependency updates applied:"
+            echo ""
+            echo "### Changed dependencies:"
+            git diff go.mod
+            echo ""
+            echo "### go.sum changes:"
+            git diff --stat go.sum
+          } > update_changes.txt
 
       - name: 🧪 Test updated dependencies
         if: steps.update.outputs.has-changes == 'true'
@@ -308,32 +311,42 @@ jobs:
 
       - name: 📝 Generate summary report
         run: |
-          echo "## 🔄 Dependency Management Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🔄 Dependency Management Summary"
+            echo ""
+            echo "**Trigger:** ${{ github.event_name }}"
+            echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "${{ needs.analyze.outputs.has-updates }}" == "true" ]]; then
-            echo "### 📋 Analysis Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Updates Available:** ✅ Yes" >> $GITHUB_STEP_SUMMARY
-            echo "- **Update Job:** ${{ needs.update.result }}" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "### 📋 Analysis Results"
+              echo "- **Updates Available:** ✅ Yes"
+              echo "- **Update Job:** ${{ needs.update.result }}"
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
 
             if [[ -f update_summary.txt ]]; then
-              echo "### 📊 Update Details" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              cat update_summary.txt >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
+              {
+                echo "### 📊 Update Details"
+                echo '```'
+                cat update_summary.txt
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
             fi
           else
-            echo "### 📋 Analysis Results" >> $GITHUB_STEP_SUMMARY
-            echo "- **Updates Available:** ℹ️ No updates found" >> $GITHUB_STEP_SUMMARY
-            echo "- **Dependencies:** Up to date" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "### 📋 Analysis Results"
+              echo "- **Updates Available:** ℹ️ No updates found"
+              echo "- **Dependencies:** Up to date"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔗 Related Links" >> $GITHUB_STEP_SUMMARY
-          echo "- [Dependency Graph](https://github.com/${{ github.repository }}/network/dependencies)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Security Advisories](https://github.com/${{ github.repository }}/security/advisories)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Dependabot Settings](https://github.com/${{ github.repository }}/settings/security_analysis)" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "### 🔗 Related Links"
+            echo "- [Dependency Graph](https://github.com/${{ github.repository }}/network/dependencies)"
+            echo "- [Security Advisories](https://github.com/${{ github.repository }}/security/advisories)"
+            echo "- [Dependabot Settings](https://github.com/${{ github.repository }}/settings/security_analysis)"
+          } >> "$GITHUB_STEP_SUMMARY"
