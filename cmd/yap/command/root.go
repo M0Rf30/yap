@@ -66,6 +66,9 @@ var rootCmd = &cobra.Command{
   # Build for specific distribution and release
   yap build ubuntu-jammy /path/to/project
 
+  # Generate dependency graph visualization
+  yap graph --output docs/dependencies.svg .
+
   # Install a package artifact
   yap install /path/to/package.deb
 

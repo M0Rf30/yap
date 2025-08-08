@@ -591,6 +591,12 @@ func (mpc *MultipleProject) setSingleProject(path string) {
 	singleProject = true
 }
 
+// ReadProjectOnly reads the project configuration without initializing distro-specific components.
+// This is useful for operations like graph generation that only need project structure.
+func (mpc *MultipleProject) ReadProjectOnly(path string) error {
+	return mpc.readProject(path)
+}
+
 // validateJSON validates the JSON of the MultipleProject struct.
 //
 // It uses the validator package to validate the struct and returns any errors encountered.
