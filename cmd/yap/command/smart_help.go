@@ -32,7 +32,8 @@ func SmartErrorHandler(cmd *cobra.Command, err error) error {
 		provideSimilarCommands(cmd, errorStr)
 	case strings.Contains(errorStr, "unsupported distribution"):
 		provideSimilarDistributions(errorStr)
-	case strings.Contains(errorStr, "yap.json not found"):
+	case strings.Contains(errorStr, "yap.json not found") ||
+		strings.Contains(errorStr, "neither yap.json nor PKGBUILD found"):
 		provideProjectSetupHelp()
 	case strings.Contains(errorStr, "requires at least"):
 		provideArgumentHelp(cmd)
@@ -120,16 +121,24 @@ func provideSimilarDistributions(errorStr string) {
 func provideProjectSetupHelp() {
 	helpText := `📁 YAP Project Setup Guide:
 
+For Multi-Project (recommended for multiple packages):
 1. Create a yap.json file in your project directory
 2. Define your package specifications
-3. Add PKGBUILD files for each package
+3. Add PKGBUILD files for each package in subdirectories
+
+For Single Project (one package):
+1. Create a PKGBUILD file in your project directory
+2. Define your package specification in the PKGBUILD
 
 Example yap.json structure:
 {
   "name": "my-project",
-  "packages": [
-    "package1",
-    "package2"
+  "description": "My multi-package project",
+  "buildDir": "build",
+  "output": "output",
+  "projects": [
+    {"name": "package1"},
+    {"name": "package2"}
   ]
 }`
 
@@ -255,7 +264,7 @@ func ShowWelcomeMessage() {
 Quick start:
 1. Run 'yap list-distros' to see supported distributions
 2. Run 'yap prepare <distro>' to set up your environment
-3. Create a project with yap.json configuration
+3. Create a project with yap.json (multiproject) or PKGBUILD (single project)
 4. Run 'yap build <distro> .' to build your packages
 
 Need help? Visit: https://github.com/M0Rf30/yap`)

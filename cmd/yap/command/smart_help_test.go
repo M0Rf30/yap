@@ -112,6 +112,11 @@ func TestSmartErrorHandler(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name:        "neither yap.json nor PKGBUILD found error",
+			err:         errors.New("neither yap.json nor PKGBUILD found in current directory"),
+			expectError: true,
+		},
+		{
 			name:        "requires at least error",
 			err:         errors.New("requires at least 1 arg(s), only received 0"),
 			expectError: true,
