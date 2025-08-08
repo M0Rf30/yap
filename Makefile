@@ -84,9 +84,9 @@ lint:
 lint-md:
 	@echo "Linting markdown files..."
 	@if command -v markdownlint-cli2 > /dev/null; then \
-		markdownlint-cli2 "**/*.md"; \
+		markdownlint-cli2 --config .markdownlint.yml "**/*.md"; \
 	elif command -v markdownlint > /dev/null; then \
-		markdownlint .; \
+		markdownlint --config .markdownlint.yml .; \
 	else \
 		echo "markdownlint not installed, skipping markdown lint"; \
 		echo "Install with: npm install -g markdownlint-cli2"; \

@@ -1,0 +1,28 @@
+{
+  "name": "dependency-orchestration-example",
+  "description": "Comprehensive example demonstrating YAP's automatic dependency resolution and installation orchestration",
+  "buildDir": "/tmp/yap-dependency-example",
+  "output": "artifacts",
+  "projects": [
+    {
+      "name": "foundation-lib",
+      "description": "Core foundation library used by all other packages"
+    },
+    {
+      "name": "middleware-service", 
+      "description": "Middleware service layer (depends on foundation-lib)"
+    },
+    {
+      "name": "database-client",
+      "description": "Database client library (depends on foundation-lib)"
+    },
+    {
+      "name": "web-framework",
+      "description": "Web framework library (depends on foundation-lib)"
+    },
+    {
+      "name": "main-application",
+      "description": "Main application (depends on web-framework, database-client, foundation-lib)"
+    }
+  ]
+}

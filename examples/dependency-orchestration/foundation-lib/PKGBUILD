@@ -1,0 +1,102 @@
+pkgname="foundation-lib"
+pkgver="1.0.0"
+pkgrel="1"
+pkgdesc="Core foundation library providing essential utilities for all application components"
+arch=('x86_64')
+maintainer="YAP Team <maintainer@yap.dev>"
+url="https://github.com/example/foundation-lib"
+
+# No runtime dependencies - this is the foundation package
+
+build() {
+  # Create core foundation library with essential utilities
+  cat > foundation.c << 'EOF'
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+// Foundation library core functions
+void foundation_init() {
+    printf("[FOUNDATION] Library initialized v%s\n", "1.0.0");
+}
+
+void foundation_log(const char* level, const char* message) {
+    time_t now = time(NULL);
+    char* timestr = ctime(&now);
+    timestr[strlen(timestr)-1] = '\0';  // Remove newline
+    printf("[FOUNDATION %s] %s: %s\n", timestr, level, message);
+}
+
+void* foundation_malloc(size_t size) {
+    void* ptr = malloc(size);
+    if (ptr) {
+        foundation_log("DEBUG", "Memory allocated");
+    }
+    return ptr;
+}
+
+void foundation_free(void* ptr) {
+    if (ptr) {
+        free(ptr);
+        foundation_log("DEBUG", "Memory freed");
+    }
+}
+
+int foundation_string_compare(const char* str1, const char* str2) {
+    return strcmp(str1, str2);
+}
+EOF
+
+  # Create comprehensive header file
+  cat > foundation.h << 'EOF'
+#ifndef FOUNDATION_H
+#define FOUNDATION_H
+
+#include <stddef.h>
+
+// Foundation library version
+#define FOUNDATION_VERSION "1.0.0"
+
+// Core function declarations
+void foundation_init();
+void foundation_log(const char* level, const char* message);
+void* foundation_malloc(size_t size);
+void foundation_free(void* ptr);
+int foundation_string_compare(const char* str1, const char* str2);
+
+#endif // FOUNDATION_H
+EOF
+
+  # Compile as shared library
+  gcc -fPIC -shared -o libfoundation.so.1.0.0 foundation.c
+  
+  # Create symlinks
+  rm -f libfoundation.so.1 libfoundation.so
+  ln -s libfoundation.so.1.0.0 libfoundation.so.1
+  ln -s libfoundation.so.1 libfoundation.so
+}
+
+package() {
+  # Install shared library
+  install -Dm755 libfoundation.so.1.0.0 "$pkgdir/usr/lib/libfoundation.so.1.0.0"
+  ln -s libfoundation.so.1.0.0 "$pkgdir/usr/lib/libfoundation.so.1"
+  ln -s libfoundation.so.1 "$pkgdir/usr/lib/libfoundation.so"
+  
+  # Install header files
+  install -Dm644 foundation.h "$pkgdir/usr/include/foundation.h"
+  
+  # Install pkg-config file for easy integration
+  mkdir -p "$pkgdir/usr/lib/pkgconfig"
+  cat > "$pkgdir/usr/lib/pkgconfig/foundation.pc" << 'EOF'
+prefix=/usr
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: Foundation Library
+Description: Core foundation library providing essential utilities
+Version: 1.0.0
+Libs: -L${libdir} -lfoundation
+Cflags: -I${includedir}
+EOF
+}
