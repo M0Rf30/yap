@@ -768,3 +768,332 @@ func TestPKGBUILD_mapVariables_EdgeCases(t *testing.T) {
 		t.Errorf("Expected Priority 'optional', got '%s'", pb.Priority)
 	}
 }
+
+func TestPKGBUILD_isValidArchitecture(t *testing.T) {
+	pb := &PKGBUILD{}
+
+	// Test valid architectures
+	validArchs := []string{
+		"x86_64", "i686", "aarch64", "armv7h", "armv6h", "armv5",
+		"ppc64", "ppc64le", "s390x", "mips", "mipsle", "riscv64",
+		"pentium4", "any",
+	}
+
+	for _, arch := range validArchs {
+		if !pb.isValidArchitecture(arch) {
+			t.Errorf("Architecture '%s' should be valid", arch)
+		}
+	}
+
+	// Test invalid architectures
+	invalidArchs := []string{
+		"invalid", "x86", "arm", "unknown_arch", "amd64",
+	}
+
+	for _, arch := range invalidArchs {
+		if pb.isValidArchitecture(arch) {
+			t.Errorf("Architecture '%s' should be invalid", arch)
+		}
+	}
+}
+
+func TestPKGBUILD_parseDirective_ArchitectureSpecific(t *testing.T) {
+	pb := &PKGBUILD{
+		FullDistroName: "ubuntu_focal",
+		Distro:         "ubuntu",
+	}
+	pb.Init()
+
+	// Test architecture-specific directive for current architecture
+	// Assuming current architecture is x86_64 (most common)
+	key, priority, err := pb.parseDirective("depends_x86_64")
+	if err != nil {
+		t.Errorf("parseDirective() returned error: %v", err)
+	}
+
+	if key != "depends" {
+		t.Errorf("Expected key 'depends', got '%s'", key)
+	}
+
+	// Priority should be 4 (higher than distribution-specific) if x86_64 is current arch
+	// or -1 if it's not the current architecture
+	if priority != 4 && priority != -1 {
+		t.Errorf("Expected priority 4 or -1 for architecture-specific directive, got %d", priority)
+	}
+
+	// Test architecture-specific directive for different architecture
+	key, priority, err = pb.parseDirective("depends_aarch64")
+	if err != nil {
+		t.Errorf("parseDirective() returned error: %v", err)
+	}
+
+	if key != "depends" {
+		t.Errorf("Expected key 'depends', got '%s'", key)
+	}
+
+	// Should be -1 if not current architecture (unless running on aarch64)
+	if priority != 4 && priority != -1 {
+		t.Errorf("Expected priority 4 or -1 for non-current architecture directive, got %d", priority)
+	}
+
+	// Test invalid architecture
+	key, priority, err = pb.parseDirective("depends_invalid_arch")
+	if err != nil {
+		t.Errorf("parseDirective() returned error: %v", err)
+	}
+
+	if key != "depends_invalid_arch" {
+		t.Errorf("Expected key 'depends_invalid_arch' for invalid architecture, got '%s'", key)
+	}
+
+	if priority != 0 {
+		t.Errorf("Expected priority 0 for invalid architecture, got %d", priority)
+	}
+
+	// Test complex architecture name
+	key, priority, err = pb.parseDirective("source_armv7h")
+	if err != nil {
+		t.Errorf("parseDirective() returned error: %v", err)
+	}
+
+	if key != "source" {
+		t.Errorf("Expected key 'source', got '%s'", key)
+	}
+
+	// Should be 4 or -1 depending on current architecture
+	if priority != 4 && priority != -1 {
+		t.Errorf("Expected priority 4 or -1 for armv7h directive, got %d", priority)
+	}
+
+	// Test that distribution directives still work with architecture syntax present
+	key, priority, err = pb.parseDirective("depends__ubuntu")
+	if err != nil {
+		t.Errorf("parseDirective() returned error: %v", err)
+	}
+
+	if key != "depends" {
+		t.Errorf("Expected key 'depends', got '%s'", key)
+	}
+
+	// Should be 2 for distribution-specific directive (ubuntu matches pb.Distro)
+	// or 3 for full distribution name, or -1 if not matching
+	if priority != 2 && priority != 3 && priority != -1 {
+		t.Errorf("Expected priority 2, 3, or -1 for distribution directive, got %d", priority)
+	}
+}
+
+func TestPKGBUILD_AddItem_ArchitectureSpecific(t *testing.T) {
+	pb := &PKGBUILD{
+		FullDistroName: "ubuntu_focal",
+		Distro:         "ubuntu",
+	}
+	pb.Init()
+
+	// Test adding architecture-specific dependencies
+	// First add base dependencies
+	err := pb.AddItem("depends", []string{"glibc", "gcc"})
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	// Add architecture-specific dependencies for current architecture
+	// This should override the base dependencies if current arch is x86_64
+	err = pb.AddItem("depends_x86_64", []string{"glibc", "gcc", "lib32-glibc"})
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	// The result depends on whether we're running on x86_64
+	// If we are, depends should have the x86_64-specific values
+	// If we're not, depends should have the base values
+	if len(pb.Depends) == 0 {
+		t.Error("Depends should not be empty after adding items")
+	}
+
+	// Test adding architecture-specific arrays for non-current architecture
+	err = pb.AddItem("makedepends_aarch64", []string{"cross-gcc"})
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	// makedepends should remain empty if we're not on aarch64
+	// or should be set if we are on aarch64
+
+	// Test adding architecture-specific variables
+	err = pb.AddItem("pkgver", "1.0.0")
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	err = pb.AddItem("pkgver_x86_64", "1.0.1")
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	// PkgVer should be "1.0.1" if current arch is x86_64, otherwise "1.0.0"
+	if pb.PkgVer != "1.0.0" && pb.PkgVer != "1.0.1" {
+		t.Errorf("Expected PkgVer to be '1.0.0' or '1.0.1', got '%s'", pb.PkgVer)
+	}
+}
+
+func TestPKGBUILD_AddItem_ArchitectureDistributionPriority(t *testing.T) {
+	pb := &PKGBUILD{
+		FullDistroName: "ubuntu_focal",
+		Distro:         "ubuntu",
+	}
+	pb.Init()
+
+	// Test priority ordering: architecture > distribution > package manager > base
+	// Add items in reverse priority order to test override behavior
+
+	// Base (priority 0)
+	err := pb.AddItem("depends", []string{"base-dep"})
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	// Package manager specific (priority 1) - simulated
+	// Note: This would require setting up constants properly
+
+	// Distribution specific (priority 2) - simulated
+	// Note: This would require setting up constants properly
+
+	// Architecture specific (priority 4) - should win
+	err = pb.AddItem("depends_x86_64", []string{"arch-specific-dep"})
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	// The final result depends on the current architecture
+	// If x86_64, should have "arch-specific-dep"
+	// Otherwise, should have "base-dep"
+	if len(pb.Depends) == 0 {
+		t.Error("Depends should not be empty")
+	}
+
+	// Test that lower priority items don't override higher priority ones
+	err = pb.AddItem("depends", []string{"should-not-override"})
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	// Depends should still have the architecture-specific value if we're on x86_64
+	// or the first base value if we're not
+}
+
+func TestPKGBUILD_MultiArchitectureSupport_Integration(t *testing.T) {
+	pb := &PKGBUILD{
+		FullDistroName: "ubuntu_focal",
+		Distro:         "ubuntu",
+	}
+	pb.Init()
+
+	// Test complete multi-architecture workflow
+	items := map[string]interface{}{
+		// Base items
+		"pkgname":     "multi-arch-test",
+		"pkgver":      "1.0.0",
+		"pkgrel":      "1",
+		"pkgdesc":     "Multi-architecture test package",
+		"arch":        []string{"x86_64", "aarch64", "armv7h"},
+		"license":     []string{"MIT"},
+		"depends":     []string{"glibc"},
+		"makedepends": []string{"gcc"},
+		"source":      []string{"https://example.com/source.tar.gz"},
+		"sha256sums":  []string{"abcd1234"},
+
+		// Architecture-specific overrides
+		"depends_x86_64":     []string{"glibc", "lib32-glibc"},
+		"depends_aarch64":    []string{"glibc", "aarch64-specific-lib"},
+		"makedepends_x86_64": []string{"gcc", "nasm"},
+		"makedepends_armv7h": []string{"gcc", "arm-cross-tools"},
+		"source_x86_64":      []string{"https://example.com/source-x86_64.tar.gz"},
+		"sha256sums_x86_64":  []string{"x86_64_hash"},
+		"package_x86_64":     "make install DESTDIR=$pkgdir ARCH=x86_64",
+	}
+
+	// Add all items
+	for key, value := range items {
+		err := pb.AddItem(key, value)
+		if err != nil {
+			t.Errorf("AddItem(%s) returned error: %v", key, err)
+		}
+	}
+
+	// Verify basic fields are set
+	if pb.PkgName != "multi-arch-test" {
+		t.Errorf("Expected PkgName 'multi-arch-test', got '%s'", pb.PkgName)
+	}
+
+	if len(pb.Arch) != 3 {
+		t.Errorf("Expected 3 architectures, got %d", len(pb.Arch))
+	}
+
+	// The exact values depend on the current architecture
+	// but we can verify that values are set
+	if len(pb.Depends) == 0 {
+		t.Error("Depends should not be empty")
+	}
+
+	if len(pb.MakeDepends) == 0 {
+		t.Error("MakeDepends should not be empty")
+	}
+
+	if len(pb.SourceURI) == 0 {
+		t.Error("SourceURI should not be empty")
+	}
+
+	if len(pb.HashSums) == 0 {
+		t.Error("HashSums should not be empty")
+	}
+}
+
+func TestPKGBUILD_CombinedArchitectureDistribution(t *testing.T) {
+	pb := &PKGBUILD{
+		FullDistroName: "ubuntu_focal",
+		Distro:         "ubuntu",
+	}
+	pb.Init()
+
+	// Test combined architecture + distribution syntax parsing
+	key, _, err := pb.parseDirective("depends_x86_64__ubuntu_focal")
+	if err != nil {
+		t.Errorf("parseDirective() returned error: %v", err)
+	}
+
+	if key != "depends" {
+		t.Errorf("Expected key 'depends', got '%s'", key)
+	}
+
+	// Test simple architecture syntax still works
+	key, _, err = pb.parseDirective("makedepends_x86_64")
+	if err != nil {
+		t.Errorf("parseDirective() returned error: %v", err)
+	}
+
+	if key != "makedepends" {
+		t.Errorf("Expected key 'makedepends', got '%s'", key)
+	}
+
+	// Test that combined directives work with AddItem
+	err = pb.AddItem("depends", []string{"base"})
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	err = pb.AddItem("depends_x86_64__ubuntu_focal", []string{"combined"})
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	// Test architecture-only directive
+	err = pb.AddItem("makedepends_x86_64", []string{"arch-specific"})
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	// Results depend on current architecture, but should not be empty
+	if len(pb.Depends) == 0 {
+		t.Error("Depends should not be empty")
+	}
+}

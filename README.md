@@ -292,6 +292,90 @@ depends__ubuntu_noble="noble-optimized"  # Priority 3 (most specific)
 - **Alpine**: `alpine_3_18`, `alpine_3_19`
 - And more...
 
+#### Architecture-Specific Variables
+
+YAP also supports architecture-specific variable overrides using the `_` (single underscore) syntax, following the Arch Linux PKGBUILD convention. Architecture-specific variables have the **highest priority** in the system.
+
+**Updated Priority System (Highest to Lowest):**
+
+1. **Priority 4+** - Combined architecture + distribution: `variable_x86_64__ubuntu_noble`
+2. **Priority 4** - Architecture-specific: `variable_x86_64`
+3. **Priority 3** - Full distribution with codename: `variable__ubuntu_noble`
+4. **Priority 2** - Distribution name only: `variable__ubuntu`  
+5. **Priority 1** - Package manager: `variable__apt`
+6. **Priority 0** - Base variable (fallback): `variable`
+
+**Supported Architectures:**
+- `x86_64` - 64-bit x86 (Intel/AMD)
+- `i686` - 32-bit x86
+- `aarch64` - 64-bit ARM
+- `armv7h` - ARMv7 hard-float
+- `armv6h` - ARMv6 hard-float
+- `armv5` - ARMv5
+- `ppc64` - PowerPC 64-bit
+- `ppc64le` - PowerPC 64-bit Little Endian
+- `s390x` - IBM System z
+- `mips`, `mipsle` - MIPS architectures
+- `riscv64` - RISC-V 64-bit
+- `pentium4` - Pentium 4 optimized
+- `any` - Architecture-independent
+
+**Examples:**
+
+```bash
+# Base dependencies (Priority 0)
+depends=('glibc' 'gcc')
+
+# Architecture-specific dependencies (Priority 4 - highest)
+depends_x86_64=('glibc' 'gcc' 'lib32-glibc')
+depends_aarch64=('glibc' 'gcc' 'aarch64-linux-gnu-gcc')
+depends_armv7h=('glibc' 'gcc' 'arm-linux-gnueabihf-gcc')
+
+# Architecture-specific sources
+source=('https://example.com/generic-source.tar.gz')
+source_x86_64=('https://example.com/x86_64-optimized.tar.gz')
+source_aarch64=('https://example.com/aarch64-source.tar.gz')
+
+# Architecture-specific build options
+makedepends=('gcc' 'make')
+makedepends_x86_64=('gcc' 'make' 'nasm')  # x86_64 specific assembler
+makedepends_armv7h=('gcc' 'make' 'arm-cross-tools')
+
+# Architecture-specific checksums
+sha256sums=('generic_hash')
+sha256sums_x86_64=('x86_64_specific_hash')
+sha256sums_aarch64=('aarch64_specific_hash')
+```
+
+**Combined Architecture and Distribution Example:**
+```bash
+# Base package
+depends=('base-lib')
+
+# Package manager specific (Priority 1)
+depends__apt=('libbase-dev')
+
+# Distribution specific (Priority 2) 
+depends__ubuntu=('libbase-ubuntu')
+
+# Full distribution specific (Priority 3)
+depends__ubuntu_noble=('libbase-ubuntu-noble')
+
+# Architecture specific (Priority 4)
+depends_x86_64=('libbase-x86_64-optimized')
+
+# Combined architecture + distribution (Priority 4+ - highest!)
+depends_x86_64__ubuntu_noble=('libbase-x86_64-ubuntu-noble-super-optimized')
+
+# Result on x86_64 Ubuntu Noble: uses 'libbase-x86_64-ubuntu-noble-super-optimized'
+# Result on aarch64 Ubuntu Noble: uses 'libbase-ubuntu-noble'
+# Result on x86_64 Ubuntu Jammy: uses 'libbase-x86_64-optimized'
+```
+
+**Note:** 
+- Architecture-specific variables only apply when building for that specific architecture. If the current build architecture doesn't match the suffix, the variable is ignored and the next highest priority variable is used.
+- **Combined syntax** `variable_arch__distribution` allows for the most specific targeting, combining both architecture and distribution requirements for maximum flexibility.
+
 #### Enhanced Array Support
 
 ```bash
