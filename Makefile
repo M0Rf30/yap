@@ -83,7 +83,7 @@ lint:
 # Generate documentation
 doc:
 	@echo "Viewing all package documentation..."
-	@$(GOCMD) doc -all ./...
+	@$(GOCMD) doc -all .
 
 # Start documentation server
 doc-serve:
