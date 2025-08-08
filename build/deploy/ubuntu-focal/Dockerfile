@@ -55,40 +55,25 @@ LABEL org.opencontainers.image.version="${VERSION}"
 
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive
-ENV GOROOT=/usr/local/go
-ENV GOPATH=/go
-ENV PATH=$GOROOT/bin:$GOPATH/bin:$PATH
 
-# Install minimal runtime dependencies and Go
+# Install minimal runtime dependencies
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         bash-completion \
         binutils \
         ca-certificates \
-        sudo \
-        wget && \
-    # Download and install Go (official binaries, no checksums)
-    case "${TARGETARCH}" in \
-        amd64) GO_ARCH=amd64 ;; \
-        arm64) GO_ARCH=arm64 ;; \
-        *) GO_ARCH=amd64 ;; \
-    esac && \
-    wget --progress=dot:giga -O go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
-    tar -C /usr/local -xzf go.tar.gz && \
-    rm go.tar.gz && \
-    # Remove wget to minimize final image
-    apt-get remove -y wget && \
-    apt-get autoremove -y && \
+        sudo && \
     # Set timezone
     ln -sf /usr/share/zoneinfo/UTC /etc/localtime && \
     # Clean up
+    apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN groupadd -g 1000 yap && \
-    useradd -m -u 1000 -g yap -s /bin/bash yap && \
+RUN groupadd -g 1001 yap && \
+    useradd -m -u 1001 -g 1001 -s /bin/bash yap && \
     echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap' >> /etc/sudoers
 
 # Copy binary and completion from builder

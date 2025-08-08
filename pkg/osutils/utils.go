@@ -899,6 +899,11 @@ func normalizeScriptContent(script string) string {
 
 // logScriptContent logs script content using direct writer to avoid line wrapping.
 func logScriptContent(cmds string) {
+	// Only log script content if debug level is enabled
+	if baseLogger.Level > pterm.LogLevelDebug {
+		return
+	}
+
 	// Start multiprinter for consistent output handling
 	_, err := MultiPrinter.Start()
 	if err != nil {
@@ -1062,7 +1067,7 @@ func formatBytes(size int64) string {
 
 	units := []string{"B", "KB", "MB", "GB", "TB"}
 
-	return fmt.Sprintf("%.1f %s", float64(size)/float64(div), units[exp])
+	return fmt.Sprintf("%.1f %s", float64(size)/float64(div), units[exp+1])
 }
 
 // CheckGO checks if the GO executable is already installed.//
