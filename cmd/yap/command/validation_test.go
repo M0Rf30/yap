@@ -147,7 +147,7 @@ func TestValidateProjectPath(t *testing.T) {
 		},
 		{
 			name:    "examples directory with yap.json",
-			path:    "../../../examples",
+			path:    "../../../examples/circular-deps",
 			wantErr: false,
 		},
 		{
