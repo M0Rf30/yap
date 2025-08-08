@@ -399,6 +399,55 @@ package() {
 }
 ```
 
+#### Extended Checksum Support
+
+YAP supports all standard Arch Linux checksum types, providing comprehensive file integrity verification:
+
+**Supported Checksum Types (in order of cryptographic strength):**
+- `b2sums` - BLAKE2b checksums (512-bit, strongest and fastest)
+- `sha512sums` - SHA-512 checksums  
+- `sha384sums` - SHA-384 checksums
+- `sha256sums` - SHA-256 checksums (most common)
+- `sha224sums` - SHA-224 checksums
+- `cksums` - CRC32 checksums from UNIX-standard cksum (fastest, for compatibility)
+
+**Examples:**
+
+```bash
+# Traditional SHA-256 checksums (most common)
+source=('https://example.com/app-1.0.tar.gz')
+sha256sums=('a1b2c3d4e5f6789abcdef...')
+
+# BLAKE2b checksums (strongest and fastest, recommended for new packages)
+source=('https://example.com/app-1.0.tar.gz')
+b2sums=('2f240f2a3d2f8d8f9f9f9f9f9f9f9f9f...')
+
+# CRC32 checksums (fast, for compatibility or large files)
+source=('https://example.com/app-1.0.tar.gz')
+cksums=('1234567890 2048576')  # Format: checksum filesize
+
+# Architecture-specific checksums
+source=('https://example.com/generic-1.0.tar.gz')
+source_x86_64=('https://example.com/optimized-x86_64-1.0.tar.gz')
+
+sha256sums=('generic_file_hash')
+sha256sums_x86_64=('optimized_file_hash')
+
+# Multiple checksum types can coexist
+b2sums=('blake2_hash_for_generic')
+b2sums_x86_64=('blake2_hash_for_x86_64')
+cksums=('1234567890 1048576')
+cksums_x86_64=('9876543210 2097152')
+```
+
+**Notes:**
+- Use the strongest available checksum from upstream (preferably `b2sums`)
+- Architecture-specific checksums follow the same priority system as other variables
+- `cksums` format is `checksum filesize` (space-separated, as per UNIX cksum)
+- Multiple checksum types can be used simultaneously for different verification needs
+- BLAKE2b offers superior performance and security compared to SHA variants
+```
+
 #### Package Manager Specific Sections
 
 ```bash
