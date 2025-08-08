@@ -8,6 +8,11 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
+const (
+	alpineDistro = "alpine"
+	archDistro   = "arch"
+)
+
 // pullCmd represents the pull command.
 var pullCmd = &cobra.Command{
 	Use:     "pull <distro>",
@@ -40,7 +45,7 @@ Re-running this command will update to the latest image versions.`,
 	Run: func(_ *cobra.Command, args []string) {
 		split := strings.Split(args[0], "-")
 
-		if len(split) == 1 && split[0] != "alpine" && split[0] != "arch" {
+		if len(split) == 1 && split[0] != alpineDistro && split[0] != archDistro {
 			osutils.Logger.Fatal("except for alpine and arch, specify also the codename " +
 				"(i. e. rocky-9, ubuntu-jammy)")
 		}

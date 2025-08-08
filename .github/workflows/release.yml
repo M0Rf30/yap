@@ -49,20 +49,20 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.tag }}"
           else
-            VERSION=${GITHUB_REF#refs/tags/}
+            VERSION="${GITHUB_REF#refs/tags/}"
           fi
 
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
           # Check if this is a prerelease
-          if [[ $VERSION =~ -[a-zA-Z] ]]; then
-            echo "is-prerelease=true" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" =~ -[a-zA-Z] ]]; then
+            echo "is-prerelease=true" >> "$GITHUB_OUTPUT"
           else
-            echo "is-prerelease=false" >> $GITHUB_OUTPUT
+            echo "is-prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
           echo "📋 Version: ${VERSION}"
-          echo "📋 Pre-release: $([ $VERSION =~ -[a-zA-Z] ] && echo 'true' || echo 'false')"
+          echo "📋 Pre-release: $([[ "$VERSION" =~ -[a-zA-Z] ]] && echo 'true' || echo 'false')"
 
       - name: 🐹 Set up Go
         uses: actions/setup-go@v5
@@ -236,33 +236,38 @@ jobs:
         id: status
         run: |
           if [[ "${{ needs.goreleaser.result }}" == "success" ]]; then
-            echo "status=success" >> $GITHUB_OUTPUT
-            echo "message=🎉 Release ${{ needs.validate.outputs.version }} completed successfully!" >> $GITHUB_OUTPUT
+            echo "status=success" >> "$GITHUB_OUTPUT"
+            echo "message=🎉 Release ${{ needs.validate.outputs.version }} completed successfully!" >> "$GITHUB_OUTPUT"
           else
-            echo "status=failure" >> $GITHUB_OUTPUT
-            echo "message=❌ Release ${{ needs.validate.outputs.version }} failed. Check the workflow logs." >> $GITHUB_OUTPUT
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+            echo "message=❌ Release ${{ needs.validate.outputs.version }} failed. Check the workflow logs." >> "$GITHUB_OUTPUT"
           fi
 
       - name: 📝 Create release summary
         run: |
-          echo "## 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Pre-release:** ${{ needs.validate.outputs.is-prerelease }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ${{ steps.status.outputs.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📋 Job Results" >> $GITHUB_STEP_SUMMARY
-          echo "- **Validation:** ${{ needs.validate.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Binary Release:** ${{ needs.goreleaser.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Container Images:** ${{ needs.containers.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Package Publishing:** ${{ needs.packages.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🚀 Release Summary"
+            echo ""
+            echo "**Version:** ${{ needs.validate.outputs.version }}"
+            echo "**Pre-release:** ${{ needs.validate.outputs.is-prerelease }}"
+            echo "**Status:** ${{ steps.status.outputs.status }}"
+            echo ""
+            echo "### 📋 Job Results"
+            echo "- **Validation:** ${{ needs.validate.result }}"
+            echo "- **Binary Release:** ${{ needs.goreleaser.result }}"
+            echo "- **Container Images:** ${{ needs.containers.result }}"
+            echo "- **Package Publishing:** ${{ needs.packages.result }}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          
           if [[ "${{ steps.status.outputs.status }}" == "success" ]]; then
-            echo "✅ Release completed successfully!" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "📦 **Downloads:** https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-            echo "🐳 **Container Images:** Available on GitHub Container Registry and Docker Hub" >> $GITHUB_STEP_SUMMARY
-            echo "📚 **Documentation:** https://pkg.go.dev/github.com/M0Rf30/yap/v2@${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "✅ Release completed successfully!"
+              echo ""
+              echo "📦 **Downloads:** https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate.outputs.version }}"
+              echo "🐳 **Container Images:** Available on GitHub Container Registry and Docker Hub"
+              echo "📚 **Documentation:** https://pkg.go.dev/github.com/M0Rf30/yap/v2@${{ needs.validate.outputs.version }}"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "❌ Release failed. Please check the workflow logs and try again." >> $GITHUB_STEP_SUMMARY
+            echo "❌ Release failed. Please check the workflow logs and try again." >> "$GITHUB_STEP_SUMMARY"
           fi

@@ -139,10 +139,10 @@ jobs:
 
       - name: 📝 Output image details
         run: |
-          echo "## 🐳 Docker Image Built" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**OS:** ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:** ${{ steps.meta.outputs.tags }}" >> \
-            $GITHUB_STEP_SUMMARY
-          echo "**Labels:** ${{ steps.meta.outputs.labels }}" >> \
-            $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🐳 Docker Image Built"
+            echo ""
+            echo "**OS:** ${{ matrix.os }}"
+            echo "**Tags:** ${{ steps.meta.outputs.tags }}"
+            echo "**Labels:** ${{ steps.meta.outputs.labels }}"
+          } >> "$GITHUB_STEP_SUMMARY"

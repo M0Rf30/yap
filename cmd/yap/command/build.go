@@ -3,7 +3,7 @@ package command
 
 import (
 	"errors"
-	"os"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -53,9 +53,9 @@ DEPENDENCY RESOLUTION:
 
   # Build with custom version override
   yap build --pkgver 1.2.3 --pkgrel 2 ubuntu-jammy .`,
-	Args:   createValidateDistroArgs(1),
+	Args:   cobra.RangeArgs(1, 2), // Allow 1 or 2 arguments like the old version
 	PreRun: PreRunValidation,
-	Run: func(_ *cobra.Command, args []string) {
+	RunE: func(_ *cobra.Command, args []string) error {
 		// Set verbose flag from global flag
 		project.Verbose = verbose
 		osutils.SetVerbose(verbose)
@@ -75,6 +75,35 @@ DEPENDENCY RESOLUTION:
 
 			if len(split) > 1 {
 				release = split[1]
+			}
+		} else if len(args) == 1 {
+			// Single argument - could be path only or distro+path in one
+			firstArg := args[0]
+			// Check if it's a path (contains /, is . or .., or is a valid project path)
+			if strings.Contains(firstArg, "/") || firstArg == "." || firstArg == ".." {
+				// It's definitely a path
+				fullJSONPath, _ = filepath.Abs(firstArg)
+			} else {
+				// Check if it's a valid project path
+				if err := validateProjectPath(firstArg); err == nil {
+					// It's a valid project path
+					fullJSONPath, _ = filepath.Abs(firstArg)
+				} else {
+					// Try to validate as distro
+					if err := validateDistroArg(firstArg); err == nil {
+						// It's a valid distro, but no path provided - use current directory
+						split := strings.Split(firstArg, "-")
+						distro = split[0]
+						if len(split) > 1 {
+							release = split[1]
+						}
+						fullJSONPath, _ = filepath.Abs(".")
+					} else {
+						// Neither valid distro nor valid path
+						return fmt.Errorf("argument '%s' is neither a valid distribution nor a valid project path",
+							firstArg)
+					}
+				}
 			}
 		}
 
@@ -105,10 +134,9 @@ DEPENDENCY RESOLUTION:
 				logStructuredError(yapErr)
 			} else {
 				osutils.Logger.Error("Project initialization failed", osutils.Logger.Args("error", err))
-				osutils.Logger.Fatal("fatal error",
-					osutils.Logger.Args("error", err))
+				return err
 			}
-			os.Exit(1)
+			return err
 		}
 
 		osutils.Logger.Info("Project initialized successfully")
@@ -124,13 +152,13 @@ DEPENDENCY RESOLUTION:
 				logStructuredError(yapErr)
 			} else {
 				osutils.Logger.Error("Build failed", osutils.Logger.Args("error", err))
-				osutils.Logger.Fatal("fatal error",
-					osutils.Logger.Args("error", err))
+				return err
 			}
-			os.Exit(1)
+			return err
 		}
 
 		osutils.Logger.Info("All packages built successfully")
+		return nil
 	},
 }
 
