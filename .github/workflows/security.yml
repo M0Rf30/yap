@@ -2,9 +2,9 @@ name: 🔒 Security Analysis
 
 on:
   push:
-    branches: ["main", "codebase-improvements"]
+    branches: ["main"]
   pull_request:
-    branches: ["main", "codebase-improvements"]
+    branches: ["main"]
   schedule:
     # Run security scan every day at 6:00 AM UTC
     - cron: "0 6 * * *"

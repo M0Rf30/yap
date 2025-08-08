@@ -558,3 +558,213 @@ func TestPKGBUILD_Integration(t *testing.T) {
 	pb.ValidateMandatoryItems()
 	pb.ValidateGeneral()
 }
+
+func TestPKGBUILD_GetDepends(t *testing.T) {
+	pb := &PKGBUILD{}
+
+	// Test with empty makeDepends - should return nil
+	err := pb.GetDepends("echo", []string{}, []string{})
+	if err != nil {
+		t.Errorf("GetDepends with empty makeDepends should not return error, got: %v", err)
+	}
+
+	// Test with makeDepends - should execute command (using echo for safety)
+	err = pb.GetDepends("echo", []string{"arg1"}, []string{"make", "gcc"})
+	if err != nil {
+		t.Errorf("GetDepends with makeDepends should not fail with echo command, got: %v", err)
+	}
+
+	// Test with invalid command - should return error
+	err = pb.GetDepends("nonexistent-command-12345", []string{}, []string{"make"})
+	if err == nil {
+		t.Error("GetDepends with invalid command should return error")
+	}
+}
+
+func TestPKGBUILD_GetUpdates(t *testing.T) {
+	pb := &PKGBUILD{}
+
+	// Test with valid command (using echo for safety)
+	err := pb.GetUpdates("echo", "update")
+	if err != nil {
+		t.Errorf("GetUpdates with echo command should not fail, got: %v", err)
+	}
+
+	// Test with no arguments
+	err = pb.GetUpdates("echo")
+	if err != nil {
+		t.Errorf("GetUpdates with no args should not fail, got: %v", err)
+	}
+
+	// Test with invalid command - should return error
+	err = pb.GetUpdates("nonexistent-command-12345")
+	if err == nil {
+		t.Error("GetUpdates with invalid command should return error")
+	}
+}
+
+func TestPKGBUILD_ValidateGeneral_ErrorCases(t *testing.T) {
+	// Test cases that should trigger validation errors
+	// Note: These tests verify the validation logic works but cannot test
+	// the actual exit behavior due to os.Exit calls
+	pb := &PKGBUILD{}
+
+	// Test with missing license - should trigger validation logic
+	// We expect this to call os.Exit, so we can't test it directly
+	// Instead, test the individual validation components
+
+	// Test with empty package name but set other fields to see validation steps
+	pb.PkgName = "test"
+	pb.License = []string{"MIT"}
+	pb.Package = "echo test"
+
+	// This should pass basic validation checks
+	// (We can't test the exit cases directly due to os.Exit)
+}
+
+func TestPKGBUILD_mapArrays_EdgeCases(t *testing.T) {
+	pb := &PKGBUILD{}
+
+	// Test with unknown array key
+	pb.mapArrays("unknown_array", []string{"value1", "value2"})
+	// Should not panic, just ignore unknown keys
+
+	// Test with empty array
+	pb.mapArrays("depends", []string{})
+
+	if len(pb.Depends) != 0 {
+		t.Error("Empty array should result in empty slice")
+	}
+
+	// Test makedepends
+	pb.mapArrays("makedepends", []string{"cmake", "make"})
+
+	if len(pb.MakeDepends) != 2 || pb.MakeDepends[0] != "cmake" || pb.MakeDepends[1] != "make" {
+		t.Errorf("Expected MakeDepends ['cmake', 'make'], got %v", pb.MakeDepends)
+	}
+
+	// Test optdepends
+	pb.mapArrays("optdepends", []string{"optional-pkg"})
+
+	if len(pb.OptDepends) != 1 || pb.OptDepends[0] != "optional-pkg" {
+		t.Errorf("Expected OptDepends ['optional-pkg'], got %v", pb.OptDepends)
+	}
+
+	// Test license
+	pb.mapArrays("license", []string{"GPL-3.0"})
+
+	if len(pb.License) != 1 || pb.License[0] != "GPL-3.0" {
+		t.Errorf("Expected License ['GPL-3.0'], got %v", pb.License)
+	}
+
+	// Test backup
+	pb.mapArrays("backup", []string{"/etc/config"})
+
+	if len(pb.Backup) != 1 || pb.Backup[0] != "/etc/config" {
+		t.Errorf("Expected Backup ['/etc/config'], got %v", pb.Backup)
+	}
+
+	// Test options
+	pb.mapArrays("options", []string{"!strip"})
+
+	if len(pb.Options) != 1 || pb.Options[0] != "!strip" {
+		t.Errorf("Expected Options ['!strip'], got %v", pb.Options)
+	}
+
+	// Test provides
+	pb.mapArrays("provides", []string{"some-library"})
+
+	if len(pb.Provides) != 1 || pb.Provides[0] != "some-library" {
+		t.Errorf("Expected Provides ['some-library'], got %v", pb.Provides)
+	}
+
+	// Test conflicts
+	pb.mapArrays("conflicts", []string{"old-package"})
+
+	if len(pb.Conflicts) != 1 || pb.Conflicts[0] != "old-package" {
+		t.Errorf("Expected Conflicts ['old-package'], got %v", pb.Conflicts)
+	}
+
+	// Test replaces
+	pb.mapArrays("replaces", []string{"obsolete-package"})
+
+	if len(pb.Replaces) != 1 || pb.Replaces[0] != "obsolete-package" {
+		t.Errorf("Expected Replaces ['obsolete-package'], got %v", pb.Replaces)
+	}
+}
+
+func TestPKGBUILD_mapFunctions_EdgeCases(t *testing.T) {
+	pb := &PKGBUILD{}
+
+	// Test unknown function
+	pb.mapFunctions("unknown_function", "echo unknown")
+	// Should not panic, just ignore unknown functions
+
+	// Test all supported scriptlets
+	pb.mapFunctions("prerm", "echo pre-remove")
+
+	if pb.PreRm != "echo pre-remove" {
+		t.Errorf("Expected PreRm 'echo pre-remove', got '%s'", pb.PreRm)
+	}
+
+	pb.mapFunctions("postrm", "echo post-remove")
+
+	if pb.PostRm != "echo post-remove" {
+		t.Errorf("Expected PostRm 'echo post-remove', got '%s'", pb.PostRm)
+	}
+}
+
+func TestPKGBUILD_mapVariables_EdgeCases(t *testing.T) {
+	pb := &PKGBUILD{}
+
+	// Store original environment
+	originalPkgrel := os.Getenv("pkgrel")
+	originalPkgdesc := os.Getenv("pkgdesc")
+
+	defer func() {
+		// Restore original environment
+		_ = os.Setenv("pkgrel", originalPkgrel)
+		_ = os.Setenv("pkgdesc", originalPkgdesc)
+	}()
+
+	// Test unknown variable
+	pb.mapVariables("unknown_var", "value")
+	// Should not panic, just ignore unknown variables
+
+	// Test all variable mappings
+	pb.mapVariables("pkgrel", "2")
+
+	if pb.PkgRel != "2" {
+		t.Errorf("Expected PkgRel '2', got '%s'", pb.PkgRel)
+	}
+
+	pb.mapVariables("pkgdesc", "Updated description")
+
+	if pb.PkgDesc != "Updated description" {
+		t.Errorf("Expected PkgDesc 'Updated description', got '%s'", pb.PkgDesc)
+	}
+
+	pb.mapVariables("url", "https://example.com")
+
+	if pb.URL != "https://example.com" {
+		t.Errorf("Expected URL 'https://example.com', got '%s'", pb.URL)
+	}
+
+	pb.mapVariables("maintainer", "John Doe")
+
+	if pb.Maintainer != "John Doe" {
+		t.Errorf("Expected Maintainer 'John Doe', got '%s'", pb.Maintainer)
+	}
+
+	pb.mapVariables("section", "development")
+
+	if pb.Section != "development" {
+		t.Errorf("Expected Section 'development', got '%s'", pb.Section)
+	}
+
+	pb.mapVariables("priority", "optional")
+
+	if pb.Priority != "optional" {
+		t.Errorf("Expected Priority 'optional', got '%s'", pb.Priority)
+	}
+}

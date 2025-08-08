@@ -2,9 +2,9 @@ name: 📊 Code Coverage
 
 on:
   push:
-    branches: ["main", "codebase-improvements"]
+    branches: ["main"]
   pull_request:
-    branches: ["main", "codebase-improvements"]
+    branches: ["main"]
   schedule:
     # Run coverage analysis every Sunday at 12:00 PM UTC
     - cron: "0 12 * * 0"
