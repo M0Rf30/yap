@@ -1097,3 +1097,119 @@ func TestPKGBUILD_CombinedArchitectureDistribution(t *testing.T) {
 		t.Error("Depends should not be empty")
 	}
 }
+
+func TestPKGBUILD_ChecksumSupport_B2Sums(t *testing.T) {
+	pb := &PKGBUILD{}
+	pb.Init()
+
+	// Test adding BLAKE2b checksums
+	err := pb.AddItem("b2sums", []string{
+		"2f240f2a3d2f8d8f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f",
+		"3f340f3a4d3f9d9f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+	})
+	if err != nil {
+		t.Errorf("AddItem(b2sums) returned error: %v", err)
+	}
+
+	if len(pb.HashSums) != 2 {
+		t.Errorf("Expected 2 b2sums, got %d", len(pb.HashSums))
+	}
+
+	expectedB2Sum := "2f240f2a3d2f8d8f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f"
+	if pb.HashSums[0] != expectedB2Sum {
+		t.Errorf("Expected b2sum '%s', got '%s'", expectedB2Sum, pb.HashSums[0])
+	}
+}
+
+func TestPKGBUILD_ChecksumSupport_CkSums(t *testing.T) {
+	pb := &PKGBUILD{}
+	pb.Init()
+
+	// Test adding CRC32 checksums (UNIX cksum format)
+	err := pb.AddItem("cksums", []string{
+		"1234567890 512",
+		"9876543210 1024",
+	})
+	if err != nil {
+		t.Errorf("AddItem(cksums) returned error: %v", err)
+	}
+
+	if len(pb.HashSums) != 2 {
+		t.Errorf("Expected 2 cksums, got %d", len(pb.HashSums))
+	}
+
+	expectedCkSum := "1234567890 512"
+	if pb.HashSums[0] != expectedCkSum {
+		t.Errorf("Expected cksum '%s', got '%s'", expectedCkSum, pb.HashSums[0])
+	}
+}
+
+func TestPKGBUILD_ChecksumSupport_AllSHATypes(t *testing.T) {
+	testCases := []struct {
+		name     string
+		key      string
+		value    string
+		expected string
+	}{
+		{"SHA-512", "sha512sums", "sha512_hash_value", "sha512_hash_value"},
+		{"SHA-384", "sha384sums", "sha384_hash_value", "sha384_hash_value"},
+		{"SHA-256", "sha256sums", "sha256_hash_value", "sha256_hash_value"},
+		{"SHA-224", "sha224sums", "sha224_hash_value", "sha224_hash_value"},
+		{"BLAKE2b", "b2sums", "blake2_hash_value", "blake2_hash_value"},
+		{"CRC32", "cksums", "1234567890 512", "1234567890 512"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pb := &PKGBUILD{}
+			pb.Init()
+
+			err := pb.AddItem(tc.key, []string{tc.value})
+			if err != nil {
+				t.Errorf("AddItem(%s) returned error: %v", tc.key, err)
+			}
+
+			if len(pb.HashSums) != 1 {
+				t.Errorf("Expected 1 %s, got %d", tc.key, len(pb.HashSums))
+			}
+
+			if pb.HashSums[0] != tc.expected {
+				t.Errorf("Expected %s '%s', got '%s'", tc.key, tc.expected, pb.HashSums[0])
+			}
+		})
+	}
+}
+
+func TestPKGBUILD_ChecksumSupport_ArchitectureSpecific(t *testing.T) {
+	pb := &PKGBUILD{
+		FullDistroName: "ubuntu_focal",
+		Distro:         "ubuntu",
+	}
+	pb.Init()
+
+	// Test architecture-specific checksums
+	err := pb.AddItem("b2sums", []string{"base_blake2_hash"})
+	if err != nil {
+		t.Errorf("AddItem(b2sums) returned error: %v", err)
+	}
+
+	err = pb.AddItem("b2sums_x86_64", []string{"x86_64_blake2_hash"})
+	if err != nil {
+		t.Errorf("AddItem(b2sums_x86_64) returned error: %v", err)
+	}
+
+	err = pb.AddItem("cksums", []string{"1234567890 512"})
+	if err != nil {
+		t.Errorf("AddItem(cksums) returned error: %v", err)
+	}
+
+	err = pb.AddItem("cksums_x86_64", []string{"9876543210 1024"})
+	if err != nil {
+		t.Errorf("AddItem(cksums_x86_64) returned error: %v", err)
+	}
+
+	// Results depend on current architecture but should not be empty
+	if len(pb.HashSums) == 0 {
+		t.Error("HashSums should not be empty")
+	}
+}
