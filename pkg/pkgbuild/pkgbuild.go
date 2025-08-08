@@ -315,6 +315,10 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
 // mapArrays reads an array name and its content and maps them to the PKGBUILD
 // struct.
 func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
+	if pkgBuild.mapChecksumsArrays(key, data) {
+		return
+	}
+
 	switch key {
 	case "arch":
 		pkgBuild.Arch = data.([]string)
@@ -338,12 +342,34 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 		pkgBuild.Replaces = data.([]string)
 	case "source":
 		pkgBuild.SourceURI = data.([]string)
-	case "sha256sums":
-		pkgBuild.HashSums = data.([]string)
-	case "sha512sums":
-		pkgBuild.HashSums = data.([]string)
 	case "backup":
 		pkgBuild.Backup = data.([]string)
+	}
+}
+
+// mapChecksumsArrays handles mapping of checksum arrays and returns true if handled
+func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any) bool {
+	switch key {
+	case "sha512sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "sha384sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "sha256sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "sha224sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "b2sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "cksums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	default:
+		return false
 	}
 }
 
