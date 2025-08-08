@@ -486,7 +486,7 @@ git clone https://github.com/M0Rf30/yap.git
 cd yap
 
 # Install dependencies
-go mod download
+make deps
 
 # Build
 make build
@@ -496,6 +496,69 @@ make test
 
 # Install
 make install
+```
+
+### Available Make Targets
+
+YAP provides a comprehensive Makefile with various targets for development:
+
+```bash
+# Development targets
+make build            # Build the application
+make clean            # Clean build artifacts  
+make test             # Run tests
+make test-coverage    # Run tests with coverage report
+make deps             # Download dependencies
+make fmt              # Format code
+make lint             # Lint code with golangci-lint
+make lint-md          # Lint markdown files
+
+# Documentation targets
+make doc              # View all package documentation
+make doc-serve        # Start documentation server on localhost:8080
+make doc-package PKG=<path>  # View specific package docs
+make doc-deps         # Install documentation tools
+make doc-generate     # Generate static documentation files
+make doc-serve-static # Serve static docs on localhost:8081
+
+# Build targets
+make run              # Build and run the application
+make build-all        # Build for all architectures
+make release          # Create release packages
+
+# Docker targets
+make docker-build DISTRO=<name>  # Build Docker image for distribution
+make docker-build-all            # Build Docker images for all distributions
+make docker-list-distros         # List available distributions
+
+# Utility targets
+make all              # Clean, deps, fmt, lint, test, doc, and build
+make help             # Show available targets
+```
+
+### Examples
+
+```bash
+# Build YAP
+make build
+
+# Run tests with coverage
+make test-coverage
+
+# Format and lint code
+make fmt lint
+
+# Build Docker image for specific distribution
+make docker-build DISTRO=ubuntu-noble
+
+# Build all Docker images
+make docker-build-all
+
+# Start documentation server
+make doc-serve
+
+# Create release packages
+make release
 ```
 
 ### Contributing
@@ -512,19 +575,22 @@ make install
 
 ```bash
 # Set up development environment
-make dev-setup
+make deps
 
-# Run with live reload
-make dev-run
+# Format and lint code
+make fmt lint
+
+# Run tests
+make test
+
+# Build application
+make build
 
 # Generate documentation
-make docs
+make doc-generate
 
-# Run linters
-make lint
-
-# Format code
-make format
+# Start documentation server
+make doc-serve
 ```
 
 ## 📚 Examples
