@@ -54,33 +54,16 @@ LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${VERSION}"
 
 
-# Go environment variables
-ENV GOROOT=/usr/local/go
-ENV GOPATH=/go
-ENV PATH=$GOROOT/bin:$GOPATH/bin:$PATH
-
-# Install minimal runtime dependencies and Go
+# Install minimal runtime dependencies
 RUN yum -y update && yum -y install \
         bash-completion \
         ca-certificates \
-        sudo \
-        wget && \
-    # Download and install Go (official binaries, no checksums)
-    case "${TARGETARCH}" in \
-        amd64) GO_ARCH=amd64 ;; \
-        arm64) GO_ARCH=arm64 ;; \
-        *) GO_ARCH=amd64 ;; \
-    esac && \
-    wget --progress=dot:giga -O go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
-    tar -C /usr/local -xzf go.tar.gz && \
-    rm go.tar.gz && \
-    # Remove wget to minimize final image
-    yum remove -y wget && \
+        sudo && \
     yum clean all && rm -rf /var/cache/yum
 
 # Create non-root user
-RUN groupadd -g 1000 yap && \
-    useradd -m -u 1000 -g yap -s /bin/bash yap && \
+RUN groupadd -g 1001 yap && \
+    useradd -m -u 1001 -g 1001 -s /bin/bash yap && \
     echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap' >> /etc/sudoers
 
 # Copy binary and completion from builder

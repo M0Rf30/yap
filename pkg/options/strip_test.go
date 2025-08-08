@@ -291,6 +291,323 @@ func TestProcessFileWithWriteError(t *testing.T) {
 	assert.NoError(t, err) // Should not error, just skip the file
 }
 
+func TestProcessFileErrorScenarios(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T) (string, fs.DirEntry)
+		wantErr bool
+	}{
+		{
+			name: "Missing file should be handled gracefully",
+			setup: func(t *testing.T) (string, fs.DirEntry) {
+				t.Helper()
+				// Create a DirEntry for a file that will be deleted
+				tempDir := t.TempDir()
+				filePath := filepath.Join(tempDir, "will_be_deleted.txt")
+				err := os.WriteFile(filePath, []byte("content"), 0o600)
+				require.NoError(t, err)
+
+				info, err := os.Stat(filePath)
+				require.NoError(t, err)
+				dirEntry := fs.FileInfoToDirEntry(info)
+
+				// Delete the file after getting the DirEntry
+				err = os.Remove(filePath)
+				require.NoError(t, err)
+
+				return filePath, dirEntry
+			},
+			wantErr: false, // Should return nil, not error (warn and continue)
+		},
+		{
+			name: "File in non-existent directory",
+			setup: func(t *testing.T) (string, fs.DirEntry) {
+				t.Helper()
+				// Create a temporary file first to get a valid DirEntry
+				tempDir := t.TempDir()
+				tempFile := filepath.Join(tempDir, "temp.txt")
+				err := os.WriteFile(tempFile, []byte("content"), 0o600)
+				require.NoError(t, err)
+
+				info, err := os.Stat(tempFile)
+				require.NoError(t, err)
+				dirEntry := fs.FileInfoToDirEntry(info)
+
+				// Return path to non-existent location
+				return "/totally/nonexistent/path/file.txt", dirEntry
+			},
+			wantErr: false, // Should handle gracefully
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			filePath, dirEntry := tt.setup(t)
+
+			err := processFile(filePath, dirEntry, nil)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestProcessFilePermissionHandling(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name        string
+		fileName    string
+		initialPerm os.FileMode
+		expectNoErr bool
+	}{
+		{
+			name:        "Read-only file should be made writable",
+			fileName:    "readonly_file.txt",
+			initialPerm: 0o444,
+			expectNoErr: true,
+		},
+		{
+			name:        "Already writable file should work",
+			fileName:    "writable_file.txt",
+			initialPerm: 0o644,
+			expectNoErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			filePath := filepath.Join(tempDir, tt.fileName)
+			err := os.WriteFile(filePath, []byte("test content"), tt.initialPerm)
+			require.NoError(t, err)
+
+			info, err := os.Stat(filePath)
+			require.NoError(t, err)
+
+			dirEntry := fs.FileInfoToDirEntry(info)
+
+			err = processFile(filePath, dirEntry, nil)
+			if tt.expectNoErr {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+
+			// Verify file is now writable (if it exists)
+			if info, err := os.Stat(filePath); err == nil {
+				assert.True(t, info.Mode().Perm()&0o200 != 0, "File should be writable after processing")
+			}
+		})
+	}
+}
+
+func TestProcessFileAdvanced(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		setup       func(t *testing.T) (string, fs.DirEntry)
+		description string
+		wantErr     bool
+	}{
+		{
+			name: "Regular file processing workflow",
+			setup: func(t *testing.T) (string, fs.DirEntry) {
+				t.Helper()
+				tempDir := t.TempDir()
+				filePath := filepath.Join(tempDir, "regular_file.txt")
+				err := os.WriteFile(filePath, []byte("content"), 0o600)
+				require.NoError(t, err)
+				info, err := os.Stat(filePath)
+				require.NoError(t, err)
+				return filePath, fs.FileInfoToDirEntry(info)
+			},
+			description: "Should process regular files without error",
+			wantErr:     false,
+		},
+		{
+			name: "Binary file processing",
+			setup: func(t *testing.T) (string, fs.DirEntry) {
+				t.Helper()
+				tempDir := t.TempDir()
+				filePath := filepath.Join(tempDir, "binary_file.bin")
+				// Create a binary file with some fake ELF-like content
+				err := os.WriteFile(filePath, []byte("\x7fELF\x01\x01\x01"), 0o755)
+				require.NoError(t, err)
+				info, err := os.Stat(filePath)
+				require.NoError(t, err)
+				return filePath, fs.FileInfoToDirEntry(info)
+			},
+			description: "Should process binary files",
+			wantErr:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			filePath, dirEntry := tt.setup(t)
+
+			err := processFile(filePath, dirEntry, nil)
+			if tt.wantErr {
+				assert.Error(t, err, tt.description)
+			} else {
+				assert.NoError(t, err, tt.description)
+			}
+		})
+	}
+}
+
+func TestProcessFileChmodError(t *testing.T) {
+	t.Parallel()
+
+	// Skip if running as root since root can typically change any permissions
+	if os.Getuid() == 0 {
+		t.Skip("Skipping permission test when running as root")
+	}
+
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "test_chmod_fail.txt")
+
+	// Create a file
+	err := os.WriteFile(filePath, []byte("content"), 0o600)
+	require.NoError(t, err)
+
+	info, err := os.Stat(filePath)
+	require.NoError(t, err)
+
+	dirEntry := fs.FileInfoToDirEntry(info)
+
+	// Make the directory read-only so chmod on the file will fail
+	err = os.Chmod(tempDir, 0o444)
+	require.NoError(t, err)
+
+	defer func() {
+		// Restore permissions for cleanup
+		_ = os.Chmod(tempDir, 0o755)
+	}()
+
+	// processFile should handle the chmod failure gracefully
+	err = processFile(filePath, dirEntry, nil)
+	assert.NoError(t, err, "processFile should handle chmod failures gracefully")
+}
+
+func TestStripErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		setupDir func(t *testing.T) string
+		wantErr  bool
+	}{
+		{
+			name: "Directory with permission issues",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				tempDir := t.TempDir()
+
+				// Create a subdirectory that we'll make inaccessible
+				subDir := filepath.Join(tempDir, "inaccessible")
+				err := os.MkdirAll(subDir, 0o755)
+				require.NoError(t, err)
+
+				// Create a file in the subdirectory
+				testFile := filepath.Join(subDir, "test.txt")
+				err = os.WriteFile(testFile, []byte("content"), 0o600)
+				require.NoError(t, err)
+
+				// Make subdirectory inaccessible (if not root)
+				if os.Getuid() != 0 {
+					err = os.Chmod(subDir, 0o000)
+					require.NoError(t, err)
+
+					// Schedule cleanup
+					t.Cleanup(func() {
+						_ = os.Chmod(subDir, 0o755)
+					})
+				}
+
+				return tempDir
+			},
+			wantErr: os.Getuid() != 0, // Will error if not root, succeed if root
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			packageDir := tt.setupDir(t)
+
+			err := Strip(packageDir)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestProcessFileStatErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T) (string, fs.DirEntry)
+		wantErr bool
+	}{
+		{
+			name: "Missing file should be handled gracefully",
+			setup: func(t *testing.T) (string, fs.DirEntry) {
+				t.Helper()
+				// Create a DirEntry for a file that will be deleted
+				tempDir := t.TempDir()
+				filePath := filepath.Join(tempDir, "will_be_deleted.txt")
+				err := os.WriteFile(filePath, []byte("content"), 0o600)
+				require.NoError(t, err)
+
+				info, err := os.Stat(filePath)
+				require.NoError(t, err)
+				dirEntry := fs.FileInfoToDirEntry(info)
+
+				// Delete the file after getting the DirEntry
+				err = os.Remove(filePath)
+				require.NoError(t, err)
+
+				return filePath, dirEntry
+			},
+			wantErr: false, // Should return nil, not error
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			filePath, dirEntry := tt.setup(t)
+
+			err := processFile(filePath, dirEntry, nil)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestStripIntegration(t *testing.T) {
 	t.Parallel()
 
