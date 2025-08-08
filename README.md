@@ -228,22 +228,69 @@ YAP extends the standard PKGBUILD format with multi-distribution support:
 
 #### Distribution-Specific Variables
 
+YAP supports distribution-specific variable overrides using the `__` (double underscore) syntax. These directives follow a **strict priority system** to ensure the most specific configuration takes precedence.
+
+**Priority System (Highest to Lowest):**
+
+1. **Priority 3** - Full distribution with codename: `variable__ubuntu_noble`
+2. **Priority 2** - Distribution name only: `variable__ubuntu`  
+3. **Priority 1** - Package manager: `variable__apt`
+4. **Priority 0** - Base variable (fallback): `variable`
+
+**How It Works:**
+- Higher priority values **override** lower priority values
+- Once a higher priority is set, lower priorities are **ignored**
+- Most specific configuration always wins
+
+**Examples:**
+
 ```bash
-# Base description
+# Base description (Priority 0 - fallback)
 pkgdesc="My application"
 
-# Distribution-specific descriptions
+# Distribution-specific descriptions (Priority 2)
 pkgdesc__debian="My application for Debian/Ubuntu"
 pkgdesc__fedora="My application for Fedora/CentOS"
 pkgdesc__alpine="My application for Alpine Linux"
 pkgdesc__arch="My application for Arch Linux"
 
-# Distribution-specific dependencies
+# Version-specific descriptions (Priority 3 - highest)
+pkgdesc__ubuntu_noble="My application optimized for Ubuntu 24.04 Noble"
+pkgdesc__ubuntu_jammy="My application for Ubuntu 22.04 Jammy"
+pkgdesc__fedora_39="My application for Fedora 39"
+
+# Package manager specific dependencies (Priority 1)
 makedepends=('gcc' 'make')
 makedepends__apt=('build-essential' 'cmake')
 makedepends__yum=('gcc-c++' 'cmake3')
 makedepends__apk=('build-base' 'cmake')
+
+# Distribution-specific dependencies (Priority 2)
+makedepends__ubuntu=('build-essential' 'cmake' 'pkg-config')
+makedepends__debian=('build-essential' 'cmake')
+
+# Version-specific dependencies (Priority 3 - highest)
+makedepends__ubuntu_noble=('build-essential' 'cmake' 'pkg-config' 'libtool')
 ```
+
+**Practical Example for Ubuntu Noble:**
+```bash
+depends="generic-package"          # Priority 0 (fallback)
+depends__apt="apt-specific"        # Priority 1 (package manager)
+depends__ubuntu="ubuntu-specific"  # Priority 2 (distribution)
+depends__ubuntu_noble="noble-optimized"  # Priority 3 (most specific)
+
+# Result: Only "noble-optimized" will be used for Ubuntu Noble builds
+```
+
+**Supported Distribution Codes:**
+- **Ubuntu**: `ubuntu_focal`, `ubuntu_jammy`, `ubuntu_noble`
+- **Debian**: `debian_bullseye`, `debian_bookworm` 
+- **Fedora**: `fedora_38`, `fedora_39`, `fedora_40`
+- **Rocky**: `rocky_8`, `rocky_9`
+- **CentOS**: `centos_7`, `centos_8`
+- **Alpine**: `alpine_3_18`, `alpine_3_19`
+- And more...
 
 #### Enhanced Array Support
 
