@@ -15,11 +15,11 @@ import (
 
 // Static error definitions to satisfy err113 linter.
 var (
-	ErrDistributionEmpty = errors.New("distribution cannot be empty")
-	ErrProjectPathEmpty  = errors.New("project path cannot be empty")
-	ErrPathNotExist      = errors.New("path does not exist")
-	ErrYapJSONNotFound   = errors.New("yap.json not found")
-	ErrInsufficientArgs  = errors.New("requires at least one argument")
+	ErrDistributionEmpty   = errors.New("distribution cannot be empty")
+	ErrProjectPathEmpty    = errors.New("project path cannot be empty")
+	ErrPathNotExist        = errors.New("path does not exist")
+	ErrProjectFileNotFound = errors.New("project file not found")
+	ErrInsufficientArgs    = errors.New("requires at least one argument")
 )
 
 // ValidDistrosCompletion provides completion for valid distributions.
@@ -51,7 +51,8 @@ func ValidDistrosCompletion(_ *cobra.Command, args []string, toComplete string) 
 	return completions, cobra.ShellCompDirectiveNoFileComp
 }
 
-// ProjectPathCompletion provides completion for project paths (directories with yap.json).
+// ProjectPathCompletion provides completion for project paths
+// (directories with yap.json or PKGBUILD).
 func ProjectPathCompletion(_ *cobra.Command, _ []string, _ string) (
 	[]string, cobra.ShellCompDirective) {
 	return nil, cobra.ShellCompDirectiveFilterDirs
@@ -79,7 +80,7 @@ func validateDistroArg(distro string) error {
 		distro, formatDistroSuggestions(baseDist), ErrDistributionEmpty)
 }
 
-// validateProjectPath validates that the project path exists and contains yap.json.
+// validateProjectPath validates that the project path exists and contains yap.json or PKGBUILD.
 func validateProjectPath(path string) error {
 	if path == "" {
 		return ErrProjectPathEmpty
@@ -96,14 +97,19 @@ func validateProjectPath(path string) error {
 		return fmt.Errorf("%s: %w", absPath, ErrPathNotExist)
 	}
 
-	// Check for yap.json file
+	// Check for yap.json file (multiproject)
 	yapJSONPath := filepath.Join(absPath, "yap.json")
+	// Check for PKGBUILD file (single project)
+	pkgbuildPath := filepath.Join(absPath, "PKGBUILD")
 
-	_, err = os.Stat(yapJSONPath)
-	if os.IsNotExist(err) {
-		return fmt.Errorf("yap.json not found in %s\n\n"+
-			"Make sure you're in a YAP project directory or specify the correct path: %w",
-			absPath, ErrYapJSONNotFound)
+	_, yapJSONErr := os.Stat(yapJSONPath)
+	_, pkgbuildErr := os.Stat(pkgbuildPath)
+
+	if os.IsNotExist(yapJSONErr) && os.IsNotExist(pkgbuildErr) {
+		return fmt.Errorf("neither yap.json nor PKGBUILD found in %s\n\n"+
+			"Make sure you're in a YAP project directory (containing yap.json for "+
+			"multiproject or PKGBUILD for single project) or specify the correct path: %w",
+			absPath, ErrProjectFileNotFound)
 	}
 
 	return nil
