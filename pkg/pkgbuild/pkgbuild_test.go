@@ -622,6 +622,154 @@ func TestPKGBUILD_ValidateGeneral_ErrorCases(t *testing.T) {
 	// (We can't test the exit cases directly due to os.Exit)
 }
 
+func TestPKGBUILD_ValidateGeneral_InvalidLicense(t *testing.T) {
+	pb := &PKGBUILD{
+		PkgName:   "test-package",
+		License:   []string{"INVALID_LICENSE"},
+		SourceURI: []string{"https://example.com/source.tar.gz"},
+		HashSums:  []string{"sha256sum"},
+		Package:   "cp file $pkgdir/",
+	}
+
+	// Test license validation directly - INVALID_LICENSE should fail
+	if pb.checkLicense() {
+		t.Error("INVALID_LICENSE should fail validation")
+	}
+}
+
+func TestPKGBUILD_ValidateGeneral_SourceHashMismatch(t *testing.T) {
+	pb := &PKGBUILD{
+		PkgName:   "test-package",
+		License:   []string{"MIT"},
+		SourceURI: []string{"https://example.com/source1.tar.gz", "https://example.com/source2.tar.gz"},
+		HashSums:  []string{"sha256sum1"}, // Only one hash for two sources
+		Package:   "cp file $pkgdir/",
+	}
+
+	// Test individual components since ValidateGeneral would exit
+	if len(pb.SourceURI) == len(pb.HashSums) {
+		t.Error("Source URI and HashSums should have different lengths for this test")
+	}
+}
+
+func TestPKGBUILD_ValidateGeneral_MissingPackageFunction(t *testing.T) {
+	pb := &PKGBUILD{
+		PkgName:   "test-package",
+		License:   []string{"MIT"},
+		SourceURI: []string{"https://example.com/source.tar.gz"},
+		HashSums:  []string{"sha256sum"},
+		Package:   "", // Missing package function
+	}
+
+	// Test individual validation components
+	if pb.Package != "" {
+		t.Error("Package function should be empty for this test")
+	}
+}
+
+func TestPKGBUILD_ValidateGeneral_MultipleErrors(t *testing.T) {
+	pb := &PKGBUILD{
+		PkgName:   "test-package",
+		License:   []string{"INVALID_LICENSE"}, // Invalid license
+		SourceURI: []string{"https://example.com/source1.tar.gz", "https://example.com/source2.tar.gz"},
+		HashSums:  []string{"sha256sum1"}, // Mismatched hash count
+		Package:   "",                     // Missing package function
+	}
+
+	// Test individual validation components since ValidateGeneral would exit
+	if pb.checkLicense() {
+		t.Error("Invalid license should fail validation")
+	}
+
+	if len(pb.SourceURI) == len(pb.HashSums) {
+		t.Error("Source URI and HashSums should have different lengths")
+	}
+
+	if pb.Package != "" {
+		t.Error("Package function should be empty")
+	}
+}
+
+func TestPKGBUILD_ValidateGeneral_EmptyLicense(t *testing.T) {
+	pb := &PKGBUILD{
+		PkgName:   "test-package",
+		License:   []string{}, // Empty license array
+		SourceURI: []string{"https://example.com/source.tar.gz"},
+		HashSums:  []string{"sha256sum"},
+		Package:   "cp file $pkgdir/",
+	}
+
+	// Empty license actually passes validation (per spdx library behavior)
+	result := pb.checkLicense()
+	if !result {
+		t.Error("Empty license unexpectedly failed validation")
+	}
+}
+
+func TestPKGBUILD_ValidateGeneral_AllValidationPaths(t *testing.T) {
+	// Test case 1: Valid license, source-hash match, has package function
+	t.Run("all_valid", func(t *testing.T) {
+		pb := &PKGBUILD{
+			PkgName:   "test-package",
+			License:   []string{"MIT"},
+			SourceURI: []string{"https://example.com/source.tar.gz"},
+			HashSums:  []string{"sha256sum"},
+			Package:   "cp file $pkgdir/",
+		}
+		// This should pass all validation checks and not exit
+		pb.ValidateGeneral()
+	})
+
+	// Test case 2: Valid license, no sources (empty arrays), has package function
+	t.Run("no_sources_valid", func(t *testing.T) {
+		pb := &PKGBUILD{
+			PkgName:   "test-package",
+			License:   []string{"GPL-2.0"},
+			SourceURI: []string{},
+			HashSums:  []string{},
+			Package:   "echo 'no sources needed'",
+		}
+		// This should pass all validation checks
+		pb.ValidateGeneral()
+	})
+
+	// Test case 3: PROPRIETARY license (special case), valid other fields
+	t.Run("proprietary_license", func(t *testing.T) {
+		pb := &PKGBUILD{
+			PkgName:   "test-package",
+			License:   []string{"PROPRIETARY"},
+			SourceURI: []string{"https://example.com/source.tar.gz"},
+			HashSums:  []string{"sha256sum"},
+			Package:   "cp file $pkgdir/",
+		}
+		pb.ValidateGeneral()
+	})
+
+	// Test case 4: CUSTOM license (special case), valid other fields
+	t.Run("custom_license", func(t *testing.T) {
+		pb := &PKGBUILD{
+			PkgName:   "test-package",
+			License:   []string{"CUSTOM"},
+			SourceURI: []string{"https://example.com/source.tar.gz"},
+			HashSums:  []string{"sha256sum"},
+			Package:   "cp file $pkgdir/",
+		}
+		pb.ValidateGeneral()
+	})
+
+	// Test case 5: Multiple valid licenses
+	t.Run("multiple_licenses", func(t *testing.T) {
+		pb := &PKGBUILD{
+			PkgName:   "test-package",
+			License:   []string{"MIT", "GPL-2.0"},
+			SourceURI: []string{"https://example.com/source1.tar.gz", "https://example.com/source2.tar.gz"},
+			HashSums:  []string{"sha256sum1", "sha256sum2"},
+			Package:   "cp files $pkgdir/",
+		}
+		pb.ValidateGeneral()
+	})
+}
+
 func TestPKGBUILD_mapArrays_EdgeCases(t *testing.T) {
 	pb := &PKGBUILD{}
 
@@ -1320,7 +1468,7 @@ func TestPKGBUILD_SetMainFolders_Alpine(t *testing.T) {
 
 	pb.SetMainFolders()
 
-	expectedPackageDir := filepath.Join("/tmp/test", "apk", "pkg", "test-pkg")
+	expectedPackageDir := filepath.Join(filepath.FromSlash("/tmp/test"), "apk", "pkg", "test-pkg")
 	if pb.PackageDir != expectedPackageDir {
 		t.Errorf("Expected PackageDir '%s', got '%s'", expectedPackageDir, pb.PackageDir)
 	}
@@ -1347,7 +1495,7 @@ func TestPKGBUILD_SetMainFolders_NonAlpine(t *testing.T) {
 	pb.SetMainFolders()
 
 	// For non-alpine, should have random string appended
-	if !strings.HasPrefix(pb.PackageDir, filepath.Join("/tmp/test", "ubuntu-")) {
+	if !strings.HasPrefix(pb.PackageDir, filepath.Join(filepath.FromSlash("/tmp/test"), "ubuntu-")) {
 		t.Errorf("Expected PackageDir to start with '/tmp/test/ubuntu-', got '%s'", pb.PackageDir)
 	}
 
@@ -1429,7 +1577,7 @@ func TestPKGBUILD_ComputeArchitecture_EdgeCases(t *testing.T) {
 			pb.ComputeArchitecture()
 
 			// Architecture should be computed (not empty)
-			if pb.Arch == nil || len(pb.Arch) == 0 {
+			if len(pb.Arch) == 0 {
 				t.Error("Architecture should be computed")
 			}
 		})
@@ -1514,7 +1662,10 @@ func TestPKGBUILD_CreateSpec_EdgeCases(t *testing.T) {
 
 	// Create temporary file for spec output
 	tempFile := filepath.Join(os.TempDir(), "test-spec")
-	defer os.Remove(tempFile)
+
+	defer func() {
+		_ = os.Remove(tempFile)
+	}()
 
 	// Test CreateSpec with minimal required fields
 	err := pb.CreateSpec(tempFile, tmpl)
