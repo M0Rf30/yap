@@ -1,3 +1,4 @@
+// Package pkgbuild provides PKGBUILD structure and manipulation functionality.
 package pkgbuild
 
 import (
@@ -8,14 +9,19 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/github/go-spdx/v2/spdxexp"
 	"github.com/pkg/errors"
+
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+)
+
+const (
+	dependsKey = "depends"
 )
 
 // PKGBUILD defines all the fields accepted by the yap specfile (variables,
-// arrays, functions). It adds some exotics fields to manage debconfig
+// arrays, functions).
 // templating and other rpm/deb descriptors.
 type PKGBUILD struct {
 	Arch           []string
@@ -27,6 +33,7 @@ type PKGBUILD struct {
 	Codename       string
 	Conflicts      []string
 	Copyright      []string
+	DataHash       string
 	DebConfig      string
 	DebTemplate    string
 	Depends        []string
@@ -131,7 +138,14 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			osutils.Logger.Warn("failed to close pkgbuild file", osutils.Logger.Args("path", cleanFilePath,
+				"error", err))
+		}
+	}()
 
 	return tmpl.Execute(file, pkgBuild)
 }
@@ -171,10 +185,11 @@ func (pkgBuild *PKGBUILD) Init() {
 
 // RenderSpec initializes a new template with custom functions and parses the provided script.
 // It adds two custom functions to the template:
-//  1. "join": Takes a slice of strings and joins them into a single string, separated by commas,
-//     while also trimming any leading or trailing spaces.
-//  2. "multiline": Takes a string and replaces newline characters with a newline followed by a space,
-//     effectively formatting the string for better readability in multi-line contexts.
+//
+//	"join": Takes a slice of strings and joins them into a single string, separated by commas,
+//	while also trimming any leading or trailing spaces.
+//	"multiline": Takes a string and replaces newline characters with a newline followed by a space,
+//	effectively formatting the string for better readability in multi-line contexts.
 //
 // The method returns the parsed template, which can be used for rendering with data.
 func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
@@ -300,6 +315,10 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
 // mapArrays reads an array name and its content and maps them to the PKGBUILD
 // struct.
 func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
+	if pkgBuild.mapChecksumsArrays(key, data) {
+		return
+	}
+
 	switch key {
 	case "arch":
 		pkgBuild.Arch = data.([]string)
@@ -307,7 +326,7 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 		pkgBuild.Copyright = data.([]string)
 	case "license":
 		pkgBuild.License = data.([]string)
-	case "depends":
+	case dependsKey:
 		pkgBuild.Depends = data.([]string)
 	case "options":
 		pkgBuild.Options = data.([]string)
@@ -323,12 +342,34 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 		pkgBuild.Replaces = data.([]string)
 	case "source":
 		pkgBuild.SourceURI = data.([]string)
-	case "sha256sums":
-		pkgBuild.HashSums = data.([]string)
-	case "sha512sums":
-		pkgBuild.HashSums = data.([]string)
 	case "backup":
 		pkgBuild.Backup = data.([]string)
+	}
+}
+
+// mapChecksumsArrays handles mapping of checksum arrays and returns true if handled
+func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any) bool {
+	switch key {
+	case "sha512sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "sha384sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "sha256sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "sha224sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "b2sums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	case "cksums":
+		pkgBuild.HashSums = data.([]string)
+		return true
+	default:
+		return false
 	}
 }
 
@@ -337,13 +378,19 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 	switch key {
 	case "build":
-		pkgBuild.Build = os.ExpandEnv(data.(string))
+		// Don't use os.ExpandEnv here as it removes runtime variables like ${bin}
+		// Variable expansion is now handled properly in the parser
+		pkgBuild.Build = data.(string)
 	case "package":
-		pkgBuild.Package = os.ExpandEnv(data.(string))
+		// Don't use os.ExpandEnv here as it removes runtime variables
+		// Variable expansion is now handled properly in the parser
+		pkgBuild.Package = data.(string)
 	case "preinst":
 		pkgBuild.PreInst = data.(string)
 	case "prepare":
-		pkgBuild.Prepare = os.ExpandEnv(data.(string))
+		// Don't use os.ExpandEnv here as it removes runtime variables
+		// Variable expansion is now handled properly in the parser
+		pkgBuild.Prepare = data.(string)
 	case "postinst":
 		pkgBuild.PostInst = data.(string)
 	case "posttrans":
@@ -403,43 +450,134 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 
 // parseDirective is a function that takes an input string and returns a key,
 // priority, and an error.
-func (pkgBuild *PKGBUILD) parseDirective(input string) (string, int, error) {
-	// Split the input string by "__" to separate the key and the directive.
-	split := strings.Split(input, "__")
-	key := split[0]
+func (pkgBuild *PKGBUILD) parseDirective(input string) (key string, priority int, err error) {
+	// Check for combined architecture + distribution syntax first (_arch__distro)
+	if key, priority, found := pkgBuild.parseCombinedArchDistro(input); found {
+		return key, priority, nil
+	}
 
-	// If there is only one element in the split array, return the key and a priority of 0.
+	// Check for architecture-specific syntax (single underscore, no double underscore)
+	if key, priority, found := pkgBuild.parseArchitectureOnly(input); found {
+		return key, priority, nil
+	}
+
+	// Parse distribution-only syntax
+	return pkgBuild.parseDistributionOnly(input)
+}
+
+// parseCombinedArchDistro handles combined architecture + distribution syntax
+func (pkgBuild *PKGBUILD) parseCombinedArchDistro(input string) (
+	key string, priority int, found bool,
+) {
+	if !strings.Contains(input, "_") || !strings.Contains(input, "__") {
+		return "", 0, false
+	}
+
+	parts := strings.SplitN(input, "__", 2)
+	if len(parts) != 2 {
+		return "", 0, false
+	}
+
+	archPart := parts[0]
+	distributionPart := parts[1]
+
+	if !strings.Contains(archPart, "_") {
+		return "", 0, false
+	}
+
+	archSplit := strings.Split(archPart, "_")
+	if len(archSplit) < 2 {
+		return "", 0, false
+	}
+
+	possibleArch := strings.Join(archSplit[1:], "_")
+	key = archSplit[0]
+
+	if !pkgBuild.isValidArchitecture(possibleArch) {
+		return "", 0, false
+	}
+
+	currentArch := osutils.GetArchitecture()
+	if possibleArch != currentArch {
+		return key, -1, true // Invalid architecture for current system
+	}
+
+	// Check distribution part
+	distPriority := pkgBuild.getDistributionPriority(distributionPart)
+	if distPriority > 0 {
+		return key, distPriority + 4, true // Add 4 to boost arch+distro combinations
+	}
+
+	return key, -1, true
+}
+
+// parseArchitectureOnly handles architecture-specific syntax
+func (pkgBuild *PKGBUILD) parseArchitectureOnly(input string) (
+	key string, priority int, found bool,
+) {
+	if !strings.Contains(input, "_") || strings.Contains(input, "__") {
+		return "", 0, false
+	}
+
+	archSplit := strings.Split(input, "_")
+	if len(archSplit) < 2 {
+		return "", 0, false
+	}
+
+	possibleArch := strings.Join(archSplit[1:], "_")
+	key = archSplit[0]
+
+	if !pkgBuild.isValidArchitecture(possibleArch) {
+		return "", 0, false
+	}
+
+	currentArch := osutils.GetArchitecture()
+	if possibleArch == currentArch {
+		return key, 4, true // Higher priority than distribution-specific
+	}
+
+	return key, -1, true // Invalid architecture for current system
+}
+
+// parseDistributionOnly handles distribution-only syntax
+func (pkgBuild *PKGBUILD) parseDistributionOnly(input string) (
+	key string, priority int, err error,
+) {
+	split := strings.Split(input, "__")
+	key = split[0]
+
 	if len(split) == 1 {
 		return key, 0, nil
 	}
 
-	// If there are more than two elements in the split array, return an error.
 	if len(split) != 2 {
 		return key, 0, errors.Errorf("invalid use of '__' directive in %s", input)
 	}
 
-	// If the FullDistroName is empty, return the key and a priority of 0.
 	if pkgBuild.FullDistroName == "" {
 		return key, 0, nil
 	}
 
-	// Set the directive to the second element in the split array.
 	directive := split[1]
-	priority := -1
+	priority = pkgBuild.getDistributionPriority(directive)
 
-	// Check if the directive matches the FullDistroName and set the priority accordingly.
-	if directive == pkgBuild.FullDistroName {
-		priority = 3
-	} else if constants.DistrosSet.Contains(directive) &&
-		directive == pkgBuild.Distro {
-		priority = 2
-	} else if constants.PackagersSet.Contains(directive) &&
-		directive == constants.DistroPackageManager[pkgBuild.Distro] {
-		priority = 1
-	}
-
-	// Return the key, priority, and no error.
 	return key, priority, nil
+}
+
+// getDistributionPriority returns the priority for a distribution directive
+func (pkgBuild *PKGBUILD) getDistributionPriority(directive string) int {
+	switch {
+	case directive == pkgBuild.FullDistroName:
+		return 3
+	case constants.DistrosSet.Contains(directive) &&
+		directive == pkgBuild.Distro:
+		return 2
+	case constants.PackagersSet.Contains(directive) &&
+		directive == constants.DistroPackageManager[pkgBuild.Distro]:
+		return 1
+	default:
+		return -1
+	}
 }
 
 // checkLicense checks if the license of the PKGBUILD is valid.
@@ -479,4 +617,16 @@ func (pkgBuild *PKGBUILD) processOptions() {
 			pkgBuild.StaticEnabled = false
 		}
 	}
+}
+
+// isValidArchitecture checks if the provided architecture string is a valid architecture.
+func (pkgBuild *PKGBUILD) isValidArchitecture(arch string) bool {
+	validArchitectures := []string{
+		"x86_64", "i686", "aarch64", "armv7h", "armv6h", "armv5",
+		"ppc64", "ppc64le", "s390x", "mips", "mipsle", "riscv64",
+		"pentium4", // Arch Linux 32 support
+		"any",      // Architecture-independent packages
+	}
+
+	return osutils.Contains(validArchitectures, arch)
 }

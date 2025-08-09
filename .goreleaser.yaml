@@ -19,6 +19,8 @@ builds:
 
 upx:
   - enabled: true
+    compress: best
+    lzma: true
 
 archives:
   - formats: tar.gz

@@ -12,10 +12,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/klauspost/pgzip"
+
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
 // Pkg represents a package manager for the Pkg distribution.
@@ -56,7 +57,10 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	osutils.Logger.Info("", osutils.Logger.Args("artifact", pkgFilePath))
+	pkgLogger := osutils.WithComponent(m.PKGBUILD.PkgName)
+	pkgLogger.Info("package artifact created", osutils.Logger.Args("pkgver", m.PKGBUILD.PkgVer,
+		"pkgrel", m.PKGBUILD.PkgRel,
+		"artifact", pkgFilePath))
 
 	return nil
 }
@@ -172,14 +176,17 @@ func (m *Pkg) Install(artifactsPath string) error {
 // makeDepends is a slice of strings representing the dependencies to be included.
 // It returns an error if there is any issue getting the dependencies.
 func (m *Pkg) Prepare(makeDepends []string) error {
+	installArgs := getBaseInstallArgs()
 	return m.PKGBUILD.GetDepends("pacman", installArgs, makeDepends)
 }
 
 // PrepareEnvironment prepares the environment for the Makepkg.
 //
-// It takes a boolean parameter `golang` which indicates whether the environment should be prepared for Golang.
+// It takes a boolean parameter `golang` which indicates whether the environment
+// should be prepared for Golang.
 // It returns an error if there is any issue in preparing the environment.
 func (m *Pkg) PrepareEnvironment(golang bool) error {
+	installArgs := getBaseInstallArgs()
 	installArgs = append(installArgs, buildEnvironmentDeps...)
 
 	if golang {
@@ -208,7 +215,8 @@ func createContent(
 	contentType string,
 	modTime, size int64,
 	fileInfoMode uint32,
-	sha256 []byte) osutils.FileContent {
+	sha256 []byte,
+) osutils.FileContent {
 	fileInfo := &osutils.FileInfo{
 		Mode:    fileInfoMode,
 		Size:    size,
@@ -225,7 +233,8 @@ func createContent(
 }
 
 // handleFileEntry processes a file entry at the given path, checking if it is a backup file,
-// and appending its content to the provided slice based on its type (config, symlink, or regular file).
+// and appending its content to the provided slice based on its type (config, symlink, or
+// regular file).
 func handleFileEntry(path, packageDir string, contents *[]osutils.FileContent) error {
 	fileInfo, err := os.Lstat(path)
 	if err != nil {
@@ -279,6 +288,13 @@ func walkPackageDirectory(packageDir string, entries *[]osutils.FileContent) err
 		}
 
 		if path == packageDir {
+			return nil
+		}
+
+		// Skip metadata files that start with '.' (same as pacman's handle_simple_path)
+		filename := filepath.Base(path)
+
+		if filename != "" && filename[0] == '.' {
 			return nil
 		}
 
@@ -337,14 +353,26 @@ func createMTREEGzip(mtreeContent, outputFile string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+
+	defer func() {
+		err := out.Close()
+		if err != nil {
+			osutils.Logger.Warn("failed to close output file", osutils.Logger.Args("error", err))
+		}
+	}()
 
 	// Create a gzip writer
-	gw := pgzip.NewWriter(out)
-	defer gw.Close()
+	gzipWriter := pgzip.NewWriter(out)
+
+	defer func() {
+		err := gzipWriter.Close()
+		if err != nil {
+			osutils.Logger.Warn("failed to close gzip writer", osutils.Logger.Args("error", err))
+		}
+	}()
 
 	// Copy the source file to the gzip writer
-	_, err = io.Copy(gw, strings.NewReader(mtreeContent))
+	_, err = io.Copy(gzipWriter, strings.NewReader(mtreeContent))
 	if err != nil {
 		return err
 	}

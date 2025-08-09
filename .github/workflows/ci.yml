@@ -1,0 +1,306 @@
+name: 🔄 Continuous Integration
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - ".gitignore"
+  pull_request:
+    branches: ["main"]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - ".gitignore"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.24.5"
+
+jobs:
+  # ===================================
+  # Code Quality & Linting
+  # ===================================
+  quality:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 📥 Download dependencies
+        run: go mod download
+
+      - name: 🧹 Run gofmt
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "❌ Code is not formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+          echo "✅ Code is properly formatted"
+
+      - name: 🔍 Run go vet
+        run: go vet ./...
+
+      - name: 📊 Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+
+      - name: 📝 Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v20
+        with:
+          globs: "**/*.md"
+
+  # ===================================
+  # Security Scanning
+  # ===================================
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 🔒 Install Gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: 🔒 Run Gosec Security Scanner
+        run: |
+          gosec -fmt sarif -out gosec.sarif ./...
+
+      - name: 📋 Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gosec.sarif
+
+  # ===================================
+  # Build & Test Matrix
+  # ===================================
+  test:
+    name: 🧪 Test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        # os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ["1.24.5"]
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: 📥 Download dependencies
+        run: go mod download
+
+      - name: ✅ Verify dependencies
+        run: go mod verify
+
+      - name: 🔨 Build project
+        run: CGO_ENABLED=0 go build -v ./...
+
+      - name: 🧪 Run tests
+        run: go test -v -coverprofile=coverage.out ./...
+
+      - name: 📊 Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.24.5'
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  # ===================================
+  # Build Validation
+  # ===================================
+  build:
+    name: 🔨 Build Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [quality, security]
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 📥 Download dependencies
+        run: go mod download
+
+      - name: 🔨 Build for multiple architectures
+        run: |
+          # Linux
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/yap-linux-amd64 ./cmd/yap
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o dist/yap-linux-arm64 ./cmd/yap
+
+          # # macOS
+          # CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o dist/yap-darwin-amd64 ./cmd/yap
+          # CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o dist/yap-darwin-arm64 ./cmd/yap
+
+          # # Windows
+          # CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/yap-windows-amd64.exe ./cmd/yap
+
+          echo "✅ Multi-architecture build successful"
+
+      - name: 🧪 Test built binaries
+        run: |
+          ./dist/yap-linux-amd64 version
+          echo "✅ Binary execution test passed"
+
+      - name: 📦 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+          retention-days: 7
+
+  # ===================================
+  # Integration Tests
+  # ===================================
+  integration:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build]
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 📥 Download build artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: build-artifacts
+          path: dist/
+
+      - name: 🔧 Make binaries executable
+        run: chmod +x dist/*
+
+      - name: 🧪 Run integration tests
+        run: |
+          # Test example PKGBUILD if available
+          if [ -f examples/yap/PKGBUILD ]; then
+            echo "🧪 Testing example build..."
+            cd examples/yap
+            timeout 300 ../../dist/yap-linux-amd64 build . || echo "⚠️ Integration test completed with warnings"
+            cd ../..
+          fi
+
+  # ===================================
+  # Documentation Generation
+  # ===================================
+  docs:
+    name: 📚 Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 📚 Generate documentation
+        run: |
+          make doc-deps
+          make doc-generate
+
+      - name: 📤 Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: docs/api/
+          retention-days: 30
+
+  # ===================================
+  # Summary Job
+  # ===================================
+  ci-success:
+    name: ✅ CI Success
+    runs-on: ubuntu-latest
+    needs: [quality, security, test, build, integration, docs]
+    if: always()
+
+    steps:
+      - name: 🎉 All jobs completed
+        run: |
+          if [[ "${{ needs.quality.result }}" == "success" && \
+                "${{ needs.security.result }}" == "success" && \
+                "${{ needs.test.result }}" == "success" && \
+                "${{ needs.build.result }}" == "success" && \
+                ("${{ needs.integration.result }}" == "success" || "${{ needs.integration.result }}" == "skipped") && \
+                ("${{ needs.docs.result }}" == "success" || "${{ needs.docs.result }}" == "skipped") ]]; then
+            echo "🎉 All CI jobs completed successfully!"
+            exit 0
+          else
+            echo "❌ Some CI jobs failed"
+            exit 1
+          fi

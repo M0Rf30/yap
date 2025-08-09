@@ -1,3 +1,4 @@
+// Package makepkg provides Arch Linux package building functionality and constants.
 package makepkg
 
 var buildEnvironmentDeps = []string{
@@ -85,7 +86,7 @@ const dotMtree = `#mtree
 /set type=file uid=0 gid=0 mode=644
 {{- range . }}
 {{- if eq .Type "dir" }}
-.{{ .Destination }} time={{ .FileInfo.ModTime }}.0 type=dir
+.{{ .Destination }} time={{ .FileInfo.ModTime }}.0 mode={{ printf "%o" .FileInfo.Mode }} type=dir
 {{- else if eq .Type "symlink" }}
 .{{ .Destination }} time={{ .FileInfo.ModTime }}.0 mode={{ printf "%o" .FileInfo.Mode }} type=link link={{ .Source }}
 {{- else }}
@@ -93,7 +94,6 @@ const dotMtree = `#mtree
 .{{ .Destination }} time={{ .FileInfo.ModTime }}.0 size={{ .FileInfo.Size }} sha256digest={{ printf "%x" .SHA256 }}
 {{- else if eq .Destination "/.PKGINFO" }}
 .{{ .Destination }} time={{ .FileInfo.ModTime }}.0 size={{ .FileInfo.Size }} sha256digest={{ printf "%x" .SHA256 }}
-/set mode=755
 {{- else }}
 .{{ .Destination }} time={{ .FileInfo.ModTime }}.0 mode={{ printf "%o" .FileInfo.Mode }} size={{ .FileInfo.Size }} sha256digest={{ printf "%x" .SHA256 }}
 {{- end }}
@@ -101,9 +101,11 @@ const dotMtree = `#mtree
 {{- end }}
 `
 
-var installArgs = []string{
-	"-S",
-	"--noconfirm",
+func getBaseInstallArgs() []string {
+	return []string{
+		"-S",
+		"--noconfirm",
+	}
 }
 
 const postInstall = `

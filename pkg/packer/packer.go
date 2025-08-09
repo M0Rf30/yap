@@ -1,13 +1,14 @@
+// Package packer provides unified package building interface for multiple formats.
 package packer
 
 import (
-	"github.com/M0Rf30/yap/pkg/abuild"
-	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/dpkg"
-	"github.com/M0Rf30/yap/pkg/makepkg"
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/rpm"
+	"github.com/M0Rf30/yap/v2/pkg/abuild"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/dpkg"
+	"github.com/M0Rf30/yap/v2/pkg/makepkg"
+	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/rpm"
 )
 
 // Packer is the common interface implemented by all package managers.
@@ -25,7 +26,8 @@ type Packer interface {
 	// build machine. It returns any error if encountered.
 	PrepareEnvironment(flag bool) error
 	// PrepareFakeroot sets up the environment for building the final artifact in a fakeroot context.
-	// It takes an output path where the artifact will be written and returns an error if any issues occur.
+	// It takes an output path where the artifact will be written and returns an error if any issues
+	// occur.
 	PrepareFakeroot(output string) error
 	// Update performs a package manager update operation. It returns any error if
 	// encountered.
