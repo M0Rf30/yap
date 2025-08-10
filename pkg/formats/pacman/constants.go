@@ -1,5 +1,5 @@
-// Package makepkg provides Arch Linux package building functionality and constants.
-package makepkg
+// Package pacman provides Arch Linux package building functionality and constants.
+package pacman
 
 var buildEnvironmentDeps = []string{
 	"base-devel",

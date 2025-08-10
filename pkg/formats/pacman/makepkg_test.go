@@ -1,4 +1,4 @@
-package makepkg_test
+package pacman_test
 
 import (
 	"bufio"
@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/M0Rf30/yap/v2/pkg/makepkg"
+	"github.com/M0Rf30/yap/v2/pkg/formats/pacman"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -95,7 +95,7 @@ func TestPkg_BuildPackage(t *testing.T) {
 			err := testCase.setupFiles(packageDir)
 			require.NoError(t, err)
 
-			pkg := &makepkg.Pkg{
+			pkg := &pacman.Pkg{
 				PKGBUILD: testCase.pkgbuild,
 			}
 
@@ -208,7 +208,7 @@ func TestPkg_PrepareFakeroot(t *testing.T) {
 			err := testCase.setupFiles(packageDir, startDir)
 			require.NoError(t, err)
 
-			pkg := &makepkg.Pkg{
+			pkg := &pacman.Pkg{
 				PKGBUILD: testCase.pkgbuild,
 			}
 
@@ -263,7 +263,7 @@ func TestPkg_Install(t *testing.T) {
 	err = os.WriteFile(testFile, []byte("test content"), 0o600)
 	require.NoError(t, err)
 
-	pkg := &makepkg.Pkg{
+	pkg := &pacman.Pkg{
 		PKGBUILD: installTestPkg,
 	}
 
@@ -285,7 +285,7 @@ func TestPkg_Prepare(t *testing.T) {
 		PkgRel:  "1",
 	}
 
-	pkg := &makepkg.Pkg{
+	pkg := &pacman.Pkg{
 		PKGBUILD: packageBuild,
 	}
 
@@ -324,7 +324,7 @@ func TestPkg_PrepareEnvironment(t *testing.T) {
 				PkgRel:  "1",
 			}
 
-			pkg := &makepkg.Pkg{
+			pkg := &pacman.Pkg{
 				PKGBUILD: packageBuild,
 			}
 
@@ -345,7 +345,7 @@ func TestPkg_Update(t *testing.T) {
 		PkgRel:  "1",
 	}
 
-	pkg := &makepkg.Pkg{
+	pkg := &pacman.Pkg{
 		PKGBUILD: packageBuild,
 	}
 
@@ -376,7 +376,7 @@ func TestPkg_BuildPackage_WithEpoch(t *testing.T) {
 	err = os.WriteFile(testFile, []byte("epoch test content"), 0o600)
 	require.NoError(t, err)
 
-	pkg := &makepkg.Pkg{
+	pkg := &pacman.Pkg{
 		PKGBUILD: epochTestPkg,
 	}
 
@@ -399,7 +399,7 @@ func TestPkg_BuildPackage_Error(t *testing.T) {
 		PackageDir:   "/nonexistent/path",
 	}
 
-	pkg := &makepkg.Pkg{
+	pkg := &pacman.Pkg{
 		PKGBUILD: errorTestPkg,
 	}
 
@@ -437,7 +437,7 @@ func TestMTREEFormat(t *testing.T) {
 	err = os.Chmod(testFile, 0o755)
 	require.NoError(t, err)
 
-	pkg := &makepkg.Pkg{
+	pkg := &pacman.Pkg{
 		PKGBUILD: pkgBuild,
 	}
 

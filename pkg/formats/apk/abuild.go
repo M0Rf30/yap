@@ -1,5 +1,5 @@
-// Package abuild provides functionality for building Alpine Linux APK packages.
-package abuild
+// Package apk provides functionality for building Alpine Linux APK packages.
+package apk
 
 import (
 	"archive/tar"
