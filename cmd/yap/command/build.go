@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/project"
@@ -60,8 +61,8 @@ DEPENDENCY RESOLUTION:
 
 		// Enhanced user feedback with progress
 		if verbose {
-			osutils.Logger.Info("verbose mode enabled", osutils.Logger.Args("command", "build"))
-			osutils.Logger.Info("Starting build process with verbose logging enabled")
+			logger.Info("verbose mode enabled", "command", "build")
+			logger.Info("Starting build process with verbose logging enabled")
 		}
 
 		// Parse flexible arguments using shared function
@@ -74,18 +75,18 @@ DEPENDENCY RESOLUTION:
 		if distro == "" {
 			osRelease, _ := osutils.ParseOSRelease()
 			distro = osRelease.ID
-			osutils.Logger.Warn("No distribution specified, using detected",
-				osutils.Logger.Args("distro", distro))
+			logger.Warn("No distribution specified, using detected",
+				"distro", distro)
 		} else {
-			osutils.Logger.Info("Building for distribution",
-				osutils.Logger.Args("distro", distro, "release", release))
+			logger.Info("Building for distribution",
+				"distro", distro, "release", release)
 		}
 
 		// Show project path
-		osutils.Logger.Info("Project path", osutils.Logger.Args("path", fullJSONPath))
+		logger.Info("Project path", "path", fullJSONPath)
 
 		// Initialize project with timestamp logging
-		osutils.Logger.Info("Initializing project...")
+		logger.Info("Initializing project...")
 
 		// Initialize MultipleProject
 		mpc := project.MultipleProject{}
@@ -96,16 +97,16 @@ DEPENDENCY RESOLUTION:
 			if errors.As(err, &yapErr) {
 				logStructuredError(yapErr)
 			} else {
-				osutils.Logger.Error("Project initialization failed", osutils.Logger.Args("error", err))
+				logger.Error("Project initialization failed", "error", err)
 				return err
 			}
 			return err
 		}
 
-		osutils.Logger.Info("Project initialized successfully")
+		logger.Info("Project initialized successfully")
 
 		// Build packages with timestamp logging
-		osutils.Logger.Info("Building packages...")
+		logger.Info("Building packages...")
 
 		err = mpc.BuildAll()
 		if err != nil {
@@ -114,13 +115,13 @@ DEPENDENCY RESOLUTION:
 			if errors.As(err, &yapErr) {
 				logStructuredError(yapErr)
 			} else {
-				osutils.Logger.Error("Build failed", osutils.Logger.Args("error", err))
+				logger.Error("Build failed", "error", err)
 				return err
 			}
 			return err
 		}
 
-		osutils.Logger.Info("All packages built successfully")
+		logger.Info("All packages built successfully")
 		return nil
 	},
 }
@@ -143,7 +144,7 @@ func logStructuredError(yapErr *yapErrors.YapError) {
 		args = append(args, "underlying_error", yapErr.Cause.Error())
 	}
 
-	osutils.Logger.Fatal("build failed", osutils.Logger.Args(args...))
+	logger.Fatal("build failed", args...)
 }
 
 //nolint:gochecknoinits // Required for cobra command registration

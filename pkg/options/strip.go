@@ -8,12 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
 // Strip walks through the directory to process each file.
 func Strip(packageDir string) error {
-	osutils.Logger.Info("stripping binaries")
+	logger.Info("stripping binaries")
 
 	return filepath.WalkDir(packageDir, processFile)
 }
@@ -30,33 +31,33 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	}
 
 	// Always try to ensure the file is writable before stripping
-	osutils.Logger.Debug(
+	logger.Debug(
 		"ensuring file is writable before stripping",
-		osutils.Logger.Args("file", binary))
+		"file", binary)
 
 	info, err := os.Stat(binary)
 	if err != nil {
-		osutils.Logger.Warn(
+		logger.Warn(
 			"failed to get file info",
-			osutils.Logger.Args("file", binary, "error", err))
+			"file", binary, "error", err)
 
 		return nil
 	}
 
 	chmodErr := osutils.Chmod(binary, info.Mode().Perm()|0o200)
 	if chmodErr != nil {
-		osutils.Logger.Warn(
+		logger.Warn(
 			"failed to make file writable",
-			osutils.Logger.Args("file", binary, "error", chmodErr))
+			"file", binary, "error", chmodErr)
 
 		return nil // Skip if we can't change permissions
 	}
 
 	err = osutils.CheckWritable(binary)
 	if err != nil {
-		osutils.Logger.Warn(
+		logger.Warn(
 			"file still not writable after chmod",
-			osutils.Logger.Args("file", binary, "error", err))
+			"file", binary, "error", err)
 
 		return nil // Skip if not writable
 	}
@@ -68,15 +69,15 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 
 	stripFlags, stripLTO := determineStripFlags(fileType, binary)
 
-	osutils.Logger.Debug(
+	logger.Debug(
 		"about to strip binary",
-		osutils.Logger.Args("file", binary, "flags", stripFlags))
+		"file", binary, "flags", stripFlags)
 
 	err = osutils.StripFile(binary, stripFlags)
 	if err != nil {
-		osutils.Logger.Error(
+		logger.Error(
 			"strip command failed",
-			osutils.Logger.Args("file", binary, "flags", stripFlags, "error", err))
+			"file", binary, "flags", stripFlags, "error", err)
 
 		return err
 	}

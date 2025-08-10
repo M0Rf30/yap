@@ -12,6 +12,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -86,8 +87,8 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 	defer func() {
 		err := rpmFile.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close RPM file", osutils.Logger.Args("path", cleanFilePath,
-				"error", err))
+			logger.Warn("failed to close RPM file", "path", cleanFilePath,
+				"error", err)
 		}
 	}()
 
@@ -96,10 +97,11 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	pkgLogger := osutils.WithComponent(r.PKGBUILD.PkgName)
-	pkgLogger.Info("package artifact created", osutils.Logger.Args("pkgver", r.PKGBUILD.PkgVer,
+	logger.WithComponent(r.PKGBUILD.PkgName)
+	logger.Info("package artifact created",
+		"pkgver", r.PKGBUILD.PkgVer,
 		"pkgrel", r.PKGBUILD.PkgRel,
-		"artifact", cleanFilePath))
+		"artifact", cleanFilePath)
 
 	return nil
 }
@@ -384,8 +386,8 @@ func getModTime(fileInfo os.FileInfo) uint32 {
 	mTime := fileInfo.ModTime().Unix()
 	// Check for overflow in the modification time.
 	if mTime < 0 || mTime > int64(^uint32(0)) {
-		osutils.Logger.Fatal("modification time is out of range for uint32",
-			osutils.Logger.Args("time", mTime))
+		logger.Fatal("modification time is out of range for uint32",
+			"time", mTime)
 	}
 
 	return uint32(mTime)

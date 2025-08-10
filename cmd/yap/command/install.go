@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
@@ -72,9 +73,9 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	osutils.Logger.Info("detected package type", osutils.Logger.Args(
+	logger.Info("detected package type",
 		"artifact", absPath,
-		"type", packageType))
+		"type", packageType)
 
 	// Install using appropriate package manager
 	return installPackage(packageType, absPath)
@@ -128,10 +129,10 @@ func installPackage(packageType, artifactPath string) error {
 		return fmt.Errorf("unsupported package type: %s", packageType)
 	}
 
-	osutils.Logger.Info("installing package", osutils.Logger.Args(
+	logger.Info("installing package",
 		"command", cmd,
 		"args", strings.Join(args, " "),
-		"artifact", artifactPath))
+		"artifact", artifactPath)
 
 	// Execute the installation command with the same pattern as internal managers
 	err := osutils.Exec(false, "", cmd, args...)
@@ -139,9 +140,9 @@ func installPackage(packageType, artifactPath string) error {
 		return fmt.Errorf("failed to install package with %s: %w", cmd, err)
 	}
 
-	osutils.Logger.Info("package installed successfully", osutils.Logger.Args(
+	logger.Info("package installed successfully",
 		"artifact", artifactPath,
-		"type", packageType))
+		"type", packageType)
 
 	return nil
 }

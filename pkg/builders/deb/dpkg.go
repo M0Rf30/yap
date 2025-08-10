@@ -12,6 +12,7 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -46,8 +47,8 @@ func (d *Package) BuildPackage(artifactsPath string) error {
 	defer func() {
 		err := os.RemoveAll(debTemp)
 		if err != nil {
-			osutils.Logger.Warn("failed to remove temporary directory",
-				osutils.Logger.Args("path", debTemp, "error", err))
+			logger.Warn("failed to remove temporary directory",
+				"path", debTemp, "error", err)
 		}
 	}()
 
@@ -315,7 +316,7 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 	defer func() {
 		err := debPackage.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close debian package file", osutils.Logger.Args("error", err))
+			logger.Warn("failed to close debian package file", "error", err)
 		}
 	}()
 
@@ -366,10 +367,10 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	pkgLogger := osutils.WithComponent(d.PKGBUILD.PkgName)
-	pkgLogger.Info("package artifact created", osutils.Logger.Args("pkgver", d.PKGBUILD.PkgVer,
+	logger.WithComponent(d.PKGBUILD.PkgName)
+	logger.Info("package artifact created", "pkgver", d.PKGBUILD.PkgVer,
 		"pkgrel", d.PKGBUILD.PkgRel,
-		"artifact", artifactFilePath))
+		"artifact", artifactFilePath)
 
 	return nil
 }

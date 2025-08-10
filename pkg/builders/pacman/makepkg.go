@@ -15,6 +15,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -57,10 +58,11 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	pkgLogger := osutils.WithComponent(m.PKGBUILD.PkgName)
-	pkgLogger.Info("package artifact created", osutils.Logger.Args("pkgver", m.PKGBUILD.PkgVer,
+	logger.WithComponent(m.PKGBUILD.PkgName)
+	logger.Info("package artifact created",
+		"pkgver", m.PKGBUILD.PkgVer,
 		"pkgrel", m.PKGBUILD.PkgRel,
-		"artifact", pkgFilePath))
+		"artifact", pkgFilePath)
 
 	return nil
 }
@@ -248,7 +250,7 @@ func createMTREEGzip(mtreeContent, outputFile string) error {
 	defer func() {
 		err := out.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close output file", osutils.Logger.Args("error", err))
+			logger.Warn("failed to close output file", "error", err)
 		}
 	}()
 
@@ -258,7 +260,7 @@ func createMTREEGzip(mtreeContent, outputFile string) error {
 	defer func() {
 		err := gzipWriter.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close gzip writer", osutils.Logger.Args("error", err))
+			logger.Warn("failed to close gzip writer", "error", err)
 		}
 	}()
 

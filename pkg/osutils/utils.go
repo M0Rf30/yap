@@ -25,6 +25,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	ycontext "github.com/M0Rf30/yap/v2/pkg/context"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 const (
@@ -36,172 +37,12 @@ const (
 	logLevelInfo    = "INFO"
 )
 
-// Global flag to disable colored output.
-var colorDisabled = false
-
-// SetColorDisabled sets the global color preference.
-func SetColorDisabled(disabled bool) {
-	colorDisabled = disabled
-
-	// Configure pterm color settings
-	if disabled {
-		pterm.DisableColor()
-	} else {
-		pterm.EnableColor()
-	}
-}
-
-// IsColorDisabled returns true if colors should be disabled.
-func IsColorDisabled() bool {
-	// Check environment variable first (common convention)
-	envDisabled := os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
-
-	if envDisabled {
-		// Ensure pterm is configured to match environment
-		if !colorDisabled {
-			SetColorDisabled(true)
-		}
-
-		return true
-	}
-
-	return colorDisabled
-}
-
-// YapLogger wraps pterm.Logger to add [yap] prefix to all messages.
-type YapLogger struct {
-	*pterm.Logger
-}
-
-// Info logs an info message with [yap] prefix.
-func (y *YapLogger) Info(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Info("[yap] "+msg, args...)
-}
-
-// Tips logs a tips message with [yap] prefix and TIPS level.
-func (y *YapLogger) Tips(msg string, _ ...[]pterm.LoggerArgument) {
-	// Create a custom log entry with TIPS level
-	timestamp := time.Now().Format(timestampFormat)
-
-	var logMsg string
-	if IsColorDisabled() {
-		// Plain text format without colors
-		logMsg = fmt.Sprintf("%s %s  [yap] %s", timestamp, logLevelInfo, msg)
-	} else {
-		// Colored format
-		logMsg = fmt.Sprintf("%s %s  %s %s",
-			pterm.FgGray.Sprint(timestamp),
-			pterm.FgCyan.Sprint(logLevelInfo),
-			pterm.FgBlue.Sprint("[yap]"),
-			msg,
-		)
-	}
-
-	pterm.Println(logMsg)
-}
-
-// Warn logs a warning message with [yap] prefix.
-func (y *YapLogger) Warn(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Warn("[yap] "+msg, args...)
-}
-
-// Error logs an error message with [yap] prefix.
-func (y *YapLogger) Error(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Error("[yap] "+msg, args...)
-}
-
-// Debug logs a debug message with [yap] prefix.
-func (y *YapLogger) Debug(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Debug("[yap] "+msg, args...)
-}
-
-// Fatal logs a fatal message with [yap] prefix.
-func (y *YapLogger) Fatal(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Fatal("[yap] "+msg, args...)
-}
-
-// Args creates logger arguments (delegate to embedded logger).
-func (y *YapLogger) Args(args ...any) []pterm.LoggerArgument {
-	return y.Logger.Args(args...)
-}
-
-// SetVerbose configures the logger level based on verbose flag.
-func SetVerbose(verbose bool) {
-	var level pterm.LogLevel
-	if verbose {
-		level = pterm.LogLevelDebug
-	} else {
-		level = pterm.LogLevelInfo
-	}
-
-	baseLogger = pterm.DefaultLogger.WithLevel(level).WithWriter(MultiPrinter.Writer)
-	Logger = &YapLogger{baseLogger}
-}
-
 var (
-	// MultiPrinter is the default multi printer.
-	MultiPrinter = pterm.DefaultMultiPrinter
-	// baseLogger is the underlying pterm logger.
-	baseLogger = pterm.DefaultLogger.WithLevel(pterm.LogLevelInfo).WithWriter(MultiPrinter.Writer)
-	// Logger is the default logger with information level logging.
-	// It writes to the MultiPrinter's writer and adds [yap] prefix.
-	Logger = &YapLogger{baseLogger}
+	// SetVerbose is an alias for logger.SetVerbose for compatibility.
+	SetVerbose = logger.SetVerbose
+	// MultiPrinter is an alias for logger.MultiPrinter for compatibility.
+	MultiPrinter = logger.MultiPrinter
 )
-
-// ComponentLogger provides component-specific logging with identifiers.
-type ComponentLogger struct {
-	*pterm.Logger
-
-	component string
-}
-
-// WithComponent creates a logger with a component identifier.
-func WithComponent(component string) *ComponentLogger {
-	return &ComponentLogger{
-		Logger:    baseLogger,
-		component: component,
-	}
-}
-
-// ServiceLogger returns a logger with "yap" as component identifier for service messages.
-func ServiceLogger() *ComponentLogger {
-	return WithComponent("yap")
-}
-
-// Info logs an info message with component identifier.
-func (cl *ComponentLogger) Info(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := "[" + cl.component + "] " + msg
-	cl.Logger.Info(prefixedMsg, args...)
-}
-
-// Warn logs a warning message with component identifier.
-func (cl *ComponentLogger) Warn(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := "[" + cl.component + "] " + msg
-	cl.Logger.Warn(prefixedMsg, args...)
-}
-
-// Error logs an error message with component identifier.
-func (cl *ComponentLogger) Error(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := "[" + cl.component + "] " + msg
-	cl.Logger.Error(prefixedMsg, args...)
-}
-
-// Fatal logs a fatal message with component identifier and exits.
-func (cl *ComponentLogger) Fatal(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := "[" + cl.component + "] " + msg
-	cl.Logger.Fatal(prefixedMsg, args...)
-}
-
-// Debug logs a debug message with component identifier.
-func (cl *ComponentLogger) Debug(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := "[" + cl.component + "] " + msg
-	cl.Logger.Debug(prefixedMsg, args...)
-}
-
-// Args creates logger arguments for ComponentLogger (delegate to embedded logger).
-func (cl *ComponentLogger) Args(args ...any) []pterm.LoggerArgument {
-	return cl.Logger.Args(args...)
-}
 
 // PackageDecoratedWriter wraps an io.Writer to decorate each line with package name and timestamp.
 type PackageDecoratedWriter struct {
@@ -282,7 +123,7 @@ func (pdw *PackageDecoratedWriter) writeLine(line []byte) error {
 	timestamp := time.Now().Format(timestampFormat)
 
 	var decoratedLine string
-	if IsColorDisabled() {
+	if logger.IsColorDisabled() {
 		// Plain text format without colors
 		decoratedLine = fmt.Sprintf("%s %s  [%s] %s\n", timestamp, logLevelInfo,
 			pdw.packageName, lineContent)
@@ -307,9 +148,8 @@ func (pdw *PackageDecoratedWriter) writeLine(line []byte) error {
 // Parameters:
 // - destination: the path where the downloaded file will be saved.
 // - uri: the URL of the file to download.
-// - logger: optional component logger for context-aware logging. If nil, uses default logger.
 // - maxRetries: maximum number of retry attempts (0 = no retries, default: 3).
-func DownloadWithResume(destination, uri string, logger *ComponentLogger, maxRetries int) error {
+func DownloadWithResume(destination, uri string, maxRetries int) error {
 	if maxRetries <= 0 {
 		maxRetries = 3
 	}
@@ -318,22 +158,17 @@ func DownloadWithResume(destination, uri string, logger *ComponentLogger, maxRet
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			activeLogger := logger
-			if activeLogger == nil {
-				activeLogger = ServiceLogger()
-			}
-
-			activeLogger.Info("retrying download", Logger.Args(
+			logger.Info("retrying download",
 				"attempt", attempt+1,
 				"max_retries", maxRetries+1,
-				"url", uri))
+				"url", uri)
 
 			// Exponential backoff: 1s, 2s, 4s, 8s
 			backoff := time.Duration(1<<(attempt-1)) * time.Second
 			time.Sleep(backoff)
 		}
 
-		err := downloadWithResumeInternal(context.Background(), destination, uri, logger, "", "")
+		err := downloadWithResumeInternal(context.Background(), destination, uri, "", "")
 		if err == nil {
 			return nil
 		}
@@ -361,7 +196,6 @@ func DownloadWithResume(destination, uri string, logger *ComponentLogger, maxRet
 //   - sourceName: source name for progress reporting (if empty, uses filename from URI).
 func DownloadWithResumeContext(
 	destination, uri string,
-	logger *ComponentLogger,
 	maxRetries int,
 	packageName, sourceName string,
 ) error {
@@ -373,15 +207,10 @@ func DownloadWithResumeContext(
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			activeLogger := logger
-			if activeLogger == nil {
-				activeLogger = ServiceLogger()
-			}
-
-			activeLogger.Info("retrying download", Logger.Args(
+			logger.Info("retrying download",
 				"attempt", attempt+1,
 				"max_retries", maxRetries+1,
-				"url", uri))
+				"url", uri)
 
 			// Exponential backoff: 1s, 2s, 4s, 8s
 			backoff := time.Duration(1<<(attempt-1)) * time.Second
@@ -390,7 +219,7 @@ func DownloadWithResumeContext(
 
 		err := downloadWithResumeInternal(
 			context.Background(),
-			destination, uri, logger, packageName, sourceName)
+			destination, uri, packageName, sourceName)
 		if err == nil {
 			return nil
 		}
@@ -408,10 +237,10 @@ func DownloadWithResumeContext(
 
 // downloadWithResumeInternal performs the actual download with resume capability.
 func downloadWithResumeInternal(
-	ctx context.Context, destination, uri string, logger *ComponentLogger,
+	ctx context.Context, destination, uri string,
 	packageName, sourceName string,
 ) error {
-	client, req, err := prepareDownloadRequest(ctx, destination, uri, logger)
+	client, req, err := prepareDownloadRequest(ctx, destination, uri)
 	if err != nil {
 		return err
 	}
@@ -421,23 +250,21 @@ func downloadWithResumeInternal(
 		return errors.Errorf("download failed: no response")
 	}
 
-	activeLogger := getActiveLogger(logger)
-	logDownloadStart(activeLogger, uri, resp)
+	logDownloadStart(uri, resp)
 
 	_, err = MultiPrinter.Start()
 	if err != nil {
 		return err
 	}
 
-	progressBar := createProgressBar(resp, logger, packageName, sourceName, uri)
+	progressBar := createProgressBar(resp, packageName, sourceName, uri)
 
-	return monitorDownload(resp, progressBar, activeLogger, destination)
+	return monitorDownload(resp, progressBar, destination)
 }
 
 // prepareDownloadRequest creates and configures the download request.
 func prepareDownloadRequest(
-	ctx context.Context, destination, uri string, logger *ComponentLogger,
-) (*grab.Client, *grab.Request, error) {
+	ctx context.Context, destination, uri string) (*grab.Client, *grab.Request, error) {
 	client := grab.NewClient()
 	client.UserAgent = "YAP/1.0 (Yet Another Packager)"
 
@@ -446,68 +273,52 @@ func prepareDownloadRequest(
 		return nil, nil, errors.Errorf("download failed %s", err)
 	}
 
-	configureResumeIfPossible(req, destination, uri, logger)
+	configureResumeIfPossible(req, destination, uri)
 	req.WithContext(ctx)
 
 	return client, req, nil
 }
 
 // configureResumeIfPossible checks for partial files and enables resume.
-func configureResumeIfPossible(req *grab.Request, destination, uri string,
-	logger *ComponentLogger) {
+func configureResumeIfPossible(req *grab.Request, destination, uri string) {
 	info, err := os.Stat(destination)
 	if err == nil && info.Size() > 0 {
 		req.NoResume = false // Enable resume
 
-		if logger != nil {
-			logger.Info("resuming download", Logger.Args(
-				"url", uri,
-				"existing_size", formatBytes(info.Size())))
-		}
+		logger.Info("resuming download",
+			"url", uri,
+			"existing_size", formatBytes(info.Size()))
 	}
-}
-
-// getActiveLogger returns the provided logger or default logger.
-func getActiveLogger(logger *ComponentLogger) *ComponentLogger {
-	if logger != nil {
-		return logger
-	}
-
-	return ServiceLogger()
 }
 
 // logDownloadStart logs the initial download information.
-func logDownloadStart(activeLogger *ComponentLogger, uri string, resp *grab.Response) {
+func logDownloadStart(uri string, resp *grab.Response) {
 	if resp.CanResume {
-		activeLogger.Info("server supports resume", Logger.Args("url", uri))
+		logger.Info("server supports resume", "url", uri)
 	}
 
-	activeLogger.Info("downloading", Logger.Args("url", resp.Request.URL()))
-	activeLogger.Info("response status: " + resp.HTTPResponse.Status)
+	logger.Info("downloading", "url", resp.Request.URL())
+	logger.Info("response status: " + resp.HTTPResponse.Status)
 }
 
 // createProgressBar creates an enhanced progress bar if the response size is known.
 func createProgressBar(
-	resp *grab.Response, logger *ComponentLogger, packageName, sourceName, uri string,
+	resp *grab.Response, packageName, sourceName, uri string,
 ) *EnhancedProgressBar {
 	if resp.Size() <= 0 {
 		return nil
 	}
 
-	pkgName := determinePackageName(packageName, logger)
+	pkgName := determinePackageName(packageName)
 	srcName := determineSourceName(sourceName, uri)
 
 	return NewEnhancedProgressBar(MultiPrinter.Writer, pkgName, srcName, resp.Size())
 }
 
 // determinePackageName resolves the package name for progress display.
-func determinePackageName(packageName string, logger *ComponentLogger) string {
+func determinePackageName(packageName string) string {
 	if packageName != "" {
 		return packageName
-	}
-
-	if logger != nil && logger.component != "" {
-		return logger.component
 	}
 
 	return "yap"
@@ -529,7 +340,7 @@ func determineSourceName(sourceName, uri string) string {
 // monitorDownload handles the download monitoring loop.
 func monitorDownload(
 	resp *grab.Response, progressBar *EnhancedProgressBar,
-	activeLogger *ComponentLogger, destination string,
+	destination string,
 ) error {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -545,7 +356,7 @@ func monitorDownload(
 				return resp.Err()
 			}
 
-			activeLogger.Info("download completed", Logger.Args("path", destination))
+			logger.Info("download completed", "path", destination)
 
 			return nil
 
@@ -596,7 +407,6 @@ type ConcurrentDownloadManager struct {
 type DownloadJob struct {
 	Destination string
 	URL         string
-	Logger      *ComponentLogger
 	MaxRetries  int
 	Done        chan error
 }
@@ -621,13 +431,11 @@ func NewConcurrentDownloadManager(maxConcurrent int) *ConcurrentDownloadManager 
 // SubmitDownload submits a download job to the concurrent manager.
 func (cdm *ConcurrentDownloadManager) SubmitDownload(
 	destination, downloadURL string,
-	logger *ComponentLogger,
 	maxRetries int,
 ) error {
 	job := &DownloadJob{
 		Destination: destination,
 		URL:         downloadURL,
-		Logger:      logger,
 		MaxRetries:  maxRetries,
 		Done:        make(chan error, 1),
 	}
@@ -646,7 +454,7 @@ func (cdm *ConcurrentDownloadManager) SubmitDownload(
 			cdm.mutex.Unlock()
 		}()
 
-		err := downloadWithResumeInternal(ctx, job.Destination, job.URL, job.Logger, "", "")
+		err := downloadWithResumeInternal(ctx, job.Destination, job.URL, "", "")
 
 		cdm.mutex.Lock()
 		cdm.jobResults[jobKey] = err
@@ -725,10 +533,7 @@ func (cdm *ConcurrentDownloadManager) Shutdown(timeout time.Duration) error {
 //
 // Returns a map of destination -> error for any failed downloads.
 func DownloadConcurrently(
-	downloads map[string]string,
-	logger *ComponentLogger,
-	maxConcurrent, maxRetries int,
-) map[string]error {
+	downloads map[string]string, maxConcurrent, maxRetries int) map[string]error {
 	if len(downloads) == 0 {
 		return make(map[string]error)
 	}
@@ -738,13 +543,13 @@ func DownloadConcurrently(
 	defer func() {
 		err := manager.Shutdown(30 * time.Second)
 		if err != nil {
-			Logger.Warn("failed to shutdown download manager", Logger.Args("error", err))
+			logger.Warn("failed to shutdown download manager", "error", err)
 		}
 	}()
 
 	// Submit all downloads
 	for destination, url := range downloads {
-		err := manager.SubmitDownload(destination, url, logger, maxRetries)
+		err := manager.SubmitDownload(destination, url, maxRetries)
 		if err != nil {
 			// If we can't submit, record the error immediately
 			manager.mutex.Lock()
@@ -825,7 +630,7 @@ func (gpw *GitProgressWriter) writeDecoratedLine(lineContent string) error {
 	timestamp := time.Now().Format(timestampFormat)
 
 	var decoratedLine string
-	if IsColorDisabled() {
+	if logger.IsColorDisabled() {
 		// Plain text format without colors
 		decoratedLine = fmt.Sprintf("%s %s  [%s] %s\n", timestamp, logLevelInfo,
 			gpw.packageName, lineContent)
@@ -899,11 +704,6 @@ func normalizeScriptContent(script string) string {
 
 // logScriptContent logs script content using direct writer to avoid line wrapping.
 func logScriptContent(cmds string) {
-	// Only log script content if debug level is enabled
-	if baseLogger.Level > pterm.LogLevelDebug {
-		return
-	}
-
 	// Start multiprinter for consistent output handling
 	_, err := MultiPrinter.Start()
 	if err != nil {
@@ -988,7 +788,7 @@ func (epb *EnhancedProgressBar) Finish() {
 	timestamp := time.Now().Format(timestampFormat)
 
 	var completionLine string
-	if IsColorDisabled() {
+	if logger.IsColorDisabled() {
 		// Plain text format without colors
 		completionLine = fmt.Sprintf("%s %s  [%s] %s completed in %v\n",
 			timestamp, logLevelInfo, epb.packageName, epb.title, duration)
@@ -1030,7 +830,7 @@ func (epb *EnhancedProgressBar) render(percent int) {
 	timestamp := time.Now().Format(timestampFormat)
 
 	var progressLine string
-	if IsColorDisabled() {
+	if logger.IsColorDisabled() {
 		// Plain text format without colors
 		progressLine = fmt.Sprintf("%s %s  [%s] %s: [%s] %d%% (%s/%s) %s\n",
 			timestamp, logLevelInfo, epb.packageName, epb.title, bar, percent, currentSize, totalSize, speed)
@@ -1076,7 +876,7 @@ func formatBytes(size int64) string {
 func CheckGO() bool {
 	_, err := os.Stat(goExecutable)
 	if err == nil {
-		Logger.Info("go is already installed")
+		logger.Info("go is already installed")
 
 		return true
 	}
@@ -1120,7 +920,7 @@ func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
 	defer func() {
 		err := out.Close()
 		if err != nil {
-			Logger.Warn("failed to close output file", Logger.Args("path", cleanFilePath, "error", err))
+			logger.Warn("failed to close output file", "path", cleanFilePath, "error", err)
 		}
 	}()
 
@@ -1144,7 +944,7 @@ func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
 // - destination: the path where the downloaded file will be saved.
 // - url: the URL of the file to download.
 // - logger: optional component logger for context-aware logging. If nil, uses default logger.
-func Download(destination, uri string, logger *ComponentLogger) error {
+func Download(destination, uri string) error {
 	// create client
 	client := grab.NewClient()
 
@@ -1155,18 +955,12 @@ func Download(destination, uri string, logger *ComponentLogger) error {
 
 	resp := client.Do(req)
 	if resp.HTTPResponse == nil {
-		Logger.Fatal("download failed: no response", Logger.Args("error", resp.Err()))
-	}
-
-	// Use provided logger or default logger
-	activeLogger := logger
-	if activeLogger == nil {
-		activeLogger = ServiceLogger()
+		logger.Fatal("download failed: no response", "error", resp.Err())
 	}
 
 	// start download
-	activeLogger.Info("downloading", Logger.Args("url", req.URL()))
-	activeLogger.Info("response status: " + resp.HTTPResponse.Status)
+	logger.Info("downloading", "url", req.URL())
+	logger.Info("response status: " + resp.HTTPResponse.Status)
 
 	// Start multiprinter for consistent output handling
 	_, err = MultiPrinter.Start()
@@ -1180,9 +974,6 @@ func Download(destination, uri string, logger *ComponentLogger) error {
 	if resp.Size() > 0 {
 		// Use logger component as package name if available
 		pkgName := "yap"
-		if logger != nil && logger.component != "" {
-			pkgName = logger.component
-		}
 
 		// Extract filename from URI
 		srcName := Filename(uri)
@@ -1205,7 +996,7 @@ Loop:
 			}
 
 			ticker.Stop()
-			activeLogger.Info("download completed", Logger.Args("path", destination))
+			logger.Info("download completed", "path", destination)
 
 			break Loop
 
@@ -1228,7 +1019,7 @@ Loop:
 // - referenceName: the reference name for the clone operation.
 // - logger: optional component logger for context-aware logging. If nil, uses default logger.
 func GitClone(dloadFilePath, sourceItemURI, sshPassword string,
-	referenceName plumbing.ReferenceName, logger *ComponentLogger,
+	referenceName plumbing.ReferenceName,
 ) error {
 	// Start multiprinter for consistent output handling
 	_, err := MultiPrinter.Start()
@@ -1255,14 +1046,7 @@ func GitClone(dloadFilePath, sourceItemURI, sshPassword string,
 		EnableDotGitCommonDir: true,
 	}
 
-	// Use provided logger or default logger
-	activeLogger := logger
-	if activeLogger == nil {
-		activeLogger = ServiceLogger()
-	}
-
-	activeLogger.Info("cloning",
-		Logger.Args("repo", sourceItemURI))
+	logger.Info("cloning", "repo", sourceItemURI)
 
 	if Exists(dloadFilePath) {
 		return handleExistingRepo(dloadFilePath, referenceName, plainOpenOptions)
@@ -1275,8 +1059,8 @@ func GitClone(dloadFilePath, sourceItemURI, sshPassword string,
 
 		publicKey, err := ssh.NewPublicKeysFromFile("git", sshKeyPath, sshPassword)
 		if err != nil {
-			Logger.Error("failed to load ssh key")
-			Logger.Warn("try to use an ssh-password with the -p")
+			logger.Error("failed to load ssh key")
+			logger.Warn("try to use an ssh-password with the -p")
 
 			return err
 		}
@@ -1384,10 +1168,9 @@ func GOSetup() error {
 		return nil
 	}
 
-	err := Download(goArchivePath, constants.GoArchiveURL, nil)
+	err := Download(goArchivePath, constants.GoArchiveURL)
 	if err != nil {
-		Logger.Fatal("download failed",
-			Logger.Args("error", err))
+		logger.Fatal("download failed", "error", err)
 	}
 
 	err = Unarchive(goArchivePath, "/usr/lib")
@@ -1410,7 +1193,7 @@ func GOSetup() error {
 		return err
 	}
 
-	Logger.Info("go successfully installed")
+	logger.Info("go successfully installed")
 
 	return err
 }
@@ -1463,9 +1246,9 @@ func RunScriptWithPackage(cmds, packageName string) error {
 
 	// Log script execution start
 	if packageName != "" {
-		Logger.Info("executing shell script", Logger.Args("package", packageName))
+		logger.Info("executing shell script", "package", packageName)
 	} else {
-		Logger.Info("executing shell script")
+		logger.Info("executing shell script")
 	}
 
 	// Log script content with proper multiline handling
@@ -1477,7 +1260,7 @@ func RunScriptWithPackage(cmds, packageName string) error {
 	// Parse the script
 	script, err := syntax.NewParser().Parse(strings.NewReader(cmds), "")
 	if err != nil {
-		Logger.Error("failed to parse script", Logger.Args("error", err))
+		logger.Error("failed to parse script", "error", err)
 
 		return err
 	}
@@ -1485,7 +1268,7 @@ func RunScriptWithPackage(cmds, packageName string) error {
 	// Start multiprinter
 	_, err = MultiPrinter.Start()
 	if err != nil {
-		Logger.Error("failed to start multiprinter", Logger.Args("error", err))
+		logger.Error("failed to start multiprinter", "error", err)
 
 		return err
 	}
@@ -1502,12 +1285,12 @@ func RunScriptWithPackage(cmds, packageName string) error {
 		interp.StdIO(nil, writer, writer),
 	)
 	if err != nil {
-		Logger.Error("failed to create script runner", Logger.Args("error", err))
+		logger.Error("failed to create script runner", "error", err)
 
 		return err
 	}
 
-	Logger.Debug("starting script execution")
+	logger.Debug("starting script execution")
 
 	// Execute script
 	err = runner.Run(context.TODO(), script)
@@ -1516,22 +1299,26 @@ func RunScriptWithPackage(cmds, packageName string) error {
 	// Log results with consistent formatting
 	if err != nil {
 		if packageName != "" {
-			Logger.Error("script execution failed",
-				Logger.Args("error", err, "duration", duration, "package", packageName))
+			logger.Error("script execution failed",
+				"error", err,
+				"duration", duration,
+				"package", packageName)
 		} else {
-			Logger.Error("script execution failed",
-				Logger.Args("error", err, "duration", duration))
+			logger.Error("script execution failed",
+				"error", err,
+				"duration", duration)
 		}
 
 		return err
 	}
 
 	if packageName != "" {
-		Logger.Info("shell script execution completed successfully",
-			Logger.Args("duration", duration, "package", packageName))
+		logger.Info("shell script execution completed successfully",
+			"duration", duration,
+			"package", packageName)
 	} else {
-		Logger.Info("shell script execution completed successfully",
-			Logger.Args("duration", duration))
+		logger.Info("shell script execution completed successfully",
+			"duration", duration)
 	}
 
 	return nil
@@ -1597,7 +1384,9 @@ func Unarchive(source, destination string) error {
 			defer func() {
 				err := newFile.Close()
 				if err != nil {
-					Logger.Warn("failed to close new file", Logger.Args("path", cleanNewPath, "error", err))
+					logger.Warn("failed to close new file",
+						"path", cleanNewPath,
+						"error", err)
 				}
 			}()
 
@@ -1609,7 +1398,7 @@ func Unarchive(source, destination string) error {
 			defer func() {
 				err := archiveFileTemp.Close()
 				if err != nil {
-					Logger.Warn("failed to close archive file", Logger.Args("error", err))
+					logger.Warn("failed to close archive file", "error", err)
 				}
 			}()
 

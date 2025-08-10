@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
@@ -217,7 +218,7 @@ func PreRunValidation(cmd *cobra.Command, _ []string) {
 
 	// Additional pre-run setup can go here
 	if verbose {
-		osutils.Logger.Info("verbose mode enabled", osutils.Logger.Args("command", cmd.Name()))
+		logger.Info("verbose mode enabled", "command", cmd.Name())
 	}
 }
 

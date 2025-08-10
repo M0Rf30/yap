@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 const (
@@ -69,7 +71,7 @@ func CalculateSHA256(path string) ([]byte, error) {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			Logger.Warn("failed to close file", Logger.Args("path", cleanFilePath, "error", err))
+			logger.Warn("failed to close file", "path", cleanFilePath, "error", err)
 		}
 	}()
 
@@ -108,7 +110,7 @@ func CheckWritable(path string) error {
 func Chmod(path string, perm os.FileMode) error {
 	err := os.Chmod(path, perm)
 	if err != nil {
-		Logger.Error("failed to chmod", Logger.Args("path", path))
+		logger.Error("failed to chmod", "path", path)
 
 		return err
 	}
@@ -125,7 +127,7 @@ func Create(path string) (*os.File, error) {
 
 	file, err := os.Create(cleanFilePath)
 	if err != nil {
-		Logger.Error("failed to create path", Logger.Args("path", path))
+		logger.Error("failed to create path", "path", path)
 	}
 
 	return file, err
@@ -147,13 +149,13 @@ func CreateWrite(path, data string) error {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			Logger.Warn("failed to close file", Logger.Args("path", path, "error", err))
+			logger.Warn("failed to close file", "path", path, "error", err)
 		}
 	}()
 
 	_, err = file.WriteString(data)
 	if err != nil {
-		Logger.Error("failed to write to file", Logger.Args("path", path))
+		logger.Error("failed to write to file", "path", path)
 
 		return err
 	}
@@ -211,8 +213,7 @@ func GetDirSize(path string) (int64, error) {
 
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
-			Logger.Fatal("failed to get dir size",
-				Logger.Args("path", path))
+			logger.Fatal("failed to get dir size", "path", path)
 		}
 
 		if !info.IsDir() {
@@ -232,7 +233,7 @@ func GetFileType(path string) string {
 	// Check if the file is a symlink
 	fileInfo, err := os.Lstat(cleanFilePath)
 	if err != nil {
-		Logger.Fatal("fatal error", Logger.Args("error", err))
+		logger.Fatal("fatal error", "error", err)
 	}
 
 	// Skip if it's a symbolic link
@@ -243,14 +244,13 @@ func GetFileType(path string) string {
 	// Open the ELF binary
 	file, err := os.Open(cleanFilePath)
 	if err != nil {
-		Logger.Fatal("fatal error",
-			Logger.Args("error", err))
+		logger.Fatal("fatal error", "error", err)
 	}
 
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			Logger.Warn("failed to close file", Logger.Args("path", cleanFilePath, "error", err))
+			logger.Warn("failed to close file", "path", cleanFilePath, "error", err)
 		}
 	}()
 
@@ -300,7 +300,7 @@ func IsStaticLibrary(path string) bool {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			Logger.Warn("failed to close file", Logger.Args("path", cleanFilePath, "error", err))
+			logger.Warn("failed to close file", "path", cleanFilePath, "error", err)
 		}
 	}()
 
@@ -329,8 +329,7 @@ func Open(path string) (*os.File, error) {
 
 	file, err := os.Open(cleanFilePath)
 	if err != nil {
-		Logger.Error("failed to open file",
-			Logger.Args("path", path))
+		logger.Error("failed to open file", "path", path)
 	}
 
 	return file, err
