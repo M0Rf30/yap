@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/rpmpack"
 
-	"github.com/M0Rf30/yap/v2/pkg/filesystem"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -193,10 +193,20 @@ func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
 	backupFiles := r.prepareBackupFiles()
 
 	// Walk through the package directory and retrieve the contents.
-	walker := filesystem.NewWalker(r.PKGBUILD.PackageDir, backupFiles)
-	contents, err := walker.WalkPackageDirectory()
+	walker := files.NewWalker(r.PKGBUILD.PackageDir, files.WalkOptions{
+		BackupFiles: backupFiles,
+	})
+
+	entries, err := walker.Walk()
 	if err != nil {
 		return err // Return the error if walking the directory fails.
+	}
+
+	// Convert to legacy format for compatibility
+	var contents []*osutils.FileContent
+	for _, entry := range entries {
+		converted := entry.ConvertToLegacyFormat()
+		contents = append(contents, &converted)
 	}
 
 	// Add the retrieved contents to the RPM object and return any error that occurs.
