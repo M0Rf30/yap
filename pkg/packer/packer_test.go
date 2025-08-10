@@ -3,11 +3,11 @@ package packer
 import (
 	"testing"
 
-	"github.com/M0Rf30/yap/v2/pkg/abuild"
 	"github.com/M0Rf30/yap/v2/pkg/dpkg"
-	"github.com/M0Rf30/yap/v2/pkg/makepkg"
+	"github.com/M0Rf30/yap/v2/pkg/formats/apk"
+	"github.com/M0Rf30/yap/v2/pkg/formats/pacman"
+	"github.com/M0Rf30/yap/v2/pkg/formats/rpm"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/rpm"
 )
 
 func TestGetPackageManager_APK(t *testing.T) {
@@ -22,9 +22,9 @@ func TestGetPackageManager_APK(t *testing.T) {
 		t.Fatal("GetPackageManager returned nil for alpine")
 	}
 
-	_, ok := packer.(*abuild.Apk)
+	_, ok := packer.(*apk.Apk)
 	if !ok {
-		t.Error("GetPackageManager did not return abuild.Apk for alpine")
+		t.Error("GetPackageManager did not return apk.Apk for alpine")
 	}
 }
 
@@ -64,9 +64,9 @@ func TestGetPackageManager_PKG(t *testing.T) {
 		t.Fatal("GetPackageManager returned nil for arch")
 	}
 
-	_, ok := packer.(*makepkg.Pkg)
+	_, ok := packer.(*pacman.Pkg)
 	if !ok {
-		t.Error("GetPackageManager did not return makepkg.Pkg for arch")
+		t.Error("GetPackageManager did not return pacman.Pkg for arch")
 	}
 }
 
@@ -122,10 +122,10 @@ func TestGetPackageManager_Integration(t *testing.T) {
 
 	// Test all supported distros return valid packers
 	testCases := map[string]any{
-		"alpine":        (*abuild.Apk)(nil),
+		"alpine":        (*apk.Apk)(nil),
 		"debian":        (*dpkg.Deb)(nil),
 		"ubuntu":        (*dpkg.Deb)(nil),
-		"arch":          (*makepkg.Pkg)(nil),
+		"arch":          (*pacman.Pkg)(nil),
 		"fedora":        (*rpm.RPM)(nil),
 		"centos":        (*rpm.RPM)(nil),
 		"opensuse-leap": (*rpm.RPM)(nil),
@@ -141,8 +141,8 @@ func TestGetPackageManager_Integration(t *testing.T) {
 
 			// Check that the packer has the correct PKGBUILD reference
 			switch p := packer.(type) {
-			case *abuild.Apk:
-				if expectedType != (*abuild.Apk)(nil) {
+			case *apk.Apk:
+				if expectedType != (*apk.Apk)(nil) {
 					t.Errorf("Expected different type for %s", distro)
 				}
 
@@ -157,8 +157,8 @@ func TestGetPackageManager_Integration(t *testing.T) {
 				if p.PKGBUILD != pkgBuild {
 					t.Error("PKGBUILD reference not set correctly")
 				}
-			case *makepkg.Pkg:
-				if expectedType != (*makepkg.Pkg)(nil) {
+			case *pacman.Pkg:
+				if expectedType != (*pacman.Pkg)(nil) {
 					t.Errorf("Expected different type for %s", distro)
 				}
 
