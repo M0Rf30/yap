@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
@@ -121,7 +122,7 @@ func showSystemStatus() {
 				pterm.FgWhite.Sprint(fmt.Sprintf("%d variants", len(distros))))
 		}
 	} else {
-		osutils.Logger.Tips("💡 Use --verbose to see full list")
+		logger.Tips("💡 Use --verbose to see full list")
 	}
 
 	pterm.Println()

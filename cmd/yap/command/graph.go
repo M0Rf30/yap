@@ -9,7 +9,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/graph/layout"
 	"github.com/M0Rf30/yap/v2/pkg/graph/loader"
 	"github.com/M0Rf30/yap/v2/pkg/graph/render"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 var (
@@ -25,7 +25,7 @@ var graphCmd = &cobra.Command{
 	Short: "🎨 Generate beautiful dependency graphs",
 	Long: `Generate modern, interactive dependency graph visualizations of your project.
 
-The graph command analyzes your yap.json project file and creates beautiful 
+The graph command analyzes your yap.json project file and creates beautiful
 dependency visualizations showing the relationships between packages. The output
 includes topological ordering, dependency popularity analysis, and modern styling.
 
@@ -95,8 +95,11 @@ func runGraphCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to resolve project path: %w", err)
 	}
 
-	osutils.Logger.Info("generating dependency graph", osutils.Logger.Args(
-		"project", absPath, "output", graphOutput, "format", graphFormat, "theme", graphTheme))
+	logger.Info("generating dependency graph",
+		"project", absPath,
+		"output", graphOutput,
+		"format", graphFormat,
+		"theme", graphTheme)
 
 	// Load project configuration only
 	graphData, err := loader.LoadProjectForGraph(absPath, graphTheme)

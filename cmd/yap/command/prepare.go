@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/project"
@@ -56,20 +56,20 @@ to build packages, reducing build failures due to missing dependencies.`,
 			if !project.SkipSyncDeps {
 				err := packageManager.Update()
 				if err != nil {
-					osutils.Logger.Error(err.Error(),
-						osutils.Logger.Args("error", err))
+					logger.Error(err.Error(),
+						"error", err)
 				}
 			}
 
 			err := packageManager.PrepareEnvironment(GoLang)
 			if err != nil {
-				osutils.Logger.Error(err.Error())
+				logger.Error(err.Error())
 			}
 
-			osutils.Logger.Info("basic build environment successfully prepared")
+			logger.Info("basic build environment successfully prepared")
 
 			if GoLang {
-				osutils.Logger.Info("go successfully installed")
+				logger.Info("go successfully installed")
 			}
 		},
 	}

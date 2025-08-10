@@ -17,6 +17,7 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
@@ -209,8 +210,8 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	if CleanBuild || Zap {
 		err := mpc.Clean()
 		if err != nil {
-			osutils.Logger.Fatal("fatal error",
-				osutils.Logger.Args("error", err))
+			logger.Fatal("fatal error",
+				"error", err)
 		}
 	}
 
@@ -233,8 +234,8 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		mpc.getRuntimeDeps()
 
 		if len(runtimeDepends) > 0 {
-			osutils.Logger.Info("installing external runtime dependencies",
-				osutils.Logger.Args("count", len(runtimeDepends)))
+			logger.Info("installing external runtime dependencies",
+				"count", len(runtimeDepends))
 
 			err := packageManager.Prepare(runtimeDepends)
 			if err != nil {
@@ -261,9 +262,10 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 			defer waitGroup.Done()
 
 			for proj := range projectChan {
-				pkgLogger := osutils.WithComponent(proj.Builder.PKGBUILD.PkgName)
-				pkgLogger.Info("making package", pkgLogger.Args("pkgver", proj.Builder.PKGBUILD.PkgVer,
-					"pkgrel", proj.Builder.PKGBUILD.PkgRel))
+				logger.WithComponent(proj.Builder.PKGBUILD.PkgName)
+				logger.Info("making package",
+					"pkgver", proj.Builder.PKGBUILD.PkgVer,
+					"pkgrel", proj.Builder.PKGBUILD.PkgRel)
 
 				err := proj.Builder.Compile(NoBuild)
 				if err != nil {
@@ -330,8 +332,8 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
 	}
 
 	if fromPkgName != "" && toPkgName != "" && firstIndex > lastIndex {
-		osutils.Logger.Fatal("invalid package order: %s should be built before %s",
-			osutils.Logger.Args(fromPkgName, toPkgName))
+		logger.Fatal("invalid package order: %s should be built before %s",
+			fromPkgName, toPkgName)
 	}
 }
 
@@ -400,8 +402,9 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 	defer func() {
 		err := os.RemoveAll(proj.Builder.PKGBUILD.PackageDir)
 		if err != nil {
-			osutils.Logger.Warn("failed to remove package directory",
-				osutils.Logger.Args("path", proj.Builder.PKGBUILD.PackageDir, "error", err))
+			logger.Warn("failed to remove package directory",
+				"path", proj.Builder.PKGBUILD.PackageDir,
+				"error", err)
 		}
 	}()
 
@@ -415,9 +418,10 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		return err
 	}
 
-	pkgLogger := osutils.WithComponent(proj.Builder.PKGBUILD.PkgName)
-	pkgLogger.Info("building resulting package", pkgLogger.Args("pkgver", proj.Builder.PKGBUILD.PkgVer,
-		"pkgrel", proj.Builder.PKGBUILD.PkgRel))
+	logger.WithComponent(proj.Builder.PKGBUILD.PkgName)
+	logger.Info("building resulting package",
+		"pkgver", proj.Builder.PKGBUILD.PkgVer,
+		"pkgrel", proj.Builder.PKGBUILD.PkgRel)
 
 	err = proj.PackageManager.BuildPackage(mpc.Output)
 	if err != nil {
@@ -444,8 +448,8 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 	}
 
 	if !matchFound {
-		osutils.Logger.Fatal("package not found",
-			osutils.Logger.Args("pkgname", pkgName))
+		logger.Fatal("package not found",
+			"pkgname", pkgName)
 	}
 
 	return index
@@ -484,8 +488,9 @@ func (mpc *MultipleProject) getRuntimeDeps() {
 	}
 
 	if len(runtimeDepends) > 0 {
-		osutils.Logger.Info("external runtime dependencies collected",
-			osutils.Logger.Args("count", len(runtimeDepends), "dependencies", runtimeDepends))
+		logger.Info("external runtime dependencies collected",
+			"count", len(runtimeDepends),
+			"dependencies", runtimeDepends)
 	}
 }
 
@@ -546,14 +551,14 @@ func (mpc *MultipleProject) readProject(path string) error {
 
 	if osutils.Exists(jsonFilePath) {
 		projectFilePath = jsonFilePath
-		osutils.Logger.Info("multi-project file found",
-			osutils.Logger.Args("path", projectFilePath))
+		logger.Info("multi-project file found",
+			"path", projectFilePath)
 	}
 
 	if osutils.Exists(pkgbuildFilePath) {
 		projectFilePath = pkgbuildFilePath
-		osutils.Logger.Info("single-project file found",
-			osutils.Logger.Args("path", projectFilePath))
+		logger.Info("single-project file found",
+			"path", projectFilePath)
 
 		mpc.setSingleProject(path)
 	}
@@ -566,8 +571,7 @@ func (mpc *MultipleProject) readProject(path string) error {
 	defer func() {
 		err := filePath.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close project file",
-				osutils.Logger.Args("path", projectFilePath, "error", err))
+			logger.Warn("failed to close project file", "path", projectFilePath, "error", err)
 		}
 	}()
 
@@ -624,7 +628,7 @@ func (mpc *MultipleProject) validateJSON() error {
 
 // displayVerboseDependencyInfo shows detailed dependency information for all projects.
 func (mpc *MultipleProject) displayVerboseDependencyInfo() {
-	osutils.Logger.Debug("dependency analysis starting")
+	logger.Debug("dependency analysis starting")
 
 	// Create dependency map for internal packages
 	packageMap := make(map[string]*Project)
@@ -640,7 +644,7 @@ func (mpc *MultipleProject) displayVerboseDependencyInfo() {
 		mpc.displayPackageDependencyInfo(proj, packageMap, runtimeDependencyMap)
 	}
 
-	osutils.Logger.Debug("dependency analysis complete")
+	logger.Debug("dependency analysis complete")
 }
 
 // displayPackageDependencyInfo shows dependency information for a specific package.
@@ -651,7 +655,7 @@ func (mpc *MultipleProject) displayPackageDependencyInfo(
 	pkgVer := proj.Builder.PKGBUILD.PkgVer
 	pkgRel := proj.Builder.PKGBUILD.PkgRel
 
-	osutils.Logger.Debug(fmt.Sprintf("📦 %s-%s-%s", pkgName, pkgVer, pkgRel))
+	logger.Debug(fmt.Sprintf("📦 %s-%s-%s", pkgName, pkgVer, pkgRel))
 
 	// Show runtime dependencies
 	if len(proj.Builder.PKGBUILD.Depends) > 0 {
@@ -674,18 +678,18 @@ func (mpc *MultipleProject) displayPackageDependencyInfo(
 			reason = "Will be installed after build (runtime dependency)"
 		}
 
-		osutils.Logger.Debug("  └─ " + reason)
+		logger.Debug("  └─ " + reason)
 	} else {
-		osutils.Logger.Debug("  └─ Build only (no installation)")
+		logger.Debug("  └─ Build only (no installation)")
 	}
 
-	osutils.Logger.Debug("")
+	logger.Debug("")
 }
 
 // displayDependencies is a helper function to display dependency information.
 func (mpc *MultipleProject) displayDependencies(
 	title string, deps []string, packageMap map[string]*Project) {
-	osutils.Logger.Debug(fmt.Sprintf("  ├─ %s:", title))
+	logger.Debug(fmt.Sprintf("  ├─ %s:", title))
 
 	internalDeps := make([]string, 0)
 	externalDeps := make([]string, 0)
@@ -706,7 +710,7 @@ func (mpc *MultipleProject) displayDependencies(
 			prefix = PrefixLast
 		}
 
-		osutils.Logger.Debug(fmt.Sprintf("%s %s", prefix, dep))
+		logger.Debug(fmt.Sprintf("%s %s", prefix, dep))
 	}
 
 	// Display external dependencies
@@ -716,14 +720,14 @@ func (mpc *MultipleProject) displayDependencies(
 			prefix = PrefixLast
 		}
 
-		osutils.Logger.Debug(fmt.Sprintf("%s %s", prefix, dep))
+		logger.Debug(fmt.Sprintf("%s %s", prefix, dep))
 	}
 }
 
 // resolveDependencies builds a dependency graph and returns projects in topologically sorted order.
 // Returns slices of project batches that can be built in parallel within each batch.
 func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
-	osutils.Logger.Info("analyzing package dependencies")
+	logger.Info("analyzing package dependencies")
 
 	// Build dependency graph
 	projectMap := make(map[string]*Project)
@@ -738,9 +742,9 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 		dependedBy[pkgName] = make([]string, 0)
 	}
 
-	osutils.Logger.Info(
+	logger.Info(
 		"building dependency graph",
-		osutils.Logger.Args("total_packages", len(projectMap)))
+		"total_packages", len(projectMap))
 
 	// Build dependency relationships
 	totalDeps := 0
@@ -758,8 +762,9 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 		allDeps = append(allDeps, proj.Builder.PKGBUILD.MakeDepends...)
 
 		if len(allDeps) > 0 {
-			osutils.Logger.Info("package declares dependencies",
-				osutils.Logger.Args("package", pkgName, "all_dependencies", allDeps))
+			logger.Info("package declares dependencies",
+				"package", pkgName,
+				"all_dependencies", allDeps)
 		}
 
 		// Check runtime dependencies
@@ -785,13 +790,14 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 		}
 
 		if len(packageDeps) > 0 {
-			osutils.Logger.Info("package dependencies found",
-				osutils.Logger.Args("package", pkgName, "depends_on", packageDeps))
+			logger.Info("package dependencies found",
+				"package", pkgName,
+				"depends_on", packageDeps)
 		}
 	}
 
-	osutils.Logger.Info("dependency analysis complete",
-		osutils.Logger.Args("total_internal_dependencies", totalDeps))
+	logger.Info("dependency analysis complete",
+		"total_internal_dependencies", totalDeps)
 
 	// Perform topological sort using Kahn's algorithm
 	return mpc.topologicalSort(projectMap, dependsOn, dependedBy)
@@ -803,16 +809,16 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 	dependsOn map[string][]string, dependedBy map[string][]string,
 ) ([][]*Project, error) {
-	osutils.Logger.Info("performing topological sort for build order")
+	logger.Info("performing topological sort for build order")
 
 	// Calculate dependency popularity to identify fundamental packages
 	popularity := mpc.calculateDependencyPopularity()
 
-	osutils.Logger.Debug("dependency popularity analysis:")
+	logger.Debug("dependency popularity analysis:")
 
 	for pkgName, count := range popularity {
 		if count > 0 {
-			osutils.Logger.Debug(fmt.Sprintf("  %s: depended on by %d packages", pkgName, count))
+			logger.Debug(fmt.Sprintf("  %s: depended on by %d packages", pkgName, count))
 		}
 	}
 
@@ -862,17 +868,17 @@ func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 				problematicPackages = append(problematicPackages, fmt.Sprintf("%s(%d)", pkgName, degree))
 			}
 
-			osutils.Logger.Error("circular dependency detected",
-				osutils.Logger.Args("remaining_packages", problematicPackages))
+			logger.Error("circular dependency detected",
+				"remaining_packages", problematicPackages)
 
 			return nil, fmt.Errorf("%w: %v", ErrCircularDependency, problematicPackages)
 		}
 
-		osutils.Logger.Debug("build batch determined",
-			osutils.Logger.Args("batch_number", batchNum,
-				"batch_size", len(currentBatch),
-				"packages", batchPackages,
-				"parallel_workers", min(runtime.NumCPU(), len(currentBatch))))
+		logger.Debug("build batch determined",
+			"batch_number", batchNum,
+			"batch_size", len(currentBatch),
+			"packages", batchPackages,
+			"parallel_workers", min(runtime.NumCPU(), len(currentBatch)))
 
 		result = append(result, currentBatch)
 
@@ -891,8 +897,9 @@ func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 		batchNum++
 	}
 
-	osutils.Logger.Info("build order determined",
-		osutils.Logger.Args("total_batches", len(result), "total_packages", len(projectMap)))
+	logger.Info("build order determined",
+		"total_batches", len(result),
+		"total_packages", len(projectMap))
 
 	return result, nil
 }
@@ -980,10 +987,10 @@ func (mpc *MultipleProject) buildBatchWithDependencyInstall(projects []*Project,
 	}
 
 	// Log the build strategy for the current batch
-	osutils.ServiceLogger().Info("batch build strategy",
-		osutils.Logger.Args("runtime_dependencies", len(runtimeDeps),
-			"regular_packages", len(regularPackages),
-			"batch_number", batchNumber))
+	logger.Info("batch build strategy",
+		"runtime_dependencies", len(runtimeDeps),
+		"regular_packages", len(regularPackages),
+		"batch_number", batchNumber)
 
 	// Phase 1: Build and install runtime dependencies first
 	err := mpc.buildAndInstallRuntimeDeps(runtimeDeps, maxWorkers)
@@ -1017,9 +1024,9 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 		return nil
 	}
 
-	osutils.Logger.Info(
+	logger.Info(
 		"building regular packages",
-		osutils.Logger.Args("count", len(regularPackages)))
+		"count", len(regularPackages))
 
 	err := mpc.buildProjectsParallel(regularPackages, maxWorkers)
 	if err != nil {
@@ -1037,8 +1044,8 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 
 		// Stop if the target package has been built
 		if ToPkgName != "" && proj.Builder.PKGBUILD.PkgName == ToPkgName {
-			osutils.Logger.Info("stopping build at target package",
-				osutils.Logger.Args("target_package", ToPkgName))
+			logger.Info("stopping build at target package",
+				"target_package", ToPkgName)
 
 			return nil // Use a sentinel error or other mechanism if specific exit is needed
 		}
@@ -1050,18 +1057,19 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 // installPackage installs a single package.
 func (mpc *MultipleProject) installPackage(proj *Project) error {
 	pkgName := proj.Builder.PKGBUILD.PkgName
-	osutils.Logger.Info("installing package", osutils.Logger.Args("package", pkgName))
+	logger.Info("installing package", "package", pkgName)
 
 	err := proj.PackageManager.Install(mpc.Output)
 	if err != nil {
-		osutils.Logger.Error(
+		logger.Error(
 			"package installation failed",
-			osutils.Logger.Args("package", pkgName, "error", err))
+			"package", pkgName,
+			"error", err)
 
 		return err
 	}
 
-	osutils.Logger.Info("package installed", osutils.Logger.Args("package", pkgName))
+	logger.Info("package installed", "package", pkgName)
 
 	return nil
 }
@@ -1071,10 +1079,9 @@ func (mpc *MultipleProject) installPackage(proj *Project) error {
 // dependencies.
 func (mpc *MultipleProject) buildRuntimeDependenciesInOrder(
 	runtimeDeps []*Project, maxWorkers int) error {
-	serviceLogger := osutils.ServiceLogger()
-	serviceLogger.Info(
+	logger.Info(
 		"runtime dependencies build optimization",
-		osutils.Logger.Args("count", len(runtimeDeps)))
+		"count", len(runtimeDeps))
 
 	// Build dependency graph for runtime dependencies only
 	runtimeProjectMap, runtimeDependsOn, runtimeDependedBy :=
@@ -1087,9 +1094,9 @@ func (mpc *MultipleProject) buildRuntimeDependenciesInOrder(
 		return err
 	}
 
-	osutils.Logger.Info(
+	logger.Info(
 		"runtime dependencies batching complete",
-		osutils.Logger.Args("batches", len(runtimeBatches)))
+		"batches", len(runtimeBatches))
 
 	return mpc.buildAndInstallRuntimeBatches(runtimeBatches, maxWorkers)
 }
@@ -1128,9 +1135,10 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 		if _, exists := runtimeProjectMap[depName]; exists {
 			runtimeDependsOn[pkgName] = append(runtimeDependsOn[pkgName], depName)
 			runtimeDependedBy[depName] = append(runtimeDependedBy[depName], pkgName)
-			osutils.Logger.Info(
+			logger.Info(
 				"runtime dependency found",
-				osutils.Logger.Args("dependent", pkgName, "dependency", depName))
+				"dependent", pkgName,
+				"dependency", depName)
 		}
 	}
 
@@ -1140,9 +1148,10 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 		if _, exists := runtimeProjectMap[depName]; exists {
 			runtimeDependsOn[pkgName] = append(runtimeDependsOn[pkgName], depName)
 			runtimeDependedBy[depName] = append(runtimeDependedBy[depName], pkgName)
-			osutils.Logger.Info(
+			logger.Info(
 				"make dependency found",
-				osutils.Logger.Args("dependent", pkgName, "dependency", depName))
+				"dependent", pkgName,
+				"dependency", depName)
 		}
 	}
 }
@@ -1150,8 +1159,6 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 // buildAndInstallRuntimeBatches builds and installs runtime dependency batches.
 func (mpc *MultipleProject) buildAndInstallRuntimeBatches(
 	runtimeBatches [][]*Project, maxWorkers int) error {
-	serviceLogger := osutils.ServiceLogger()
-
 	// Build and install each batch of runtime dependencies
 	for batchIndex, batch := range runtimeBatches {
 		batchSize := len(batch)
@@ -1161,10 +1168,10 @@ func (mpc *MultipleProject) buildAndInstallRuntimeBatches(
 			batchPackages = append(batchPackages, proj.Builder.PKGBUILD.PkgName)
 		}
 
-		serviceLogger.Info("building runtime dependency batch",
-			osutils.Logger.Args("batch", batchIndex+1,
-				"parallel_packages", batchSize,
-				"packages", batchPackages))
+		logger.Info("building runtime dependency batch",
+			"batch", batchIndex+1,
+			"parallel_packages", batchSize,
+			"packages", batchPackages)
 
 		// Build this batch in parallel
 		err := mpc.buildProjectsParallel(batch, min(maxWorkers, batchSize))
@@ -1188,22 +1195,25 @@ func (mpc *MultipleProject) installRuntimeBatch(batch []*Project) error {
 		pkgName := proj.Builder.PKGBUILD.PkgName
 
 		if !NoBuild {
-			osutils.Logger.Info("installing runtime dependency", osutils.Logger.Args("package", pkgName))
+			logger.Info("installing runtime dependency",
+				"package", pkgName)
 
 			err := proj.PackageManager.Install(mpc.Output)
 			if err != nil {
-				osutils.Logger.Error("runtime dependency installation failed",
-					osutils.Logger.Args("package", pkgName, "error", err))
+				logger.Error("runtime dependency installation failed",
+					"package", pkgName,
+					"error", err)
 
 				return err
 			}
 
-			osutils.Logger.Info("runtime dependency installed", osutils.Logger.Args("package", pkgName))
+			logger.Info("runtime dependency installed",
+				"package", pkgName)
 		}
 
 		if ToPkgName != "" && pkgName == ToPkgName {
-			osutils.Logger.Info("stopping build at target package",
-				osutils.Logger.Args("target_package", ToPkgName))
+			logger.Info("stopping build at target package",
+				"target_package", ToPkgName)
 
 			return nil
 		}
@@ -1253,7 +1263,7 @@ func (mpc *MultipleProject) topologicalSortRuntimeDeps(projectMap map[string]*Pr
 			currentBatch = append(currentBatch, projectMap[pkgName])
 		}
 
-		osutils.Logger.Info(fmt.Sprintf("runtime dependency batch %d: %d packages can build in parallel",
+		logger.Info(fmt.Sprintf("runtime dependency batch %d: %d packages can build in parallel",
 			batchNum, len(currentBatch)))
 
 		result = append(result, currentBatch)
@@ -1287,19 +1297,19 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 	// Build runtime dependency map to identify packages that are needed by others
 	runtimeDependencyMap := mpc.buildRuntimeDependencyMap()
 
-	osutils.Logger.Info("dependency-aware build process starting")
-	osutils.Logger.Info("runtime dependency map:")
+	logger.Info("dependency-aware build process starting")
+	logger.Info("runtime dependency map:")
 
 	for pkgName, isRuntimeDep := range runtimeDependencyMap {
 		if isRuntimeDep {
-			osutils.Logger.Info(fmt.Sprintf("  %s -> WILL BE INSTALLED (runtime dependency)", pkgName))
+			logger.Info(fmt.Sprintf("  %s -> WILL BE INSTALLED (runtime dependency)", pkgName))
 		}
 	}
 
-	osutils.Logger.Info("starting dependency-aware build process",
-		osutils.Logger.Args("total_batches", len(buildOrder),
-			"total_packages", totalPackages,
-			"max_parallel_workers", maxWorkers))
+	logger.Info("starting dependency-aware build process",
+		"total_batches", len(buildOrder),
+		"total_packages", totalPackages,
+		"max_parallel_workers", maxWorkers)
 
 	processedPackages := 0
 
@@ -1307,8 +1317,8 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 		// Filter batch based on FromPkgName and ToPkgName
 		filteredBatch := mpc.filterBatch(batch)
 		if len(filteredBatch) == 0 {
-			osutils.Logger.Debug("skipping batch (filtered out)",
-				osutils.Logger.Args("batch_number", batchIndex+1))
+			logger.Debug("skipping batch (filtered out)",
+				"batch_number", batchIndex+1)
 
 			continue
 		}
@@ -1320,12 +1330,12 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 			batchPackages = append(batchPackages, proj.Builder.PKGBUILD.PkgName)
 		}
 
-		osutils.Logger.Debug("processing build batch",
-			osutils.Logger.Args("batch_number", batchIndex+1,
-				"batch_size", len(filteredBatch),
-				"packages", batchPackages,
-				"parallel_workers", batchWorkers,
-				"progress", fmt.Sprintf("%d/%d packages", processedPackages, totalPackages)))
+		logger.Debug("processing build batch",
+			"batch_number", batchIndex+1,
+			"batch_size", len(filteredBatch),
+			"packages", batchPackages,
+			"parallel_workers", batchWorkers,
+			"progress", fmt.Sprintf("%d/%d packages", processedPackages, totalPackages))
 
 		// Build current batch in parallel - but handle runtime dependencies specially
 		err := mpc.buildBatchWithDependencyInstall(

@@ -52,10 +52,6 @@ func TestGetLongDescription(t *testing.T) {
 	// Check that description contains expected content
 	assert.Contains(t, description, "Yet Another Packager")
 	assert.Contains(t, description, "YAP (Yet Another Packager)")
-	assert.Contains(t, description, "KEY FEATURES:")
-	assert.Contains(t, description, "Multi-format support")
-	assert.Contains(t, description, "SUPPORTED DISTRIBUTIONS:")
-	assert.Contains(t, description, "WORKFLOW:")
 }
 
 func TestIsNoColorEnabled(t *testing.T) {

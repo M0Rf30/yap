@@ -79,7 +79,7 @@ func TestGetBuildContext(t *testing.T) {
 func TestWithLogger(t *testing.T) {
 	t.Parallel()
 
-	log := logger.NewDefault()
+	log := logger.Logger
 	ctx := WithLogger(context.Background(), log)
 
 	retrievedLogger := GetLogger(ctx)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -138,8 +139,8 @@ func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
 			// Other formats use OSUtils Go setup
 			err := osutils.GOSetup()
 			if err != nil {
-				osutils.Logger.Warn("Failed to setup Go environment",
-					osutils.Logger.Args("error", err))
+				logger.Warn("Failed to setup Go environment",
+					"error", err)
 			}
 		}
 	}
@@ -168,10 +169,9 @@ func (bb *BaseBuilder) CreateFileWalker() *files.Walker {
 
 // LogPackageCreated logs successful package creation with consistent formatting.
 func (bb *BaseBuilder) LogPackageCreated(artifactPath string) {
-	pkgLogger := osutils.WithComponent(bb.PKGBUILD.PkgName)
-	pkgLogger.Info("package artifact created", osutils.Logger.Args(
+	logger.Info("package artifact created",
 		"format", bb.Format,
 		"pkgver", bb.PKGBUILD.PkgVer,
 		"pkgrel", bb.PKGBUILD.PkgRel,
-		"artifact", artifactPath))
+		"artifact", artifactPath)
 }

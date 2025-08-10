@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/project"
 )
@@ -59,15 +60,15 @@ The zap command automatically:
 		if distro == "" {
 			osRelease, _ := osutils.ParseOSRelease()
 			distro = osRelease.ID
-			osutils.Logger.Warn("No distribution specified, using detected",
-				osutils.Logger.Args("distro", distro))
+			logger.Warn("No distribution specified, using detected",
+				"distro", distro)
 		} else {
-			osutils.Logger.Info("Cleaning for distribution",
-				osutils.Logger.Args("distro", distro, "release", release))
+			logger.Info("Cleaning for distribution",
+				"distro", distro, "release", release)
 		}
 
 		// Show project path
-		osutils.Logger.Info("Project path", osutils.Logger.Args("path", fullJSONPath))
+		logger.Info("Project path", "path", fullJSONPath)
 
 		mpc := project.MultipleProject{}
 
@@ -77,17 +78,17 @@ The zap command automatically:
 
 		err = mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
-			osutils.Logger.Fatal("fatal error",
-				osutils.Logger.Args("error", err))
+			logger.Fatal("fatal error",
+				"error", err)
 		}
 
 		err = mpc.Clean()
 		if err != nil {
-			osutils.Logger.Fatal("fatal error",
-				osutils.Logger.Args("error", err))
+			logger.Fatal("fatal error",
+				"error", err)
 		}
 
-		osutils.Logger.Info("zap done.", osutils.Logger.Args("distro", distro, "release", release))
+		logger.Info("zap done.", "distro", distro, "release", release)
 		return nil
 	},
 }
