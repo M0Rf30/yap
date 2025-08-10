@@ -3,8 +3,6 @@ package command
 
 import (
 	"errors"
-	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -66,45 +64,10 @@ DEPENDENCY RESOLUTION:
 			osutils.Logger.Info("Starting build process with verbose logging enabled")
 		}
 
-		fullJSONPath, _ := filepath.Abs(args[len(args)-1]) // Always take the last argument as path
-		var distro, release string
-
-		if len(args) == 2 {
-			split := strings.Split(args[0], "-")
-			distro = split[0]
-
-			if len(split) > 1 {
-				release = split[1]
-			}
-		} else if len(args) == 1 {
-			// Single argument - could be path only or distro+path in one
-			firstArg := args[0]
-			// Check if it's a path (contains /, is . or .., or is a valid project path)
-			if strings.Contains(firstArg, "/") || firstArg == "." || firstArg == ".." {
-				// It's definitely a path
-				fullJSONPath, _ = filepath.Abs(firstArg)
-			} else {
-				// Check if it's a valid project path
-				if err := validateProjectPath(firstArg); err == nil {
-					// It's a valid project path
-					fullJSONPath, _ = filepath.Abs(firstArg)
-				} else {
-					// Try to validate as distro
-					if err := validateDistroArg(firstArg); err == nil {
-						// It's a valid distro, but no path provided - use current directory
-						split := strings.Split(firstArg, "-")
-						distro = split[0]
-						if len(split) > 1 {
-							release = split[1]
-						}
-						fullJSONPath, _ = filepath.Abs(".")
-					} else {
-						// Neither valid distro nor valid path
-						return fmt.Errorf("argument '%s' is neither a valid distribution nor a valid project path",
-							firstArg)
-					}
-				}
-			}
+		// Parse flexible arguments using shared function
+		distro, release, fullJSONPath, err := ParseFlexibleArgs(args)
+		if err != nil {
+			return err
 		}
 
 		// Use the default distro if none is provided.
@@ -126,7 +89,7 @@ DEPENDENCY RESOLUTION:
 
 		// Initialize MultipleProject
 		mpc := project.MultipleProject{}
-		err := mpc.MultiProject(distro, release, fullJSONPath)
+		err = mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
 			// Enhanced error logging with context
 			var yapErr *yapErrors.YapError

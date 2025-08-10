@@ -39,19 +39,6 @@ func getLongDescription() string {
 		"\nYAP (Yet Another Packager) is a powerful, container-based package building system" +
 		"\nthat creates packages for multiple GNU/Linux distributions from a single PKGBUILD-like" +
 		"\nspecification format." +
-		"\n\nKEY FEATURES:" +
-		"\n  • Multi-format support: RPM, DEB, APK, TAR.ZST packages" +
-		"\n  • Container-based isolation for clean, reproducible builds" +
-		"\n  • Dependency-aware build orchestration with project management" +
-		"\n  • PKGBUILD compatibility with enhanced parsing capabilities" +
-		"\n  • Component-aware structured logging system" +
-		"\n\nSUPPORTED DISTRIBUTIONS:" +
-		"\n  Alpine, Arch, CentOS, Debian, Fedora, OpenSUSE, Rocky, Ubuntu, and more" +
-		"\n\nWORKFLOW:" +
-		"\n  1. Define packages in yap.json configuration" +
-		"\n  2. Create PKGBUILD-compatible build specifications" +
-		"\n  3. Run 'yap build' to generate packages for target distributions" +
-		"\n  4. Deploy packages using your preferred package management system" +
 		"\n\nFor detailed documentation and examples, visit https://github.com/M0Rf30/yap"
 }
 
