@@ -1,4 +1,4 @@
-package abuild
+package apk
 
 var installArgs = []string{
 	"add",

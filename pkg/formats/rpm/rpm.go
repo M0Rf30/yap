@@ -1,7 +1,6 @@
 package rpm
 
 import (
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/google/rpmpack"
 
+	"github.com/M0Rf30/yap/v2/pkg/filesystem"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -193,7 +193,8 @@ func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
 	backupFiles := r.prepareBackupFiles()
 
 	// Walk through the package directory and retrieve the contents.
-	contents, err := walkPackageDirectory(r.PKGBUILD.PackageDir, backupFiles)
+	walker := filesystem.NewWalker(r.PKGBUILD.PackageDir, backupFiles)
+	contents, err := walker.WalkPackageDirectory()
 	if err != nil {
 		return err // Return the error if walking the directory fails.
 	}
@@ -324,16 +325,6 @@ func asRPMSymlink(content *osutils.FileContent) *rpmpack.RPMFile {
 	}
 }
 
-// createContent creates a new FileContent object with the specified source path,
-// destination path (relative to the package directory), and content type.
-func createContent(path, packageDir, contentType string) *osutils.FileContent {
-	return &osutils.FileContent{
-		Source:      path,
-		Destination: strings.TrimPrefix(path, packageDir),
-		Type:        contentType,
-	}
-}
-
 // createRPMFile converts a FileContent object into an RPMFile object based on its type.
 // It returns the created RPMFile and any error encountered during the conversion.
 func createRPMFile(content *osutils.FileContent) (*rpmpack.RPMFile, error) {
@@ -389,29 +380,6 @@ func (r *RPM) getRelease() {
 	}
 }
 
-// handleFileEntry processes a file entry at the given path, checking if it is a backup file,
-// and appending its content to the provided slice based on its type (config, symlink, or
-// egular file).
-func handleFileEntry(path string, backupFiles []string,
-	packageDir string, contents *[]*osutils.FileContent,
-) error {
-	fileInfo, err := os.Lstat(path)
-	if err != nil {
-		return err // Handle error from os.Lstat
-	}
-
-	switch {
-	case fileInfo.Mode()&os.ModeSymlink != 0:
-		*contents = append(*contents, createContent(path, packageDir, osutils.TypeSymlink))
-	case osutils.Contains(backupFiles, strings.TrimPrefix(path, packageDir)):
-		*contents = append(*contents, createContent(path, packageDir, osutils.TypeConfigNoReplace))
-	default:
-		*contents = append(*contents, createContent(path, packageDir, osutils.TypeFile))
-	}
-
-	return nil
-}
-
 // prepareBackupFiles prepares a list of backup file paths by ensuring each path
 // has a leading slash and returns the resulting slice of backup file paths.
 func (r *RPM) prepareBackupFiles() []string {
@@ -452,32 +420,4 @@ func processDepends(depends []string) rpmpack.Relations {
 	}
 
 	return relations
-}
-
-// walkPackageDirectory traverses the specified package directory and collects
-// file contents, including handling backup files and empty directories.
-// It returns a slice of FileContent and an error if any occurs during the traversal.
-func walkPackageDirectory(packageDir string, backupFiles []string) ([]*osutils.FileContent, error) {
-	var contents []*osutils.FileContent
-
-	err := filepath.WalkDir(packageDir, func(path string, dirEntry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if dirEntry.IsDir() {
-			if osutils.IsEmptyDir(path, dirEntry) {
-				contents = append(contents, createContent(path, packageDir, osutils.TypeDir))
-			}
-
-			return nil
-		}
-
-		return handleFileEntry(path, backupFiles, packageDir, &contents)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return contents, nil
 }
