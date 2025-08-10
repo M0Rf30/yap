@@ -14,40 +14,9 @@ const (
 	Tools = "Development/Tools"
 )
 
-var buildEnvironmentDeps = []string{
-	"autoconf",
-	"automake",
-	"diffutils",
-	"expect",
-	"gcc",
-	"gcc-c++",
-	"libtool-ltdl",
-	"libtool-ltdl-devel",
-	"make",
-	"openssl",
-	"patch",
-	"pkgconf",
-	"which",
-}
-
-var installArgs = []string{
-	"-y",
-	"install",
-}
-
 var (
-	// RPMArchs maps standard architecture names to RPM package architecture names.
-	RPMArchs = map[string]string{
-		"x86_64":  "x86_64",
-		"i686":    "i686",
-		"aarch64": "aarch64",
-		"armv7h":  "armv7h",
-		"armv6h":  "armv6h",
-		"arm":     "arm",
-		"any":     "noarch",
-	}
-
 	// RPMGroups maps common group names to RPM group categories.
+	// This is RPM-specific logic that should remain here.
 	RPMGroups = map[string]string{
 		"admin":        "Applications/System",
 		"any":          "noarch",
@@ -84,6 +53,7 @@ var (
 	}
 
 	// RPMDistros maps distribution names to their RPM suffix.
+	// This is RPM-specific logic that should remain here.
 	RPMDistros = map[string]string{
 		"almalinux": ".el",
 		"amzn":      ".amzn",

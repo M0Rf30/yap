@@ -1,6 +1,14 @@
 // Package constants provides centralized constants and mappings for all package formats.
 package constants
 
+// Package format constants
+const (
+	FormatAPK    = "apk"
+	FormatDEB    = "deb"
+	FormatRPM    = "rpm"
+	FormatPacman = "pacman"
+)
+
 // RPMGroups maps common group names to RPM group categories.
 // This consolidates the group mapping logic from the RPM package.
 var RPMGroups = map[string]string{
@@ -90,13 +98,13 @@ func GetBuildDeps() *BuildEnvironmentDeps {
 // GetInstallArgs returns the package manager install arguments.
 func GetInstallArgs(format string) []string {
 	switch format {
-	case "apk":
+	case FormatAPK:
 		return []string{"add", "--allow-untrusted"}
-	case "deb":
+	case FormatDEB:
 		return []string{"--allow-downgrades", "--assume-yes", "install"}
-	case "rpm":
+	case FormatRPM:
 		return []string{"-y", "install"}
-	case "pacman":
+	case FormatPacman:
 		return []string{"-U", "--noconfirm"}
 	default:
 		return []string{}

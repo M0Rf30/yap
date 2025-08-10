@@ -148,10 +148,25 @@ func (mpc *MultipleProject) Clean() error {
 			}
 		}
 
-		if Zap && !singleProject {
+		if Zap {
+			// For zap command, remove all build artifacts including:
+			// - StartDir (contains src/, pkg/, and other build files)
+			// - SourceDir (src directory specifically)
+			// - PkgDir (pkg directory if it exists separately)
+
+			// Remove StartDir completely (this includes src, pkg, and all build artifacts)
 			err := os.RemoveAll(proj.Builder.PKGBUILD.StartDir)
 			if err != nil {
 				return err
+			}
+
+			// Also remove any additional directories that might exist
+			pkgDir := filepath.Join(proj.Builder.PKGBUILD.StartDir, "pkg")
+			if _, err := os.Stat(pkgDir); err == nil {
+				err = os.RemoveAll(pkgDir)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
