@@ -7,6 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/M0Rf30/yap/v2/pkg/graph"
+	"github.com/M0Rf30/yap/v2/pkg/graph/render"
+	"github.com/M0Rf30/yap/v2/pkg/graph/theme"
 )
 
 func TestGraphCommand(t *testing.T) {
@@ -16,8 +20,8 @@ func TestGraphCommand(t *testing.T) {
 		outputPath := filepath.Join(tempDir, "test-graph.svg")
 
 		// Test basic SVG generation
-		graphData := &GraphData{
-			Nodes: map[string]*GraphNode{
+		graphData := &graph.Data{
+			Nodes: map[string]*graph.Node{
 				"pkg1": {
 					Name:    "pkg1",
 					Version: "1.0.0",
@@ -35,13 +39,13 @@ func TestGraphCommand(t *testing.T) {
 					Level:   1,
 				},
 			},
-			Edges: []Edge{
+			Edges: []graph.Edge{
 				{From: "pkg2", To: "pkg1", Type: "runtime"},
 			},
-			Theme: getTheme("modern"),
+			Theme: theme.GetTheme("modern"),
 		}
 
-		err := generateSVGGraph(graphData, outputPath)
+		err := render.GenerateSVGGraph(graphData, outputPath, false)
 		require.NoError(t, err)
 
 		// Verify file was created
@@ -54,13 +58,13 @@ func TestGraphCommand(t *testing.T) {
 	})
 
 	t.Run("Theme selection", func(t *testing.T) {
-		modernTheme := getTheme("modern")
+		modernTheme := theme.GetTheme("modern")
 		assert.Equal(t, "#00C851", modernTheme.NodeInternal)
 
-		darkTheme := getTheme("dark")
+		darkTheme := theme.GetTheme("dark")
 		assert.Equal(t, "#1a1a1a", darkTheme.Background)
 
-		classicTheme := getTheme("classic")
+		classicTheme := theme.GetTheme("classic")
 		assert.Equal(t, "#ffffff", classicTheme.Background)
 	})
 }

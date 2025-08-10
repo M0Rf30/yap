@@ -1,7 +1,6 @@
 package command
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -12,7 +11,7 @@ import (
 
 // zapCmd represents the command to deeply clean build environments.
 var zapCmd = &cobra.Command{
-	Use:     "zap <distro> <path>",
+	Use:     "zap [distro] <path>",
 	GroupID: "build",
 	Aliases: []string{"clean"},
 	Short:   "🧹 Deeply clean build environment and artifacts",
@@ -28,28 +27,47 @@ This command is useful for:
 WARNING: This operation is destructive and removes all build outputs
 and intermediate files. Use with caution in production environments.
 
+DISTRIBUTION FORMAT:
+  Use 'distro' or 'distro-release' format (e.g., 'ubuntu-jammy', 'fedora-38')
+  If no distro is specified, uses the current system's distribution.
+
 The zap command automatically:
   • Skips dependency installation (nomakedeps=true)
   • Skips package manager sync (skip-sync=true)
   • Enables deep cleaning mode (zap=true)`,
-	Example: `  # Clean specific project for distribution
+	Example: `  # Clean current system distribution
+  yap zap .
+  yap zap /path/to/project
+
+  # Clean specific project for distribution
   yap zap ubuntu-jammy /path/to/project
   yap zap fedora-38 .
   yap zap alpine /home/user/myproject
 
   # Clean current directory project
   yap zap rocky-9 .`,
-	Args:   createValidateDistroArgs(2),
+	Args:   cobra.RangeArgs(1, 2), // Allow 1 or 2 arguments like the build command
 	PreRun: PreRunValidation,
-	Run: func(_ *cobra.Command, args []string) {
-		fullJSONPath, _ := filepath.Abs(args[1])
-		split := strings.Split(args[0], "-")
-		distro := split[0]
-		release := ""
-
-		if len(split) > 1 {
-			release = split[1]
+	RunE: func(_ *cobra.Command, args []string) error {
+		// Parse flexible arguments using shared function
+		distro, release, fullJSONPath, err := ParseFlexibleArgs(args)
+		if err != nil {
+			return err
 		}
+
+		// Use the default distro if none is provided.
+		if distro == "" {
+			osRelease, _ := osutils.ParseOSRelease()
+			distro = osRelease.ID
+			osutils.Logger.Warn("No distribution specified, using detected",
+				osutils.Logger.Args("distro", distro))
+		} else {
+			osutils.Logger.Info("Cleaning for distribution",
+				osutils.Logger.Args("distro", distro, "release", release))
+		}
+
+		// Show project path
+		osutils.Logger.Info("Project path", osutils.Logger.Args("path", fullJSONPath))
 
 		mpc := project.MultipleProject{}
 
@@ -57,7 +75,7 @@ The zap command automatically:
 		project.SkipSyncDeps = true
 		project.Zap = true
 
-		err := mpc.MultiProject(distro, release, fullJSONPath)
+		err = mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
 			osutils.Logger.Fatal("fatal error",
 				osutils.Logger.Args("error", err))
@@ -70,6 +88,7 @@ The zap command automatically:
 		}
 
 		osutils.Logger.Info("zap done.", osutils.Logger.Args("distro", distro, "release", release))
+		return nil
 	},
 }
 
@@ -85,13 +104,23 @@ func init() {
 	) ([]string, cobra.ShellCompDirective) {
 		switch len(args) {
 		case 0:
-			// First arg: distribution
+			// First arg: distribution or path
+			if strings.Contains(toComplete, "/") || toComplete == "." {
+				return nil, cobra.ShellCompDirectiveFilterDirs
+			}
+
 			return ValidDistrosCompletion(cmd, args, toComplete)
 		case 1:
-			// Second arg: path
+			// Second arg: path (if first was distro)
 			return nil, cobra.ShellCompDirectiveFilterDirs
 		default:
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 	}
+
+	// BUILD RANGE CONTROL FLAGS - same as build command for target support
+	zapCmd.Flags().StringVarP(&project.FromPkgName,
+		"from", "", "", "▶️  start cleaning from specified package name (dependency-aware)")
+	zapCmd.Flags().StringVarP(&project.ToPkgName,
+		"to", "", "", "⏹️  stop cleaning at specified package name (dependency-aware)")
 }

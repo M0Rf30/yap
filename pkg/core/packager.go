@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -50,19 +51,19 @@ func NewBasePackageManager(pkgBuild *pkgbuild.PKGBUILD, config *Config) *BasePac
 // BuildPackageName constructs standardized package names based on format.
 func (bpm *BasePackageManager) BuildPackageName(format string) string {
 	switch format {
-	case "apk":
+	case constants.FormatAPK:
 		return fmt.Sprintf("%s-%s-r%s.%s.apk",
 			bpm.PKGBUILD.PkgName,
 			bpm.PKGBUILD.PkgVer,
 			bpm.PKGBUILD.PkgRel,
 			bpm.PKGBUILD.ArchComputed)
-	case "deb":
+	case constants.FormatDEB:
 		return fmt.Sprintf("%s_%s-%s_%s.deb",
 			bpm.PKGBUILD.PkgName,
 			bpm.PKGBUILD.PkgVer,
 			bpm.PKGBUILD.PkgRel,
 			bpm.PKGBUILD.ArchComputed)
-	case "rpm":
+	case constants.FormatRPM:
 		name := fmt.Sprintf("%s-%s-%s.%s.rpm",
 			bpm.PKGBUILD.PkgName,
 			bpm.PKGBUILD.PkgVer,
@@ -78,7 +79,7 @@ func (bpm *BasePackageManager) BuildPackageName(format string) string {
 		}
 
 		return name
-	case "pacman":
+	case constants.FormatPacman:
 		name := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst",
 			bpm.PKGBUILD.PkgName,
 			bpm.PKGBUILD.PkgVer,
@@ -115,7 +116,7 @@ func (bpm *BasePackageManager) PrepareEnvironmentCommon(golang bool) error {
 	copy(args[len(bpm.Config.InstallArgs):], bpm.Config.BuildEnvDeps)
 
 	if golang {
-		if bpm.Config.Name == "apk" {
+		if bpm.Config.Name == constants.FormatAPK {
 			osutils.CheckGO()
 
 			args = append(args, "go")
@@ -127,7 +128,7 @@ func (bpm *BasePackageManager) PrepareEnvironmentCommon(golang bool) error {
 		}
 	}
 
-	useSudo := bpm.Config.Name != "apk"
+	useSudo := bpm.Config.Name != constants.FormatAPK
 
 	return osutils.Exec(useSudo, "", bpm.Config.InstallCmd, args...)
 }
@@ -148,7 +149,7 @@ func (bpm *BasePackageManager) InstallCommon(artifactsPath, packageName string) 
 	copy(args, bpm.Config.InstallArgs)
 	args[len(bpm.Config.InstallArgs)] = pkgFilePath
 
-	useSudo := bpm.Config.Name != "apk"
+	useSudo := bpm.Config.Name != constants.FormatAPK
 
 	return osutils.Exec(useSudo, "", bpm.Config.InstallCmd, args...)
 }

@@ -196,8 +196,10 @@ func (m *Pkg) Prepare(makeDepends []string) error {
 // should be prepared for Golang.
 // It returns an error if there is any issue in preparing the environment.
 func (m *Pkg) PrepareEnvironment(golang bool) error {
+	// Use centralized build dependencies
+	buildDeps := constants.GetBuildDeps()
 	installArgs := getBaseInstallArgs()
-	installArgs = append(installArgs, buildEnvironmentDeps...)
+	installArgs = append(installArgs, buildDeps.Pacman...)
 
 	if golang {
 		osutils.CheckGO()

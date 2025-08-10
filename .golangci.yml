@@ -108,6 +108,11 @@ linters:
     generated: strict
 
     rules:
+      - path: "pkg/builders/common/"
+        text: "avoid meaningless package names"
+        linters:
+          - revive
+          
       - path: "(docs|dist|bin)/"
         linters:
           - gosec

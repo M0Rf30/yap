@@ -8,7 +8,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/builders/rpm"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/core"
-	"github.com/M0Rf30/yap/v2/pkg/dpkg"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -59,14 +58,7 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	case "apk":
 		return apk.NewBuilder(pkgBuild)
 	case "apt":
-		// Use the new refactored deb package if available, fallback to legacy
-		if useNewImplementation() {
-			return deb.NewPackage(pkgBuild)
-		}
-
-		return &dpkg.Deb{
-			PKGBUILD: pkgBuild,
-		}
+		return deb.NewPackage(pkgBuild)
 	case "pacman":
 		return &pacman.Pkg{
 			PKGBUILD: pkgBuild,
@@ -85,12 +77,4 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	}
 
 	return nil
-}
-
-// useNewImplementation determines whether to use the new refactored implementations.
-// This can be controlled by environment variables or feature flags during the transition.
-func useNewImplementation() bool {
-	// For now, enable the new implementation
-	// In production, this could be controlled by a feature flag or environment variable
-	return true
 }

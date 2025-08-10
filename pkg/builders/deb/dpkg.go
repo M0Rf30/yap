@@ -1,4 +1,4 @@
-package dpkg
+package deb
 
 import (
 	"fmt"
@@ -11,25 +11,33 @@ import (
 	"github.com/blakesmith/ar"
 	"github.com/otiai10/copy"
 
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
-// Deb represents a Deb package.
+// Package represents a Deb package.
 //
 // It contains the directory path of the package and the PKGBUILD struct, which
 // contains the metadata and build instructions for the package.
-type Deb struct {
+type Package struct {
 	debDir   string
 	PKGBUILD *pkgbuild.PKGBUILD
+}
+
+// NewPackage creates a new Debian package manager.
+func NewPackage(pkgBuild *pkgbuild.PKGBUILD) *Package {
+	return &Package{
+		PKGBUILD: pkgBuild,
+	}
 }
 
 // BuildPackage builds the Debian package and cleans up afterward.
 // It takes artifactsPath to specify where to store the package.
 // The method calls dpkgDeb to create the package and removes the
 // package directory, returning an error if any step fails.
-func (d *Deb) BuildPackage(artifactsPath string) error {
+func (d *Package) BuildPackage(artifactsPath string) error {
 	debTemp, err := os.MkdirTemp(d.PKGBUILD.SourceDir, "tmp")
 	if err != nil {
 		return err
@@ -80,12 +88,14 @@ func (d *Deb) BuildPackage(artifactsPath string) error {
 // constructs the package file path using details from the PKGBUILD and
 // executes the `apt-get install` command. Returns an error if the
 // installation fails.
-func (d *Deb) Install(artifactsPath string) error {
+func (d *Package) Install(artifactsPath string) error {
 	artifactFilePath := filepath.Join(artifactsPath,
 		fmt.Sprintf("%s_%s-%s_%s.deb",
 			d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
 			d.PKGBUILD.ArchComputed))
 
+	// Use centralized install arguments
+	installArgs := constants.GetInstallArgs(constants.FormatDEB)
 	installArgs = append(installArgs, artifactFilePath)
 
 	err := osutils.Exec(false, "", "apt-get", installArgs...)
@@ -100,7 +110,9 @@ func (d *Deb) Install(artifactsPath string) error {
 //
 // makeDepends: a slice of strings representing the dependencies to be installed.
 // Returns an error if there was a problem installing the dependencies.
-func (d *Deb) Prepare(makeDepends []string) error {
+func (d *Package) Prepare(makeDepends []string) error {
+	// Use centralized install arguments
+	installArgs := constants.GetInstallArgs(constants.FormatDEB)
 	return d.PKGBUILD.GetDepends("apt-get", installArgs, makeDepends)
 }
 
@@ -108,8 +120,11 @@ func (d *Deb) Prepare(makeDepends []string) error {
 //
 // It takes a boolean parameter `golang` which indicates whether or not to set up Go.
 // It returns an error if there was a problem during the environment preparation.
-func (d *Deb) PrepareEnvironment(golang bool) error {
-	installArgs = append(installArgs, buildEnvironmentDeps...)
+func (d *Package) PrepareEnvironment(golang bool) error {
+	// Use centralized build dependencies and install arguments
+	buildDeps := constants.GetBuildDeps()
+	installArgs := constants.GetInstallArgs(constants.FormatDEB)
+	installArgs = append(installArgs, buildDeps.DEB...)
 
 	err := osutils.Exec(false, "", "apt-get", installArgs...)
 	if err != nil {
@@ -129,9 +144,12 @@ func (d *Deb) PrepareEnvironment(golang bool) error {
 // PrepareFakeroot sets up the environment for building a Debian package in a fakeroot context.
 // It retrieves architecture and release information, cleans up the debDir, creates necessary
 // resources, and strips binaries. The method returns an error if any step fails.
-func (d *Deb) PrepareFakeroot(_ string) error {
+func (d *Package) PrepareFakeroot(_ string) error {
 	d.getRelease()
-	d.PKGBUILD.ArchComputed = DebArchs[d.PKGBUILD.ArchComputed]
+
+	// Use centralized architecture mapping
+	archMapping := constants.GetArchMapping()
+	d.PKGBUILD.ArchComputed = archMapping.TranslateArch(constants.FormatDEB, d.PKGBUILD.ArchComputed)
 
 	err := os.RemoveAll(d.debDir)
 	if err != nil {
@@ -158,7 +176,7 @@ func (d *Deb) PrepareFakeroot(_ string) error {
 //
 // Returns:
 // - error: An error if the update fails.
-func (d *Deb) Update() error {
+func (d *Package) Update() error {
 	return d.PKGBUILD.GetUpdates("apt-get", "update")
 }
 
@@ -188,7 +206,7 @@ func addArFile(writer *ar.Writer, name string, body []byte, date time.Time) erro
 // addScriptlets generates and writes the scripts for the Deb package.
 // It takes no parameters and returns an error if there was an issue
 // generating or writing the scripts.
-func (d *Deb) addScriptlets() error {
+func (d *Package) addScriptlets() error {
 	scripts := map[string]string{
 		"preinst":  d.PKGBUILD.PreInst,
 		"postinst": d.PKGBUILD.PostInst,
@@ -225,7 +243,7 @@ func (d *Deb) addScriptlets() error {
 // It generates a file located at the debDir path containing the backup
 // files specified in the PKGBUILD. Returns an error if there was a
 // problem creating or writing to the file.
-func (d *Deb) createConfFiles() error {
+func (d *Package) createConfFiles() error {
 	if len(d.PKGBUILD.Backup) == 0 {
 		return nil
 	}
@@ -249,7 +267,7 @@ func (d *Deb) createConfFiles() error {
 // It checks if there is a license specified in the PKGBUILD and creates
 // the copyright file accordingly. Returns an error if there was an
 // issue creating the file.
-func (d *Deb) createCopyrightFile() error {
+func (d *Package) createCopyrightFile() error {
 	if len(d.PKGBUILD.License) == 0 {
 		return nil
 	}
@@ -264,7 +282,7 @@ func (d *Deb) createCopyrightFile() error {
 // name. It takes parameters for the variable used to create the debconf
 // asset and the name of the debconf asset. Returns an error if there
 // was an issue during the creation.
-func (d *Deb) createDebconfFile(name, variable string) error {
+func (d *Package) createDebconfFile(name, variable string) error {
 	if variable == "" {
 		return nil
 	}
@@ -279,7 +297,7 @@ func (d *Deb) createDebconfFile(name, variable string) error {
 // It takes a string parameter `artifactPath` which represents the path
 // where the Deb package files will be generated. The function returns
 // an error if there was an issue generating the Deb package files.
-func (d *Deb) createDeb(artifactPath, control, data string) error {
+func (d *Package) createDeb(artifactPath, control, data string) error {
 	// Create the .deb package
 	artifactFilePath := filepath.Join(artifactPath,
 		fmt.Sprintf("%s_%s-%s_%s.deb",
@@ -365,7 +383,7 @@ func (d *Deb) createDeb(artifactPath, control, data string) error {
 // It creates the debconf templates file.
 // It creates the debconf config file.
 // It returns an error if any of the operations fail.
-func (d *Deb) createDebResources() error {
+func (d *Package) createDebResources() error {
 	d.debDir = filepath.Join(d.PKGBUILD.PackageDir, "DEBIAN")
 
 	err := osutils.ExistsMakeDir(d.debDir)
@@ -423,7 +441,7 @@ func getModTime() time.Time {
 	return time.Now()
 }
 
-func (d *Deb) getRelease() {
+func (d *Package) getRelease() {
 	if d.PKGBUILD.Codename != "" {
 		d.PKGBUILD.PkgRel += d.PKGBUILD.Codename
 	} else {
@@ -443,7 +461,7 @@ func (d *Deb) getRelease() {
 //
 // Returns:
 //   - a new slice of strings with modified elements for deb syntax.
-func (d *Deb) processDepends(depends []string) []string {
+func (d *Package) processDepends(depends []string) []string {
 	pattern := `(?m)(<|<=|>=|=|>|<)`
 	regex := regexp.MustCompile(pattern)
 
