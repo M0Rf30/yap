@@ -119,17 +119,17 @@ func WithCancel(
 }
 
 // WithLogger adds a logger to the context.
-func WithLogger(parent context.Context, log *logger.Logger) context.Context {
+func WithLogger(parent context.Context, log *logger.YapLogger) context.Context {
 	return context.WithValue(parent, LoggerKey, log)
 }
 
 // GetLogger retrieves logger from context, returns default if not found.
-func GetLogger(ctx context.Context) *logger.Logger {
-	if log, ok := ctx.Value(LoggerKey).(*logger.Logger); ok {
+func GetLogger(ctx context.Context) *logger.YapLogger {
+	if log, ok := ctx.Value(LoggerKey).(*logger.YapLogger); ok {
 		return log
 	}
 
-	return logger.Global()
+	return logger.Logger
 }
 
 // WithTraceID adds a trace ID to the context.

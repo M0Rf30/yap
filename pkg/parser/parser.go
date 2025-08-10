@@ -10,6 +10,7 @@ import (
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -37,8 +38,8 @@ var OverridePkgVer string
 func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
 	if err != nil {
-		osutils.Logger.Error("failed to get root directory",
-			osutils.Logger.Args("path", home))
+		logger.Error("failed to get root directory",
+			"path", home)
 
 		return nil, err
 	}
@@ -90,9 +91,9 @@ func getSyntaxFile(path string) (*syntax.File, error) {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			osutils.Logger.Warn(
+			logger.Warn(
 				"failed to close PKGBUILD file",
-				osutils.Logger.Args("path", filePath, "error", err))
+				"path", filePath, "error", err)
 		}
 	}()
 

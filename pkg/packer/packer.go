@@ -8,7 +8,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/builders/rpm"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/core"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -50,7 +50,7 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	// Get configuration for the package manager
 	config := core.GetConfig(pkgManager)
 	if config == nil {
-		osutils.Logger.Fatal("unsupported package manager", osutils.Logger.Args("manager", pkgManager))
+		logger.Fatal("unsupported package manager", "manager", pkgManager)
 		return nil
 	}
 
@@ -72,8 +72,8 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 			PKGBUILD: pkgBuild,
 		}
 	default:
-		osutils.Logger.Fatal("unsupported linux distro",
-			osutils.Logger.Args("distro", distro))
+		logger.Fatal("unsupported linux distro",
+			"distro", distro)
 	}
 
 	return nil

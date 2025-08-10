@@ -10,7 +10,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/graph"
 	"github.com/M0Rf30/yap/v2/pkg/graph/layout"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // SVG represents the SVG document structure.
@@ -43,7 +43,7 @@ func GenerateSVGGraph(graphData *graph.Data, outputPath string, showExternal boo
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			osutils.Logger.Error("failed to close file", osutils.Logger.Args("error", closeErr))
+			logger.Error("failed to close file", "error", closeErr)
 		}
 	}()
 
@@ -62,8 +62,10 @@ func GenerateSVGGraph(graphData *graph.Data, outputPath string, showExternal boo
 		return fmt.Errorf("failed to write SVG data: %w", err)
 	}
 
-	osutils.Logger.Info("SVG graph generated successfully", osutils.Logger.Args(
-		"output", outputPath, "nodes", len(graphData.Nodes), "edges", len(graphData.Edges)))
+	logger.Info("SVG graph generated successfully",
+		"output", outputPath,
+		"nodes", len(graphData.Nodes),
+		"edges", len(graphData.Edges))
 
 	return nil
 }
@@ -80,15 +82,14 @@ func GeneratePNGGraph(graphData *graph.Data, outputPath string, showExternal boo
 		return err
 	}
 
-	osutils.Logger.Info("SVG graph generated for PNG conversion",
-		osutils.Logger.Args("svg_path", svgPath))
+	logger.Info("SVG graph generated for PNG conversion",
+		"svg_path", svgPath)
 
-	osutils.Logger.Warn("PNG conversion requires external tools",
-		osutils.Logger.Args(
-			"suggestion", "Install Inkscape or ImageMagick to convert SVG to PNG",
-			"inkscape_command", "inkscape --export-type=png --export-filename="+outputPath+" "+svgPath,
-			"imagemagick_command", "convert "+svgPath+" "+outputPath,
-		))
+	logger.Warn("PNG conversion requires external tools",
+		"suggestion", "Install Inkscape or ImageMagick to convert SVG to PNG",
+		"inkscape_command", "inkscape --export-type=png --export-filename="+outputPath+" "+svgPath,
+		"imagemagick_command", "convert "+svgPath+" "+outputPath,
+	)
 
 	return nil
 }
@@ -134,83 +135,83 @@ func createSVGContent(graphData *graph.Data, showExternal bool) *SVG {
 func createSVGStyles(theme *graph.Theme) string {
 	return fmt.Sprintf(`
     <style>
-      .graph-bg { 
-        fill: %s; 
+      .graph-bg {
+        fill: %s;
       }
-      .node-internal { 
-        fill: %s; 
-        stroke: %s; 
-        stroke-width: 2; 
+      .node-internal {
+        fill: %s;
+        stroke: %s;
+        stroke-width: 2;
         filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
         cursor: pointer;
         transition: all 0.3s ease;
       }
-      .node-external { 
-        fill: %s; 
-        stroke: %s; 
-        stroke-width: 2; 
+      .node-external {
+        fill: %s;
+        stroke: %s;
+        stroke-width: 2;
         filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
         cursor: pointer;
         transition: all 0.3s ease;
       }
-      .node-popular { 
-        fill: %s; 
-        stroke: %s; 
-        stroke-width: 3; 
+      .node-popular {
+        fill: %s;
+        stroke: %s;
+        stroke-width: 3;
         filter: drop-shadow(3px 3px 6px rgba(0,0,0,0.4));
         cursor: pointer;
         transition: all 0.3s ease;
       }
-      .node:hover rect { 
-        transform: scale(1.05); 
+      .node:hover rect {
+        transform: scale(1.05);
         filter: drop-shadow(4px 4px 8px rgba(0,0,0,0.5));
       }
-      .edge-runtime { 
-        stroke: %s; 
-        stroke-width: 3; 
-        fill: none; 
+      .edge-runtime {
+        stroke: %s;
+        stroke-width: 3;
+        fill: none;
         marker-end: url(#arrowhead-runtime);
         opacity: 0.9;
       }
-      .edge-make { 
-        stroke: %s; 
-        stroke-width: 2; 
-        stroke-dasharray: 8,4; 
-        fill: none; 
+      .edge-make {
+        stroke: %s;
+        stroke-width: 2;
+        stroke-dasharray: 8,4;
+        fill: none;
         marker-end: url(#arrowhead-make);
         opacity: 0.8;
       }
-      .edge-check { 
-        stroke: %s; 
-        stroke-width: 2; 
-        stroke-dasharray: 4,4; 
-        fill: none; 
+      .edge-check {
+        stroke: %s;
+        stroke-width: 2;
+        stroke-dasharray: 4,4;
+        fill: none;
         marker-end: url(#arrowhead-check);
         opacity: 0.7;
       }
-      .edge-optional { 
-        stroke: %s; 
-        stroke-width: 1; 
-        stroke-dasharray: 2,6; 
-        fill: none; 
+      .edge-optional {
+        stroke: %s;
+        stroke-width: 1;
+        stroke-dasharray: 2,6;
+        fill: none;
         marker-end: url(#arrowhead-optional);
         opacity: 0.6;
       }
-      .node-text { 
-        fill: %s; 
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-        font-size: 13px; 
-        font-weight: 600; 
-        text-anchor: middle; 
+      .node-text {
+        fill: %s;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        text-anchor: middle;
         dominant-baseline: central;
         pointer-events: none;
         text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
       }
-      .version-text { 
-        fill: %s; 
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-        font-size: 10px; 
-        text-anchor: middle; 
+      .version-text {
+        fill: %s;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 10px;
+        text-anchor: middle;
         dominant-baseline: central;
         pointer-events: none;
         opacity: 0.9;
@@ -241,19 +242,19 @@ func createSVGStyles(theme *graph.Theme) string {
       }
     </style>
     <defs>
-      <marker id="arrowhead-runtime" markerWidth="10" markerHeight="7" 
+      <marker id="arrowhead-runtime" markerWidth="10" markerHeight="7"
        refX="9" refY="3.5" orient="auto">
         <polygon points="0 0, 10 3.5, 0 7" fill="%s" />
       </marker>
-      <marker id="arrowhead-make" markerWidth="10" markerHeight="7" 
+      <marker id="arrowhead-make" markerWidth="10" markerHeight="7"
        refX="9" refY="3.5" orient="auto">
         <polygon points="0 0, 10 3.5, 0 7" fill="%s" />
       </marker>
-      <marker id="arrowhead-check" markerWidth="10" markerHeight="7" 
+      <marker id="arrowhead-check" markerWidth="10" markerHeight="7"
        refX="9" refY="3.5" orient="auto">
         <polygon points="0 0, 10 3.5, 0 7" fill="%s" />
       </marker>
-      <marker id="arrowhead-optional" markerWidth="10" markerHeight="7" 
+      <marker id="arrowhead-optional" markerWidth="10" markerHeight="7"
        refX="9" refY="3.5" orient="auto">
         <polygon points="0 0, 10 3.5, 0 7" fill="%s" />
       </marker>
@@ -434,7 +435,7 @@ func addLegend(content *strings.Builder, bounds *graph.Bounds) {
 	fmt.Fprintf(content, `
   <g class="legend">
     <text x="50" y="%.1f" class="legend-text">Legend:</text>
-    
+
     <!-- Node Types -->
     <circle cx="70" cy="%.1f" r="8" class="node-internal" />
     <text x="85" y="%.1f" class="legend-text">Internal Package</text>
@@ -442,17 +443,17 @@ func addLegend(content *strings.Builder, bounds *graph.Bounds) {
     <text x="215" y="%.1f" class="legend-text">Popular Package</text>
     <circle cx="330" cy="%.1f" r="8" class="node-external" />
     <text x="345" y="%.1f" class="legend-text">External Package</text>
-    
+
     <!-- Dependency Types -->
     <line x1="50" y1="%.1f" x2="80" y2="%.1f" class="edge-runtime" />
     <text x="90" y="%.1f" class="legend-text">Runtime Dependency</text>
-    
+
     <line x1="220" y1="%.1f" x2="250" y2="%.1f" class="edge-make" />
     <text x="260" y="%.1f" class="legend-text">Build Dependency</text>
-    
+
     <line x1="380" y1="%.1f" x2="410" y2="%.1f" class="edge-check" />
     <text x="420" y="%.1f" class="legend-text">Check Dependency</text>
-    
+
     <line x1="550" y1="%.1f" x2="580" y2="%.1f" class="edge-optional" />
     <text x="590" y="%.1f" class="legend-text">Optional Dependency</text>
   </g>`,

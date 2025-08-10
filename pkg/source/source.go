@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
@@ -165,23 +166,20 @@ func (src *Source) getProtocol() string {
 func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 	normalizedURI := strings.TrimPrefix(src.SourceItemURI, constants.Git+"+")
 
-	// Create component logger for this package
-	var logger *osutils.ComponentLogger
 	if src.PkgName != "" {
-		logger = osutils.WithComponent(src.PkgName)
+		logger.WithComponent(src.PkgName)
 	}
 
 	switch protocol {
 	case constants.Git:
 		referenceName := src.getReferenceType()
 
-		return osutils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName, logger)
+		return osutils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName)
 	default:
 		// Use enhanced download with resume capability and 3 retries, with context information
 		return osutils.DownloadWithResumeContext(
 			dloadFilePath,
 			normalizedURI,
-			logger,
 			3,
 			src.PkgName,
 			src.SourceItemPath)
@@ -233,12 +231,8 @@ func (src *Source) symlinkSources(symlinkSource string) error {
 //
 // It takes the source file path as a parameter and returns an error if any.
 func (src *Source) validateSource(sourceFilePath string) error {
-	// Create component logger for this package
-	var logger *osutils.ComponentLogger
 	if src.PkgName != "" {
-		logger = osutils.WithComponent(src.PkgName)
-	} else {
-		logger = osutils.ServiceLogger()
+		logger.WithComponent(src.PkgName)
 	}
 
 	info, err := os.Stat(sourceFilePath)
@@ -247,7 +241,8 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	}
 
 	if src.Hash == "SKIP" || info.IsDir() {
-		logger.Info("skip integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
+		logger.Info("skip integrity check for",
+			"source", src.SourceItemURI)
 
 		return nil
 	}
@@ -271,9 +266,10 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			osutils.Logger.Warn(
+			logger.Warn(
 				"failed to close source file",
-				osutils.Logger.Args("path", sourceFilePath, "error", err))
+				"path", sourceFilePath,
+				"error", err)
 		}
 	}()
 
@@ -289,7 +285,8 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return errors.Errorf("hash verification failed %s", src.SourceItemPath)
 	}
 
-	logger.Info("integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
+	logger.Info("integrity check for",
+		"source", src.SourceItemURI)
 
 	return nil
 }
@@ -358,8 +355,7 @@ func processConcurrentDownloads(sources []*Source, maxConcurrent int) error {
 		return nil // All files already exist
 	}
 
-	logger := createSourceLogger(sources)
-	results := osutils.DownloadConcurrently(downloads, logger, maxConcurrent, 3)
+	results := osutils.DownloadConcurrently(downloads, maxConcurrent, 3)
 
 	return processDownloadResults(results, sourceMap)
 }
@@ -387,9 +383,9 @@ func prepareDownloadMap(sources []*Source) (
 }
 
 // createSourceLogger creates a component logger from the first source if available.
-func createSourceLogger(sources []*Source) *osutils.ComponentLogger {
+func createSourceLogger(sources []*Source) *logger.ComponentLogger {
 	if len(sources) > 0 && sources[0].PkgName != "" {
-		return osutils.WithComponent(sources[0].PkgName)
+		return logger.WithComponent(sources[0].PkgName)
 	}
 
 	return nil

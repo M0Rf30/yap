@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 const (
@@ -275,11 +275,11 @@ func ShowCommandTips(cmd *cobra.Command) {
 	switch cmd.Name() {
 	case buildCommand:
 		if !verbose {
-			osutils.Logger.Tips("💡 Use --verbose (-v) for detailed build output")
+			logger.Tips("💡 Use --verbose (-v) for detailed build output")
 		}
 	case "prepare":
-		osutils.Logger.Tips("💡 Use --golang (-g) to also install Go development tools")
+		logger.Tips("💡 Use --golang (-g) to also install Go development tools")
 	case "list-distros":
-		osutils.Logger.Tips("💡 Use these identifiers with other YAP commands")
+		logger.Tips("💡 Use these identifiers with other YAP commands")
 	}
 }
