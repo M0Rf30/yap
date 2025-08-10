@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // CalculateSHA256 calculates the SHA-256 checksum of a file.
@@ -22,8 +22,8 @@ func CalculateSHA256(path string) ([]byte, error) {
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			osutils.Logger.Warn("failed to close file during SHA256 calculation",
-				osutils.Logger.Args("path", cleanFilePath, "error", closeErr))
+			logger.Warn("failed to close file during SHA256 calculation",
+				"path", cleanFilePath, "error", closeErr)
 		}
 	}()
 

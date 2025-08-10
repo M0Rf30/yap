@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
@@ -119,10 +120,9 @@ func (pkgBuild *PKGBUILD) ComputeArchitecture() {
 
 	isSupported = osutils.Contains(pkgBuild.Arch, currentArch)
 	if !isSupported {
-		osutils.Logger.Fatal("unsupported architecture",
-			osutils.Logger.Args(
-				"pkgname", pkgBuild.PkgName,
-				"arch", strings.Join(pkgBuild.Arch, " ")))
+		logger.Fatal("unsupported architecture",
+			"pkgname", pkgBuild.PkgName,
+			"arch", strings.Join(pkgBuild.Arch, " "))
 	}
 
 	pkgBuild.ArchComputed = currentArch
@@ -142,8 +142,9 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			osutils.Logger.Warn("failed to close pkgbuild file", osutils.Logger.Args("path", cleanFilePath,
-				"error", err))
+			logger.Warn("failed to close pkgbuild file",
+				"path", cleanFilePath,
+				"error", err)
 		}
 	}()
 
@@ -222,8 +223,7 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 
 		_, err := rand.Read(key)
 		if err != nil {
-			osutils.Logger.Fatal("fatal error",
-				osutils.Logger.Args("error", err))
+			logger.Fatal("fatal error", "error", err)
 		}
 
 		randomString := hex.EncodeToString(key)
@@ -232,17 +232,17 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 
 	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
 	if err != nil {
-		osutils.Logger.Fatal("failed to set variable pkgdir")
+		logger.Fatal("failed to set variable pkgdir")
 	}
 
 	err = os.Setenv("srcdir", pkgBuild.SourceDir)
 	if err != nil {
-		osutils.Logger.Fatal("failed to set variable srcdir")
+		logger.Fatal("failed to set variable srcdir")
 	}
 
 	err = os.Setenv("startdir", pkgBuild.StartDir)
 	if err != nil {
-		osutils.Logger.Fatal("failed to set variable startdir")
+		logger.Fatal("failed to set variable startdir")
 	}
 }
 
@@ -255,26 +255,26 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() {
 	if !pkgBuild.checkLicense() {
 		checkErrors = append(checkErrors, "license")
 
-		osutils.Logger.Error("invalid SPDX license identifier",
-			osutils.Logger.Args("pkgname", pkgBuild.PkgName))
-		osutils.Logger.Info("you can find valid SPDX license identifiers here",
-			osutils.Logger.Args("🌐", "https://spdx.org/licenses/"))
+		logger.Error("invalid SPDX license identifier",
+			"pkgname", pkgBuild.PkgName)
+		logger.Info("you can find valid SPDX license identifiers here",
+			"🌐", "https://spdx.org/licenses/")
 	}
 
 	// Check source and hash sums
 	if len(pkgBuild.SourceURI) != len(pkgBuild.HashSums) {
 		checkErrors = append(checkErrors, "source-hash mismatch")
 
-		osutils.Logger.Error("number of sources and hashsums differs",
-			osutils.Logger.Args("pkgname", pkgBuild.PkgName))
+		logger.Error("number of sources and hashsums differs",
+			"pkgname", pkgBuild.PkgName)
 	}
 
 	// Check for package() function
 	if pkgBuild.Package == "" {
 		checkErrors = append(checkErrors, "package function")
 
-		osutils.Logger.Error("missing package() function",
-			osutils.Logger.Args("pkgname", pkgBuild.PkgName))
+		logger.Error("missing package() function",
+			"pkgname", pkgBuild.PkgName)
 	}
 
 	// Exit if there are validation errors
@@ -304,11 +304,10 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
 
 	// Exit if there are validation errors
 	if len(validationErrors) > 0 {
-		osutils.Logger.Fatal(
+		logger.Fatal(
 			"failed to set variables",
-			osutils.Logger.Args(
-				"variables",
-				strings.Join(validationErrors, " ")))
+			"variables",
+			strings.Join(validationErrors, " "))
 	}
 }
 
@@ -443,8 +442,8 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	}
 
 	if err != nil {
-		osutils.Logger.Fatal("failed to set variable",
-			osutils.Logger.Args("variable", key))
+		logger.Fatal("failed to set variable",
+			"variable", key)
 	}
 }
 

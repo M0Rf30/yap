@@ -8,7 +8,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // SetupEnhancedHelp configures enhanced help formatting for commands.
@@ -45,7 +45,7 @@ func SetupEnhancedHelp() {
 {{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
 
 {{styleAdditionalHelp}}{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
-  {{rpad .Name .NamePadding | styleCommand}} {{.Short | styleShort}}{{end}}{{end}}{{end}}{{if 
+  {{rpad .Name .NamePadding | styleCommand}} {{.Short | styleShort}}{{end}}{{end}}{{end}}{{if
   .HasAvailableSubCommands}}
 
 {{styleMoreInfo}}{{end}}
@@ -140,7 +140,7 @@ func CustomErrorHandler(cmd *cobra.Command, err error) error {
 		// Add helpful suggestion
 		if strings.Contains(err.Error(), "unknown command") ||
 			strings.Contains(err.Error(), "unsupported distribution") {
-			osutils.Logger.Tips("💡 Use '" + cmd.CommandPath() + " --help' to see available options")
+			logger.Tips("💡 Use '" + cmd.CommandPath() + " --help' to see available options")
 		}
 
 		return err

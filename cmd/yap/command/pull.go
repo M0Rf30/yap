@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
@@ -46,14 +47,14 @@ Re-running this command will update to the latest image versions.`,
 		split := strings.Split(args[0], "-")
 
 		if len(split) == 1 && split[0] != alpineDistro && split[0] != archDistro {
-			osutils.Logger.Fatal("except for alpine and arch, specify also the codename " +
+			logger.Fatal("except for alpine and arch, specify also the codename " +
 				"(i. e. rocky-9, ubuntu-jammy)")
 		}
 
 		err := osutils.PullContainers(args[0])
 		if err != nil {
-			osutils.Logger.Fatal("failed to pull image",
-				osutils.Logger.Args("error", err))
+			logger.Fatal("failed to pull image",
+				"error", err)
 		}
 	},
 }
