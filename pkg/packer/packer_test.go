@@ -3,10 +3,10 @@ package packer
 import (
 	"testing"
 
+	"github.com/M0Rf30/yap/v2/pkg/builders/apk"
+	"github.com/M0Rf30/yap/v2/pkg/builders/pacman"
+	"github.com/M0Rf30/yap/v2/pkg/builders/rpm"
 	"github.com/M0Rf30/yap/v2/pkg/dpkg"
-	"github.com/M0Rf30/yap/v2/pkg/formats/apk"
-	"github.com/M0Rf30/yap/v2/pkg/formats/pacman"
-	"github.com/M0Rf30/yap/v2/pkg/formats/rpm"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 

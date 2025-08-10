@@ -14,7 +14,7 @@ import (
 	"github.com/klauspost/pgzip"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/filesystem"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -116,11 +116,20 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 
 	var mtreeEntries []osutils.FileContent
 
+	// Create file walker
+	walker := files.NewWalker(m.PKGBUILD.PackageDir, files.WalkOptions{
+		SkipDotFiles: true, // makepkg skips dot files
+	})
+
 	// Walk through the package directory and retrieve the contents.
-	walker := filesystem.NewWalker(m.PKGBUILD.PackageDir, nil) // makepkg doesn't use backup files
-	mtreeEntries, err = walker.WalkForMakePkg()
+	entries, err := walker.Walk()
 	if err != nil {
 		return err // Return the error if walking the directory fails.
+	}
+
+	// Convert to legacy format for compatibility
+	for _, entry := range entries {
+		mtreeEntries = append(mtreeEntries, entry.ConvertToLegacyFormat())
 	}
 
 	mtreeFile, err := renderMtree(mtreeEntries)

@@ -2,13 +2,13 @@
 package packer
 
 import (
+	"github.com/M0Rf30/yap/v2/pkg/builders/apk"
+	"github.com/M0Rf30/yap/v2/pkg/builders/deb"
+	"github.com/M0Rf30/yap/v2/pkg/builders/pacman"
+	"github.com/M0Rf30/yap/v2/pkg/builders/rpm"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/core"
 	"github.com/M0Rf30/yap/v2/pkg/dpkg"
-	"github.com/M0Rf30/yap/v2/pkg/formats/apk"
-	"github.com/M0Rf30/yap/v2/pkg/formats/deb"
-	"github.com/M0Rf30/yap/v2/pkg/formats/pacman"
-	"github.com/M0Rf30/yap/v2/pkg/formats/rpm"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -57,14 +57,13 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 
 	switch pkgManager {
 	case "apk":
-		return &apk.Apk{
-			PKGBUILD: pkgBuild,
-		}
+		return apk.NewBuilder(pkgBuild)
 	case "apt":
 		// Use the new refactored deb package if available, fallback to legacy
 		if useNewImplementation() {
 			return deb.NewPackage(pkgBuild)
 		}
+
 		return &dpkg.Deb{
 			PKGBUILD: pkgBuild,
 		}
