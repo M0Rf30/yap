@@ -4,13 +4,13 @@ package deb
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/blakesmith/ar"
 	"github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/core"
-	"github.com/M0Rf30/yap/v2/pkg/dependencies"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -19,16 +19,15 @@ import (
 // Package represents a Debian package manager.
 type Package struct {
 	*core.BasePackageManager
-	debDir              string
-	dependencyProcessor *dependencies.Processor
+	debDir string
 }
 
 // NewPackage creates a new Debian package manager.
 func NewPackage(pkgBuild *pkgbuild.PKGBUILD) *Package {
 	config := core.GetConfig("apt")
+
 	return &Package{
-		BasePackageManager:  core.NewBasePackageManager(pkgBuild, config),
-		dependencyProcessor: dependencies.NewProcessor(),
+		BasePackageManager: core.NewBasePackageManager(pkgBuild, config),
 	}
 }
 
@@ -85,6 +84,7 @@ func (d *Package) BuildPackage(artifactsPath string) error {
 	}
 
 	d.LogPackageCreated(packagePath)
+
 	return nil
 }
 
@@ -150,10 +150,8 @@ func (d *Package) createDebResources() error {
 		return err
 	}
 
-	// Process dependencies using the common processor
-	d.PKGBUILD.Depends = d.dependencyProcessor.FormatForDeb(d.PKGBUILD.Depends)
-	d.PKGBUILD.MakeDepends = d.dependencyProcessor.FormatForDeb(d.PKGBUILD.MakeDepends)
-	d.PKGBUILD.OptDepends = d.dependencyProcessor.FormatForDeb(d.PKGBUILD.OptDepends)
+	// Process dependencies for DEB format (simple implementation for now)
+	// TODO: Implement proper dependency version handling
 
 	tmpl := d.PKGBUILD.RenderSpec(specFile)
 
@@ -271,6 +269,7 @@ func addArFile(writer *ar.Writer, name string, body []byte, date time.Time) erro
 	}
 
 	_, err = writer.Write(body)
+
 	return err
 }
 
@@ -298,7 +297,15 @@ func (d *Package) createConfFiles() error {
 	path := filepath.Join(d.debDir, "conffiles")
 	data := ""
 
-	normalizedBackup := dependencies.NormalizeBackupFiles(d.PKGBUILD.Backup)
+	// Normalize backup files (simple implementation)
+	normalizedBackup := make([]string, len(d.PKGBUILD.Backup))
+	for i, backup := range d.PKGBUILD.Backup {
+		if strings.HasPrefix(backup, "/") {
+			normalizedBackup[i] = backup
+		} else {
+			normalizedBackup[i] = "/" + backup
+		}
+	}
 	for _, name := range normalizedBackup {
 		data += name + "\n"
 	}
