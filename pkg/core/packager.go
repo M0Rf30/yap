@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -156,11 +157,11 @@ func (bpm *BasePackageManager) InstallCommon(artifactsPath, packageName string) 
 
 // LogPackageCreated logs successful package creation.
 func (bpm *BasePackageManager) LogPackageCreated(artifactPath string) {
-	pkgLogger := osutils.WithComponent(bpm.PKGBUILD.PkgName)
-	pkgLogger.Info("package artifact created", osutils.Logger.Args(
+	logger.WithComponent(bpm.PKGBUILD.PkgName)
+	logger.Info("package artifact created",
 		"pkgver", bpm.PKGBUILD.PkgVer,
 		"pkgrel", bpm.PKGBUILD.PkgRel,
-		"artifact", artifactPath))
+		"artifact", artifactPath)
 }
 
 // ValidateArtifactsPath ensures the artifacts path exists.

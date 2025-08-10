@@ -6,7 +6,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 var (
@@ -29,7 +29,7 @@ func getLongDescription() string {
 
 	// Check if colors should be disabled
 	var coloredLogo string
-	if osutils.IsColorDisabled() {
+	if logger.IsColorDisabled() {
 		coloredLogo = logo
 	} else {
 		coloredLogo = pterm.FgCyan.Sprint(logo)
@@ -70,7 +70,7 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		// Set color preference based on --no-color flag and environment variables
 		shouldDisableColor := noColor || os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
-		osutils.SetColorDisabled(shouldDisableColor)
+		logger.SetColorDisabled(shouldDisableColor)
 
 		// Show welcome message for first-time users
 		if cmd.Name() == "yap" && len(cmd.Flags().Args()) == 0 {
@@ -93,7 +93,7 @@ func Execute() {
 func init() {
 	// Check environment variables early for color preference
 	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
-		osutils.SetColorDisabled(true)
+		logger.SetColorDisabled(true)
 	}
 
 	// Set up enhanced help formatting

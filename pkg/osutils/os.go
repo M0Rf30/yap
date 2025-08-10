@@ -5,6 +5,8 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // OSRelease represents the contents of the /etc/os-release file.
@@ -22,7 +24,7 @@ func ParseOSRelease() (OSRelease, error) {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			Logger.Warn("failed to close os-release file", Logger.Args("error", err))
+			logger.Warn("failed to close os-release file", "error", err)
 		}
 	}()
 

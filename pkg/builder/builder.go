@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/source"
@@ -31,9 +32,10 @@ func (builder *Builder) Compile(noBuild bool) error {
 			WithOperation("initDirs")
 	}
 
-	pkgLogger := osutils.WithComponent(builder.PKGBUILD.PkgName)
-	pkgLogger.Info("retrieving sources", osutils.Logger.Args("pkgver", builder.PKGBUILD.PkgVer,
-		"pkgrel", builder.PKGBUILD.PkgRel))
+	logger.WithComponent(builder.PKGBUILD.PkgName)
+	logger.Info("retrieving sources",
+		"pkgver", builder.PKGBUILD.PkgVer,
+		"pkgrel", builder.PKGBUILD.PkgRel)
 
 	err = builder.getSources()
 	if err != nil {
@@ -78,8 +80,8 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	pkgRel := builder.PKGBUILD.PkgRel
 
 	// Use component logger for consistent formatting
-	pkgLogger := osutils.WithComponent(pkgName)
-	pkgLogger.Info(message, pkgLogger.Args("pkgver", pkgVer, "pkgrel", pkgRel))
+	logger.WithComponent(pkgName)
+	logger.Info(message, "pkgver", pkgVer, "pkgrel", pkgRel)
 
 	// Execute script with package decoration
 	err := osutils.RunScriptWithPackage("  set -e\n"+pkgbuildFunction, pkgName)

@@ -9,7 +9,7 @@ import (
 
 	"github.com/mholt/archives"
 
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // CreateTarZst creates a compressed tar.zst archive from the specified source
@@ -46,8 +46,9 @@ func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
 
 	defer func() {
 		if closeErr := out.Close(); closeErr != nil {
-			osutils.Logger.Warn("failed to close output file",
-				osutils.Logger.Args("path", cleanFilePath, "error", closeErr))
+			logger.Warn("failed to close output file",
+				"path", cleanFilePath,
+				"error", closeErr)
 		}
 	}()
 
@@ -88,8 +89,9 @@ func CreateTarGz(sourceDir, outputFile string, formatGNU bool) error {
 
 	defer func() {
 		if closeErr := out.Close(); closeErr != nil {
-			osutils.Logger.Warn("failed to close output file",
-				osutils.Logger.Args("path", cleanFilePath, "error", closeErr))
+			logger.Warn("failed to close output file",
+				"path", cleanFilePath,
+				"error", closeErr)
 		}
 	}()
 

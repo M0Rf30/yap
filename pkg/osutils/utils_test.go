@@ -15,66 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSetColorDisabled(t *testing.T) {
-	// Test setting color disabled to true
-	SetColorDisabled(true)
-	assert.True(t, IsColorDisabled())
-
-	// Test setting color disabled to false
-	SetColorDisabled(false)
-	assert.False(t, IsColorDisabled())
-}
-
-func TestIsColorDisabled(t *testing.T) {
-	// Test default state
-	result := IsColorDisabled()
-	// Result can be true or false depending on environment, just ensure it doesn't panic
-	assert.NotNil(t, result)
-}
-
-func TestSetVerbose(t *testing.T) {
-	// Test setting verbose mode
-	assert.NotPanics(t, func() {
-		SetVerbose(true)
-		SetVerbose(false)
-	})
-}
-
-func TestGlobalLoggingFunctions(t *testing.T) {
-	// Test that global logging functions don't panic
-	assert.NotPanics(t, func() {
-		// These are global logger functions from the Logger variable
-		_ = Logger.Args("key", "value")
-	})
-}
-
-func TestServiceLogger(t *testing.T) {
-	// Test ServiceLogger creation
-	assert.NotPanics(t, func() {
-		logger := ServiceLogger()
-
-		// Test service logger methods
-		logger.Info("test info")
-		logger.Warn("test warning")
-		logger.Error("test error")
-		logger.Debug("test debug")
-		logger.Args("test", "args")
-	})
-}
-
-func TestWithComponent(t *testing.T) {
-	// Test WithComponent function
-	assert.NotPanics(t, func() {
-		logger := WithComponent("test-component")
-
-		// Test component logger methods (but not Fatal as it exits)
-		logger.Info("test info")
-		logger.Warn("test warning")
-		logger.Error("test error")
-		logger.Debug("test debug")
-		logger.Args("test", "args")
-	})
-}
 func TestProgressWriters(t *testing.T) {
 	// Test progress writer creation
 	assert.NotPanics(t, func() {
@@ -116,16 +56,6 @@ func TestProcessFunctions(t *testing.T) {
 	assert.NotPanics(t, func() {
 		// These should not panic even if they fail
 		_ = CheckGO()
-	})
-}
-
-func TestLoggerFunctions(t *testing.T) {
-	// Test logger functions that have 0% coverage
-	assert.NotPanics(t, func() {
-		// These functions may output to stderr/stdout but shouldn't panic
-		Logger.Tips("This is a tip message")
-		Logger.Warn("This is a warning message")
-		Logger.Debug("This is a debug message")
 	})
 }
 
@@ -198,7 +128,7 @@ func TestDownloadWithResume(t *testing.T) {
 	destFile := filepath.Join(testDir, "test_download.txt")
 
 	// Test download with nil logger
-	err := DownloadWithResume(destFile, server.URL, nil, 1)
+	err := DownloadWithResume(destFile, server.URL, 1)
 	assert.NoError(t, err)
 
 	// Verify file was downloaded
@@ -221,18 +151,15 @@ func TestDownloadWithResumeContext(t *testing.T) {
 	destFile := filepath.Join(testDir, "test_download_ctx.txt")
 
 	// Test with proper parameters
-	err := DownloadWithResumeContext(destFile, server.URL, nil, 1, "test-pkg", "test-source")
+	err := DownloadWithResumeContext(destFile, server.URL, 1, "test-pkg", "test-source")
 	assert.NoError(t, err)
 
 	assert.FileExists(t, destFile)
 }
 
 func TestDownload(t *testing.T) {
-	// Test Download function signature exists and compiles
-	// Note: Download calls Logger.Fatal on some errors, so we can't test all paths
-
-	// Skip this test since Download function calls Fatal which exits the process
-	t.Skip("Download function calls Fatal which exits process, making it untestable")
+	// Skip this test since Download function calls logger.Fatal which exits the process
+	t.Skip("Download function calls logger.Fatal which exits process, making it untestable")
 }
 func TestDownloadConcurrently(t *testing.T) {
 	// Create test server
@@ -248,7 +175,7 @@ func TestDownloadConcurrently(t *testing.T) {
 		server.URL: filepath.Join(testDir, "file1.txt"),
 	}
 
-	errors := DownloadConcurrently(downloads, nil, 2, 1)
+	errors := DownloadConcurrently(downloads, 2, 1)
 	assert.NotNil(t, errors) // Map should be returned, can be empty
 
 	// Check if at least we get a response (may succeed or fail)
