@@ -1,10 +1,9 @@
-package makepkg
+package pacman
 
 import (
 	"bytes"
 	"encoding/hex"
 	"io"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"github.com/klauspost/pgzip"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/filesystem"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -117,7 +117,8 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 	var mtreeEntries []osutils.FileContent
 
 	// Walk through the package directory and retrieve the contents.
-	err = walkPackageDirectory(m.PKGBUILD.PackageDir, &mtreeEntries)
+	walker := filesystem.NewWalker(m.PKGBUILD.PackageDir, nil) // makepkg doesn't use backup files
+	mtreeEntries, err = walker.WalkForMakePkg()
 	if err != nil {
 		return err // Return the error if walking the directory fails.
 	}
@@ -204,127 +205,6 @@ func (m *Pkg) PrepareEnvironment(golang bool) error {
 // It returns an error if there is any issue during the update process.
 func (m *Pkg) Update() error {
 	return m.PKGBUILD.GetUpdates("pacman", "-Sy")
-}
-
-// createContent creates a new FileContent object with the specified source path,
-// destination path (relative to the package directory), and content type.
-func createContent(
-	linkSource,
-	path,
-	packageDir,
-	contentType string,
-	modTime, size int64,
-	fileInfoMode uint32,
-	sha256 []byte,
-) osutils.FileContent {
-	fileInfo := &osutils.FileInfo{
-		Mode:    fileInfoMode,
-		Size:    size,
-		ModTime: modTime,
-	}
-
-	return osutils.FileContent{
-		Destination: strings.TrimPrefix(path, packageDir),
-		FileInfo:    fileInfo,
-		Source:      linkSource,
-		SHA256:      sha256,
-		Type:        contentType,
-	}
-}
-
-// handleFileEntry processes a file entry at the given path, checking if it is a backup file,
-// and appending its content to the provided slice based on its type (config, symlink, or
-// regular file).
-func handleFileEntry(path, packageDir string, contents *[]osutils.FileContent) error {
-	fileInfo, err := os.Lstat(path)
-	if err != nil {
-		return err
-	}
-
-	if fileInfo.Mode()&os.ModeSymlink != 0 {
-		readlink, err := os.Readlink(path)
-		if err != nil {
-			return err
-		}
-
-		*contents = append(*contents,
-			createContent(
-				readlink,
-				path,
-				packageDir,
-				osutils.TypeSymlink,
-				fileInfo.ModTime().Unix(),
-				fileInfo.Size(),
-				uint32(fileInfo.Mode().Perm()),
-				nil))
-	} else {
-		sha256, err := osutils.CalculateSHA256(path)
-		if err != nil {
-			return err
-		}
-
-		*contents = append(*contents,
-			createContent(
-				"",
-				path,
-				packageDir,
-				osutils.TypeFile,
-				fileInfo.ModTime().Unix(),
-				fileInfo.Size(),
-				uint32(fileInfo.Mode().Perm()),
-				sha256))
-	}
-
-	return nil
-}
-
-// walkPackageDirectory traverses the specified package directory and collects
-// file contents, including handling backup files and empty directories.
-// It returns a slice of FileContent and an error if any occurs during the traversal.
-func walkPackageDirectory(packageDir string, entries *[]osutils.FileContent) error {
-	err := filepath.WalkDir(packageDir, func(path string, dirEntry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if path == packageDir {
-			return nil
-		}
-
-		// Skip metadata files that start with '.' (same as pacman's handle_simple_path)
-		filename := filepath.Base(path)
-
-		if filename != "" && filename[0] == '.' {
-			return nil
-		}
-
-		if dirEntry.IsDir() {
-			fileInfo, err := dirEntry.Info()
-			if err != nil {
-				return err
-			}
-
-			*entries = append(*entries,
-				createContent(
-					"",
-					path,
-					packageDir,
-					osutils.TypeDir,
-					fileInfo.ModTime().Unix(),
-					fileInfo.Size(),
-					uint32(fileInfo.Mode().Perm()),
-					nil))
-
-			return nil
-		}
-
-		return handleFileEntry(path, packageDir, entries)
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func renderMtree(entries []osutils.FileContent) (string, error) {

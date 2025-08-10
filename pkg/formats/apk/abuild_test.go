@@ -1,4 +1,4 @@
-package abuild_test
+package apk_test
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/M0Rf30/yap/v2/pkg/abuild"
+	"github.com/M0Rf30/yap/v2/pkg/formats/apk"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -122,7 +122,7 @@ func TestApk_BuildPackage(t *testing.T) {
 			err := testCase.setupFiles(packageDir)
 			require.NoError(t, err)
 
-			apk := &abuild.Apk{
+			apk := &apk.Apk{
 				PKGBUILD: testCase.pkgbuild,
 			}
 
@@ -213,7 +213,7 @@ func TestApk_PrepareFakeroot(t *testing.T) {
 			err := testCase.setupFiles(packageDir)
 			require.NoError(t, err)
 
-			apk := &abuild.Apk{
+			apk := &apk.Apk{
 				PKGBUILD: testCase.pkgbuild,
 			}
 
@@ -269,7 +269,7 @@ func TestApk_Install(t *testing.T) {
 	err = os.WriteFile(testFile, []byte("test content"), 0o600)
 	require.NoError(t, err)
 
-	apk := &abuild.Apk{
+	apk := &apk.Apk{
 		PKGBUILD: apkPackage,
 	}
 
@@ -291,7 +291,7 @@ func TestApk_Prepare(t *testing.T) {
 		PkgRel:  "1",
 	}
 
-	apk := &abuild.Apk{
+	apk := &apk.Apk{
 		PKGBUILD: testApk,
 	}
 
@@ -326,7 +326,7 @@ func TestApk_PrepareEnvironment(t *testing.T) {
 				PkgRel:  "1",
 			}
 
-			apk := &abuild.Apk{
+			apk := &apk.Apk{
 				PKGBUILD: testApk,
 			}
 
@@ -347,7 +347,7 @@ func TestApk_Update(t *testing.T) {
 		PkgRel:  "1",
 	}
 
-	apk := &abuild.Apk{
+	apk := &apk.Apk{
 		PKGBUILD: testApk,
 	}
 
@@ -368,7 +368,7 @@ func TestApk_BuildPackage_Error(t *testing.T) {
 		PackageDir:   "/nonexistent/path",
 	}
 
-	apk := &abuild.Apk{
+	apk := &apk.Apk{
 		PKGBUILD: errorApk,
 	}
 
@@ -395,7 +395,7 @@ func TestApkArchMapping(t *testing.T) {
 		t.Run(test.input, func(t *testing.T) {
 			t.Parallel()
 
-			mapped := abuild.APKArchs[test.input]
+			mapped := apk.APKArchs[test.input]
 			assert.Equal(t, test.expected, mapped)
 		})
 	}
