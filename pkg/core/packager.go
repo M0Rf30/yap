@@ -76,6 +76,7 @@ func (bpm *BasePackageManager) BuildPackageName(format string) string {
 				bpm.PKGBUILD.PkgRel,
 				bpm.PKGBUILD.ArchComputed)
 		}
+
 		return name
 	case "pacman":
 		name := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst",
@@ -91,6 +92,7 @@ func (bpm *BasePackageManager) BuildPackageName(format string) string {
 				bpm.PKGBUILD.PkgRel,
 				bpm.PKGBUILD.ArchComputed)
 		}
+
 		return name
 	default:
 		return fmt.Sprintf("%s-%s-%s-%s",
@@ -115,6 +117,7 @@ func (bpm *BasePackageManager) PrepareEnvironmentCommon(golang bool) error {
 	if golang {
 		if bpm.Config.Name == "apk" {
 			osutils.CheckGO()
+
 			args = append(args, "go")
 		} else {
 			err := osutils.GOSetup()
@@ -125,6 +128,7 @@ func (bpm *BasePackageManager) PrepareEnvironmentCommon(golang bool) error {
 	}
 
 	useSudo := bpm.Config.Name != "apk"
+
 	return osutils.Exec(useSudo, "", bpm.Config.InstallCmd, args...)
 }
 
@@ -133,6 +137,7 @@ func (bpm *BasePackageManager) UpdateCommon() error {
 	if len(bpm.Config.UpdateArgs) == 0 {
 		return nil // Some package managers don't need explicit update
 	}
+
 	return bpm.PKGBUILD.GetUpdates(bpm.Config.InstallCmd, bpm.Config.UpdateArgs...)
 }
 
@@ -144,6 +149,7 @@ func (bpm *BasePackageManager) InstallCommon(artifactsPath, packageName string) 
 	args[len(bpm.Config.InstallArgs)] = pkgFilePath
 
 	useSudo := bpm.Config.Name != "apk"
+
 	return osutils.Exec(useSudo, "", bpm.Config.InstallCmd, args...)
 }
 
@@ -161,6 +167,7 @@ func (bpm *BasePackageManager) ValidateArtifactsPath(artifactsPath string) error
 	if _, err := os.Stat(artifactsPath); os.IsNotExist(err) {
 		return fmt.Errorf("artifacts path does not exist: %s", artifactsPath)
 	}
+
 	return nil
 }
 
@@ -181,6 +188,8 @@ func (bpm *BasePackageManager) SetInstalledSize() error {
 	if err != nil {
 		return err
 	}
+
 	bpm.PKGBUILD.InstalledSize = size / 1024 // Convert to KB
+
 	return nil
 }
