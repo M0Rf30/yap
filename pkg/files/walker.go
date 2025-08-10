@@ -125,10 +125,12 @@ func (w *Walker) createEntry(path string, dirEntry fs.DirEntry) (*Entry, error) 
 	switch {
 	case fileInfo.Mode()&os.ModeSymlink != 0:
 		entry.Type = osutils.TypeSymlink
+
 		linkTarget, err := os.Readlink(path)
 		if err != nil {
 			return nil, err
 		}
+
 		entry.LinkTarget = linkTarget
 
 	case fileInfo.IsDir():
@@ -145,6 +147,7 @@ func (w *Walker) createEntry(path string, dirEntry fs.DirEntry) (*Entry, error) 
 			if err != nil {
 				return nil, err
 			}
+
 			entry.SHA256 = sha256Hash
 		}
 	}
@@ -159,6 +162,7 @@ func (w *Walker) shouldSkipFile(fileName string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
