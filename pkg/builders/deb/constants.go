@@ -1,39 +1,7 @@
-// Package dpkg provides Debian package building functionality and constants.
-package dpkg
+// Package deb provides Debian package building functionality and constants.
+package deb
 
-var buildEnvironmentDeps = []string{
-	"autoconf",
-	"binutils",
-	"ca-certificates",
-	"g++",
-	"gcc",
-	"libc-dev",
-	"libc6-dev",
-	"libltdl7",
-	"libtool",
-	"make",
-	"patch",
-	"pkg-config",
-	"tzdata",
-}
-
-var installArgs = []string{
-	"--allow-downgrades",
-	"--assume-yes",
-	"install",
-}
-
-// DebArchs maps standard architecture names to Debian package architecture names.
-var DebArchs = map[string]string{
-	"any":     "all",
-	"x86_64":  "amd64",
-	"i686":    "386",
-	"aarch64": "arm64",
-	"armv7h":  "arm7",
-	"armv6h":  "arm6",
-	"arm":     "arm5",
-}
-
+// Template constants - these are DEB-specific templates that should remain here
 const specFile = `
 {{- /* Mandatory fields */ -}}
 Package: {{.PkgName}}

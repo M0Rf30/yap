@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/rpmpack"
 
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/osutils"
@@ -111,7 +112,10 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 func (r *RPM) PrepareFakeroot(_ string) error {
 	r.getGroup()
 	r.getRelease()
-	r.PKGBUILD.ArchComputed = RPMArchs[r.PKGBUILD.ArchComputed]
+
+	// Use centralized architecture mapping
+	archMapping := constants.GetArchMapping()
+	r.PKGBUILD.ArchComputed = archMapping.TranslateArch(constants.FormatRPM, r.PKGBUILD.ArchComputed)
 
 	if r.PKGBUILD.StripEnabled {
 		return options.Strip(r.PKGBUILD.PackageDir)
@@ -137,6 +141,9 @@ func (r *RPM) Install(artifactsPath string) error {
 		".rpm"
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
+
+	// Use centralized install arguments
+	installArgs := constants.GetInstallArgs(constants.FormatRPM)
 	installArgs = append(installArgs, pkgFilePath)
 
 	err := osutils.Exec(false, "", "dnf", installArgs...)
@@ -152,6 +159,8 @@ func (r *RPM) Install(artifactsPath string) error {
 // makeDepends is a slice of strings representing the dependencies to be installed.
 // It returns an error if there is any issue during the installation process.
 func (r *RPM) Prepare(makeDepends []string) error {
+	// Use centralized install arguments
+	installArgs := constants.GetInstallArgs(constants.FormatRPM)
 	return r.PKGBUILD.GetDepends("dnf", installArgs, makeDepends)
 }
 
@@ -161,7 +170,10 @@ func (r *RPM) Prepare(makeDepends []string) error {
 // Go environment.
 // It returns an error if there was an issue with the environment preparation.
 func (r *RPM) PrepareEnvironment(golang bool) error {
-	installArgs = append(installArgs, buildEnvironmentDeps...)
+	// Use centralized build dependencies and install arguments
+	buildDeps := constants.GetBuildDeps()
+	installArgs := constants.GetInstallArgs(constants.FormatRPM)
+	installArgs = append(installArgs, buildDeps.RPM...)
 
 	err := osutils.Exec(false, "", "dnf", installArgs...)
 	if err != nil {
@@ -204,6 +216,7 @@ func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
 
 	// Convert to legacy format for compatibility
 	var contents []*osutils.FileContent
+
 	for _, entry := range entries {
 		converted := entry.ConvertToLegacyFormat()
 		contents = append(contents, &converted)

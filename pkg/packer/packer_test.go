@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/apk"
+	"github.com/M0Rf30/yap/v2/pkg/builders/deb"
 	"github.com/M0Rf30/yap/v2/pkg/builders/pacman"
 	"github.com/M0Rf30/yap/v2/pkg/builders/rpm"
-	"github.com/M0Rf30/yap/v2/pkg/dpkg"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -44,9 +44,9 @@ func TestGetPackageManager_DEB(t *testing.T) {
 				t.Fatalf("GetPackageManager returned nil for %s", distro)
 			}
 
-			_, ok := packer.(*dpkg.Deb)
+			_, ok := packer.(*deb.Package)
 			if !ok {
-				t.Errorf("GetPackageManager did not return dpkg.Deb for %s", distro)
+				t.Errorf("GetPackageManager did not return deb.Package for %s", distro)
 			}
 		})
 	}
@@ -123,8 +123,8 @@ func TestGetPackageManager_Integration(t *testing.T) {
 	// Test all supported distros return valid packers
 	testCases := map[string]any{
 		"alpine":        (*apk.Apk)(nil),
-		"debian":        (*dpkg.Deb)(nil),
-		"ubuntu":        (*dpkg.Deb)(nil),
+		"debian":        (*deb.Package)(nil),
+		"ubuntu":        (*deb.Package)(nil),
 		"arch":          (*pacman.Pkg)(nil),
 		"fedora":        (*rpm.RPM)(nil),
 		"centos":        (*rpm.RPM)(nil),
@@ -149,8 +149,8 @@ func TestGetPackageManager_Integration(t *testing.T) {
 				if p.PKGBUILD != pkgBuild {
 					t.Error("PKGBUILD reference not set correctly")
 				}
-			case *dpkg.Deb:
-				if expectedType != (*dpkg.Deb)(nil) {
+			case *deb.Package:
+				if expectedType != (*deb.Package)(nil) {
 					t.Errorf("Expected different type for %s", distro)
 				}
 

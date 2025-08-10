@@ -112,14 +112,15 @@ func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
 	installArgs := constants.GetInstallArgs(bb.Format)
 
 	var deps []string
+
 	switch bb.Format {
-	case "apk":
+	case constants.FormatAPK:
 		deps = buildDeps.APK
-	case "deb":
+	case constants.FormatDEB:
 		deps = buildDeps.DEB
-	case "rpm":
+	case constants.FormatRPM:
 		deps = buildDeps.RPM
-	case "pacman":
+	case constants.FormatPacman:
 		deps = buildDeps.Pacman
 	}
 
@@ -129,8 +130,9 @@ func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
 
 	if golang {
 		// APK uses different Go setup
-		if bb.Format == "apk" {
+		if bb.Format == constants.FormatAPK {
 			osutils.CheckGO()
+
 			allArgs = append(allArgs, "go")
 		} else {
 			// Other formats use OSUtils Go setup

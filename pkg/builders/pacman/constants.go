@@ -1,10 +1,7 @@
 // Package pacman provides Arch Linux package building functionality and constants.
 package pacman
 
-var buildEnvironmentDeps = []string{
-	"base-devel",
-}
-
+// Template constants - these are pacman-specific templates that should remain here
 const dotBuildinfo = `format = 2
 pkgname = {{.PkgName}}
 pkgbase = {{.PkgName}}
@@ -101,6 +98,7 @@ const dotMtree = `#mtree
 {{- end }}
 `
 
+// getBaseInstallArgs returns pacman-specific install arguments
 func getBaseInstallArgs() []string {
 	return []string{
 		"-S",

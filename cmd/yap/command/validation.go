@@ -220,3 +220,66 @@ func PreRunValidation(cmd *cobra.Command, _ []string) {
 		osutils.Logger.Info("verbose mode enabled", osutils.Logger.Args("command", cmd.Name()))
 	}
 }
+
+// ParseFlexibleArgs parses flexible command arguments for build and zap commands
+// that support both "command path" and "command distro path" formats.
+// Returns (distro, release, fullJSONPath, error).
+func ParseFlexibleArgs(args []string) (distro, release, fullJSONPath string, err error) {
+	fullJSONPath, _ = filepath.Abs(args[len(args)-1]) // Always take the last argument as path
+
+	if len(args) == 2 {
+		distro, release = parseDistroAndRelease(args[0])
+		return distro, release, fullJSONPath, nil
+	}
+
+	if len(args) == 1 {
+		return parseSingleArg(args[0])
+	}
+
+	return "", "", fullJSONPath, nil
+}
+
+// parseDistroAndRelease parses distro-release format and returns distro and release.
+func parseDistroAndRelease(arg string) (distro, release string) {
+	split := strings.Split(arg, "-")
+	distro = split[0]
+
+	if len(split) > 1 {
+		release = split[1]
+	}
+
+	return distro, release
+}
+
+// parseSingleArg parses a single argument that could be path or distro.
+func parseSingleArg(firstArg string) (distro, release, fullJSONPath string, err error) {
+	// Check if it's a path (contains /, is . or .., or is a valid project path)
+	if isPathArgument(firstArg) {
+		fullJSONPath, _ = filepath.Abs(firstArg)
+		return "", "", fullJSONPath, nil
+	}
+
+	// Check if it's a valid project path
+	if validateProjectPath(firstArg) == nil {
+		fullJSONPath, _ = filepath.Abs(firstArg)
+		return "", "", fullJSONPath, nil
+	}
+
+	// Try to validate as distro
+	if validateDistroArg(firstArg) == nil {
+		distro, release = parseDistroAndRelease(firstArg)
+		fullJSONPath, _ = filepath.Abs(".")
+
+		return distro, release, fullJSONPath, nil
+	}
+
+	// Neither valid distro nor valid path
+	return "", "", "", fmt.Errorf(
+		"argument '%s' is neither a valid distribution nor a valid project path",
+		firstArg)
+}
+
+// isPathArgument checks if the argument looks like a path.
+func isPathArgument(arg string) bool {
+	return strings.Contains(arg, "/") || arg == "." || arg == ".."
+}
