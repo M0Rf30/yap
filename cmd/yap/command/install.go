@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 const (
@@ -135,7 +135,7 @@ func installPackage(packageType, artifactPath string) error {
 		"artifact", artifactPath)
 
 	// Execute the installation command with the same pattern as internal managers
-	err := osutils.Exec(false, "", cmd, args...)
+	err := shell.Exec(false, "", cmd, args...)
 	if err != nil {
 		return fmt.Errorf("failed to install package with %s: %w", cmd, err)
 	}

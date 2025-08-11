@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/project"
 )
 
@@ -58,7 +58,7 @@ The zap command automatically:
 
 		// Use the default distro if none is provided.
 		if distro == "" {
-			osRelease, _ := osutils.ParseOSRelease()
+			osRelease, _ := platform.ParseOSRelease()
 			distro = osRelease.ID
 			logger.Warn("No distribution specified, using detected",
 				"distro", distro)
