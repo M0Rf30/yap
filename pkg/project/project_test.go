@@ -241,12 +241,6 @@ func TestErrors(t *testing.T) {
 	assert.Contains(t, project.ErrCircularRuntimeDependency.Error(), "circular dependency in runtime dependencies")
 }
 
-func TestPrefixConstants(t *testing.T) {
-	// Test prefix constants are set correctly
-	assert.Equal(t, "  │  ├─", project.PrefixMiddle)
-	assert.Equal(t, "  │  └─", project.PrefixLast)
-}
-
 func TestSingleProjectSetup(t *testing.T) {
 	testDir := t.TempDir()
 

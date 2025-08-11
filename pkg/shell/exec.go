@@ -22,7 +22,7 @@ import (
 
 const (
 	timestampFormat = "2006-01-02 15:04:05"
-	logLevelInfo    = "INFO "
+	logLevelInfo    = " INFO"
 )
 
 var (
@@ -99,13 +99,15 @@ func (pdw *PackageDecoratedWriter) writeLine(line []byte) error {
 
 	var decoratedLine string
 	if logger.IsColorDisabled() {
-		decoratedLine = fmt.Sprintf("%s %s  [%s] %s\n", timestamp, logLevelInfo,
+		decoratedLine = fmt.Sprintf("%s %s [%s] %s\n", timestamp, logLevelInfo,
 			pdw.packageName, lineContent)
 	} else {
-		decoratedLine = pterm.Sprintf("%s %s  [%s] %s\n",
+		decoratedLine = pterm.Sprintf("%s %s %s%s%s %s\n",
 			pterm.FgGray.Sprint(timestamp),
 			pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(logLevelInfo),
-			pterm.FgYellow.Sprint(pdw.packageName),
+			pterm.NewStyle(pterm.FgWhite).Sprint("["),
+			pterm.NewStyle(pterm.FgYellow).Sprint(pdw.packageName),
+			pterm.NewStyle(pterm.FgWhite).Sprint("]"),
 			lineContent,
 		)
 	}
@@ -170,13 +172,15 @@ func (gpw *GitProgressWriter) writeDecoratedLine(lineContent string) error {
 
 	var decoratedLine string
 	if logger.IsColorDisabled() {
-		decoratedLine = fmt.Sprintf("%s %s  [%s] %s\n", timestamp, logLevelInfo,
+		decoratedLine = fmt.Sprintf("%s %s [%s] %s\n", timestamp, logLevelInfo,
 			gpw.packageName, lineContent)
 	} else {
-		decoratedLine = pterm.Sprintf("%s %s  %s %s\n",
+		decoratedLine = pterm.Sprintf("%s %s %s%s%s %s\n",
 			pterm.FgGray.Sprint(timestamp),
 			pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(logLevelInfo),
-			pterm.FgYellow.Sprintf("[%s]", gpw.packageName),
+			pterm.NewStyle(pterm.FgWhite).Sprint("["),
+			pterm.NewStyle(pterm.FgYellow).Sprint(gpw.packageName),
+			pterm.NewStyle(pterm.FgWhite).Sprint("]"),
 			lineContent,
 		)
 	}
@@ -294,9 +298,12 @@ func logScriptContent(cmds string) {
 	}
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	headerLine := pterm.Sprintf("%s %s %s %s\n",
+	headerLine := pterm.Sprintf("%s %s %s%s%s %s\n",
 		pterm.FgGray.Sprint(timestamp),
-		pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("DEBUG "), pterm.FgBlue.Sprint("[yap]"),
+		pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("DEBUG"),
+		pterm.NewStyle(pterm.FgWhite).Sprint("["),
+		pterm.NewStyle(pterm.FgYellow).Sprint("yap"),
+		pterm.NewStyle(pterm.FgWhite).Sprint("]"),
 		"script content:",
 	)
 	_, _ = MultiPrinter.Writer.Write([]byte(headerLine))
@@ -308,9 +315,12 @@ func logScriptContent(cmds string) {
 		trimmed := strings.TrimSpace(line)
 		if trimmed != "" {
 			timestamp := time.Now().Format("2006-01-02 15:04:05")
-			scriptLine := pterm.Sprintf("%s %s %s   %s\n",
+			scriptLine := pterm.Sprintf("%s %s %s%s%s   %s\n",
 				pterm.FgGray.Sprint(timestamp),
-				pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("DEBUG "), pterm.FgBlue.Sprint("[yap]"),
+				pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("DEBUG"),
+				pterm.NewStyle(pterm.FgWhite).Sprint("["),
+				pterm.NewStyle(pterm.FgYellow).Sprint("yap"),
+				pterm.NewStyle(pterm.FgWhite).Sprint("]"),
 				trimmed,
 			)
 			_, _ = MultiPrinter.Writer.Write([]byte(scriptLine))

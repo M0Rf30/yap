@@ -29,12 +29,19 @@
 ## Build/Test Commands
 
 ### Primary Commands
+- `make all` - Complete workflow: clean, deps, fmt, lint, test, doc, build
+- `make build` - Build the yap binary with version info and optimizations
+- `make build-all` - Build for multiple architectures (linux, darwin, windows)
+- `make clean` - Clean build artifacts and temporary files
+- `make deps` - Download and tidy Go module dependencies
+- `make fmt` - Format code with gofmt
+- `make lint` - Run golangci-lint with comprehensive checks
+- `make lint-md` - Lint markdown files
+- `make release` - Create release packages with full validation
+- `make run` - Build and run yap with current changes
 - `make test` - Run all tests with `-p 1 -v` flags (sequential execution required)
 - `make test-coverage` - Run tests with coverage report (generates coverage.html)
-- `make build` - Build the yap binary with version info and optimizations
-- `make lint` - Run golangci-lint with comprehensive checks
-- `make fmt` - Format code with gofmt
-- `make all` - Complete workflow: clean, deps, fmt, lint, test, doc, build
+
 
 ### Package-Specific Testing
 ```bash
@@ -53,24 +60,18 @@ go test -timeout 30s ./pkg/download/...
 
 ### Documentation Commands
 - `make doc` - View all package documentation
-- `make doc-serve` - Start documentation server on localhost:8080
-- `make doc-package PKG=./pkg/specific` - View specific package documentation
-- `make doc-generate` - Generate static documentation files in docs/api/
 - `make doc-deps` - Install documentation dependencies (pkgsite)
-
-### Development Commands
-- `make run` - Build and run yap with current changes
-- `make clean` - Clean build artifacts and temporary files
-- `make deps` - Download and tidy Go module dependencies
-- `make build-all` - Build for multiple architectures (linux, darwin, windows)
-- `make release` - Create release packages with full validation
+- `make doc-generate` - Generate static documentation files in docs/api/
+- `make doc-package PKG=./pkg/specific` - View specific package documentation
+- `make doc-serve` - Start documentation server on localhost:8080
+- `make doc-serve-static` - Serve static documentation files on localhost:8081
 
 ## Code Style
 
 ### Module and Imports
 - **Module**: `github.com/M0Rf30/yap/v2` 
 - **Import grouping**: Standard → Third-party → Local (with goimports)
-- **Local prefix**: `github.com/M0Rf30/yap`
+- **Local prefix**: `github.com/M0Rf30/yap/v2`
 
 ### Code Standards
 - **Line length**: Max 100 characters (enforced by golangci-lint)
@@ -243,7 +244,7 @@ docker build --progress=plain --no-cache -f build/deploy/alpine/Dockerfile .
 - Use temporary directories for file system tests
 
 ### Continuous Integration
-- Tests run on Go 1.24.5 (as specified in go.mod)
+- Tests run on Go 1.24.6 (as specified in go.mod)
 - Multi-architecture builds (amd64, arm64) on Ubuntu runners
 - Integration with GitHub Actions
 

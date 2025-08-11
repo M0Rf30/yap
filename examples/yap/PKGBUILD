@@ -41,7 +41,11 @@ build() {
     -o "${pkgname}" \
     ./cmd/yap
 
-  upx --best --lzma "${pkgname}"
+  upx \
+    --best \
+    --lzma \
+    --force-overwrite \
+    "${pkgname}"
 }
 
 package() {

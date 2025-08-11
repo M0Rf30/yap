@@ -51,7 +51,7 @@ clean:
 # Run tests
 test:
 	@echo "Running tests..."
-	$(GOTEST) -p 1 -v ./...
+	@$(GOTEST) -p 1 -v ./... || exit 1
 
 # Run tests with coverage
 test-coverage:
