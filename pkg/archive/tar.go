@@ -3,6 +3,7 @@ package archive
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,9 +14,9 @@ import (
 )
 
 // CreateTarZst creates a compressed tar.zst archive from the specified source
-// directory. This consolidates the archive creation logic from osutils.
+// directory. This consolidates the archive creation logic for YAP packages.
 func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
-	ctx := context.TODO()
+	ctx := context.Background()
 	options := &archives.FromDiskOptions{
 		FollowSymlinks: false,
 	}
@@ -68,7 +69,7 @@ func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
 
 // CreateTarGz creates a compressed tar.gz archive from the specified source directory.
 func CreateTarGz(sourceDir, outputFile string, formatGNU bool) error {
-	ctx := context.TODO()
+	ctx := context.Background()
 	options := &archives.FromDiskOptions{
 		FollowSymlinks: false,
 	}
@@ -107,4 +108,100 @@ func CreateTarGz(sourceDir, outputFile string, formatGNU bool) error {
 	}
 
 	return format.Archive(ctx, out, files)
+}
+
+// Extract extracts an archive file to the specified destination directory.
+// It opens the source archive file, identifies its format, and extracts it to the destination.
+//
+// Returns an error if there was a problem extracting the files.
+func Extract(source, destination string) error {
+	ctx := context.Background()
+
+	// Open the source archive file
+	sourceFile, err := os.Open(filepath.Clean(source))
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if closeErr := sourceFile.Close(); closeErr != nil {
+			logger.Warn("failed to close source file", "path", source, "error", closeErr)
+		}
+	}()
+
+	// Identify the archive file's format
+	format, archiveReader, _ := archives.Identify(ctx, "", sourceFile)
+
+	dirMap := make(map[string]bool)
+
+	// Check if the format is an extractor. If not, skip the archive file.
+	extractor, ok := format.(archives.Extractor)
+
+	if !ok {
+		return nil
+	}
+
+	return extractor.Extract(
+		ctx,
+		archiveReader,
+		func(_ context.Context, archiveFile archives.FileInfo) error {
+			fileName := archiveFile.NameInArchive
+			newPath := filepath.Join(destination, fileName)
+
+			if archiveFile.IsDir() {
+				dirMap[newPath] = true
+
+				return os.MkdirAll(newPath, 0o755) // #nosec
+			}
+
+			fileDir := filepath.Dir(newPath)
+			_, seenDir := dirMap[fileDir]
+
+			if !seenDir {
+				dirMap[fileDir] = true
+
+				_ = os.MkdirAll(fileDir, 0o755) // #nosec
+			}
+
+			cleanNewPath := filepath.Clean(newPath)
+
+			// Check if file already exists and has the same size to avoid re-extraction
+			if existingInfo, err := os.Stat(cleanNewPath); err == nil {
+				if existingInfo.Size() == archiveFile.Size() {
+					logger.Debug("skipping extraction, file exists with same size", "path", cleanNewPath)
+					return nil
+				}
+			}
+
+			newFile, err := os.OpenFile(cleanNewPath,
+				os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+				archiveFile.Mode())
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				if closeErr := newFile.Close(); closeErr != nil {
+					logger.Warn("failed to close new file",
+						"path", cleanNewPath,
+						"error", closeErr)
+				}
+			}()
+
+			archiveFileTemp, err := archiveFile.Open()
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				if closeErr := archiveFileTemp.Close(); closeErr != nil {
+					logger.Warn("failed to close archive file", "error", closeErr)
+				}
+			}()
+
+			// Use a buffered copy for better performance on large files
+			_, err = io.CopyBuffer(newFile, archiveFileTemp, make([]byte, 32*1024))
+
+			return err
+		})
 }
