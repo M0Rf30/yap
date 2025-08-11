@@ -4,8 +4,19 @@ package files
 import (
 	"os"
 	"time"
+)
 
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+// File type constants
+const (
+	TagLink             = 0o120000
+	TagDirectory        = 0o40000
+	TypeFile            = "file"
+	TypeDir             = "dir"
+	TypeImplicitDir     = "implicit dir"
+	TypeSymlink         = "symlink"
+	TypeTree            = "tree"
+	TypeConfig          = "config"
+	TypeConfigNoReplace = "config|noreplace"
 )
 
 // Entry represents a file or directory entry in a package.
@@ -20,22 +31,6 @@ type Entry struct {
 	LinkTarget  string      // Target path for symlinks
 	SHA256      []byte      // SHA256 hash for regular files
 	IsBackup    bool        // Whether this file should be treated as a config backup
-}
-
-// ConvertToLegacyFormat converts Entry to the legacy osutils.FileContent format.
-// This provides backward compatibility during the transition period.
-func (e *Entry) ConvertToLegacyFormat() osutils.FileContent {
-	return osutils.FileContent{
-		Source:      e.Source,
-		Destination: e.Destination,
-		Type:        e.Type,
-		SHA256:      e.SHA256,
-		FileInfo: &osutils.FileInfo{
-			Mode:    uint32(e.Mode.Perm()),
-			Size:    e.Size,
-			ModTime: e.ModTime.Unix(),
-		},
-	}
 }
 
 // IsRegularFile returns true if this entry represents a regular file.
@@ -55,5 +50,5 @@ func (e *Entry) IsSymlink() bool {
 
 // IsConfigFile returns true if this entry represents a configuration file.
 func (e *Entry) IsConfigFile() bool {
-	return e.Type == osutils.TypeConfig || e.Type == osutils.TypeConfigNoReplace
+	return e.Type == TypeConfig || e.Type == TypeConfigNoReplace
 }
