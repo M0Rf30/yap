@@ -59,10 +59,10 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	logger.WithComponent(m.PKGBUILD.PkgName)
 	logger.Info("package artifact created",
-		"pkgver", m.PKGBUILD.PkgVer,
-		"pkgrel", m.PKGBUILD.PkgRel,
+		"package", m.PKGBUILD.PkgName,
+		"version", m.PKGBUILD.PkgVer,
+		"release", m.PKGBUILD.PkgRel,
 		"artifact", pkgFilePath)
 
 	return nil

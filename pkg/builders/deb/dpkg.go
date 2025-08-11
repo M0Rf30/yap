@@ -370,9 +370,10 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	logger.WithComponent(d.PKGBUILD.PkgName)
-	logger.Info("package artifact created", "pkgver", d.PKGBUILD.PkgVer,
-		"pkgrel", d.PKGBUILD.PkgRel,
+	logger.Info("package artifact created",
+		"package", d.PKGBUILD.PkgName,
+		"version", d.PKGBUILD.PkgVer,
+		"release", d.PKGBUILD.PkgRel,
 		"artifact", artifactFilePath)
 
 	return nil

@@ -98,10 +98,10 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	logger.WithComponent(r.PKGBUILD.PkgName)
 	logger.Info("package artifact created",
-		"pkgver", r.PKGBUILD.PkgVer,
-		"pkgrel", r.PKGBUILD.PkgRel,
+		"package", r.PKGBUILD.PkgName,
+		"version", r.PKGBUILD.PkgVer,
+		"release", r.PKGBUILD.PkgRel,
 		"artifact", cleanFilePath)
 
 	return nil

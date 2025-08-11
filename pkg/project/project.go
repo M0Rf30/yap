@@ -55,11 +55,6 @@ var (
 	ErrCircularDependency = errors.New("circular dependency detected")
 	// ErrCircularRuntimeDependency indicates a circular runtime dependency was detected.
 	ErrCircularRuntimeDependency = errors.New("circular dependency in runtime dependencies")
-
-	// PrefixMiddle is the prefix for middle dependency items in display.
-	PrefixMiddle = "  │  ├─"
-	// PrefixLast is the prefix for last dependency items in display.
-	PrefixLast = "  │  └─"
 )
 
 // DistroProject is an interface that defines the methods for creating and
@@ -239,17 +234,20 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 	var waitGroup sync.WaitGroup
 
 	// Start workers
-	for range maxWorkers {
+	for workerNum := range maxWorkers {
 		waitGroup.Add(1)
 
-		go func() {
+		go func(workerID int) {
 			defer waitGroup.Done()
 
+			workerIDStr := fmt.Sprintf("worker-%d", workerID)
+
 			for proj := range projectChan {
-				logger.Debug("making package",
+				logger.Debug("creating package",
 					"package", proj.Builder.PKGBUILD.PkgName,
-					"pkgver", proj.Builder.PKGBUILD.PkgVer,
-					"pkgrel", proj.Builder.PKGBUILD.PkgRel)
+					"version", proj.Builder.PKGBUILD.PkgVer,
+					"release", proj.Builder.PKGBUILD.PkgRel,
+					"worker_id", workerIDStr)
 
 				err := proj.Builder.Compile(NoBuild)
 				if err != nil {
@@ -271,7 +269,7 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 					return
 				}
 			}
-		}()
+		}(workerNum)
 	}
 
 	// Send projects to workers
@@ -316,8 +314,9 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
 	}
 
 	if fromPkgName != "" && toPkgName != "" && firstIndex > lastIndex {
-		logger.Fatal("invalid package order: %s should be built before %s",
-			fromPkgName, toPkgName)
+		logger.Fatal("invalid package order",
+			"required_first", fromPkgName,
+			"required_second", toPkgName)
 	}
 }
 
@@ -432,10 +431,10 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		return err
 	}
 
-	logger.WithComponent(proj.Builder.PKGBUILD.PkgName)
 	logger.Info("building resulting package",
-		"pkgver", proj.Builder.PKGBUILD.PkgVer,
-		"pkgrel", proj.Builder.PKGBUILD.PkgRel)
+		"package", proj.Builder.PKGBUILD.PkgName,
+		"version", proj.Builder.PKGBUILD.PkgVer,
+		"release", proj.Builder.PKGBUILD.PkgRel)
 
 	err = proj.PackageManager.BuildPackage(mpc.Output)
 	if err != nil {
@@ -463,7 +462,7 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 
 	if !matchFound {
 		logger.Fatal("package not found",
-			"pkgname", pkgName)
+			"package", pkgName)
 	}
 
 	return index
@@ -669,7 +668,10 @@ func (mpc *MultipleProject) displayPackageDependencyInfo(
 	pkgVer := proj.Builder.PKGBUILD.PkgVer
 	pkgRel := proj.Builder.PKGBUILD.PkgRel
 
-	logger.Debug(fmt.Sprintf("📦 %s-%s-%s", pkgName, pkgVer, pkgRel))
+	logger.Debug("package information",
+		"package", pkgName,
+		"version", pkgVer,
+		"release", pkgRel)
 
 	// Show runtime dependencies
 	if len(proj.Builder.PKGBUILD.Depends) > 0 {
@@ -685,25 +687,29 @@ func (mpc *MultipleProject) displayPackageDependencyInfo(
 	shouldInstall := proj.HasToInstall || runtimeDependencyMap[pkgName]
 
 	if shouldInstall {
-		var reason string
+		var installType string
 		if proj.HasToInstall {
-			reason = "Will be installed after build (explicitly marked)"
+			installType = "explicit"
 		} else {
-			reason = "Will be installed after build (runtime dependency)"
+			installType = "runtime_dependency"
 		}
 
-		logger.Debug("  └─ " + reason)
+		logger.Debug("package installation planned",
+			"package", pkgName,
+			"install_type", installType,
+			"action", "install_after_build")
 	} else {
-		logger.Debug("  └─ Build only (no installation)")
+		logger.Debug("package installation planned",
+			"package", pkgName,
+			"action", "build_only")
 	}
-
-	logger.Debug("")
 }
 
 // displayDependencies is a helper function to display dependency information.
 func (mpc *MultipleProject) displayDependencies(
 	title string, deps []string, packageMap map[string]*Project) {
-	logger.Debug(fmt.Sprintf("  ├─ %s:", title))
+	logger.Debug("dependency category",
+		"category", title)
 
 	internalDeps := make([]string, 0)
 	externalDeps := make([]string, 0)
@@ -718,23 +724,17 @@ func (mpc *MultipleProject) displayDependencies(
 	}
 
 	// Display internal dependencies
-	for i, dep := range internalDeps {
-		prefix := PrefixMiddle
-		if i == len(internalDeps)-1 && len(externalDeps) == 0 {
-			prefix = PrefixLast
-		}
-
-		logger.Debug(fmt.Sprintf("%s %s", prefix, dep))
+	for _, dep := range internalDeps {
+		logger.Debug("internal dependency",
+			"dependency", dep,
+			"type", "internal")
 	}
 
 	// Display external dependencies
-	for i, dep := range externalDeps {
-		prefix := PrefixMiddle
-		if i == len(externalDeps)-1 {
-			prefix = PrefixLast
-		}
-
-		logger.Debug(fmt.Sprintf("%s %s", prefix, dep))
+	for _, dep := range externalDeps {
+		logger.Debug("external dependency",
+			"dependency", dep,
+			"type", "external")
 	}
 }
 
@@ -832,7 +832,9 @@ func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 
 	for pkgName, count := range popularity {
 		if count > 0 {
-			logger.Debug(fmt.Sprintf("  %s: depended on by %d packages", pkgName, count))
+			logger.Debug("dependency popularity",
+				"package", pkgName,
+				"dependent_count", count)
 		}
 	}
 
@@ -1332,8 +1334,9 @@ func (mpc *MultipleProject) topologicalSortRuntimeDeps(projectMap map[string]*Pr
 			currentBatch = append(currentBatch, projectMap[pkgName])
 		}
 
-		logger.Info(fmt.Sprintf("runtime dependency batch %d: %d packages can build in parallel",
-			batchNum, len(currentBatch)))
+		logger.Info("runtime dependency batch analysis",
+			"batch_number", batchNum,
+			"parallel_packages", len(currentBatch))
 
 		result = append(result, currentBatch)
 
@@ -1371,7 +1374,9 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 
 	for pkgName, isRuntimeDep := range runtimeDependencyMap {
 		if isRuntimeDep {
-			logger.Info(fmt.Sprintf("  %s -> WILL BE INSTALLED (runtime dependency)", pkgName))
+			logger.Info("runtime dependency detected",
+				"package", pkgName,
+				"action", "will_be_installed")
 		}
 	}
 

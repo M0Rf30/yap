@@ -559,19 +559,19 @@ func TestSource_Integration(t *testing.T) {
 }
 
 func TestSource_GetConcurrently(t *testing.T) {
-	// Test GetConcurrently function which has 0% coverage
+	t.Parallel()
+
 	tempDir := t.TempDir()
 	srcDir := filepath.Join(tempDir, "src")
 	err := os.MkdirAll(srcDir, 0o755)
 	require.NoError(t, err)
 
-	// Create some test source files
 	sources := make([]*Source, 2)
 
 	for i := range 2 {
 		fileName := fmt.Sprintf("file%d.txt", i)
 		filePath := filepath.Join(tempDir, fileName)
-		content := fmt.Appendf(nil, "content %d", i)
+		content := []byte(fmt.Sprintf("content %d", i))
 		err := os.WriteFile(filePath, content, 0o600)
 		require.NoError(t, err)
 
@@ -587,12 +587,8 @@ func TestSource_GetConcurrently(t *testing.T) {
 		}
 	}
 
-	// Test GetConcurrently (should not panic even if it fails)
-	assert.NotPanics(t, func() {
-		err := GetConcurrently(sources, 2)
-		// Error might occur due to internal logic, but shouldn't panic
-		_ = err
-	})
+	err = GetConcurrently(sources, 2)
+	assert.NoError(t, err)
 }
 
 func TestConcurrentDownloadHelpers(t *testing.T) {
