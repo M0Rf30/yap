@@ -3,6 +3,7 @@ pkgver="3.1.0"
 pkgrel="1"
 pkgdesc="Modern web framework providing HTTP server, routing, and template engine"
 arch=('x86_64')
+license=('BSD-3-Clause')
 maintainer="YAP Team <maintainer@yap.dev>"
 url="https://github.com/example/web-framework"
 

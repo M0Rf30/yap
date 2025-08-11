@@ -562,16 +562,10 @@ func TestPKGBUILD_Integration(t *testing.T) {
 func TestPKGBUILD_GetDepends(t *testing.T) {
 	pb := &PKGBUILD{}
 
-	// Test with empty makeDepends - should return nil
-	err := pb.GetDepends("echo", []string{}, []string{})
+	// Test with empty makeDepends slice - should not error
+	err := pb.GetDepends("pacman", []string{}, []string{})
 	if err != nil {
 		t.Errorf("GetDepends with empty makeDepends should not return error, got: %v", err)
-	}
-
-	// Test with makeDepends - should execute command (using echo for safety)
-	err = pb.GetDepends("echo", []string{"arg1"}, []string{"make", "gcc"})
-	if err != nil {
-		t.Errorf("GetDepends with makeDepends should not fail with echo command, got: %v", err)
 	}
 
 	// Test with invalid command - should return error
@@ -579,21 +573,27 @@ func TestPKGBUILD_GetDepends(t *testing.T) {
 	if err == nil {
 		t.Error("GetDepends with invalid command should return error")
 	}
+
+	// Test with echo command - should return security error
+	err = pb.GetDepends("echo", []string{"arg1"}, []string{"make", "gcc"})
+	if err == nil {
+		t.Error("GetDepends with non-allowed command should return security error")
+	}
 }
 
 func TestPKGBUILD_GetUpdates(t *testing.T) {
 	pb := &PKGBUILD{}
 
-	// Test with valid command (using echo for safety)
+	// Test with non-allowed command (echo) - should return security error
 	err := pb.GetUpdates("echo", "update")
-	if err != nil {
-		t.Errorf("GetUpdates with echo command should not fail, got: %v", err)
+	if err == nil {
+		t.Error("GetUpdates with non-allowed command should return security error")
 	}
 
-	// Test with no arguments
+	// Test with no arguments - should still return security error for echo
 	err = pb.GetUpdates("echo")
-	if err != nil {
-		t.Errorf("GetUpdates with no args should not fail, got: %v", err)
+	if err == nil {
+		t.Error("GetUpdates with non-allowed command should return security error")
 	}
 
 	// Test with invalid command - should return error
@@ -601,25 +601,6 @@ func TestPKGBUILD_GetUpdates(t *testing.T) {
 	if err == nil {
 		t.Error("GetUpdates with invalid command should return error")
 	}
-}
-
-func TestPKGBUILD_ValidateGeneral_ErrorCases(t *testing.T) {
-	// Test cases that should trigger validation errors
-	// Note: These tests verify the validation logic works but cannot test
-	// the actual exit behavior due to os.Exit calls
-	pb := &PKGBUILD{}
-
-	// Test with missing license - should trigger validation logic
-	// We expect this to call os.Exit, so we can't test it directly
-	// Instead, test the individual validation components
-
-	// Test with empty package name but set other fields to see validation steps
-	pb.PkgName = "test"
-	pb.License = []string{"MIT"}
-	pb.Package = "echo test"
-
-	// This should pass basic validation checks
-	// (We can't test the exit cases directly due to os.Exit)
 }
 
 func TestPKGBUILD_ValidateGeneral_InvalidLicense(t *testing.T) {
@@ -1137,7 +1118,7 @@ func TestPKGBUILD_MultiArchitectureSupport_Integration(t *testing.T) {
 	pb.Init()
 
 	// Test complete multi-architecture workflow
-	items := map[string]interface{}{
+	items := map[string]any{
 		// Base items
 		"pkgname":     "multi-arch-test",
 		"pkgver":      "1.0.0",
@@ -1494,15 +1475,28 @@ func TestPKGBUILD_SetMainFolders_NonAlpine(t *testing.T) {
 
 	pb.SetMainFolders()
 
-	// For non-alpine, should have random string appended
-	if !strings.HasPrefix(pb.PackageDir, filepath.Join(filepath.FromSlash("/tmp/test"), "ubuntu-")) {
-		t.Errorf("Expected PackageDir to start with '/tmp/test/ubuntu-', got '%s'", pb.PackageDir)
+	// For non-alpine distributions, should use pkg-<distro> format
+	expectedPath := filepath.Join(filepath.FromSlash("/tmp/test"), "pkg-ubuntu")
+	if pb.PackageDir != expectedPath {
+		t.Errorf("Expected PackageDir to be '%s', got '%s'", expectedPath, pb.PackageDir)
 	}
+}
 
-	// Should have 10 character hex suffix (5 bytes * 2 hex chars)
-	parts := strings.Split(pb.PackageDir, "ubuntu-")
-	if len(parts) != 2 || len(parts[1]) != 10 {
-		t.Errorf("Expected 10-character hex suffix, got '%s'", pb.PackageDir)
+func TestPKGBUILD_SetMainFolders_Arch(t *testing.T) {
+	pb := &PKGBUILD{
+		Distro:    "arch",
+		PkgName:   "test-pkg",
+		StartDir:  "/tmp/test",
+		SourceDir: "/tmp/test/src",
+	}
+	pb.Init()
+
+	pb.SetMainFolders()
+
+	// For arch distribution, should use just "pkg"
+	expectedPath := filepath.Join(filepath.FromSlash("/tmp/test"), "pkg")
+	if pb.PackageDir != expectedPath {
+		t.Errorf("Expected PackageDir to be '%s', got '%s'", expectedPath, pb.PackageDir)
 	}
 }
 

@@ -490,7 +490,7 @@ func TestMultipleProjectWithMissingJSON(t *testing.T) {
 
 func TestGlobalVariableModification(t *testing.T) {
 	// Test that we can modify global variables without issues
-	originalValues := map[string]interface{}{
+	originalValues := map[string]any{
 		"Verbose":      project.Verbose,
 		"CleanBuild":   project.CleanBuild,
 		"NoBuild":      project.NoBuild,

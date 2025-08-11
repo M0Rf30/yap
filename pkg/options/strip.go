@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	binutil "github.com/M0Rf30/yap/v2/pkg/binary"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
 // Strip walks through the directory to process each file.
@@ -44,7 +45,7 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 		return nil
 	}
 
-	chmodErr := osutils.Chmod(binary, info.Mode().Perm()|0o200)
+	chmodErr := files.Chmod(binary, info.Mode().Perm()|0o200)
 	if chmodErr != nil {
 		logger.Warn(
 			"failed to make file writable",
@@ -53,7 +54,7 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 		return nil // Skip if we can't change permissions
 	}
 
-	err = osutils.CheckWritable(binary)
+	err = files.CheckWritable(binary)
 	if err != nil {
 		logger.Warn(
 			"file still not writable after chmod",
@@ -62,7 +63,7 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 		return nil // Skip if not writable
 	}
 
-	fileType := osutils.GetFileType(binary)
+	fileType := files.GetFileType(binary)
 	if fileType == "" || fileType == "ET_NONE" {
 		return err
 	}
@@ -73,7 +74,7 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 		"about to strip binary",
 		"file", binary, "flags", stripFlags)
 
-	err = osutils.StripFile(binary, stripFlags)
+	err = binutil.StripFile(binary, stripFlags)
 	if err != nil {
 		logger.Error(
 			"strip command failed",
@@ -83,7 +84,7 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	}
 
 	if stripLTO {
-		err := osutils.StripLTO(binary)
+		err := binutil.StripLTO(binary)
 		if err != nil {
 			return err
 		}
@@ -107,7 +108,7 @@ func determineStripFlags(fileType, binary string) (string, bool) {
 	case strings.Contains(fileType, "ET_EXEC"):
 		return stripBinaries, false
 	case strings.Contains(fileType, "ET_REL"):
-		isStatic := osutils.IsStaticLibrary(binary)
+		isStatic := files.IsStaticLibrary(binary)
 		if isStatic {
 			return stripStatic, true
 		} else if strings.HasSuffix(binary, ".ko") || strings.HasSuffix(binary, ".o") {
