@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,11 +12,13 @@ import (
 
 	"github.com/klauspost/pgzip"
 
+	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // Pkg represents a package manager for the Pkg distribution.
@@ -53,7 +54,7 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-	err := osutils.CreateTarZst(m.PKGBUILD.PackageDir, pkgFilePath, false)
+	err := archive.CreateTarZst(m.PKGBUILD.PackageDir, pkgFilePath, false)
 	if err != nil {
 		return err
 	}
@@ -75,7 +76,7 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 // if any stem fails.
 func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 	m.pacmanDir = m.PKGBUILD.StartDir
-	m.PKGBUILD.InstalledSize, _ = osutils.GetDirSize(m.PKGBUILD.PackageDir)
+	m.PKGBUILD.InstalledSize, _ = files.GetDirSize(m.PKGBUILD.PackageDir)
 	m.PKGBUILD.BuildDate = time.Now().Unix()
 	m.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 	m.PKGBUILD.PkgType = "pkg" // can be pkg, split, debug, src
@@ -93,9 +94,9 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 		}
 	}
 
-	checksumBytes, err := osutils.CalculateSHA256(pkgBuildFile)
+	checksumBytes, err := files.CalculateSHA256(pkgBuildFile)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	m.PKGBUILD.Checksum = hex.EncodeToString(checksumBytes)
@@ -116,7 +117,7 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 		return err
 	}
 
-	var mtreeEntries []osutils.FileContent
+	var mtreeEntries []*files.Entry
 
 	// Create file walker
 	walker := files.NewWalker(m.PKGBUILD.PackageDir, files.WalkOptions{
@@ -129,14 +130,12 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 		return err // Return the error if walking the directory fails.
 	}
 
-	// Convert to legacy format for compatibility
-	for _, entry := range entries {
-		mtreeEntries = append(mtreeEntries, entry.ConvertToLegacyFormat())
-	}
+	// Use entries directly
+	mtreeEntries = entries
 
 	mtreeFile, err := renderMtree(mtreeEntries)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	err = createMTREEGzip(mtreeFile,
@@ -171,7 +170,7 @@ func (m *Pkg) Install(artifactsPath string) error {
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-	err := osutils.Exec(false, "",
+	err := shell.Exec(false, "",
 		"pacman",
 		"-U",
 		"--noconfirm",
@@ -204,12 +203,12 @@ func (m *Pkg) PrepareEnvironment(golang bool) error {
 	installArgs = append(installArgs, buildDeps.Pacman...)
 
 	if golang {
-		osutils.CheckGO()
+		platform.CheckGO()
 
 		installArgs = append(installArgs, "go")
 	}
 
-	return osutils.Exec(false, "", "pacman", installArgs...)
+	return shell.ExecWithSudo(false, "", "pacman", installArgs...)
 }
 
 // Update updates the Makepkg package manager.
@@ -220,7 +219,7 @@ func (m *Pkg) Update() error {
 	return m.PKGBUILD.GetUpdates("pacman", "-Sy")
 }
 
-func renderMtree(entries []osutils.FileContent) (string, error) {
+func renderMtree(entries []*files.Entry) (string, error) {
 	tmpl, err := template.New("mtree").Parse(dotMtree)
 	if err != nil {
 		return "", err
