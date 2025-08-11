@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 )
 
 // WalkOptions configures the behavior of directory walking.
@@ -82,22 +81,6 @@ func (w *Walker) Walk() ([]*Entry, error) {
 	return entries, err
 }
 
-// WalkLegacy provides backward compatibility by returning the old FileContent format.
-func (w *Walker) WalkLegacy() ([]*osutils.FileContent, error) {
-	entries, err := w.Walk()
-	if err != nil {
-		return nil, err
-	}
-
-	legacy := make([]*osutils.FileContent, len(entries))
-	for i, entry := range entries {
-		converted := entry.ConvertToLegacyFormat()
-		legacy[i] = &converted
-	}
-
-	return legacy, nil
-}
-
 // createEntry creates an Entry from a file system entry.
 func (w *Walker) createEntry(path string, dirEntry fs.DirEntry) (*Entry, error) {
 	fileInfo, err := dirEntry.Info()
@@ -125,7 +108,7 @@ func (w *Walker) createEntry(path string, dirEntry fs.DirEntry) (*Entry, error) 
 	// Determine file type and handle special cases
 	switch {
 	case fileInfo.Mode()&os.ModeSymlink != 0:
-		entry.Type = osutils.TypeSymlink
+		entry.Type = TypeSymlink
 
 		linkTarget, err := os.Readlink(path)
 		if err != nil {
@@ -135,13 +118,13 @@ func (w *Walker) createEntry(path string, dirEntry fs.DirEntry) (*Entry, error) 
 		entry.LinkTarget = linkTarget
 
 	case fileInfo.IsDir():
-		entry.Type = osutils.TypeDir
+		entry.Type = TypeDir
 
 	case entry.IsBackup:
-		entry.Type = osutils.TypeConfigNoReplace
+		entry.Type = TypeConfigNoReplace
 
 	default:
-		entry.Type = osutils.TypeFile
+		entry.Type = TypeFile
 		// Calculate SHA256 for regular files
 		if fileInfo.Mode().IsRegular() {
 			sha256Hash, err := w.calculateSHA256(path)
