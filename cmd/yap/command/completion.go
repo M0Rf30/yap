@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // completionCmd represents the completion command.
@@ -47,19 +47,19 @@ appropriate completion directory for automatic loading.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		switch args[0] {
 		case "bash":
-			err := cmd.Root().GenBashCompletion(osutils.MultiPrinter.Writer)
+			err := cmd.Root().GenBashCompletion(shell.MultiPrinter.Writer)
 			if err != nil {
 				logger.Fatal("failed to generate bash completion",
 					"error", err)
 			}
 		case "fish":
-			err := cmd.Root().GenFishCompletion(osutils.MultiPrinter.Writer, true)
+			err := cmd.Root().GenFishCompletion(shell.MultiPrinter.Writer, true)
 			if err != nil {
 				logger.Fatal("failed to generate fish completion",
 					"error", err)
 			}
 		case "zsh":
-			err := cmd.Root().GenZshCompletion(osutils.MultiPrinter.Writer)
+			err := cmd.Root().GenZshCompletion(shell.MultiPrinter.Writer)
 			if err != nil {
 				logger.Fatal("failed to generate zsh completion",
 					"error", err)

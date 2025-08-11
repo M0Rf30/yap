@@ -15,9 +15,13 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/pkg/errors"
 
+	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/download"
+	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/git"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 const (
@@ -94,7 +98,7 @@ func (src *Source) Get() error {
 		defer mutex.Unlock()
 
 		// Check again after acquiring the lock (double-checked locking pattern)
-		if !osutils.Exists(sourceFilePath) {
+		if !files.Exists(sourceFilePath) {
 			err = src.getURL(sourceType, sourceFilePath, SSHPassword)
 		}
 
@@ -116,7 +120,7 @@ func (src *Source) Get() error {
 		return err
 	}
 
-	err = osutils.Unarchive(sourceFilePath, src.SrcDir)
+	err = archive.Extract(sourceFilePath, src.SrcDir)
 	if err != nil {
 		return err
 	}
@@ -174,15 +178,21 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 	case constants.Git:
 		referenceName := src.getReferenceType()
 
-		return osutils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName)
+		return git.Clone(dloadFilePath, normalizedURI, sshPassword, referenceName)
 	default:
 		// Use enhanced download with resume capability and 3 retries, with context information
-		return osutils.DownloadWithResumeContext(
+		_, err := shell.MultiPrinter.Start()
+		if err != nil {
+			return err
+		}
+
+		return download.WithResumeContext(
 			dloadFilePath,
 			normalizedURI,
 			3,
 			src.PkgName,
-			src.SourceItemPath)
+			src.SourceItemPath,
+			shell.MultiPrinter.Writer)
 	}
 }
 
@@ -192,7 +202,7 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 // No parameters.
 // No return types.
 func (src *Source) parseURI() {
-	src.SourceItemPath = osutils.Filename(src.SourceItemURI)
+	src.SourceItemPath = download.Filename(src.SourceItemURI)
 
 	if strings.Contains(src.SourceItemURI, "::") {
 		split := strings.SplitN(src.SourceItemURI, "::", 2)
@@ -209,8 +219,8 @@ func (src *Source) parseURI() {
 		src.RefValue = splitFragment[1]
 
 		// Update SourceItemPath to remove the fragment only if no custom name was used
-		if src.SourceItemPath == osutils.Filename(split[0]+"#"+fragment) {
-			src.SourceItemPath = osutils.Filename(src.SourceItemURI)
+		if src.SourceItemPath == files.Filename(split[0]+"#"+fragment) {
+			src.SourceItemPath = files.Filename(src.SourceItemURI)
 		}
 	}
 }
@@ -220,11 +230,19 @@ func (src *Source) parseURI() {
 // It returns an error if the symlink creation fails.
 func (src *Source) symlinkSources(symlinkSource string) error {
 	symlinkTarget := filepath.Join(src.SrcDir, src.SourceItemPath)
-	if !osutils.Exists(symlinkTarget) {
-		return os.Symlink(symlinkSource, symlinkTarget)
+
+	// Check if target already exists and points to the correct source
+	if linkTarget, err := os.Readlink(symlinkTarget); err == nil {
+		if linkTarget == symlinkSource {
+			return nil // Already correctly linked
+		}
+		// Remove existing incorrect symlink
+		if err := os.Remove(symlinkTarget); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return os.Symlink(symlinkSource, symlinkTarget)
 }
 
 // validateSource checks the integrity of the source files.
@@ -258,7 +276,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return errors.Errorf("unsupported hash length %d", len(src.Hash))
 	}
 
-	file, err := osutils.Open(filepath.Clean(sourceFilePath))
+	file, err := files.Open(filepath.Clean(sourceFilePath))
 	if err != nil {
 		return err
 	}
@@ -355,7 +373,12 @@ func processConcurrentDownloads(sources []*Source, maxConcurrent int) error {
 		return nil // All files already exist
 	}
 
-	results := osutils.DownloadConcurrently(downloads, maxConcurrent, 3)
+	_, err := shell.MultiPrinter.Start()
+	if err != nil {
+		return errors.Wrap(err, "failed to start multiprinter")
+	}
+
+	results := download.Concurrently(downloads, maxConcurrent, 3, shell.MultiPrinter.Writer)
 
 	return processDownloadResults(results, sourceMap)
 }
@@ -370,7 +393,7 @@ func prepareDownloadMap(sources []*Source) (
 		sourceFilePath := filepath.Join(src.StartDir, src.SourceItemPath)
 
 		// Skip if file already exists (respecting existing duplicate download prevention)
-		if osutils.Exists(sourceFilePath) {
+		if files.Exists(sourceFilePath) {
 			continue
 		}
 
@@ -430,5 +453,5 @@ func processSuccessfulDownload(destination string, src *Source) error {
 		return err
 	}
 
-	return osutils.Unarchive(destination, src.SrcDir)
+	return archive.Extract(destination, src.SrcDir)
 }

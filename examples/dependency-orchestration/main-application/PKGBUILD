@@ -3,6 +3,7 @@ pkgver="1.5.0"
 pkgrel="1"
 pkgdesc="Main web application combining web framework, database client, and foundation libraries"
 arch=('x86_64')
+license=('MIT')
 maintainer="YAP Team <maintainer@yap.dev>"
 url="https://github.com/example/main-application"
 

@@ -2,8 +2,6 @@
 package pkgbuild
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,8 +12,13 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/set"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
+
+// ArchAny represents architecture-independent packages.
+const ArchAny = "any"
 
 const (
 	dependsKey = "depends"
@@ -109,16 +112,16 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 // If "any", sets to "any". Otherwise, checks if current architecture is supported.
 // Logs error if not supported, then sets to current architecture if supported.
 func (pkgBuild *PKGBUILD) ComputeArchitecture() {
-	isSupported := osutils.Contains(pkgBuild.Arch, "any")
+	isSupported := set.Contains(pkgBuild.Arch, ArchAny)
 	if isSupported {
-		pkgBuild.ArchComputed = "any"
+		pkgBuild.ArchComputed = ArchAny
 
 		return
 	}
 
-	currentArch := osutils.GetArchitecture()
+	currentArch := platform.GetArchitecture()
 
-	isSupported = osutils.Contains(pkgBuild.Arch, currentArch)
+	isSupported = set.Contains(pkgBuild.Arch, currentArch)
 	if !isSupported {
 		logger.Fatal("unsupported architecture",
 			"pkgname", pkgBuild.PkgName,
@@ -161,14 +164,14 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 
 	args = append(args, makeDepends...)
 
-	return osutils.Exec(false, "", packageManager, args...)
+	return shell.ExecWithSudo(false, "", packageManager, args...)
 }
 
 // GetUpdates reads the package manager name and its arguments to perform
 // a sync with remotes and consequently retrieve updates.
 // It returns any error if encountered.
 func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
-	return osutils.Exec(false, "", packageManager, args...)
+	return shell.ExecWithSudo(false, "", packageManager, args...)
 }
 
 // Init initializes the PKGBUILD struct.
@@ -219,15 +222,14 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 	case "alpine":
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
 	default:
-		key := make([]byte, 5)
-
-		_, err := rand.Read(key)
-		if err != nil {
-			logger.Fatal("fatal error", "error", err)
+		var folderName string
+		if pkgBuild.Distro == "arch" {
+			folderName = "pkg"
+		} else {
+			folderName = "pkg-" + pkgBuild.Distro
 		}
 
-		randomString := hex.EncodeToString(key)
-		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, pkgBuild.Distro+"-"+randomString)
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, folderName)
 	}
 
 	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
@@ -496,7 +498,7 @@ func (pkgBuild *PKGBUILD) parseCombinedArchDistro(input string) (
 		return "", 0, false
 	}
 
-	currentArch := osutils.GetArchitecture()
+	currentArch := platform.GetArchitecture()
 	if possibleArch != currentArch {
 		return key, -1, true // Invalid architecture for current system
 	}
@@ -530,7 +532,7 @@ func (pkgBuild *PKGBUILD) parseArchitectureOnly(input string) (
 		return "", 0, false
 	}
 
-	currentArch := osutils.GetArchitecture()
+	currentArch := platform.GetArchitecture()
 	if possibleArch == currentArch {
 		return key, 4, true // Higher priority than distribution-specific
 	}
@@ -624,8 +626,8 @@ func (pkgBuild *PKGBUILD) isValidArchitecture(arch string) bool {
 		"x86_64", "i686", "aarch64", "armv7h", "armv6h", "armv5",
 		"ppc64", "ppc64le", "s390x", "mips", "mipsle", "riscv64",
 		"pentium4", // Arch Linux 32 support
-		"any",      // Architecture-independent packages
+		ArchAny,    // Architecture-independent packages
 	}
 
-	return osutils.Contains(validArchitectures, arch)
+	return set.Contains(validArchitectures, arch)
 }

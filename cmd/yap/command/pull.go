@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
 
 const (
@@ -51,7 +51,7 @@ Re-running this command will update to the latest image versions.`,
 				"(i. e. rocky-9, ubuntu-jammy)")
 		}
 
-		err := osutils.PullContainers(args[0])
+		err := platform.PullContainers(args[0])
 		if err != nil {
 			logger.Fatal("failed to pull image",
 				"error", err)
