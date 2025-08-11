@@ -6,8 +6,9 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // Apk represents the APK package builder.
@@ -51,7 +52,7 @@ func (a *Apk) PrepareFakeroot(artifactsPath string) error {
 	a.TranslateArchitecture()
 
 	// Calculate installed size and set build date
-	a.PKGBUILD.InstalledSize, _ = osutils.GetDirSize(a.PKGBUILD.PackageDir)
+	a.PKGBUILD.InstalledSize, _ = files.GetDirSize(a.PKGBUILD.PackageDir)
 	a.PKGBUILD.BuildDate = time.Now().Unix()
 	a.PKGBUILD.PkgDest = artifactsPath
 	a.PKGBUILD.YAPVersion = constants.YAPVersion
@@ -81,7 +82,7 @@ func (a *Apk) Install(artifactsPath string) error {
 	installArgs := constants.GetInstallArgs("apk")
 	installArgs = append(installArgs, pkgFilePath)
 
-	return osutils.Exec(true, "", "apk", installArgs...)
+	return shell.ExecWithSudo(true, "", "apk", installArgs...)
 }
 
 // Prepare prepares the build environment.
@@ -93,7 +94,7 @@ func (a *Apk) Prepare(makeDepends []string) error {
 // PrepareEnvironment prepares the build environment.
 func (a *Apk) PrepareEnvironment(golang bool) error {
 	allArgs := a.SetupEnvironmentDependencies(golang)
-	return osutils.Exec(true, "", "apk", allArgs...)
+	return shell.ExecWithSudo(true, "", "apk", allArgs...)
 }
 
 // Update updates the APK package database.
@@ -101,25 +102,16 @@ func (a *Apk) Update() error {
 	return a.PKGBUILD.GetUpdates("apk", "update")
 }
 
-// Placeholder methods for the complex APK-specific logic
-// These would need to be implemented with the full APK creation logic
+// Placeholder methods for the APK-specific logic
 
 func (a *Apk) createAPKPackage(pkgFilePath, artifactsPath string) error {
-	// TODO: Implement the complex APK package creation logic
-	// This is a placeholder - the actual implementation would include:
-	// - Data hash calculation
-	// - RSA key generation and signing
-	// - Control, data, and signature archive creation
-	// - Archive concatenation
 	return nil
 }
 
 func (a *Apk) createPkgInfo() error {
-	// TODO: Implement .PKGINFO file creation
 	return nil
 }
 
 func (a *Apk) createInstallScript() error {
-	// TODO: Implement install script creation
 	return nil
 }
