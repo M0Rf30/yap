@@ -10,9 +10,10 @@ import (
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/set"
 )
 
 // OverridePkgRel is a variable that allows overriding the Pkgrel field in
@@ -83,7 +84,7 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 func getSyntaxFile(path string) (*syntax.File, error) {
 	filePath := filepath.Join(path, "PKGBUILD")
 
-	file, err := osutils.Open(filePath)
+	file, err := files.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
 		if nodeType, ok := node.(*syntax.Assign); ok {
 			if nodeType.Array != nil {
-				for _, line := range osutils.StringifyArray(nodeType) {
+				for _, line := range set.StringifyArray(nodeType) {
 					arrayDecl, _ = shell.Fields(line, os.Getenv)
 				}
 
@@ -146,7 +147,7 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 				// This allows "${array_name[@]}" to expand to individual elements
 				customVars[nodeType.Name.Value] = strings.Join(arrayDecl, " ")
 			} else {
-				varDecl, _ = shell.Expand(osutils.StringifyAssign(nodeType), os.Getenv)
+				varDecl, _ = shell.Expand(set.StringifyAssign(nodeType), os.Getenv)
 				customVars[nodeType.Name.Value] = varDecl
 				err = pkgBuild.AddItem(nodeType.Name.Value, varDecl)
 			}
@@ -164,7 +165,7 @@ func processFunctions(
 
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
 		if nodeType, ok := node.(*syntax.FuncDecl); ok {
-			funcDecl := osutils.StringifyFuncDecl(nodeType)
+			funcDecl := set.StringifyFuncDecl(nodeType)
 
 			// Pre-process array expansions before any other processing
 			expandedFunc := preprocessArrayExpansions(funcDecl, customVars)

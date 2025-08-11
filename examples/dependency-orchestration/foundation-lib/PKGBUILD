@@ -3,6 +3,7 @@ pkgver="1.0.0"
 pkgrel="1"
 pkgdesc="Core foundation library providing essential utilities for all application components"
 arch=('x86_64')
+license=('MIT')
 maintainer="YAP Team <maintainer@yap.dev>"
 url="https://github.com/example/foundation-lib"
 

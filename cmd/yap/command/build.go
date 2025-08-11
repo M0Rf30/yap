@@ -9,9 +9,10 @@ import (
 
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/project"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 	"github.com/M0Rf30/yap/v2/pkg/source"
 )
 
@@ -57,12 +58,12 @@ DEPENDENCY RESOLUTION:
 	RunE: func(_ *cobra.Command, args []string) error {
 		// Set verbose flag from global flag
 		project.Verbose = verbose
-		osutils.SetVerbose(verbose)
+		shell.SetVerbose(verbose)
 
 		// Enhanced user feedback with progress
 		if verbose {
-			logger.Info("verbose mode enabled", "command", "build")
-			logger.Info("Starting build process with verbose logging enabled")
+			logger.Debug("verbose mode enabled", "command", "build")
+			logger.Debug("Starting build process with verbose logging enabled")
 		}
 
 		// Parse flexible arguments using shared function
@@ -73,7 +74,7 @@ DEPENDENCY RESOLUTION:
 
 		// Use the default distro if none is provided.
 		if distro == "" {
-			osRelease, _ := osutils.ParseOSRelease()
+			osRelease, _ := platform.ParseOSRelease()
 			distro = osRelease.ID
 			logger.Warn("No distribution specified, using detected",
 				"distro", distro)

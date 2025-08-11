@@ -3,7 +3,6 @@ package project
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,10 +14,11 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/otiai10/copy"
+	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -150,24 +150,8 @@ func (mpc *MultipleProject) Clean() error {
 		}
 
 		if Zap {
-			// For zap command, remove all build artifacts including:
-			// - StartDir (contains src/, pkg/, and other build files)
-			// - SourceDir (src directory specifically)
-			// - PkgDir (pkg directory if it exists separately)
-
-			// Remove StartDir completely (this includes src, pkg, and all build artifacts)
-			err := os.RemoveAll(proj.Builder.PKGBUILD.StartDir)
-			if err != nil {
+			if err := mpc.cleanZapArtifacts(proj); err != nil {
 				return err
-			}
-
-			// Also remove any additional directories that might exist
-			pkgDir := filepath.Join(proj.Builder.PKGBUILD.StartDir, "pkg")
-			if _, err := os.Stat(pkgDir); err == nil {
-				err = os.RemoveAll(pkgDir)
-				if err != nil {
-					return err
-				}
 			}
 		}
 	}
@@ -189,7 +173,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	err = osutils.ExistsMakeDir(mpc.BuildDir)
+	err = files.ExistsMakeDir(mpc.BuildDir)
 	if err != nil {
 		return err
 	}
@@ -234,7 +218,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		mpc.getRuntimeDeps()
 
 		if len(runtimeDepends) > 0 {
-			logger.Info("installing external runtime dependencies",
+			logger.Debug("installing external runtime dependencies",
 				"count", len(runtimeDepends))
 
 			err := packageManager.Prepare(runtimeDepends)
@@ -262,8 +246,8 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 			defer waitGroup.Done()
 
 			for proj := range projectChan {
-				logger.WithComponent(proj.Builder.PKGBUILD.PkgName)
-				logger.Info("making package",
+				logger.Debug("making package",
+					"package", proj.Builder.PKGBUILD.PkgName,
 					"pkgver", proj.Builder.PKGBUILD.PkgVer,
 					"pkgrel", proj.Builder.PKGBUILD.PkgRel)
 
@@ -337,39 +321,69 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
 	}
 }
 
-// copyProjects copies PKGBUILD directories for all projects, creating the
-// target directory if it doesn't exist.
-// It skips files with extensions: .apk, .deb, .pkg.tar.zst, and .rpm,
-// as well as symlinks.
-// Returns an error if any operation fails; otherwise, returns nil.
-func (mpc *MultipleProject) copyProjects() error {
-	copyOpt := copy.Options{
+// shouldSkipFile determines if a file should be skipped during copying.
+func shouldSkipFile(info os.FileInfo, src, dest string) (bool, error) {
+	// Skip if destination already exists with same size and modification time
+	if destInfo, err := os.Stat(dest); err == nil {
+		if !info.IsDir() && info.Size() == destInfo.Size() && info.ModTime().Equal(destInfo.ModTime()) {
+			return true, nil
+		}
+	}
+
+	// Define a slice of file extensions to skip
+	skipExtensions := []string{
+		".apk", ".deb", ".pkg.tar.zst", ".rpm",
+		".tar.gz", ".tar.xz", ".tar.bz2", ".zip",
+	}
+	for _, ext := range skipExtensions {
+		if strings.HasSuffix(src, ext) {
+			return true, nil
+		}
+	}
+
+	// Skip temporary and build artifacts
+	basename := filepath.Base(src)
+	if strings.HasPrefix(basename, ".") || strings.HasSuffix(basename, ".tmp") ||
+		strings.HasSuffix(basename, "~") || basename == "Thumbs.db" || basename == ".DS_Store" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// setupCopyOptions creates the copy options for the copyProjects function.
+func setupCopyOptions() copy.Options {
+	return copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Skip
 		},
-		Skip: func(_ os.FileInfo, src, _ string) (bool, error) {
-			// Define a slice of file extensions to skip
-			skipExtensions := []string{".apk", ".deb", ".pkg.tar.zst", ".rpm"}
-			for _, ext := range skipExtensions {
-				if strings.HasSuffix(src, ext) {
-					return true, nil
-				}
-			}
-
-			return false, nil
+		OnDirExists: func(src, dest string) copy.DirExistsAction {
+			return copy.Merge
 		},
+		Sync:          false, // Don't delete extra files in destination
+		PreserveTimes: false, // Don't preserve modification times for better performance
+		PreserveOwner: false, // Don't preserve ownership for better performance
+		Skip:          shouldSkipFile,
 	}
+}
+
+// copyProjects copies PKGBUILD directories for all projects, creating the
+// target directory if it doesn't exist.
+// It skips files with extensions: .apk, .deb, .pkg.tar.zst, and .rpm,
+// as well as symlinks. Uses hardlinks when possible to reduce disk usage.
+// Returns an error if any operation fails; otherwise, returns nil.
+func (mpc *MultipleProject) copyProjects() error {
+	singleProject := len(mpc.Projects) == 1
+	copyOpt := setupCopyOptions()
 
 	for _, proj := range mpc.Projects {
 		// Ensure the target directory exists
-		err := osutils.ExistsMakeDir(proj.Builder.PKGBUILD.StartDir)
-		if err != nil {
+		if err := files.ExistsMakeDir(proj.Builder.PKGBUILD.StartDir); err != nil {
 			return err
 		}
 
 		// Ensure the pkgdir directory exists
-		err = osutils.ExistsMakeDir(proj.Builder.PKGBUILD.PackageDir)
-		if err != nil {
+		if err := files.ExistsMakeDir(proj.Builder.PKGBUILD.PackageDir); err != nil {
 			return err
 		}
 
@@ -382,7 +396,7 @@ func (mpc *MultipleProject) copyProjects() error {
 		}
 	}
 
-	return nil // Return nil if all operations succeed
+	return nil
 }
 
 // createPackage creates packages for the MultipleProject.
@@ -408,7 +422,7 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		}
 	}()
 
-	err := osutils.ExistsMakeDir(mpc.Output)
+	err := files.ExistsMakeDir(mpc.Output)
 	if err != nil {
 		return err
 	}
@@ -549,13 +563,13 @@ func (mpc *MultipleProject) readProject(path string) error {
 
 	var projectFilePath string
 
-	if osutils.Exists(jsonFilePath) {
+	if files.Exists(jsonFilePath) {
 		projectFilePath = jsonFilePath
 		logger.Info("multi-project file found",
 			"path", projectFilePath)
 	}
 
-	if osutils.Exists(pkgbuildFilePath) {
+	if files.Exists(pkgbuildFilePath) {
 		projectFilePath = pkgbuildFilePath
 		logger.Info("single-project file found",
 			"path", projectFilePath)
@@ -563,7 +577,7 @@ func (mpc *MultipleProject) readProject(path string) error {
 		mpc.setSingleProject(path)
 	}
 
-	filePath, err := osutils.Open(projectFilePath)
+	filePath, err := files.Open(projectFilePath)
 	if err != nil || singleProject {
 		return err
 	}
@@ -874,7 +888,7 @@ func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 			return nil, fmt.Errorf("%w: %v", ErrCircularDependency, problematicPackages)
 		}
 
-		logger.Debug("build batch determined",
+		logger.Info("build batch determined",
 			"batch_number", batchNum,
 			"batch_size", len(currentBatch),
 			"packages", batchPackages,
@@ -1214,8 +1228,63 @@ func (mpc *MultipleProject) installRuntimeBatch(batch []*Project) error {
 		if ToPkgName != "" && pkgName == ToPkgName {
 			logger.Info("stopping build at target package",
 				"target_package", ToPkgName)
+		}
+	}
 
-			return nil
+	return nil
+}
+
+// cleanZapArtifacts removes build artifacts for a project when Zap is enabled
+func (mpc *MultipleProject) cleanZapArtifacts(proj *Project) error {
+	// For single projects, StartDir is the actual project directory containing
+	// source files and PKGBUILD, so we should NOT remove it. Only remove
+	// build artifacts within it.
+	if singleProject {
+		return mpc.cleanSingleProjectArtifacts(proj)
+	}
+
+	// For multi-projects, StartDir is a build directory that can be safely removed
+	// Remove StartDir completely (this includes src, pkg, and all build artifacts)
+	return os.RemoveAll(proj.Builder.PKGBUILD.StartDir)
+}
+
+// cleanSingleProjectArtifacts removes build artifacts for single projects
+func (mpc *MultipleProject) cleanSingleProjectArtifacts(proj *Project) error {
+	// Remove src directory (contains downloaded and extracted sources)
+	srcDir := filepath.Join(proj.Builder.PKGBUILD.StartDir, "src")
+	if _, err := os.Stat(srcDir); err == nil {
+		if err := os.RemoveAll(srcDir); err != nil {
+			return err
+		}
+	}
+
+	// Remove pkg directory (contains built packages)
+	pkgDir := filepath.Join(proj.Builder.PKGBUILD.StartDir, "pkg")
+	if _, err := os.Stat(pkgDir); err == nil {
+		if err := os.RemoveAll(pkgDir); err != nil {
+			return err
+		}
+	}
+
+	// Remove other common build artifacts but preserve source files
+	return mpc.removeBuildArtifacts(proj.Builder.PKGBUILD.StartDir)
+}
+
+// removeBuildArtifacts removes common build artifacts from the specified directory
+func (mpc *MultipleProject) removeBuildArtifacts(dir string) error {
+	buildArtifacts := []string{
+		"*.tar.xz", "*.tar.gz", "*.tar.bz2", "*.deb", "*.rpm", "*.pkg.tar.*",
+		"*.log", "*.sig",
+	}
+
+	for _, pattern := range buildArtifacts {
+		matches, err := filepath.Glob(filepath.Join(dir, pattern))
+		if err != nil {
+			continue // Skip if glob pattern fails
+		}
+
+		for _, match := range matches {
+			_ = os.Remove(match) // Ignore errors for individual file removal
 		}
 	}
 

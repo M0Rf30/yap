@@ -3,6 +3,7 @@ pkgver="1.0.0"
 pkgrel="1"
 pkgdesc="Middleware service layer providing request/response handling and business logic"
 arch=('x86_64')
+license=('GPL-3.0')
 maintainer="YAP Team <maintainer@yap.dev>"
 url="https://github.com/example/middleware-service"
 

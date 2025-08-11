@@ -67,13 +67,8 @@ func (w *Walker) Walk() ([]*Entry, error) {
 			return err
 		}
 
-		// Skip empty directories unless they need explicit ownership
-		if entry.IsDirectory() && w.isEmptyDirectory(path, dirEntry) {
-			// Only include empty directories if they might need explicit ownership
-			entries = append(entries, entry)
-		} else if !entry.IsDirectory() {
-			entries = append(entries, entry)
-		}
+		// Include all entries (files, directories, symlinks)
+		entries = append(entries, entry)
 
 		return nil
 	})
@@ -169,20 +164,6 @@ func (w *Walker) isBackupFile(path string) bool {
 	}
 
 	return false
-}
-
-// isEmptyDirectory checks if a directory is empty.
-func (w *Walker) isEmptyDirectory(path string, dirEntry fs.DirEntry) bool {
-	if !dirEntry.IsDir() {
-		return false
-	}
-
-	entries, err := os.ReadDir(filepath.Clean(path))
-	if err != nil {
-		return false
-	}
-
-	return len(entries) == 0
 }
 
 // calculateSHA256 calculates the SHA256 hash of a file.

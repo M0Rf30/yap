@@ -11,7 +11,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
 
 // statusCmd provides system and environment information.
@@ -52,7 +52,7 @@ func showSystemStatus() {
 	systemInfo := pterm.DefaultSection.WithLevel(2).Sprint("💻 System Information")
 	pterm.Println(systemInfo)
 
-	osRelease, err := osutils.ParseOSRelease()
+	osRelease, err := platform.ParseOSRelease()
 	if err == nil {
 		pterm.Printf("  %s %s\n",
 			pterm.FgGreen.Sprint("Operating System:"),
