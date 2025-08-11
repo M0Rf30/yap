@@ -141,8 +141,8 @@ func parsePKGBUILD(projectDir string) (pkgName, version, release string) {
 		return "", "1.0.0", "1"
 	}
 
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(content), "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 
 		// Skip comments and empty lines
