@@ -11,10 +11,25 @@ import (
 	"github.com/pterm/pterm"
 )
 
-const (
-	timestampFormat = "2006-01-02T15:04:05.000Z07:00"
-	logLevelInfo    = "INFO "
-)
+// argsToLoggerArgs converts arguments to pterm logger arguments.
+func argsToLoggerArgs(args ...any) []pterm.LoggerArgument {
+	if len(args) == 0 {
+		return nil
+	}
+
+	var loggerArgs []pterm.LoggerArgument
+
+	for i := 0; i < len(args)-1; i += 2 {
+		key := fmt.Sprintf("%v", args[i])
+		value := args[i+1]
+		loggerArgs = append(loggerArgs, pterm.LoggerArgument{
+			Key:   key,
+			Value: value,
+		})
+	}
+
+	return loggerArgs
+}
 
 // LogLevel represents the severity level of log messages for compatibility.
 type LogLevel int
@@ -55,91 +70,158 @@ func DefaultConfig() *Config {
 var (
 	// MultiPrinter is the default multiprinter for concurrent logging.
 	MultiPrinter = pterm.DefaultMultiPrinter
-	baseLogger   = pterm.DefaultLogger.WithLevel(pterm.LogLevelInfo).WithWriter(MultiPrinter.Writer)
+	// ptermLogger is the underlying pterm logger configured for yap with uniform color scheme
+	ptermLogger = pterm.DefaultLogger.
+			WithLevel(pterm.LogLevelTrace).
+			WithWriter(MultiPrinter.Writer).
+			WithCaller(false).
+			WithTime(true).
+			WithKeyStyles(map[string]pterm.Style{
+			// Package and artifact identifiers - Green
+			"package":        *pterm.NewStyle(pterm.FgGreen),
+			"distro":         *pterm.NewStyle(pterm.FgGreen),
+			"release":        *pterm.NewStyle(pterm.FgGreen),
+			"pkgver":         *pterm.NewStyle(pterm.FgGreen),
+			"pkgrel":         *pterm.NewStyle(pterm.FgGreen),
+			"source":         *pterm.NewStyle(pterm.FgGreen),
+			"total_packages": *pterm.NewStyle(pterm.FgGreen),
+			"total_batches":  *pterm.NewStyle(pterm.FgGreen),
+			"count":          *pterm.NewStyle(pterm.FgGreen),
+			// Numbers, counts, and progress - Blue
+			"batch_number":     *pterm.NewStyle(pterm.FgBlue),
+			"batch_size":       *pterm.NewStyle(pterm.FgBlue),
+			"packages":         *pterm.NewStyle(pterm.FgBlue),
+			"parallel_workers": *pterm.NewStyle(pterm.FgBlue),
+			"progress":         *pterm.NewStyle(pterm.FgBlue),
+			"duration":         *pterm.NewStyle(pterm.FgBlue),
+			"timestamp":        *pterm.NewStyle(pterm.FgBlue),
+			// Paths and commands - Light Blue
+			"path":    *pterm.NewStyle(pterm.FgLightBlue),
+			"command": *pterm.NewStyle(pterm.FgLightBlue),
+			"dir":     *pterm.NewStyle(pterm.FgLightBlue),
+			"args":    *pterm.NewStyle(pterm.FgLightBlue),
+			// Status and state - Cyan
+			"name":      *pterm.NewStyle(pterm.FgCyan),
+			"success":   *pterm.NewStyle(pterm.FgCyan),
+			"operation": *pterm.NewStyle(pterm.FgCyan),
+		})
 	// Logger is the global YapLogger instance.
-	Logger        = &YapLogger{baseLogger}
-	globalLogger  = &YapLogger{baseLogger}
-	colorDisabled = false
+	Logger         = &YapLogger{ptermLogger: ptermLogger}
+	colorDisabled  = false
+	verboseEnabled = false
 )
 
-// YapLogger wraps pterm.Logger with yap-specific formatting.
+// YapLogger provides yap-specific logging functionality.
 type YapLogger struct {
-	*pterm.Logger
+	ptermLogger *pterm.Logger
 }
 
 // Info logs an informational message with yap prefix.
 func (y *YapLogger) Info(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Info("[yap] "+msg, args...)
-}
-
-// Tips logs a tip message with custom formatting and yap prefix.
-func (y *YapLogger) Tips(msg string, _ ...[]pterm.LoggerArgument) {
-	timestamp := time.Now().Format(timestampFormat)
-
-	var logMsg string
-	if IsColorDisabled() {
-		logMsg = fmt.Sprintf("%s %s  [yap] %s", timestamp, logLevelInfo, msg)
+	prefix := fmt.Sprintf("[yap] %s", msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		y.ptermLogger.Info(prefix, args...)
 	} else {
-		logMsg = fmt.Sprintf("%s %s  %s %s",
-			pterm.FgGray.Sprint(timestamp),
-			pterm.FgCyan.Sprint(logLevelInfo),
-			pterm.FgBlue.Sprint("[yap]"),
-			msg,
-		)
+		y.ptermLogger.Info(prefix)
 	}
-
-	pterm.Println(logMsg)
-}
-
-// Warn logs a warning message with yap prefix.
-func (y *YapLogger) Warn(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Warn("[yap] "+msg, args...)
-}
-
-func (y *YapLogger) Error(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Error("[yap] "+msg, args...)
 }
 
 // Debug logs a debug message with yap prefix.
 func (y *YapLogger) Debug(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Debug("[yap] "+msg, args...)
+	if !verboseEnabled {
+		return
+	}
+
+	prefix := fmt.Sprintf("[yap] %s", msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		y.ptermLogger.Debug(prefix, args...)
+	} else {
+		y.ptermLogger.Debug(prefix)
+	}
+}
+
+// Warn logs a warning message with yap prefix.
+func (y *YapLogger) Warn(msg string, args ...[]pterm.LoggerArgument) {
+	prefix := fmt.Sprintf("[yap] %s", msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		y.ptermLogger.Warn(prefix, args...)
+	} else {
+		y.ptermLogger.Warn(prefix)
+	}
+}
+
+// Error logs an error message with yap prefix.
+func (y *YapLogger) Error(msg string, args ...[]pterm.LoggerArgument) {
+	prefix := fmt.Sprintf("[yap] %s", msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		y.ptermLogger.Error(prefix, args...)
+	} else {
+		y.ptermLogger.Error(prefix)
+	}
+}
+
+// WithKeyStyles sets custom styles for specific argument keys
+func (y *YapLogger) WithKeyStyles(styles map[string]pterm.Style) *YapLogger {
+	return &YapLogger{
+		ptermLogger: y.ptermLogger.WithKeyStyles(styles),
+	}
+}
+
+// AppendKeyStyle adds a style for a specific argument key
+func (y *YapLogger) AppendKeyStyle(key string, style pterm.Style) *YapLogger {
+	newLogger := *y
+	newLogger.ptermLogger = y.ptermLogger.AppendKeyStyle(key, style)
+
+	return &newLogger
+}
+
+// Tips logs a tip message with custom formatting and yap prefix.
+func (y *YapLogger) Tips(msg string, args ...[]pterm.LoggerArgument) {
+	// Use pterm's info printer with custom styling for tips
+	pterm.Info.WithPrefix(pterm.Prefix{
+		Text:  "TIPS",
+		Style: pterm.NewStyle(pterm.FgMagenta),
+	}).Println(fmt.Sprintf("[yap] %s", msg))
 }
 
 // Fatal logs a fatal message with yap prefix and exits.
 func (y *YapLogger) Fatal(msg string, args ...[]pterm.LoggerArgument) {
-	y.Logger.Fatal("[yap] "+msg, args...)
+	prefix := fmt.Sprintf("[yap] %s", msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		y.ptermLogger.Fatal(prefix, args...)
+	} else {
+		y.ptermLogger.Fatal(prefix)
+	}
 }
 
 // Args converts arguments to pterm logger arguments.
 func (y *YapLogger) Args(args ...any) []pterm.LoggerArgument {
-	return y.Logger.Args(args...)
+	return argsToLoggerArgs(args...)
 }
 
 // SetVerbose configures the logger verbosity level.
 func SetVerbose(verbose bool) {
-	var level pterm.LogLevel
+	verboseEnabled = verbose
 	if verbose {
-		level = pterm.LogLevelDebug
+		ptermLogger = ptermLogger.WithLevel(pterm.LogLevelTrace)
 	} else {
-		level = pterm.LogLevelInfo
+		ptermLogger = ptermLogger.WithLevel(pterm.LogLevelInfo)
 	}
 
-	baseLogger = pterm.DefaultLogger.WithLevel(level).WithWriter(MultiPrinter.Writer)
-	Logger = &YapLogger{baseLogger}
-	globalLogger = &YapLogger{baseLogger}
+	Logger.ptermLogger = ptermLogger
 }
 
 // ComponentLogger wraps a logger with component-specific formatting.
 type ComponentLogger struct {
-	*pterm.Logger
-	Component string
+	Component   string
+	ptermLogger *pterm.Logger
 }
 
 // WithComponent creates a new ComponentLogger with the specified component name.
 func WithComponent(component string) *ComponentLogger {
 	return &ComponentLogger{
-		Logger:    baseLogger,
-		Component: component,
+		Component:   component,
+		ptermLogger: ptermLogger,
 	}
 }
 
@@ -150,36 +232,77 @@ func ServiceLogger() *ComponentLogger {
 
 // Info logs an informational message with component prefix.
 func (cl *ComponentLogger) Info(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	cl.Logger.Info(prefixedMsg, args...)
+	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		cl.ptermLogger.Info(prefix, args...)
+	} else {
+		cl.ptermLogger.Info(prefix)
+	}
 }
 
 // Warn logs a warning message with component prefix.
 func (cl *ComponentLogger) Warn(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	cl.Logger.Warn(prefixedMsg, args...)
+	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		cl.ptermLogger.Warn(prefix, args...)
+	} else {
+		cl.ptermLogger.Warn(prefix)
+	}
 }
 
+// Error logs an error message with component prefix.
 func (cl *ComponentLogger) Error(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	cl.Logger.Error(prefixedMsg, args...)
+	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		cl.ptermLogger.Error(prefix, args...)
+	} else {
+		cl.ptermLogger.Error(prefix)
+	}
 }
 
 // Fatal logs a fatal message with component prefix and exits.
 func (cl *ComponentLogger) Fatal(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	cl.Logger.Fatal(prefixedMsg, args...)
+	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		cl.ptermLogger.Fatal(prefix, args...)
+	} else {
+		cl.ptermLogger.Fatal(prefix)
+	}
 }
 
 // Debug logs a debug message with component prefix.
 func (cl *ComponentLogger) Debug(msg string, args ...[]pterm.LoggerArgument) {
-	prefixedMsg := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	cl.Logger.Debug(prefixedMsg, args...)
+	if !verboseEnabled {
+		return
+	}
+
+	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
+	if len(args) > 0 && len(args[0]) > 0 {
+		cl.ptermLogger.Debug(prefix, args...)
+	} else {
+		cl.ptermLogger.Debug(prefix)
+	}
+}
+
+// WithKeyStyles sets custom styles for specific argument keys for ComponentLogger
+func (cl *ComponentLogger) WithKeyStyles(styles map[string]pterm.Style) *ComponentLogger {
+	return &ComponentLogger{
+		Component:   cl.Component,
+		ptermLogger: cl.ptermLogger.WithKeyStyles(styles),
+	}
+}
+
+// AppendKeyStyle adds a style for a specific argument key for ComponentLogger
+func (cl *ComponentLogger) AppendKeyStyle(key string, style pterm.Style) *ComponentLogger {
+	newLogger := *cl
+	newLogger.ptermLogger = cl.ptermLogger.AppendKeyStyle(key, style)
+
+	return &newLogger
 }
 
 // Args converts arguments to pterm logger arguments.
 func (cl *ComponentLogger) Args(args ...any) []pterm.LoggerArgument {
-	return cl.Logger.Args(args...)
+	return argsToLoggerArgs(args...)
 }
 
 // IsColorDisabled checks if color output is disabled.
@@ -230,7 +353,7 @@ func New(config *Config) *CompatLogger {
 	}
 
 	return &CompatLogger{
-		yapLogger: globalLogger,
+		yapLogger: Logger,
 		config:    config,
 	}
 }
@@ -255,6 +378,7 @@ func (l *CompatLogger) Warn(msg string, args ...any) {
 	l.yapLogger.Warn(msg, convertArgsToLoggerArgs(args...)...)
 }
 
+// Error logs an error message for compatibility.
 func (l *CompatLogger) Error(msg string, args ...any) {
 	l.yapLogger.Error(msg, convertArgsToLoggerArgs(args...)...)
 }
@@ -326,46 +450,46 @@ func (l *CompatLogger) LogOperation(name string, fn func() error) error {
 // SetGlobal sets the global logger instance for compatibility.
 func SetGlobal(logger *CompatLogger) {
 	if logger != nil {
-		globalLogger = logger.yapLogger
+		Logger = logger.yapLogger
 	}
 }
 
 // Global returns the global logger instance for compatibility.
 func Global() *CompatLogger {
 	return &CompatLogger{
-		yapLogger: globalLogger,
+		yapLogger: Logger,
 		config:    DefaultConfig(),
 	}
 }
 
 // Debug logs a debug message using the global logger.
 func Debug(msg string, args ...any) {
-	globalLogger.Debug(msg, convertArgsToLoggerArgs(args...)...)
+	Logger.Debug(msg, convertArgsToLoggerArgs(args...)...)
 }
 
 // Info logs an informational message using the global logger.
 func Info(msg string, args ...any) {
-	globalLogger.Info(msg, convertArgsToLoggerArgs(args...)...)
+	Logger.Info(msg, convertArgsToLoggerArgs(args...)...)
 }
 
 // Warn logs a warning message using the global logger.
 func Warn(msg string, args ...any) {
-	globalLogger.Warn(msg, convertArgsToLoggerArgs(args...)...)
+	Logger.Warn(msg, convertArgsToLoggerArgs(args...)...)
 }
 
 // Error logs an error message using the global logger.
 func Error(msg string, args ...any) {
-	globalLogger.Error(msg, convertArgsToLoggerArgs(args...)...)
+	Logger.Error(msg, convertArgsToLoggerArgs(args...)...)
 }
 
 // Fatal logs a fatal message using the global logger and exits.
 func Fatal(msg string, args ...any) {
-	globalLogger.Fatal(msg, convertArgsToLoggerArgs(args...)...)
+	Logger.Fatal(msg, convertArgsToLoggerArgs(args...)...)
 }
 
 // Tips logs a tip message using the global logger.
 func Tips(msg string, args ...any) {
-	globalLogger.Tips(msg, convertArgsToLoggerArgs(args...)...)
+	Logger.Tips(msg, convertArgsToLoggerArgs(args...)...)
 }
 
 // WithError returns a global logger with error context.
@@ -385,5 +509,5 @@ func convertArgsToLoggerArgs(args ...any) [][]pterm.LoggerArgument {
 	}
 
 	// Convert to pterm logger arguments
-	return [][]pterm.LoggerArgument{globalLogger.Args(args...)}
+	return [][]pterm.LoggerArgument{Logger.Args(args...)}
 }
