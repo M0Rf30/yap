@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // Packager is the common interface implemented by all package managers.
@@ -118,11 +120,11 @@ func (bpm *BasePackageManager) PrepareEnvironmentCommon(golang bool) error {
 
 	if golang {
 		if bpm.Config.Name == constants.FormatAPK {
-			osutils.CheckGO()
+			platform.CheckGO()
 
 			args = append(args, "go")
 		} else {
-			err := osutils.GOSetup()
+			err := platform.GOSetup()
 			if err != nil {
 				return err
 			}
@@ -131,7 +133,7 @@ func (bpm *BasePackageManager) PrepareEnvironmentCommon(golang bool) error {
 
 	useSudo := bpm.Config.Name != constants.FormatAPK
 
-	return osutils.Exec(useSudo, "", bpm.Config.InstallCmd, args...)
+	return shell.Exec(useSudo, "", bpm.Config.InstallCmd, args...)
 }
 
 // UpdateCommon handles common update operations.
@@ -152,7 +154,7 @@ func (bpm *BasePackageManager) InstallCommon(artifactsPath, packageName string) 
 
 	useSudo := bpm.Config.Name != constants.FormatAPK
 
-	return osutils.Exec(useSudo, "", bpm.Config.InstallCmd, args...)
+	return shell.Exec(useSudo, "", bpm.Config.InstallCmd, args...)
 }
 
 // LogPackageCreated logs successful package creation.
@@ -186,7 +188,7 @@ func (bpm *BasePackageManager) SetComputedFields() {
 
 // SetInstalledSize calculates and sets the installed size.
 func (bpm *BasePackageManager) SetInstalledSize() error {
-	size, err := osutils.GetDirSize(bpm.PKGBUILD.PackageDir)
+	size, err := files.GetDirSize(bpm.PKGBUILD.PackageDir)
 	if err != nil {
 		return err
 	}
