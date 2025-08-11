@@ -27,8 +27,14 @@ type ProgressBar struct {
 func NewProgressBar(writer io.Writer, packageName, title string,
 	total int64) *ProgressBar {
 	// Create pterm progress bar with log-style format including timestamp and INFO level
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	logTitle := fmt.Sprintf("%s INFO [%s] %s", timestamp, packageName, title)
+	// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets with yellow component
+	timestamp := pterm.NewStyle(pterm.FgGray).Sprint(time.Now().Format("2006-01-02 15:04:05"))
+	info := pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(" INFO")
+	component := fmt.Sprintf("%s%s%s",
+		pterm.NewStyle(pterm.FgWhite).Sprint("["),
+		pterm.NewStyle(pterm.FgYellow).Sprint(packageName),
+		pterm.NewStyle(pterm.FgWhite).Sprint("]"))
+	logTitle := fmt.Sprintf("%s %s %s %s", timestamp, info, component, title)
 
 	ptermBar := pterm.DefaultProgressbar.
 		WithTitle(logTitle).
@@ -78,13 +84,20 @@ func (epb *ProgressBar) Update(current int64) {
 			}
 
 			// Update title with log-style format including timestamp and INFO level
-			timestamp := time.Now().Format("2006-01-02 15:04:05")
+			// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets with yellow component
+			timestamp := pterm.NewStyle(pterm.FgGray).Sprint(time.Now().Format("2006-01-02 15:04:05"))
+			info := pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(" INFO")
+			component := fmt.Sprintf("%s%s%s",
+				pterm.NewStyle(pterm.FgWhite).Sprint("["),
+				pterm.NewStyle(pterm.FgYellow).Sprint(epb.packageName),
+				pterm.NewStyle(pterm.FgWhite).Sprint("]"))
 			currentSize := formatBytes(epb.current)
 			totalSize := formatBytes(epb.total)
 
-			logTitle := fmt.Sprintf("%s INFO [%s] %s • %s/%s • %s • ETA: %s",
+			logTitle := fmt.Sprintf("%s %s %s %s • %s/%s • %s • ETA: %s",
 				timestamp,
-				epb.packageName,
+				info,
+				component,
 				epb.title,
 				currentSize,
 				totalSize,
@@ -128,14 +141,21 @@ func (epb *ProgressBar) Finish() {
 
 	if epb.ptermBar != nil {
 		// Final update with completion info in log-style format
-		timestamp := time.Now().Format("2006-01-02 15:04:05")
+		// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets with yellow component
+		timestamp := pterm.NewStyle(pterm.FgGray).Sprint(time.Now().Format("2006-01-02 15:04:05"))
+		info := pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(" INFO")
+		component := fmt.Sprintf("%s%s%s",
+			pterm.NewStyle(pterm.FgWhite).Sprint("["),
+			pterm.NewStyle(pterm.FgYellow).Sprint(epb.packageName),
+			pterm.NewStyle(pterm.FgWhite).Sprint("]"))
 		duration := time.Since(epb.startTime)
 		finalSize := formatBytes(epb.total)
 		avgSpeed := formatBytes(int64(float64(epb.total)/duration.Seconds())) + "/s"
 
-		completionTitle := fmt.Sprintf("%s INFO [%s] %s • %s • %s • Completed in %v",
+		completionTitle := fmt.Sprintf("%s %s %s %s • %s • %s • Completed in %v",
 			timestamp,
-			epb.packageName,
+			info,
+			component,
 			epb.title,
 			finalSize,
 			avgSpeed,
@@ -150,8 +170,7 @@ func (epb *ProgressBar) Finish() {
 
 	// Log final completion message using logger.Info for consistency
 	duration := time.Since(epb.startTime)
-	logger.Logger.Info(fmt.Sprintf(
-		"%s completed in %v",
-		epb.title,
-		duration))
+	logger.Info("download completed",
+		"title", epb.title,
+		"duration", duration)
 }

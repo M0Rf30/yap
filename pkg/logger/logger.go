@@ -116,9 +116,18 @@ type YapLogger struct {
 	ptermLogger *pterm.Logger
 }
 
+// formatYapPrefix creates a formatted prefix with white brackets and yellow yap text.
+func formatYapPrefix(msg string) string {
+	return fmt.Sprintf("%s%s%s %s",
+		pterm.NewStyle(pterm.FgWhite).Sprint("["),
+		pterm.NewStyle(pterm.FgYellow).Sprint("yap"),
+		pterm.NewStyle(pterm.FgWhite).Sprint("]"),
+		msg)
+}
+
 // Info logs an informational message with yap prefix.
 func (y *YapLogger) Info(msg string, args ...[]pterm.LoggerArgument) {
-	prefix := fmt.Sprintf("[yap] %s", msg)
+	prefix := formatYapPrefix(msg)
 	if len(args) > 0 && len(args[0]) > 0 {
 		y.ptermLogger.Info(prefix, args...)
 	} else {
@@ -132,7 +141,7 @@ func (y *YapLogger) Debug(msg string, args ...[]pterm.LoggerArgument) {
 		return
 	}
 
-	prefix := fmt.Sprintf("[yap] %s", msg)
+	prefix := formatYapPrefix(msg)
 	if len(args) > 0 && len(args[0]) > 0 {
 		y.ptermLogger.Debug(prefix, args...)
 	} else {
@@ -142,7 +151,7 @@ func (y *YapLogger) Debug(msg string, args ...[]pterm.LoggerArgument) {
 
 // Warn logs a warning message with yap prefix.
 func (y *YapLogger) Warn(msg string, args ...[]pterm.LoggerArgument) {
-	prefix := fmt.Sprintf("[yap] %s", msg)
+	prefix := formatYapPrefix(msg)
 	if len(args) > 0 && len(args[0]) > 0 {
 		y.ptermLogger.Warn(prefix, args...)
 	} else {
@@ -152,7 +161,7 @@ func (y *YapLogger) Warn(msg string, args ...[]pterm.LoggerArgument) {
 
 // Error logs an error message with yap prefix.
 func (y *YapLogger) Error(msg string, args ...[]pterm.LoggerArgument) {
-	prefix := fmt.Sprintf("[yap] %s", msg)
+	prefix := formatYapPrefix(msg)
 	if len(args) > 0 && len(args[0]) > 0 {
 		y.ptermLogger.Error(prefix, args...)
 	} else {
@@ -181,12 +190,12 @@ func (y *YapLogger) Tips(msg string, args ...[]pterm.LoggerArgument) {
 	pterm.Info.WithPrefix(pterm.Prefix{
 		Text:  "TIPS",
 		Style: pterm.NewStyle(pterm.FgMagenta),
-	}).Println(fmt.Sprintf("[yap] %s", msg))
+	}).Println(formatYapPrefix(msg))
 }
 
 // Fatal logs a fatal message with yap prefix and exits.
 func (y *YapLogger) Fatal(msg string, args ...[]pterm.LoggerArgument) {
-	prefix := fmt.Sprintf("[yap] %s", msg)
+	prefix := formatYapPrefix(msg)
 	if len(args) > 0 && len(args[0]) > 0 {
 		y.ptermLogger.Fatal(prefix, args...)
 	} else {
@@ -313,19 +322,9 @@ func IsColorDisabled() bool {
 	}
 
 	// Check environment variables
-	colorTerm := os.Getenv("COLORTERM")
-	term := os.Getenv("TERM")
 	noColor := os.Getenv("NO_COLOR")
 
-	if noColor != "" {
-		return true
-	}
-
-	if colorTerm == "" && term == "" {
-		return true
-	}
-
-	return false
+	return noColor != ""
 }
 
 // SetColorDisabled enables or disables color output.

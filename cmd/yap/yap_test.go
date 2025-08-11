@@ -14,9 +14,7 @@ func TestMain(t *testing.T) {
 	// we can't easily test it directly without mocking.
 	// This test ensures the package compiles and imports correctly.
 	// We just verify that main function exists and doesn't panic during compilation
-	if t == nil {
-		t.Error("test context should not be nil")
-	}
+	require.NotNil(t, t)
 }
 
 func TestPackageImports(t *testing.T) {
