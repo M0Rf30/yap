@@ -5,9 +5,11 @@ import (
 	"sync"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 	"github.com/M0Rf30/yap/v2/pkg/source"
 )
 
@@ -84,7 +86,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	logger.Info(message, "pkgver", pkgVer, "pkgrel", pkgRel)
 
 	// Execute script with package decoration
-	err := osutils.RunScriptWithPackage("  set -e\n"+pkgbuildFunction, pkgName)
+	err := shell.RunScriptWithPackage("  set -e\n"+pkgbuildFunction, pkgName)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "build stage failed").
 			WithContext("package", pkgName).
@@ -186,5 +188,15 @@ func (builder *Builder) getSources() error {
 // initDirs creates mandatory fakeroot folders (src, pkg) for a single project.
 // It returns any error if occurred.
 func (builder *Builder) initDirs() error {
-	return osutils.ExistsMakeDir(builder.PKGBUILD.SourceDir)
+	err := files.ExistsMakeDir(builder.PKGBUILD.SourceDir)
+	if err != nil {
+		return err
+	}
+
+	if err := platform.PreserveOwnership(builder.PKGBUILD.SourceDir); err != nil {
+		logger.Warn("failed to preserve ownership for SourceDir",
+			"path", builder.PKGBUILD.SourceDir, "error", err)
+	}
+
+	return nil
 }

@@ -11,11 +11,14 @@ import (
 	"github.com/blakesmith/ar"
 	"github.com/otiai10/copy"
 
+	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // Package represents a Deb package.
@@ -56,7 +59,7 @@ func (d *Package) BuildPackage(artifactsPath string) error {
 	dataArchive := filepath.Join(debTemp, dataFilename)
 
 	// Create control archive
-	err = osutils.CreateTarZst(d.debDir, controlArchive, true)
+	err = archive.CreateTarZst(d.debDir, controlArchive, true)
 	if err != nil {
 		return err
 	}
@@ -67,7 +70,7 @@ func (d *Package) BuildPackage(artifactsPath string) error {
 	}
 
 	// Create data archive
-	err = osutils.CreateTarZst(d.PKGBUILD.PackageDir, dataArchive, true)
+	err = archive.CreateTarZst(d.PKGBUILD.PackageDir, dataArchive, true)
 	if err != nil {
 		return err
 	}
@@ -99,7 +102,7 @@ func (d *Package) Install(artifactsPath string) error {
 	installArgs := constants.GetInstallArgs(constants.FormatDEB)
 	installArgs = append(installArgs, artifactFilePath)
 
-	err := osutils.Exec(false, "", "apt-get", installArgs...)
+	err := shell.ExecWithSudo(false, "", "apt-get", installArgs...)
 	if err != nil {
 		return err
 	}
@@ -127,13 +130,13 @@ func (d *Package) PrepareEnvironment(golang bool) error {
 	installArgs := constants.GetInstallArgs(constants.FormatDEB)
 	installArgs = append(installArgs, buildDeps.DEB...)
 
-	err := osutils.Exec(false, "", "apt-get", installArgs...)
+	err := shell.ExecWithSudo(false, "", "apt-get", installArgs...)
 	if err != nil {
 		return err
 	}
 
 	if golang {
-		err := osutils.GOSetup()
+		err := platform.GOSetup()
 		if err != nil {
 			return err
 		}
@@ -226,12 +229,12 @@ func (d *Package) addScriptlets() error {
 
 		path := filepath.Join(d.debDir, name)
 
-		err := osutils.CreateWrite(path, script)
+		err := files.CreateWrite(path, script)
 		if err != nil {
 			return err
 		}
 
-		err = osutils.Chmod(path, 0o755)
+		err = files.Chmod(path, 0o755)
 		if err != nil {
 			return err
 		}
@@ -261,7 +264,7 @@ func (d *Package) createConfFiles() error {
 		data += name + "\n"
 	}
 
-	return osutils.CreateWrite(path, data)
+	return files.CreateWrite(path, data)
 }
 
 // createCopyrightFile generates a copyright file for the Debian package.
@@ -387,7 +390,7 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 func (d *Package) createDebResources() error {
 	d.debDir = filepath.Join(d.PKGBUILD.PackageDir, "DEBIAN")
 
-	err := osutils.ExistsMakeDir(d.debDir)
+	err := files.ExistsMakeDir(d.debDir)
 	if err != nil {
 		return err
 	}
@@ -397,7 +400,7 @@ func (d *Package) createDebResources() error {
 		return err
 	}
 
-	size, _ := osutils.GetDirSize(d.PKGBUILD.PackageDir)
+	size, _ := files.GetDirSize(d.PKGBUILD.PackageDir)
 	d.PKGBUILD.InstalledSize = size / 1024
 	d.PKGBUILD.Depends = d.processDepends(d.PKGBUILD.Depends)
 	d.PKGBUILD.MakeDepends = d.processDepends(d.PKGBUILD.MakeDepends)
