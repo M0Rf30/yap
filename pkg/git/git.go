@@ -27,6 +27,9 @@ import (
 func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 	referenceName plumbing.ReferenceName,
 ) error {
+	if dloadFilePath == "" {
+		return errors.New("download file path cannot be empty")
+	}
 	// Start multiprinter for consistent output handling
 	_, err := shell.MultiPrinter.Start()
 	if err != nil {
