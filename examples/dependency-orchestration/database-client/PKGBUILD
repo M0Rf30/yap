@@ -3,6 +3,7 @@ pkgver="2.0.0"
 pkgrel="1"
 pkgdesc="Database client library providing connection pooling and query execution"
 arch=('x86_64')
+license=('Apache-2.0')
 maintainer="YAP Team <maintainer@yap.dev>"
 url="https://github.com/example/database-client"
 

@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 )
 
 func TestSource_parseURI(t *testing.T) {
@@ -482,7 +484,7 @@ func TestFilename(t *testing.T) {
 		t.Run(testCase.path, func(t *testing.T) {
 			t.Parallel()
 
-			result := osutils.Filename(testCase.path)
+			result := files.Filename(testCase.path)
 			assert.Equal(t, testCase.expected, result)
 		})
 	}
@@ -515,7 +517,7 @@ func TestSource_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create multiple source files
-	files := []struct {
+	testFiles := []struct {
 		name    string
 		content []byte
 	}{
@@ -523,9 +525,9 @@ func TestSource_Integration(t *testing.T) {
 		{"file2.txt", []byte("content of file 2")},
 	}
 
-	sources := make([]Source, 0, len(files))
+	sources := make([]Source, 0, len(testFiles))
 
-	for _, file := range files {
+	for _, file := range testFiles {
 		filePath := filepath.Join(tempDir, file.name)
 		err := os.WriteFile(filePath, file.content, 0o600)
 		require.NoError(t, err)
@@ -566,10 +568,10 @@ func TestSource_GetConcurrently(t *testing.T) {
 	// Create some test source files
 	sources := make([]*Source, 2)
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		fileName := fmt.Sprintf("file%d.txt", i)
 		filePath := filepath.Join(tempDir, fileName)
-		content := []byte(fmt.Sprintf("content %d", i))
+		content := fmt.Appendf(nil, "content %d", i)
 		err := os.WriteFile(filePath, content, 0o600)
 		require.NoError(t, err)
 
@@ -640,6 +642,14 @@ func TestSourceStruct(t *testing.T) {
 }
 
 func TestGetURL(t *testing.T) {
+	// Create a mock HTTP server for testing HTTP downloads
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("test file content"))
+	}))
+	defer server.Close()
+
 	// Test the getURL function which has 0% coverage
 	tests := []struct {
 		name          string
@@ -649,9 +659,9 @@ func TestGetURL(t *testing.T) {
 	}{
 		{
 			name:          "HTTP download",
-			sourceURI:     "http://example.com/file.tar.gz",
+			sourceURI:     server.URL + "/file.tar.gz",
 			protocol:      "http",
-			expectedError: true, // Will fail without actual server
+			expectedError: false, // Should succeed with mock server
 		},
 		{
 			name:          "Git protocol",
@@ -677,6 +687,10 @@ func TestGetURL(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				// Verify file was created and has content
+				content, readErr := os.ReadFile(dloadFilePath)
+				assert.NoError(t, readErr)
+				assert.Equal(t, "test file content", string(content))
 			}
 		})
 	}
@@ -780,12 +794,20 @@ func TestProcessSuccessfulDownload(t *testing.T) {
 }
 
 func TestProcessConcurrentDownloads(t *testing.T) {
+	// Create a mock HTTP server for testing concurrent downloads
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("test file content for concurrent download"))
+	}))
+	defer server.Close()
+
 	// Test processConcurrentDownloads function which has 0% coverage
 	tempDir := t.TempDir()
 
 	sources := []*Source{
 		{
-			SourceItemURI:  "http://example.com/file.txt",
+			SourceItemURI:  server.URL + "/file.txt",
 			SourceItemPath: "file.txt",
 			PkgName:        "test-pkg",
 			StartDir:       tempDir,

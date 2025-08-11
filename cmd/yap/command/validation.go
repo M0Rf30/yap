@@ -11,7 +11,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // Static error definitions to satisfy err113 linter.
@@ -214,7 +214,7 @@ func validatePathForCommand(cmd *cobra.Command, args []string) error {
 // PreRunValidation provides pre-run validation with interactive prompts for missing arguments.
 func PreRunValidation(cmd *cobra.Command, _ []string) {
 	// Set verbose logging early
-	osutils.SetVerbose(verbose)
+	shell.SetVerbose(verbose)
 
 	// Additional pre-run setup can go here
 	if verbose {
