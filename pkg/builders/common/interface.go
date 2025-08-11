@@ -8,8 +8,8 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
 
 // Builder defines the common interface that all package builders must implement.
@@ -132,12 +132,11 @@ func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
 	if golang {
 		// APK uses different Go setup
 		if bb.Format == constants.FormatAPK {
-			osutils.CheckGO()
-
-			allArgs = append(allArgs, "go")
+			platform.CheckGO()
 		} else {
-			// Other formats use OSUtils Go setup
-			err := osutils.GOSetup()
+			logger.Info("go detected: version check is disabled")
+
+			err := platform.GOSetup()
 			if err != nil {
 				logger.Warn("Failed to setup Go environment",
 					"error", err)

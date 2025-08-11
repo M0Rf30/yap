@@ -8,14 +8,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/rpmpack"
-
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
-	"github.com/M0Rf30/yap/v2/pkg/osutils"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
+
+	rpmpack "github.com/google/rpmpack"
 )
 
 // RPM represents a RPM package.
@@ -148,7 +149,7 @@ func (r *RPM) Install(artifactsPath string) error {
 	installArgs := constants.GetInstallArgs(constants.FormatRPM)
 	installArgs = append(installArgs, pkgFilePath)
 
-	err := osutils.Exec(false, "", "dnf", installArgs...)
+	err := shell.ExecWithSudo(false, "", "dnf", installArgs...)
 	if err != nil {
 		return err
 	}
@@ -177,13 +178,13 @@ func (r *RPM) PrepareEnvironment(golang bool) error {
 	installArgs := constants.GetInstallArgs(constants.FormatRPM)
 	installArgs = append(installArgs, buildDeps.RPM...)
 
-	err := osutils.Exec(false, "", "dnf", installArgs...)
+	err := shell.ExecWithSudo(false, "", "dnf", installArgs...)
 	if err != nil {
 		return err
 	}
 
 	if golang {
-		err = osutils.GOSetup()
+		err = platform.GOSetup()
 		if err != nil {
 			return err
 		}
@@ -216,24 +217,21 @@ func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
 		return err // Return the error if walking the directory fails.
 	}
 
-	// Convert to legacy format for compatibility
-	var contents []*osutils.FileContent
+	// Convert entries to FileContent format
+	var contents []*files.Entry
 
-	for _, entry := range entries {
-		converted := entry.ConvertToLegacyFormat()
-		contents = append(contents, &converted)
-	}
+	contents = append(contents, entries...)
 
 	// Add the retrieved contents to the RPM object and return any error that occurs.
 	return addContentsToRPM(contents, rpm)
 }
 
-// addContentsToRPM adds a slice of FileContent objects to the specified RPM object.
-// It creates RPMFile objects from the FileContent and adds them to the RPM.
-func addContentsToRPM(contents []*osutils.FileContent, rpm *rpmpack.RPM) error {
-	// Iterate over each FileContent in the provided slice.
+// addContentsToRPM adds a slice of Entry objects to the specified RPM object.
+// It creates RPMFile objects from the Entry and adds them to the RPM.
+func addContentsToRPM(contents []*files.Entry, rpm *rpmpack.RPM) error {
+	// Iterate over each Entry in the provided slice.
 	for _, content := range contents {
-		// Create an RPMFile from the FileContent.
+		// Create an RPMFile from the Entry.
 		file, err := createRPMFile(content)
 		if err != nil {
 			return err // Return the error if creating the RPMFile fails.
@@ -283,35 +281,38 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 	}
 }
 
-// asRPMDirectory creates an RPMFile object for a directory based on the provided FileContent.
+// asRPMDirectory creates an RPMFile object for a directory based on the provided Entry.
 // It retrieves the directory's modification time and sets the appropriate fields in the RPMFile.
-func asRPMDirectory(content *osutils.FileContent) *rpmpack.RPMFile {
-	// Get file information for the directory specified in the content.
-	fileInfo, _ := os.Stat(filepath.Clean(content.Source))
+func asRPMDirectory(entry *files.Entry) *rpmpack.RPMFile {
+	// Get file information for the directory specified in the entry.
+	fileInfo, _ := os.Stat(filepath.Clean(entry.Source))
 
 	// Retrieve the modification time of the directory.
 	mTime := getModTime(fileInfo)
 
 	// Create and return an RPMFile object for the directory.
 	return &rpmpack.RPMFile{
-		Name:  content.Destination,                          // Set the destination name.
-		Mode:  uint(fileInfo.Mode()) | osutils.TagDirectory, // Set the mode to indicate it's a directory.
-		MTime: mTime,                                        // Set the modification time.
-		Owner: "root",                                       // Set the owner to "root".
-		Group: "root",                                       // Set the group to "root".
+		Name: entry.Destination, // Set the destination name.
+		// Set the mode to indicate it's a directory.
+		Mode:  uint(fileInfo.Mode()) | files.TagDirectory,
+		MTime: mTime,  // Set the modification time.
+		Owner: "root", // Set the owner to "root".
+		Group: "root", // Set the group to "root".
 	}
 }
 
-// asRPMFile creates an RPMFile object for a regular file based on the provided FileContent.
+// asRPMFile creates an RPMFile object for a regular file based on the provided Entry.
 // It reads the file's data and retrieves its modification time.
-func asRPMFile(content *osutils.FileContent, fileType rpmpack.FileType) (*rpmpack.RPMFile, error) {
+func asRPMFile(
+	entry *files.Entry,
+	fileType rpmpack.FileType) (*rpmpack.RPMFile, error) {
 	// Read the file data from the source path.
-	data, err := os.ReadFile(content.Source)
+	data, err := os.ReadFile(entry.Source)
 	if err != nil {
 		return nil, err // Return nil and the error if reading the file fails.
 	}
 
-	cleanFilePath := filepath.Clean(content.Source)
+	cleanFilePath := filepath.Clean(entry.Source)
 	fileInfo, _ := os.Stat(cleanFilePath)
 
 	// Retrieve the modification time of the file.
@@ -319,7 +320,7 @@ func asRPMFile(content *osutils.FileContent, fileType rpmpack.FileType) (*rpmpac
 
 	// Create and return an RPMFile object for the regular file.
 	return &rpmpack.RPMFile{
-		Name:  content.Destination,   // Set the destination name.
+		Name:  entry.Destination,     // Set the destination name.
 		Body:  data,                  // Set the file data.
 		Mode:  uint(fileInfo.Mode()), // Set the file mode.
 		MTime: mTime,                 // Set the modification time.
@@ -329,10 +330,10 @@ func asRPMFile(content *osutils.FileContent, fileType rpmpack.FileType) (*rpmpac
 	}, nil
 }
 
-// asRPMSymlink creates an RPMFile object for a symbolic link based on the provided FileContent.
+// asRPMSymlink creates an RPMFile object for a symbolic link based on the provided Entry.
 // It retrieves the link's target and modification time.
-func asRPMSymlink(content *osutils.FileContent) *rpmpack.RPMFile {
-	cleanFilePath := filepath.Clean(content.Source)
+func asRPMSymlink(entry *files.Entry) *rpmpack.RPMFile {
+	cleanFilePath := filepath.Clean(entry.Source)
 	fileInfo, _ := os.Lstat(cleanFilePath) // Use Lstat to get information about the symlink.
 	body, _ := os.Readlink(cleanFilePath)  // Read the target of the symlink.
 
@@ -341,31 +342,31 @@ func asRPMSymlink(content *osutils.FileContent) *rpmpack.RPMFile {
 
 	// Create and return an RPMFile object for the symlink.
 	return &rpmpack.RPMFile{
-		Name:  content.Destination,   // Set the destination name.
-		Body:  []byte(body),          // Set the target of the symlink as the body.
-		Mode:  uint(osutils.TagLink), // Set the mode to indicate it's a symlink.
-		MTime: mTime,                 // Set the modification time.
-		Owner: "root",                // Set the owner to "root".
-		Group: "root",                // Set the group to "root".
+		Name:  entry.Destination,   // Set the destination name.
+		Body:  []byte(body),        // Set the target of the symlink as the body.
+		Mode:  uint(files.TagLink), // Set the mode to indicate it's a symlink.
+		MTime: mTime,               // Set the modification time.
+		Owner: "root",              // Set the owner to "root".
+		Group: "root",              // Set the group to "root".
 	}
 }
 
-// createRPMFile converts a FileContent object into an RPMFile object based on its type.
+// createRPMFile converts an Entry object into an RPMFile object based on its type.
 // It returns the created RPMFile and any error encountered during the conversion.
-func createRPMFile(content *osutils.FileContent) (*rpmpack.RPMFile, error) {
+func createRPMFile(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	var file *rpmpack.RPMFile
 
 	var err error
 
-	switch content.Type {
-	case osutils.TypeConfigNoReplace:
-		file, err = asRPMFile(content, rpmpack.ConfigFile|rpmpack.NoReplaceFile)
-	case osutils.TypeSymlink:
-		file = asRPMSymlink(content)
-	case osutils.TypeDir:
-		file = asRPMDirectory(content)
-	case osutils.TypeFile:
-		file, err = asRPMFile(content, rpmpack.GenericFile)
+	switch entry.Type {
+	case files.TypeConfigNoReplace:
+		file, err = asRPMFile(entry, rpmpack.ConfigFile|rpmpack.NoReplaceFile)
+	case files.TypeSymlink:
+		file = asRPMSymlink(entry)
+	case files.TypeDir:
+		file = asRPMDirectory(entry)
+	case files.TypeFile:
+		file, err = asRPMFile(entry, rpmpack.GenericFile)
 	}
 
 	return file, err
