@@ -313,19 +313,9 @@ func IsColorDisabled() bool {
 	}
 
 	// Check environment variables
-	colorTerm := os.Getenv("COLORTERM")
-	term := os.Getenv("TERM")
 	noColor := os.Getenv("NO_COLOR")
 
-	if noColor != "" {
-		return true
-	}
-
-	if colorTerm == "" && term == "" {
-		return true
-	}
-
-	return false
+	return noColor != ""
 }
 
 // SetColorDisabled enables or disables color output.

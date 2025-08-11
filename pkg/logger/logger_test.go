@@ -1,12 +1,32 @@
 package logger
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSetColorDisabled(t *testing.T) {
+	// Save original environment variables
+	oldNoColor := os.Getenv("NO_COLOR")
+	oldColorTerm := os.Getenv("COLORTERM")
+	oldTerm := os.Getenv("TERM")
+
+	// Defer restoring environment variables
+	defer func() {
+		_ = os.Setenv("NO_COLOR", oldNoColor)
+		_ = os.Setenv("COLORTERM", oldColorTerm)
+		_ = os.Setenv("TERM", oldTerm)
+
+		SetColorDisabled(false) // Reset to default behavior
+	}()
+
+	// Clear environment variables that might affect color detection
+	_ = os.Unsetenv("NO_COLOR")
+	_ = os.Unsetenv("COLORTERM")
+	_ = os.Unsetenv("TERM")
+
 	// Test setting color disabled to true
 	SetColorDisabled(true)
 	assert.True(t, IsColorDisabled())
