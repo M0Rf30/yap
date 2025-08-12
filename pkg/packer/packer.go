@@ -1,13 +1,15 @@
+// Package packer provides unified package building interface for multiple formats.
 package packer
 
 import (
-	"github.com/M0Rf30/yap/pkg/abuild"
-	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/dpkg"
-	"github.com/M0Rf30/yap/pkg/makepkg"
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/rpm"
+	"github.com/M0Rf30/yap/v2/pkg/builders/apk"
+	"github.com/M0Rf30/yap/v2/pkg/builders/deb"
+	"github.com/M0Rf30/yap/v2/pkg/builders/pacman"
+	"github.com/M0Rf30/yap/v2/pkg/builders/rpm"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/core"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
 // Packer is the common interface implemented by all package managers.
@@ -25,12 +27,17 @@ type Packer interface {
 	// build machine. It returns any error if encountered.
 	PrepareEnvironment(flag bool) error
 	// PrepareFakeroot sets up the environment for building the final artifact in a fakeroot context.
-	// It takes an output path where the artifact will be written and returns an error if any issues occur.
+	// It takes an output path where the artifact will be written and returns an error if any issues
+	// occur.
 	PrepareFakeroot(output string) error
 	// Update performs a package manager update operation. It returns any error if
 	// encountered.
 	Update() error
 }
+
+// PackageManagerConfigs holds all package manager configurations.
+// Deprecated: Use core.PackageManagerConfigs instead.
+var PackageManagerConfigs = core.PackageManagerConfigs
 
 // GetPackageManager returns a Packer interface based on the given package build and distribution.
 //
@@ -39,17 +46,21 @@ type Packer interface {
 // Returns a Packer interface.
 func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	pkgManager := constants.DistroToPackageManager[distro]
+
+	// Get configuration for the package manager
+	config := core.GetConfig(pkgManager)
+	if config == nil {
+		logger.Fatal("unsupported package manager", "manager", pkgManager)
+		return nil
+	}
+
 	switch pkgManager {
 	case "apk":
-		return &abuild.Apk{
-			PKGBUILD: pkgBuild,
-		}
+		return apk.NewBuilder(pkgBuild)
 	case "apt":
-		return &dpkg.Deb{
-			PKGBUILD: pkgBuild,
-		}
+		return deb.NewPackage(pkgBuild)
 	case "pacman":
-		return &makepkg.Pkg{
+		return &pacman.Pkg{
 			PKGBUILD: pkgBuild,
 		}
 	case "yum":
@@ -61,8 +72,8 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 			PKGBUILD: pkgBuild,
 		}
 	default:
-		osutils.Logger.Fatal("unsupported linux distro",
-			osutils.Logger.Args("distro", distro))
+		logger.Fatal("unsupported linux distro",
+			"distro", distro)
 	}
 
 	return nil

@@ -1,0 +1,369 @@
+name: 🔒 Security Analysis
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    # Run security scan every day at 6:00 AM UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.24.5"
+
+jobs:
+  # ===================================
+  # Static Analysis Security Testing
+  # ===================================
+  sast:
+    name: 🔍 Static Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 📥 Download dependencies
+        run: go mod download
+
+      - name: 🔒 Install Gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: 🔒 Run Gosec Security Scanner
+        run: |
+          gosec -fmt sarif -out gosec.sarif -exclude-dir=docs -exclude-dir=dist ./...
+
+      - name: 📋 Upload Gosec results to GitHub Security
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gosec.sarif
+
+      - name: 📤 Upload Gosec results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gosec-results
+          path: gosec.sarif
+          retention-days: 30
+
+  # ===================================
+  # Vulnerability Scanning
+  # ===================================
+  vulnerability-scan:
+    name: 🛡️ Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 📥 Download dependencies
+        run: go mod download
+
+      - name: 🛡️ Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: 🔍 Run vulnerability check
+        id: vulncheck
+        run: |
+          echo "🔍 Running vulnerability scan..."
+
+          # Run govulncheck and capture output
+          if govulncheck -json ./... > vulncheck.json 2>&1; then
+            echo "result=success" >> "$GITHUB_OUTPUT"
+            echo "✅ No vulnerabilities found"
+          else
+            echo "result=vulnerabilities_found" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Vulnerabilities detected"
+          fi
+
+          # Generate human-readable report
+          {
+            echo "## 🛡️ Vulnerability Scan Report"
+            echo ""
+            echo "**Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "**Scanner:** govulncheck"
+            echo ""
+          } > vulncheck-report.md
+
+          if [[ -f vulncheck.json ]]; then
+            if jq -e '.vulnerabilities | length > 0' vulncheck.json >/dev/null 2>&1; then
+              {
+                echo "### ⚠️ Vulnerabilities Found"
+                echo ""
+                # Extract vulnerability details using jq
+                jq -r '.vulnerabilities[] | "- **\(.osv.id)**: \(.osv.summary // "No summary available")"' vulncheck.json 2>/dev/null || echo "- See vulncheck.json for details"
+              } >> vulncheck-report.md
+            else
+              {
+                echo "### ✅ No Vulnerabilities Found"
+                echo ""
+                echo "All dependencies are secure according to the Go vulnerability database."
+              } >> vulncheck-report.md
+            fi
+          fi
+
+      - name: 📤 Upload vulnerability scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-scan-results
+          path: |
+            vulncheck.json
+            vulncheck-report.md
+          retention-days: 30
+
+      - name: 💬 Comment vulnerability results on PR
+        if: github.event_name == 'pull_request' && steps.vulncheck.outputs.result == 'vulnerabilities_found'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            if (fs.existsSync('vulncheck-report.md')) {
+              const report = fs.readFileSync('vulncheck-report.md', 'utf8');
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `🛡️ **Security Vulnerability Scan Results**\n\n${report}`
+              });
+            }
+
+  # ===================================
+  # License Compliance Check
+  # ===================================
+  license-check:
+    name: 📜 License Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 📥 Download dependencies
+        run: go mod download
+
+      - name: 📜 Install go-licenses
+        run: go install github.com/google/go-licenses@latest
+
+      - name: 🔍 Check license compliance
+        id: license-check
+        run: |
+          echo "🔍 Checking license compliance..."
+
+          # Create licenses directory
+          mkdir -p licenses
+
+          # Generate license report
+          {
+            echo "## 📜 License Compliance Report"
+            echo ""
+            echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+          } > licenses/report.md
+
+          # Check for forbidden licenses (variable defined for future use)
+          # FORBIDDEN_LICENSES="GPL-2.0,GPL-3.0,AGPL-1.0,AGPL-3.0"
+
+          if go-licenses check ./...; then
+            echo "result=compliant" >> "$GITHUB_OUTPUT"
+            {
+              echo "### ✅ License Compliance"
+              echo "All dependencies use compatible licenses."
+            } >> licenses/report.md
+          else
+            echo "result=issues_found" >> "$GITHUB_OUTPUT"
+            {
+              echo "### ⚠️ License Issues Found"
+              echo "Some dependencies may have licensing issues. Review required."
+            } >> licenses/report.md
+          fi
+
+          {
+            echo ""
+            echo "### 📋 Dependency Licenses"
+            echo ""
+          } >> licenses/report.md
+
+          # List all licenses
+          go-licenses report ./... >> licenses/report.md 2>/dev/null || echo "Unable to generate detailed license report" >> licenses/report.md
+
+      - name: 📤 Upload license compliance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-compliance-results
+          path: licenses/
+          retention-days: 30
+
+  # ===================================
+  # Secrets Detection
+  # ===================================
+  secrets-detection:
+    name: 🔐 Secrets Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔐 Run TruffleHog secrets detection
+        uses: trufflesecurity/trufflehog@main
+        with:
+          base: main
+          path: ./
+          extra_args: --results=verified,unknown
+
+  # ===================================
+  # Container Security Scanning
+  # ===================================
+  container-security:
+    name: 🐳 Container Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    strategy:
+      matrix:
+        os: [alpine, ubuntu-jammy]
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Build container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/deploy/${{ matrix.os }}/Dockerfile
+          tags: yap-${{ matrix.os }}:security-scan
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 🔍 Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: yap-${{ matrix.os }}:security-scan
+          format: "sarif"
+          output: "trivy-${{ matrix.os }}.sarif"
+
+      - name: 📋 Upload Trivy scan results
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-${{ matrix.os }}.sarif"
+
+      - name: 📤 Upload container security results
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-security-${{ matrix.os }}
+          path: "trivy-${{ matrix.os }}.sarif"
+          retention-days: 30
+
+  # ===================================
+  # Security Summary Report
+  # ===================================
+  security-summary:
+    name: 📊 Security Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [sast, vulnerability-scan, license-check, secrets-detection]
+    if: always()
+
+    steps:
+      - name: 📥 Download security artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: "*-results"
+          merge-multiple: true
+
+      - name: 📝 Generate security summary
+        run: |
+          {
+            echo "## 🔒 Security Analysis Summary"
+            echo ""
+            echo "**Analysis Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "**Trigger:** ${{ github.event_name }}"
+            echo ""
+            echo "### 📋 Security Checks"
+            echo "| Check | Status | Details |"
+            echo "|-------|--------|---------|"
+            echo "| 🔍 Static Analysis | ${{ needs.sast.result }} | Gosec security scanner |"
+            echo "| 🛡️ Vulnerability Scan | ${{ needs.vulnerability-scan.result }} | Go vulnerability database |"
+            echo "| 📜 License Compliance | ${{ needs.license-check.result }} | Dependency license check |"
+            echo "| 🔐 Secrets Detection | ${{ needs.secrets-detection.result }} | TruffleHog scan |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Overall security status
+          if [[ "${{ needs.sast.result }}" == "success" && \
+                "${{ needs.vulnerability-scan.result }}" == "success" && \
+                "${{ needs.license-check.result }}" == "success" && \
+                "${{ needs.secrets-detection.result }}" == "success" ]]; then
+            {
+              echo "### ✅ Overall Security Status: PASS"
+              echo "All security checks completed successfully."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### ⚠️ Overall Security Status: REVIEW REQUIRED"
+              echo "Some security checks require attention. Please review the failed checks above."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          {
+            echo ""
+            echo "### 🔗 Security Resources"
+            echo "- [Security Policy](https://github.com/${{ github.repository }}/security/policy)"
+            echo "- [Security Advisories](https://github.com/${{ github.repository }}/security/advisories)"
+            echo "- [Dependency Graph](https://github.com/${{ github.repository }}/network/dependencies)"
+            echo "- [Go Vulnerability Database](https://vuln.go.dev/)"
+          } >> "$GITHUB_STEP_SUMMARY"
