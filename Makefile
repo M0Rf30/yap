@@ -30,7 +30,7 @@ DOCKER_BUILD_FLAGS = --progress=plain --no-cache
 # Available distributions (dynamically retrieved from build/deploy folder)
 DISTROS = $(shell find build/deploy -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
-.PHONY: all build clean test deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static
+.PHONY: all build clean test deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats
 
 # Default target
 all: clean deps fmt lint lint-md test doc build
@@ -206,6 +206,23 @@ docker-list-distros:
 	@echo "  make docker-build DISTRO=<distro>"
 	@echo "  make docker-build-all"
 
+# Show localization statistics
+i18n-stats:
+	@echo "Showing localization statistics..."
+	@$(GOCMD) run ./cmd/i18n-tool stats
+
+# Check integrity of localization files
+i18n-check:
+	@echo "Checking localization file integrity..."
+	@$(GOCMD) run ./cmd/i18n-tool check
+
+# Build the i18n management tool
+i18n-tool:
+	@echo "Building i18n management tool..."
+	@mkdir -p $(BUILD_DIR)
+	@$(GOBUILD) -o $(BUILD_DIR)/i18n-tool ./cmd/i18n-tool
+	@echo "i18n management tool built: $(BUILD_DIR)/i18n-tool"# Build the i18n management tool
+
 # Help
 help:
 	@echo "Available targets:"
@@ -230,4 +247,7 @@ help:
 	@echo "  docker-build DISTRO=<name> - Build Docker image for distribution"
 	@echo "  docker-build-all - Build Docker images for all distributions"
 	@echo "  docker-list-distros - List available distributions"
+	@echo "  i18n-tool        - Build the i18n management tool"
+	@echo "  i18n-check       - Check integrity of localization files"
+	@echo "  i18n-stats       - Show localization statistics"
 	@echo "  help             - Show this help"

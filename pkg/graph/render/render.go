@@ -10,6 +10,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/graph"
 	"github.com/M0Rf30/yap/v2/pkg/graph/layout"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -43,7 +44,7 @@ func GenerateSVGGraph(graphData *graph.Data, outputPath string, showExternal boo
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Error("failed to close file", "error", closeErr)
+			logger.Error(i18n.T("logger.generatesvggraph.error.failed_to_close_file_1"), "error", closeErr)
 		}
 	}()
 
@@ -62,7 +63,7 @@ func GenerateSVGGraph(graphData *graph.Data, outputPath string, showExternal boo
 		return fmt.Errorf("failed to write SVG data: %w", err)
 	}
 
-	logger.Info("SVG graph generated successfully",
+	logger.Info(i18n.T("logger.generatesvggraph.info.svg_graph_generated_successfully_1"),
 		"output", outputPath,
 		"nodes", len(graphData.Nodes),
 		"edges", len(graphData.Edges))
@@ -82,10 +83,10 @@ func GeneratePNGGraph(graphData *graph.Data, outputPath string, showExternal boo
 		return err
 	}
 
-	logger.Info("SVG graph generated for PNG conversion",
+	logger.Info(i18n.T("logger.generatepnggraph.info.svg_graph_generated_for_1"),
 		"svg_path", svgPath)
 
-	logger.Warn("PNG conversion requires external tools",
+	logger.Warn(i18n.T("logger.generatepnggraph.warn.png_conversion_requires_external_1"),
 		"suggestion", "Install Inkscape or ImageMagick to convert SVG to PNG",
 		"inkscape_command", "inkscape --export-type=png --export-filename="+outputPath+" "+svgPath,
 		"imagemagick_command", "convert "+svgPath+" "+outputPath,

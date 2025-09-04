@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -34,18 +35,18 @@ func GetOriginalUser() (*OriginalUser, error) {
 
 	uid, err := strconv.Atoi(sudoUID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse SUDO_UID")
+		return nil, errors.Wrap(err, i18n.T("errors.platform.parse_sudo_uid_failed"))
 	}
 
 	gid, err := strconv.Atoi(sudoGID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse SUDO_GID")
+		return nil, errors.Wrap(err, i18n.T("errors.platform.parse_sudo_gid_failed"))
 	}
 
 	// Get user info for additional details
 	userInfo, err := user.Lookup(sudoUser)
 	if err != nil {
-		logger.Warn("failed to lookup sudo user info", "user", sudoUser, "error", err)
+		logger.Warn(i18n.T("logger.platform.warn.sudo_lookup"), "user", sudoUser, "error", err)
 		// Continue with basic info
 		return &OriginalUser{
 			UID:  uid,
@@ -77,10 +78,10 @@ func (ou *OriginalUser) ChownToOriginalUser(path string) error {
 
 	err := os.Chown(path, ou.UID, ou.GID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to chown %s to %s (%d:%d)", path, ou.Name, ou.UID, ou.GID)
+		return errors.Wrapf(err, i18n.T("errors.platform.chown_failed"), path, ou.Name, ou.UID, ou.GID)
 	}
 
-	logger.Debug("changed ownership to original user",
+	logger.Debug(i18n.T("logger.chowntooriginaluser.debug.changed_ownership_to_original_1"),
 		"path", path,
 		"user", ou.Name,
 		"uid", ou.UID,
@@ -97,7 +98,7 @@ func (ou *OriginalUser) ChownRecursiveToOriginalUser(path string) error {
 
 	err := syscall.Chown(path, ou.UID, ou.GID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to chown root directory %s", path)
+		return errors.Wrapf(err, i18n.T("errors.platform.chown_root_directory_failed"), path)
 	}
 
 	// Use filepath.Walk to recursively change ownership
@@ -108,7 +109,7 @@ func (ou *OriginalUser) ChownRecursiveToOriginalUser(path string) error {
 
 		err = syscall.Chown(walkPath, ou.UID, ou.GID)
 		if err != nil {
-			logger.Warn("failed to chown file",
+			logger.Warn(i18n.T("logger.chownrecursivetooriginaluser.warn.failed_to_chown_file_1"),
 				"path", walkPath,
 				"user", ou.Name,
 				"error", err)
@@ -124,12 +125,12 @@ func (ou *OriginalUser) ChownRecursiveToOriginalUser(path string) error {
 func PreserveOwnership(path string) error {
 	originalUser, err := GetOriginalUser()
 	if err != nil {
-		logger.Warn("failed to get original user info", "error", err)
+		logger.Warn(i18n.T("logger.preserveownership.warn.failed_to_get_original_1"), "error", err)
 		return nil // Don't fail the operation
 	}
 
 	if originalUser != nil {
-		logger.Info("preserving ownership for original user",
+		logger.Info(i18n.T("logger.preserveownership.info.preserving_ownership_for_original_1"),
 			"path", path,
 
 			"user", originalUser.Name)
@@ -144,12 +145,12 @@ func PreserveOwnership(path string) error {
 func PreserveOwnershipRecursive(path string) error {
 	originalUser, err := GetOriginalUser()
 	if err != nil {
-		logger.Warn("failed to get original user info", "error", err)
+		logger.Warn(i18n.T("logger.platform.warn.get_user"), "error", err)
 		return nil // Don't fail the operation
 	}
 
 	if originalUser != nil {
-		logger.Info("preserving ownership recursively for original user",
+		logger.Info(i18n.T("logger.platform.info.preserve_recursive"),
 
 			"path", path,
 			"user", originalUser.Name)

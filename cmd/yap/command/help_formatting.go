@@ -8,6 +8,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -99,15 +100,15 @@ func SetupEnhancedHelp() {
 	})
 
 	cobra.AddTemplateFunc("styleMoreInfo", func() string {
-		return pterm.FgGray.Sprint("Use \"yap [command] --help\" for more information about a command.")
+		return pterm.FgGray.Sprint(i18n.T("footer.more_info"))
 	})
 
 	cobra.AddTemplateFunc("styleFooter", func() string {
 		return fmt.Sprintf(`%s %s
 %s %s`,
-			pterm.FgBlue.Sprint("📖 Documentation:"),
+			pterm.FgBlue.Sprint(i18n.T("footer.documentation")),
 			pterm.FgLightBlue.Sprint("https://github.com/M0Rf30/yap"),
-			pterm.FgRed.Sprint("🐛 Report issues:"),
+			pterm.FgRed.Sprint(i18n.T("footer.report_issues")),
 			pterm.FgLightRed.Sprint("https://github.com/M0Rf30/yap/issues"))
 	})
 
@@ -140,7 +141,7 @@ func CustomErrorHandler(cmd *cobra.Command, err error) error {
 		// Add helpful suggestion
 		if strings.Contains(err.Error(), "unknown command") ||
 			strings.Contains(err.Error(), "unsupported distribution") {
-			logger.Tips("💡 Use '" + cmd.CommandPath() + " --help' to see available options")
+			logger.Tips(fmt.Sprintf(i18n.T("logger.tips.use_help"), cmd.CommandPath()))
 		}
 
 		return err

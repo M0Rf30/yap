@@ -6,6 +6,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
@@ -27,7 +28,8 @@ func (builder *Builder) Compile(noBuild bool) error {
 
 	err := builder.initDirs()
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild, "failed to initialize directories").
+		return errors.Wrap(err, errors.ErrTypeBuild,
+			i18n.T("errors.build.failed_to_initialize_directories")).
 			WithContext("package", pkgName).
 			WithContext("version", pkgVer).
 			WithContext("release", pkgRel).
@@ -35,13 +37,13 @@ func (builder *Builder) Compile(noBuild bool) error {
 	}
 
 	logger.WithComponent(builder.PKGBUILD.PkgName)
-	logger.Info("retrieving sources",
+	logger.Info(i18n.T("logger.retrieving_sources"),
 		"pkgver", builder.PKGBUILD.PkgVer,
 		"pkgrel", builder.PKGBUILD.PkgRel)
 
 	err = builder.getSources()
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild, "failed to retrieve sources").
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.failed_to_retrieve_sources")).
 			WithContext("package", pkgName).
 			WithContext("version", pkgVer).
 			WithContext("release", pkgRel).
@@ -49,17 +51,17 @@ func (builder *Builder) Compile(noBuild bool) error {
 	}
 
 	if !noBuild {
-		err := builder.processFunction(builder.PKGBUILD.Prepare, "preparing sources", "prepare")
+		err := builder.processFunction(builder.PKGBUILD.Prepare, "logger.preparing_sources", "prepare")
 		if err != nil {
 			return err
 		}
 
-		err = builder.processFunction(builder.PKGBUILD.Build, "building", "build")
+		err = builder.processFunction(builder.PKGBUILD.Build, "logger.building", "build")
 		if err != nil {
 			return err
 		}
 
-		err = builder.processFunction(builder.PKGBUILD.Package, "generating package", "package")
+		err = builder.processFunction(builder.PKGBUILD.Package, "logger.generating_package", "package")
 		if err != nil {
 			return err
 		}
@@ -83,12 +85,12 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 
 	// Use component logger for consistent formatting
 	logger.WithComponent(pkgName)
-	logger.Info(message, "pkgver", pkgVer, "pkgrel", pkgRel)
+	logger.Info(i18n.T(message), "pkgver", pkgVer, "pkgrel", pkgRel)
 
 	// Execute script with package decoration
 	err := shell.RunScriptWithPackage("  set -e\n"+pkgbuildFunction, pkgName)
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild, "build stage failed").
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).
 			WithContext("version", pkgVer).
 			WithContext("release", pkgRel).
@@ -133,7 +135,8 @@ func (builder *Builder) getSources() error {
 			for task := range sourceChan {
 				err := task.source.Get()
 				if err != nil {
-					wrappedErr := errors.Wrap(err, errors.ErrTypeBuild, "failed to retrieve source").
+					wrappedErr := errors.Wrap(err, errors.ErrTypeBuild,
+						i18n.T("errors.build.failed_to_retrieve_source")).
 						WithContext("package", pkgName).
 						WithContext("version", pkgVer).
 						WithContext("release", pkgRel).
@@ -194,7 +197,7 @@ func (builder *Builder) initDirs() error {
 	}
 
 	if err := platform.PreserveOwnership(builder.PKGBUILD.SourceDir); err != nil {
-		logger.Warn("failed to preserve ownership for SourceDir",
+		logger.Warn(i18n.T("logger.failed_to_preserve_ownership"),
 			"path", builder.PKGBUILD.SourceDir, "error", err)
 	}
 

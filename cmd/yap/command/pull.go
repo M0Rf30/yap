@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
@@ -47,13 +48,12 @@ Re-running this command will update to the latest image versions.`,
 		split := strings.Split(args[0], "-")
 
 		if len(split) == 1 && split[0] != alpineDistro && split[0] != archDistro {
-			logger.Fatal("except for alpine and arch, specify also the codename " +
-				"(i. e. rocky-9, ubuntu-jammy)")
+			logger.Fatal(i18n.T("logger.pull.specify_codename"))
 		}
 
 		err := platform.PullContainers(args[0])
 		if err != nil {
-			logger.Fatal("failed to pull image",
+			logger.Fatal(i18n.T("logger.pull.failed_to_pull"),
 				"error", err)
 		}
 	},

@@ -17,6 +17,7 @@ import (
 	"mvdan.cc/sh/v3/interp"
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -87,6 +88,25 @@ func (pdw *PackageDecoratedWriter) Write(p []byte) (int, error) {
 	return originalLen, nil
 }
 
+// formatDecoratedLine creates a decorated log line with timestamp and package name.
+func formatDecoratedLine(packageName, lineContent string) string {
+	timestamp := time.Now().Format(timestampFormat)
+
+	if logger.IsColorDisabled() {
+		return fmt.Sprintf("%s %s [%s] %s\n", timestamp, logLevelInfo,
+			packageName, lineContent)
+	}
+
+	return pterm.Sprintf("%s %s %s%s%s %s\n",
+		pterm.FgGray.Sprint(timestamp),
+		pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(logLevelInfo),
+		pterm.NewStyle(pterm.FgWhite).Sprint("["),
+		pterm.NewStyle(pterm.FgYellow).Sprint(packageName),
+		pterm.NewStyle(pterm.FgWhite).Sprint("]"),
+		lineContent,
+	)
+}
+
 func (pdw *PackageDecoratedWriter) writeLine(line []byte) error {
 	lineContent := strings.TrimRight(string(line), "\n\r")
 
@@ -95,23 +115,7 @@ func (pdw *PackageDecoratedWriter) writeLine(line []byte) error {
 		return err
 	}
 
-	timestamp := time.Now().Format(timestampFormat)
-
-	var decoratedLine string
-	if logger.IsColorDisabled() {
-		decoratedLine = fmt.Sprintf("%s %s [%s] %s\n", timestamp, logLevelInfo,
-			pdw.packageName, lineContent)
-	} else {
-		decoratedLine = pterm.Sprintf("%s %s %s%s%s %s\n",
-			pterm.FgGray.Sprint(timestamp),
-			pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(logLevelInfo),
-			pterm.NewStyle(pterm.FgWhite).Sprint("["),
-			pterm.NewStyle(pterm.FgYellow).Sprint(pdw.packageName),
-			pterm.NewStyle(pterm.FgWhite).Sprint("]"),
-			lineContent,
-		)
-	}
-
+	decoratedLine := formatDecoratedLine(pdw.packageName, lineContent)
 	_, err := pdw.writer.Write([]byte(decoratedLine))
 
 	return err
@@ -168,23 +172,7 @@ func (gpw *GitProgressWriter) handleLine(line []byte, isCarriageReturn bool) err
 }
 
 func (gpw *GitProgressWriter) writeDecoratedLine(lineContent string) error {
-	timestamp := time.Now().Format(timestampFormat)
-
-	var decoratedLine string
-	if logger.IsColorDisabled() {
-		decoratedLine = fmt.Sprintf("%s %s [%s] %s\n", timestamp, logLevelInfo,
-			gpw.packageName, lineContent)
-	} else {
-		decoratedLine = pterm.Sprintf("%s %s %s%s%s %s\n",
-			pterm.FgGray.Sprint(timestamp),
-			pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(logLevelInfo),
-			pterm.NewStyle(pterm.FgWhite).Sprint("["),
-			pterm.NewStyle(pterm.FgYellow).Sprint(gpw.packageName),
-			pterm.NewStyle(pterm.FgWhite).Sprint("]"),
-			lineContent,
-		)
-	}
-
+	decoratedLine := formatDecoratedLine(gpw.packageName, lineContent)
 	_, err := gpw.writer.Write([]byte(decoratedLine))
 
 	return err
@@ -204,7 +192,7 @@ func ExecWithContext(
 	if !excludeStdout {
 		_, err := MultiPrinter.Start()
 		if err != nil {
-			return errors.Wrap(err, "failed to start multiprinter")
+			return errors.Wrap(err, i18n.T("errors.shell.failed_to_start_multiprinter"))
 		}
 
 		decoratedWriter := NewPackageDecoratedWriter(MultiPrinter.Writer, "yap")
@@ -216,14 +204,14 @@ func ExecWithContext(
 		cmd.Dir = dir
 	}
 
-	logger.Debug("executing command", "command", name, "args", args, "dir", dir)
+	logger.Debug(i18n.T("logger.shell.debug.exec_cmd"), "command", name, "args", args, "dir", dir)
 
 	start := time.Now()
 	err := cmd.Run()
 	duration := time.Since(start)
 
 	if err != nil {
-		logger.Error("command execution failed",
+		logger.Error(i18n.T("logger.execwithcontext.error.command_execution_failed_1"),
 			"command", name,
 			"args", args,
 			"dir", dir,
@@ -233,7 +221,7 @@ func ExecWithContext(
 		return errors.Wrapf(err, "failed to execute command %s", name)
 	}
 
-	logger.Debug("command execution completed",
+	logger.Debug(i18n.T("logger.execwithcontext.debug.command_execution_completed_1"),
 		"command", name,
 		"duration", duration)
 
@@ -338,9 +326,9 @@ func RunScriptWithPackage(cmds, packageName string) error {
 	start := time.Now()
 
 	if packageName != "" {
-		logger.Info("executing shell script", "package", packageName)
+		logger.Info(i18n.T("logger.shell.info.exec_script"), "package", packageName)
 	} else {
-		logger.Info("executing shell script")
+		logger.Info(i18n.T("logger.runscriptwithpackage.info.executing_shell_script_3"))
 	}
 
 	if cmds != "" {
@@ -349,12 +337,12 @@ func RunScriptWithPackage(cmds, packageName string) error {
 
 	script, err := syntax.NewParser().Parse(strings.NewReader(cmds), "")
 	if err != nil {
-		return errors.Wrap(err, "failed to parse script")
+		return errors.Wrap(err, i18n.T("errors.shell.failed_to_parse_script"))
 	}
 
 	_, err = MultiPrinter.Start()
 	if err != nil {
-		return errors.Wrap(err, "failed to start multiprinter")
+		return errors.Wrap(err, i18n.T("errors.shell.failed_to_start_multiprinter"))
 	}
 
 	writer := MultiPrinter.Writer
@@ -367,35 +355,35 @@ func RunScriptWithPackage(cmds, packageName string) error {
 		interp.StdIO(nil, writer, writer),
 	)
 	if err != nil {
-		return errors.Wrap(err, "failed to create script runner")
+		return errors.Wrap(err, i18n.T("errors.shell.failed_to_create_script_runner"))
 	}
 
-	logger.Debug("starting script execution")
+	logger.Debug(i18n.T("logger.runscriptwithpackage.debug.starting_script_execution_1"))
 
 	err = runner.Run(context.Background(), script)
 	duration := time.Since(start)
 
 	if err != nil {
 		if packageName != "" {
-			logger.Error("script execution failed",
+			logger.Error(i18n.T("logger.runscriptwithpackage.error.script_execution_failed_1"),
 				"error", err,
 				"duration", duration,
 				"package", packageName)
 		} else {
-			logger.Error("script execution failed",
+			logger.Error(i18n.T("logger.runscriptwithpackage.error.script_execution_failed_3"),
 				"error", err,
 				"duration", duration)
 		}
 
-		return errors.Wrap(err, "script execution failed")
+		return errors.Wrap(err, i18n.T("errors.shell.script_execution_failed"))
 	}
 
 	if packageName != "" {
-		logger.Info("shell script execution completed successfully",
+		logger.Info(i18n.T("logger.unknown.info.shell_script_execution_completed_1"),
 			"duration", duration,
 			"package", packageName)
 	} else {
-		logger.Info("shell script execution completed successfully",
+		logger.Info(i18n.T("logger.unknown.info.shell_script_execution_completed_3"),
 			"duration", duration)
 	}
 
@@ -427,7 +415,7 @@ func ExecWithSudoContext(
 	}
 
 	if !allowedCommands[name] {
-		return fmt.Errorf("command '%s' is not allowed for sudo execution", name)
+		return fmt.Errorf(i18n.T("errors.shell.command_not_allowed_for_sudo"), name)
 	}
 
 	// Check if we need sudo (not running as root and not already under sudo)
@@ -441,16 +429,17 @@ func ExecWithSudoContext(
 		// #nosec G204 - command name is validated against allowlist
 		cmd = exec.CommandContext(ctx, "sudo", sudoArgs...)
 
-		logger.Debug("executing command with sudo", "command", name, "args", args, "dir", dir)
+		logger.Debug(i18n.T("logger.shell.debug.exec_sudo"), "command", name, "args", args, "dir", dir)
 	} else {
 		cmd = exec.CommandContext(ctx, name, args...)
-		logger.Debug("executing command", "command", name, "args", args, "dir", dir)
+		logger.Debug(i18n.T("logger.shell.debug.exec_sudo_cmd"),
+			"command", name, "args", args, "dir", dir)
 	}
 
 	if !excludeStdout {
 		_, err := MultiPrinter.Start()
 		if err != nil {
-			return errors.Wrap(err, "failed to start multiprinter")
+			return errors.Wrap(err, i18n.T("errors.shell.failed_to_start_multiprinter"))
 		}
 
 		decoratedWriter := NewPackageDecoratedWriter(MultiPrinter.Writer, "yap")
@@ -467,7 +456,7 @@ func ExecWithSudoContext(
 	duration := time.Since(start)
 
 	if err != nil {
-		logger.Error("command execution failed",
+		logger.Error(i18n.T("logger.unknown.error.command_execution_failed_1"),
 			"command", name,
 			"args", args,
 			"dir", dir,
@@ -478,7 +467,7 @@ func ExecWithSudoContext(
 		return errors.Wrapf(err, "failed to execute command %s", name)
 	}
 
-	logger.Debug("command execution completed",
+	logger.Debug(i18n.T("logger.unknown.debug.command_execution_completed_1"),
 		"command", name,
 		"duration", duration,
 		"sudo", needsSudo)

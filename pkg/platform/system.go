@@ -13,6 +13,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/download"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
@@ -31,12 +32,12 @@ type OSRelease struct {
 func ParseOSRelease() (OSRelease, error) {
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
-		return OSRelease{}, errors.Wrap(err, "failed to open /etc/os-release")
+		return OSRelease{}, errors.Wrap(err, i18n.T("errors.platform.open_os_release_failed"))
 	}
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn("failed to close os-release file", "error", closeErr)
+			logger.Warn(i18n.T("logger.parseosrelease.warn.failed_to_close_osrelease_1"), "error", closeErr)
 		}
 	}()
 
@@ -67,7 +68,7 @@ func ParseOSRelease() (OSRelease, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return OSRelease{}, errors.Wrap(err, "failed to scan os-release file")
+		return OSRelease{}, errors.Wrap(err, i18n.T("errors.platform.scan_os_release_failed"))
 	}
 
 	return osRelease, nil
@@ -92,7 +93,7 @@ func GetArchitecture() string {
 
 	pacmanArch, exists := architectureMap[currentArch]
 	if !exists {
-		logger.Warn("unknown architecture, falling back to GOARCH", "goarch", currentArch)
+		logger.Warn(i18n.T("logger.platform.warn.arch_fallback"), "goarch", currentArch)
 		return currentArch
 	}
 
@@ -103,7 +104,7 @@ func GetArchitecture() string {
 func CheckGO() bool {
 	_, err := os.Stat(goExecutable)
 	if err == nil {
-		logger.Info("go is already installed")
+		logger.Info(i18n.T("logger.checkgo.info.go_is_already_installed_1"))
 		return true
 	}
 
@@ -118,33 +119,33 @@ func GOSetup() error {
 
 	_, err := shell.MultiPrinter.Start()
 	if err != nil {
-		return errors.Wrap(err, "failed to start multiprinter")
+		return errors.Wrap(err, i18n.T("errors.platform.start_multiprinter_failed"))
 	}
 
 	if err := download.Download(
 		goArchivePath,
 		constants.GoArchiveURL,
 		shell.MultiPrinter.Writer); err != nil {
-		return errors.Wrap(err, "failed to download Go archive")
+		return errors.Wrap(err, i18n.T("errors.platform.download_go_archive_failed"))
 	}
 
 	if err := archive.Extract(goArchivePath, "/usr/lib"); err != nil {
-		return errors.Wrap(err, "failed to extract Go archive")
+		return errors.Wrap(err, i18n.T("errors.platform.extract_go_archive_failed"))
 	}
 
 	if err := os.Symlink("/usr/lib/go/bin/go", goExecutable); err != nil {
-		return errors.Wrap(err, "failed to create go symlink")
+		return errors.Wrap(err, i18n.T("errors.platform.create_go_symlink_failed"))
 	}
 
 	if err := os.Symlink("/usr/lib/go/bin/gofmt", "/usr/bin/gofmt"); err != nil {
-		return errors.Wrap(err, "failed to create gofmt symlink")
+		return errors.Wrap(err, i18n.T("errors.platform.create_gofmt_symlink_failed"))
 	}
 
 	if err := os.RemoveAll(goArchivePath); err != nil {
-		return errors.Wrap(err, "failed to remove go archive")
+		return errors.Wrap(err, i18n.T("errors.platform.remove_go_archive_failed"))
 	}
 
-	logger.Info("go successfully installed")
+	logger.Info(i18n.T("logger.gosetup.info.go_successfully_installed_1"))
 
 	return nil
 }
@@ -159,7 +160,7 @@ func PullContainers(distro string) error {
 	case files.Exists("/usr/bin/docker"):
 		containerApp = "/usr/bin/docker"
 	default:
-		return errors.New("no container application found")
+		return errors.New(i18n.T("errors.platform.no_container_app_found"))
 	}
 
 	args := []string{

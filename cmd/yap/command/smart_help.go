@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	buildCommand = "build"
+	buildCommand   = "build"
+	prepareCommand = "prepare"
 )
 
 // SmartErrorHandler provides enhanced error messages with intelligent suggestions.

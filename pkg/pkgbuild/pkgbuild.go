@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/set"
@@ -123,7 +124,7 @@ func (pkgBuild *PKGBUILD) ComputeArchitecture() {
 
 	isSupported = set.Contains(pkgBuild.Arch, currentArch)
 	if !isSupported {
-		logger.Fatal("unsupported architecture",
+		logger.Fatal(i18n.T("errors.pkgbuild.unsupported_architecture"),
 			"pkgname", pkgBuild.PkgName,
 			"arch", strings.Join(pkgBuild.Arch, " "))
 	}
@@ -145,7 +146,7 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			logger.Warn("failed to close pkgbuild file",
+			logger.Warn(i18n.T("logger.createspec.warn.failed_to_close_pkgbuild_1"),
 				"path", cleanFilePath,
 				"error", err)
 		}
@@ -234,17 +235,17 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 
 	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
 	if err != nil {
-		logger.Fatal("failed to set variable pkgdir")
+		logger.Fatal(i18n.T("errors.pkgbuild.failed_to_set_variable_pkgdir"))
 	}
 
 	err = os.Setenv("srcdir", pkgBuild.SourceDir)
 	if err != nil {
-		logger.Fatal("failed to set variable srcdir")
+		logger.Fatal(i18n.T("errors.pkgbuild.failed_to_set_variable_srcdir"))
 	}
 
 	err = os.Setenv("startdir", pkgBuild.StartDir)
 	if err != nil {
-		logger.Fatal("failed to set variable startdir")
+		logger.Fatal(i18n.T("errors.pkgbuild.failed_to_set_variable_startdir"))
 	}
 }
 
@@ -257,9 +258,9 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() {
 	if !pkgBuild.checkLicense() {
 		checkErrors = append(checkErrors, "license")
 
-		logger.Error("invalid SPDX license identifier",
+		logger.Error(i18n.T("logger.validategeneral.error.invalid_spdx_license_identifier_1"),
 			"pkgname", pkgBuild.PkgName)
-		logger.Info("you can find valid SPDX license identifiers here",
+		logger.Info(i18n.T("logger.validategeneral.info.you_can_find_valid_1"),
 			"🌐", "https://spdx.org/licenses/")
 	}
 
@@ -267,7 +268,7 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() {
 	if len(pkgBuild.SourceURI) != len(pkgBuild.HashSums) {
 		checkErrors = append(checkErrors, "source-hash mismatch")
 
-		logger.Error("number of sources and hashsums differs",
+		logger.Error(i18n.T("logger.validategeneral.error.number_of_sources_and_1"),
 			"pkgname", pkgBuild.PkgName)
 	}
 
@@ -275,7 +276,7 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() {
 	if pkgBuild.Package == "" {
 		checkErrors = append(checkErrors, "package function")
 
-		logger.Error("missing package() function",
+		logger.Error(i18n.T("logger.validategeneral.error.missing_package_function_1"),
 			"pkgname", pkgBuild.PkgName)
 	}
 
@@ -444,7 +445,7 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	}
 
 	if err != nil {
-		logger.Fatal("failed to set variable",
+		logger.Fatal(i18n.T("errors.pkgbuild.failed_to_set_variable"),
 			"variable", key)
 	}
 }
@@ -552,7 +553,7 @@ func (pkgBuild *PKGBUILD) parseDistributionOnly(input string) (
 	}
 
 	if len(split) != 2 {
-		return key, 0, errors.Errorf("invalid use of '__' directive in %s", input)
+		return key, 0, errors.Errorf(i18n.T("errors.pkgbuild.invalid_directive_use"), input)
 	}
 
 	if pkgBuild.FullDistroName == "" {

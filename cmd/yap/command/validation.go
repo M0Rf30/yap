@@ -10,17 +10,18 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // Static error definitions to satisfy err113 linter.
 var (
-	ErrDistributionEmpty   = errors.New("distribution cannot be empty")
-	ErrProjectPathEmpty    = errors.New("project path cannot be empty")
-	ErrPathNotExist        = errors.New("path does not exist")
-	ErrProjectFileNotFound = errors.New("project file not found")
-	ErrInsufficientArgs    = errors.New("requires at least one argument")
+	ErrDistributionEmpty   = errors.New(i18n.T("errors.validation.distribution_empty"))
+	ErrProjectPathEmpty    = errors.New(i18n.T("errors.validation.project_path_empty"))
+	ErrPathNotExist        = errors.New(i18n.T("errors.validation.path_not_exist"))
+	ErrProjectFileNotFound = errors.New(i18n.T("errors.validation.project_file_not_found"))
+	ErrInsufficientArgs    = errors.New(i18n.T("errors.validation.insufficient_args"))
 )
 
 // ValidDistrosCompletion provides completion for valid distributions.
@@ -75,9 +76,7 @@ func validateDistroArg(distro string) error {
 		}
 	}
 
-	return fmt.Errorf("unsupported distribution '%s'\n\n"+
-		"Supported distributions:\n%s\n\n"+
-		"Use 'yap list-distros' to see all available options: %w",
+	return fmt.Errorf(i18n.T("errors.validation.unsupported_distribution")+": %w",
 		distro, formatDistroSuggestions(baseDist), ErrDistributionEmpty)
 }
 
@@ -89,7 +88,7 @@ func validateProjectPath(path string) error {
 
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return fmt.Errorf("invalid path '%s': %w", path, err)
+		return fmt.Errorf(i18n.T("errors.validation.invalid_path")+": %w", path, err)
 	}
 
 	// Check if path exists
@@ -107,9 +106,7 @@ func validateProjectPath(path string) error {
 	_, pkgbuildErr := os.Stat(pkgbuildPath)
 
 	if os.IsNotExist(yapJSONErr) && os.IsNotExist(pkgbuildErr) {
-		return fmt.Errorf("neither yap.json nor PKGBUILD found in %s\n\n"+
-			"Make sure you're in a YAP project directory (containing yap.json for "+
-			"multiproject or PKGBUILD for single project) or specify the correct path: %w",
+		return fmt.Errorf(i18n.T("errors.validation.no_project_files")+": %w",
 			absPath, ErrProjectFileNotFound)
 	}
 
@@ -149,9 +146,8 @@ func formatDistroSuggestions(input string) string {
 func createValidateDistroArgs(minArgs int) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
 		if len(args) < minArgs {
-			return fmt.Errorf("requires at least %d argument(s), only received %d\n\n"+
-				"Use '%s --help' for usage information: %w",
-				minArgs, len(args), cmd.CommandPath(), ErrInsufficientArgs)
+			return fmt.Errorf(i18n.T("errors.validation.insufficient_args_detailed")+": %w",
+				minArgs, len(args), cmd.CommandPath(), cmd.CommandPath(), ErrInsufficientArgs)
 		}
 
 		if err := validateDistroForCommand(cmd, args); err != nil {
@@ -164,7 +160,7 @@ func createValidateDistroArgs(minArgs int) cobra.PositionalArgs {
 
 // validateDistroForCommand validates distro argument based on command type.
 func validateDistroForCommand(cmd *cobra.Command, args []string) error {
-	if cmd.Name() == "build" && len(args) >= 1 {
+	if cmd.Name() == buildCommand && len(args) >= 1 {
 		return validateDistroForBuildCommand(args[0])
 	}
 
@@ -203,7 +199,7 @@ func isPathLike(arg string) bool {
 // validatePathForCommand validates path arguments for commands.
 func validatePathForCommand(cmd *cobra.Command, args []string) error {
 	// For commands with path as last argument (build, zap)
-	if len(args) >= 2 || (len(args) == 1 && cmd.Name() == "build") {
+	if len(args) >= 2 || (len(args) == 1 && cmd.Name() == buildCommand) {
 		pathArg := args[len(args)-1]
 		return validateProjectPath(pathArg)
 	}
@@ -218,7 +214,7 @@ func PreRunValidation(cmd *cobra.Command, _ []string) {
 
 	// Additional pre-run setup can go here
 	if verbose {
-		logger.Info("verbose mode enabled", "command", cmd.Name())
+		logger.Info(i18n.T("messages.verbose_mode_enabled"), "command", cmd.Name())
 	}
 }
 

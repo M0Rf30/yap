@@ -1003,6 +1003,52 @@ See our [Contributing Guidelines](CONTRIBUTING.md) for details.
 - Help others and share knowledge
 - Contribute back to the project
 
+
+## 🌍 Internationalization
+
+YAP supports multiple languages for its user interface. The following languages are currently supported:
+
+- 🇬🇧 English (en)
+- 🇮🇹 Italian (it)
+- 🇷🇺 Russian (ru)
+- 🇨🇳 Chinese (zh)
+
+### Language Detection
+
+YAP automatically detects your system language based on environment variables (`LANG`, `LC_ALL`, `LC_MESSAGES`, `LANGUAGE`). You can also manually specify a language using the `--language` or `-l` flag:
+
+```bash
+# Use Italian language
+yap --language=it build .
+
+# Use Russian language
+yap -l ru build .
+```
+
+### Integrity Checks
+
+YAP includes tools to verify the integrity of localization files and ensure consistency across all supported languages:
+
+```bash
+# Check integrity of all localization files
+make i18n-check
+
+# Show localization statistics
+make i18n-stats
+
+# List all message IDs
+make i18n-tool && ./bin/i18n-tool list
+```
+
+### Contributing Translations
+
+We welcome translations to additional languages! To contribute:
+
+1. Fork the repository
+2. Copy `pkg/i18n/locales/en.yaml` to `pkg/i18n/locales/{language_code}.yaml`
+3. Translate all messages in the file
+4. Add your language code to the `SupportedLanguages` slice in `pkg/i18n/i18n.go`
+5. Submit a pull request
 ## 📄 License
 
 YAP is licensed under the **GNU General Public License v3.0**. See the [LICENSE](LICENSE.md) file for details.

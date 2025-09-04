@@ -20,6 +20,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/download"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/git"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
@@ -107,7 +108,7 @@ func (src *Source) Get() error {
 		}
 	case fileProtocol:
 	default:
-		return errors.Errorf("unsupported source type")
+		return errors.Errorf("%s", i18n.T("errors.source.unsupported_source_type"))
 	}
 
 	err := src.validateSource(sourceFilePath)
@@ -255,11 +256,11 @@ func (src *Source) validateSource(sourceFilePath string) error {
 
 	info, err := os.Stat(sourceFilePath)
 	if err != nil {
-		return errors.Errorf("failed to open file for hash %s", sourceFilePath)
+		return errors.Errorf(i18n.T("errors.source.failed_to_open_file_for_hash"), sourceFilePath)
 	}
 
 	if src.Hash == "SKIP" || info.IsDir() {
-		logger.Info("skip integrity check for",
+		logger.Info(i18n.T("logger.skip_integrity_check_for"),
 			"source", src.SourceItemURI)
 
 		return nil
@@ -273,7 +274,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	case 128:
 		hashSum = sha512.New()
 	default:
-		return errors.Errorf("unsupported hash length %d", len(src.Hash))
+		return errors.Errorf(i18n.T("errors.source.unsupported_hash_length"), len(src.Hash))
 	}
 
 	file, err := files.Open(filepath.Clean(sourceFilePath))
@@ -293,17 +294,17 @@ func (src *Source) validateSource(sourceFilePath string) error {
 
 	_, err = io.Copy(hashSum, file)
 	if err != nil {
-		return errors.Errorf("failed to copy file %s", sourceFilePath)
+		return errors.Errorf(i18n.T("errors.source.failed_to_copy_file"), sourceFilePath)
 	}
 
 	sum := hashSum.Sum(nil)
 	hexSum := hex.EncodeToString(sum)
 
 	if hexSum != src.Hash {
-		return errors.Errorf("hash verification failed %s", src.SourceItemPath)
+		return errors.Errorf(i18n.T("errors.source.hash_verification_failed"), src.SourceItemPath)
 	}
 
-	logger.Info("integrity check for",
+	logger.Info(i18n.T("logger.integrity_check_for"),
 		"source", src.SourceItemURI)
 
 	return nil
@@ -375,7 +376,7 @@ func processConcurrentDownloads(sources []*Source, maxConcurrent int) error {
 
 	_, err := shell.MultiPrinter.Start()
 	if err != nil {
-		return errors.Wrap(err, "failed to start multiprinter")
+		return errors.Wrap(err, i18n.T("errors.source.failed_to_start_multiprinter"))
 	}
 
 	results := download.Concurrently(downloads, maxConcurrent, 3, shell.MultiPrinter.Writer)
@@ -421,7 +422,7 @@ func processDownloadResults(results map[string]error, sourceMap map[string]*Sour
 	for destination, err := range results {
 		if err != nil {
 			if firstError == nil {
-				firstError = errors.Errorf("download failed for %s: %v", destination, err)
+				firstError = errors.Errorf(i18n.T("errors.source.download_failed_for"), destination, err)
 			}
 
 			continue

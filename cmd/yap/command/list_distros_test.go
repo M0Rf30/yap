@@ -5,6 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
 func TestListDistrosCommand(t *testing.T) {
@@ -62,6 +64,11 @@ func TestListDistros(t *testing.T) {
 }
 
 func TestListDistrosCommandDefinition(t *testing.T) {
+	// Initialize i18n and descriptions for testing
+	_ = i18n.Init("en")
+
+	InitializeListDistrosDescriptions()
+
 	// Test command properties
 	assert.Equal(t, "list-distros", listDistrosCmd.Use)
 	assert.Equal(t, "utility", listDistrosCmd.GroupID)

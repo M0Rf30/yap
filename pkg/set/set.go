@@ -7,6 +7,7 @@ import (
 
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -86,14 +87,14 @@ func StringifyArray(node *syntax.Assign) []string {
 	out := &strings.Builder{}
 
 	if len(node.Array.Elems) == 0 {
-		logger.Fatal("empty array, please give it a value",
+		logger.Fatal(i18n.T("errors.set.empty_array"),
 			"path", node.Name.Value)
 	}
 
 	for index := range node.Array.Elems {
 		err := printer.Print(out, node.Array.Elems[index].Value)
 		if err != nil {
-			logger.Error("unable to parse array element",
+			logger.Error(i18n.T("logger.stringifyarray.error.unable_to_parse_array_1"),
 				"path", out.String())
 		}
 
@@ -113,7 +114,7 @@ func StringifyAssign(node *syntax.Assign) string {
 	printer := syntax.NewPrinter(syntax.Indent(2))
 
 	if node.Value == nil {
-		logger.Fatal("empty variable, please give it a value",
+		logger.Fatal(i18n.T("errors.set.empty_variable"),
 			"path", node.Name.Value)
 	}
 
@@ -134,14 +135,14 @@ func StringifyFuncDecl(node *syntax.FuncDecl) string {
 
 	err := printer.Print(out, node.Body)
 	if err != nil {
-		logger.Error("unable to parse function",
+		logger.Error(i18n.T("logger.stringifyfuncdecl.error.unable_to_parse_function_1"),
 			"path", out.String())
 	}
 
 	funcDecl := strings.Trim(out.String(), "{\n}")
 
 	if funcDecl == "" {
-		logger.Fatal("empty function, please give it a value",
+		logger.Fatal(i18n.T("errors.set.empty_function"),
 			"path", node.Name.Value)
 	}
 

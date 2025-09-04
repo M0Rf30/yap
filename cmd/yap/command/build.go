@@ -1,4 +1,4 @@
-// Package command provides CLI commands for the yap package management tool.
+// Package command provides the CLI commands for the YAP package builder.
 package command
 
 import (
@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
@@ -21,40 +22,11 @@ var buildCmd = &cobra.Command{
 	Use:     "build [distro] <path>",
 	GroupID: "build",
 	Aliases: []string{"b"},
-	Short:   "🔨 Build packages from yap.json project definition",
-	Long: `Build packages for one or more distributions using a yap.json project file.
-
-The build command orchestrates the entire package building process:
-  • Parses yap.json project configuration
-  • Resolves build dependencies and order
-  • Creates isolated container environments
-  • Builds packages according to PKGBUILD specifications
-  • Handles cross-distribution compatibility
-
-DISTRIBUTION FORMAT:
-  Use 'distro' or 'distro-release' format (e.g., 'ubuntu-jammy', 'fedora-38')
-  If no distro is specified, uses the current system's distribution.
-
-DEPENDENCY RESOLUTION:
-  Build order is automatically determined from package dependencies.
-  Use --from and --to flags to build specific package ranges.`,
-	Example: `  # Build for current system distribution
-  yap build .
-  yap build /path/to/project
-
-  # Build for specific distributions
-  yap build ubuntu-jammy .
-  yap build fedora-38 /path/to/project
-  yap build alpine /home/user/myproject
-
-  # Build with specific options
-  yap build --cleanbuild --nomakedeps ubuntu-jammy .
-  yap build --from package1 --to package5 fedora-38 .
-
-  # Build with custom version override
-  yap build --pkgver 1.2.3 --pkgrel 2 ubuntu-jammy .`,
-	Args:   cobra.RangeArgs(1, 2), // Allow 1 or 2 arguments like the old version
-	PreRun: PreRunValidation,
+	Short:   "🔨 Build packages from yap.json project definition", // Will be set in init()
+	Long:    "",                                                  // Will be set in init()
+	Example: "",                                                  // Will be set in init()
+	Args:    cobra.RangeArgs(1, 2),                               // Allow 1-2 arguments
+	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
 		// Set verbose flag from global flag
 		project.Verbose = verbose
@@ -62,8 +34,7 @@ DEPENDENCY RESOLUTION:
 
 		// Enhanced user feedback with progress
 		if verbose {
-			logger.Debug("verbose mode enabled", "command", "build")
-			logger.Debug("Starting build process with verbose logging enabled")
+			logger.Debug(i18n.T("logger.build.starting_verbose"))
 		}
 
 		// Parse flexible arguments using shared function
@@ -76,18 +47,18 @@ DEPENDENCY RESOLUTION:
 		if distro == "" {
 			osRelease, _ := platform.ParseOSRelease()
 			distro = osRelease.ID
-			logger.Warn("No distribution specified, using detected",
+			logger.Warn(i18n.T("logger.build.no_distribution_specified"),
 				"distro", distro)
 		} else {
-			logger.Info("Building for distribution",
+			logger.Info(i18n.T("logger.build.building_for_distribution"),
 				"distro", distro, "release", release)
 		}
 
 		// Show project path
-		logger.Info("Project path", "path", fullJSONPath)
+		logger.Info(i18n.T("logger.build.project_path"), "path", fullJSONPath)
 
 		// Initialize project with timestamp logging
-		logger.Info("Initializing project...")
+		logger.Info(i18n.T("logger.build.initializing_project"))
 
 		// Initialize MultipleProject
 		mpc := project.MultipleProject{}
@@ -98,16 +69,16 @@ DEPENDENCY RESOLUTION:
 			if errors.As(err, &yapErr) {
 				logStructuredError(yapErr)
 			} else {
-				logger.Error("Project initialization failed", "error", err)
+				logger.Error(i18n.T("logger.build.project_init_failed"), "error", err)
 				return err
 			}
 			return err
 		}
 
-		logger.Info("Project initialized successfully")
+		logger.Info(i18n.T("logger.build.project_init_success"))
 
 		// Build packages with timestamp logging
-		logger.Info("Building packages...")
+		logger.Info(i18n.T("logger.build.building_packages"))
 
 		err = mpc.BuildAll()
 		if err != nil {
@@ -116,13 +87,13 @@ DEPENDENCY RESOLUTION:
 			if errors.As(err, &yapErr) {
 				logStructuredError(yapErr)
 			} else {
-				logger.Error("Build failed", "error", err)
+				logger.Error(i18n.T("logger.build.build_failed"), "error", err)
 				return err
 			}
 			return err
 		}
 
-		logger.Info("All packages built successfully")
+		logger.Info(i18n.T("logger.build.build_completed"))
 		return nil
 	},
 }
@@ -145,11 +116,32 @@ func logStructuredError(yapErr *yapErrors.YapError) {
 		args = append(args, "underlying_error", yapErr.Cause.Error())
 	}
 
-	logger.Fatal("build failed", args...)
+	logger.Fatal(i18n.T("logger.build.build_failed"), args...)
+}
+
+// InitializeBuildDescriptions sets the localized descriptions for the build command.
+// This must be called after i18n is initialized.
+func InitializeBuildDescriptions() {
+	buildCmd.Short = i18n.T("commands.build.short")
+	buildCmd.Long = i18n.T("commands.build.long")
+	buildCmd.Example = i18n.T("commands.build.examples")
+
+	// Update flag descriptions with localized text
+	buildCmd.Flag("cleanbuild").Usage = i18n.T("flags.build.cleanbuild")
+	buildCmd.Flag("nobuild").Usage = i18n.T("flags.build.nobuild")
+	buildCmd.Flag("zap").Usage = i18n.T("flags.build.zap")
+	buildCmd.Flag("nomakedeps").Usage = i18n.T("flags.build.nomakedeps")
+	buildCmd.Flag("skip-sync").Usage = i18n.T("flags.build.skip_sync")
+	buildCmd.Flag("pkgver").Usage = i18n.T("flags.build.pkgver")
+	buildCmd.Flag("pkgrel").Usage = i18n.T("flags.build.pkgrel")
+	buildCmd.Flag("ssh-password").Usage = i18n.T("flags.build.ssh_password")
+	buildCmd.Flag("from").Usage = i18n.T("flags.build.from")
+	buildCmd.Flag("to").Usage = i18n.T("flags.build.to")
 }
 
 //nolint:gochecknoinits // Required for cobra command registration
 func init() {
+	// Command descriptions will be set later via InitializeLocalizedDescriptions()
 	rootCmd.AddCommand(buildCmd)
 
 	// Add completion for command arguments
@@ -176,31 +168,31 @@ func init() {
 
 	// BUILD BEHAVIOR FLAGS
 	buildCmd.Flags().BoolVarP(&project.CleanBuild,
-		"cleanbuild", "c", false, "🧹 remove $srcdir/ directory before building (ensures clean build)")
+		"cleanbuild", "c", false, "")
 	buildCmd.Flags().BoolVarP(&project.NoBuild,
-		"nobuild", "o", false, "📥 download and extract source files only (no compilation)")
+		"nobuild", "o", false, "")
 	buildCmd.Flags().BoolVarP(&project.Zap,
-		"zap", "z", false, "💥 remove entire staging directory before building (deep clean)")
+		"zap", "z", false, "")
 
 	// DEPENDENCY MANAGEMENT FLAGS
 	buildCmd.Flags().BoolVarP(&project.NoMakeDeps,
-		"nomakedeps", "d", false, "⏭️  skip all make dependency (makedeps) installation and checks")
+		"nomakedeps", "d", false, "")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncDeps,
-		"skip-sync", "s", false, "🚫 skip package manager synchronization with remotes")
+		"skip-sync", "s", false, "")
 
 	// VERSION CONTROL FLAGS
 	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgVer,
-		"pkgver", "w", "", "🏷️  override package version (pkgver) for all packages in project")
+		"pkgver", "w", "", "")
 	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgRel,
-		"pkgrel", "r", "", "🔢 override package release number (pkgrel) for all packages")
+		"pkgrel", "r", "", "")
 
 	// SOURCE ACCESS FLAGS
 	buildCmd.Flags().StringVarP(&source.SSHPassword,
-		"ssh-password", "p", "", "🔐 SSH password for accessing private repositories")
+		"ssh-password", "p", "", "")
 
 	// BUILD RANGE CONTROL FLAGS
 	buildCmd.Flags().StringVarP(&project.FromPkgName,
-		"from", "", "", "▶️  start building from specified package name (dependency-aware)")
+		"from", "", "", "")
 	buildCmd.Flags().StringVarP(&project.ToPkgName,
-		"to", "", "", "⏹️  stop building at specified package name (dependency-aware)")
+		"to", "", "", "")
 }

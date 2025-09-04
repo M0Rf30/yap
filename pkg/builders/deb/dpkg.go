@@ -14,6 +14,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -50,7 +51,7 @@ func (d *Package) BuildPackage(artifactsPath string) error {
 	defer func() {
 		err := os.RemoveAll(debTemp)
 		if err != nil {
-			logger.Warn("failed to remove temporary directory",
+			logger.Warn(i18n.T("logger.buildpackage.warn.failed_to_remove_temporary_1"),
 				"path", debTemp, "error", err)
 		}
 	}()
@@ -319,7 +320,7 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 	defer func() {
 		err := debPackage.Close()
 		if err != nil {
-			logger.Warn("failed to close debian package file", "error", err)
+			logger.Warn(i18n.T("logger.createdeb.warn.failed_to_close_debian_1"), "error", err)
 		}
 	}()
 
@@ -370,7 +371,7 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	logger.Info("package artifact created",
+	logger.Info(i18n.T("logger.unknown.info.package_artifact_created_3"),
 		"package", d.PKGBUILD.PkgName,
 		"version", d.PKGBUILD.PkgVer,
 		"release", d.PKGBUILD.PkgRel,

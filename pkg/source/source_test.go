@@ -17,6 +17,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
 func TestSource_parseURI(t *testing.T) {
@@ -415,6 +416,9 @@ func TestSource_Get_FileProtocol(t *testing.T) {
 }
 
 func TestSource_Get_UnsupportedProtocol(t *testing.T) {
+	// Initialize i18n for test
+	_ = i18n.Init("en")
+
 	t.Parallel()
 
 	tempDir := t.TempDir()

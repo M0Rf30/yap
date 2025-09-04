@@ -15,6 +15,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
@@ -59,7 +60,7 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	logger.Info("package artifact created",
+	logger.Info(i18n.T("logger.buildpackage.info.package_artifact_created_1"),
 		"package", m.PKGBUILD.PkgName,
 		"version", m.PKGBUILD.PkgVer,
 		"release", m.PKGBUILD.PkgRel,
@@ -249,7 +250,7 @@ func createMTREEGzip(mtreeContent, outputFile string) error {
 	defer func() {
 		err := out.Close()
 		if err != nil {
-			logger.Warn("failed to close output file", "error", err)
+			logger.Warn(i18n.T("logger.createmtreegzip.warn.failed_to_close_output_1"), "error", err)
 		}
 	}()
 
@@ -259,7 +260,7 @@ func createMTREEGzip(mtreeContent, outputFile string) error {
 	defer func() {
 		err := gzipWriter.Close()
 		if err != nil {
-			logger.Warn("failed to close gzip writer", "error", err)
+			logger.Warn(i18n.T("logger.createmtreegzip.warn.failed_to_close_gzip_1"), "error", err)
 		}
 	}()
 

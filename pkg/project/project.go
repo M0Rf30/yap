@@ -18,6 +18,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
@@ -52,9 +53,10 @@ var (
 var (
 	// ErrCircularDependency indicates a circular dependency was detected.
 	// Static errors for linting compliance.
-	ErrCircularDependency = errors.New("circular dependency detected")
+	ErrCircularDependency = errors.New(i18n.T("errors.project.circular_dependency_detected"))
 	// ErrCircularRuntimeDependency indicates a circular runtime dependency was detected.
-	ErrCircularRuntimeDependency = errors.New("circular dependency in runtime dependencies")
+	ErrCircularRuntimeDependency = errors.New(
+		i18n.T("errors.project.circular_runtime_dependency_detected"))
 )
 
 // DistroProject is an interface that defines the methods for creating and
@@ -189,7 +191,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	if CleanBuild || Zap {
 		err := mpc.Clean()
 		if err != nil {
-			logger.Fatal("fatal error",
+			logger.Fatal(i18n.T("logger.fatal_error"),
 				"error", err)
 		}
 	}
@@ -213,7 +215,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		mpc.getRuntimeDeps()
 
 		if len(runtimeDepends) > 0 {
-			logger.Debug("installing external runtime dependencies",
+			logger.Debug(i18n.T("logger.installing_external_runtime_dependencies"),
 				"count", len(runtimeDepends))
 
 			err := packageManager.Prepare(runtimeDepends)
@@ -243,7 +245,7 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 			workerIDStr := fmt.Sprintf("worker-%d", workerID)
 
 			for proj := range projectChan {
-				logger.Debug("creating package",
+				logger.Debug(i18n.T("logger.creating_package"),
 					"package", proj.Builder.PKGBUILD.PkgName,
 					"version", proj.Builder.PKGBUILD.PkgVer,
 					"release", proj.Builder.PKGBUILD.PkgRel,
@@ -314,7 +316,7 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
 	}
 
 	if fromPkgName != "" && toPkgName != "" && firstIndex > lastIndex {
-		logger.Fatal("invalid package order",
+		logger.Fatal(i18n.T("logger.invalid_package_order"),
 			"required_first", fromPkgName,
 			"required_second", toPkgName)
 	}
@@ -415,7 +417,7 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 	defer func() {
 		err := os.RemoveAll(proj.Builder.PKGBUILD.PackageDir)
 		if err != nil {
-			logger.Warn("failed to remove package directory",
+			logger.Warn(i18n.T("logger.failed_to_remove_package_directory"),
 				"path", proj.Builder.PKGBUILD.PackageDir,
 				"error", err)
 		}
@@ -431,7 +433,7 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		return err
 	}
 
-	logger.Info("building resulting package",
+	logger.Info(i18n.T("logger.building_resulting_package"),
 		"package", proj.Builder.PKGBUILD.PkgName,
 		"version", proj.Builder.PKGBUILD.PkgVer,
 		"release", proj.Builder.PKGBUILD.PkgRel)
@@ -461,7 +463,7 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 	}
 
 	if !matchFound {
-		logger.Fatal("package not found",
+		logger.Fatal(i18n.T("logger.package_not_found"),
 			"package", pkgName)
 	}
 
@@ -501,7 +503,7 @@ func (mpc *MultipleProject) getRuntimeDeps() {
 	}
 
 	if len(runtimeDepends) > 0 {
-		logger.Info("external runtime dependencies collected",
+		logger.Info(i18n.T("logger.external_runtime_dependencies_collected"),
 			"count", len(runtimeDepends),
 			"dependencies", runtimeDepends)
 	}
@@ -564,13 +566,13 @@ func (mpc *MultipleProject) readProject(path string) error {
 
 	if files.Exists(jsonFilePath) {
 		projectFilePath = jsonFilePath
-		logger.Info("multi-project file found",
+		logger.Info(i18n.T("logger.multi_project_file_found"),
 			"path", projectFilePath)
 	}
 
 	if files.Exists(pkgbuildFilePath) {
 		projectFilePath = pkgbuildFilePath
-		logger.Info("single-project file found",
+		logger.Info(i18n.T("logger.single_project_file_found"),
 			"path", projectFilePath)
 
 		mpc.setSingleProject(path)
@@ -584,7 +586,7 @@ func (mpc *MultipleProject) readProject(path string) error {
 	defer func() {
 		err := filePath.Close()
 		if err != nil {
-			logger.Warn("failed to close project file", "path", projectFilePath, "error", err)
+			logger.Warn(i18n.T("logger.failed_to_close_project_file"), "path", projectFilePath, "error", err)
 		}
 	}()
 
@@ -641,7 +643,7 @@ func (mpc *MultipleProject) validateJSON() error {
 
 // displayVerboseDependencyInfo shows detailed dependency information for all projects.
 func (mpc *MultipleProject) displayVerboseDependencyInfo() {
-	logger.Debug("dependency analysis starting")
+	logger.Debug(i18n.T("logger.dependency_analysis_starting"))
 
 	// Create dependency map for internal packages
 	packageMap := make(map[string]*Project)
@@ -657,7 +659,7 @@ func (mpc *MultipleProject) displayVerboseDependencyInfo() {
 		mpc.displayPackageDependencyInfo(proj, packageMap, runtimeDependencyMap)
 	}
 
-	logger.Debug("dependency analysis complete")
+	logger.Debug(i18n.T("logger.dependency_analysis_complete"))
 }
 
 // displayPackageDependencyInfo shows dependency information for a specific package.
@@ -668,7 +670,7 @@ func (mpc *MultipleProject) displayPackageDependencyInfo(
 	pkgVer := proj.Builder.PKGBUILD.PkgVer
 	pkgRel := proj.Builder.PKGBUILD.PkgRel
 
-	logger.Debug("package information",
+	logger.Debug(i18n.T("logger.package_information"),
 		"package", pkgName,
 		"version", pkgVer,
 		"release", pkgRel)
@@ -694,12 +696,12 @@ func (mpc *MultipleProject) displayPackageDependencyInfo(
 			installType = "runtime_dependency"
 		}
 
-		logger.Debug("package installation planned",
+		logger.Debug(i18n.T("logger.package_installation_planned"),
 			"package", pkgName,
 			"install_type", installType,
 			"action", "install_after_build")
 	} else {
-		logger.Debug("package installation planned",
+		logger.Debug(i18n.T("logger.package_installation_planned"),
 			"package", pkgName,
 			"action", "build_only")
 	}
@@ -708,7 +710,7 @@ func (mpc *MultipleProject) displayPackageDependencyInfo(
 // displayDependencies is a helper function to display dependency information.
 func (mpc *MultipleProject) displayDependencies(
 	title string, deps []string, packageMap map[string]*Project) {
-	logger.Debug("dependency category",
+	logger.Debug(i18n.T("logger.dependency_category"),
 		"category", title)
 
 	internalDeps := make([]string, 0)
@@ -725,14 +727,14 @@ func (mpc *MultipleProject) displayDependencies(
 
 	// Display internal dependencies
 	for _, dep := range internalDeps {
-		logger.Debug("internal dependency",
+		logger.Debug(i18n.T("logger.internal_dependency"),
 			"dependency", dep,
 			"type", "internal")
 	}
 
 	// Display external dependencies
 	for _, dep := range externalDeps {
-		logger.Debug("external dependency",
+		logger.Debug(i18n.T("logger.external_dependency"),
 			"dependency", dep,
 			"type", "external")
 	}
@@ -741,7 +743,7 @@ func (mpc *MultipleProject) displayDependencies(
 // resolveDependencies builds a dependency graph and returns projects in topologically sorted order.
 // Returns slices of project batches that can be built in parallel within each batch.
 func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
-	logger.Info("analyzing package dependencies")
+	logger.Info(i18n.T("logger.analyzing_package_dependencies"))
 
 	// Build dependency graph
 	projectMap := make(map[string]*Project)
@@ -757,7 +759,7 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 	}
 
 	logger.Info(
-		"building dependency graph",
+		i18n.T("logger.project.building_dependency_graph"),
 		"total_packages", len(projectMap))
 
 	// Build dependency relationships
@@ -776,7 +778,7 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 		allDeps = append(allDeps, proj.Builder.PKGBUILD.MakeDepends...)
 
 		if len(allDeps) > 0 {
-			logger.Info("package declares dependencies",
+			logger.Info(i18n.T("logger.package_declares_dependencies"),
 				"package", pkgName,
 				"all_dependencies", allDeps)
 		}
@@ -804,13 +806,13 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 		}
 
 		if len(packageDeps) > 0 {
-			logger.Info("package dependencies found",
+			logger.Info(i18n.T("logger.package_dependencies_found"),
 				"package", pkgName,
 				"depends_on", packageDeps)
 		}
 	}
 
-	logger.Info("dependency analysis complete",
+	logger.Info(i18n.T("logger.dependency_analysis_complete"),
 		"total_internal_dependencies", totalDeps)
 
 	// Perform topological sort using Kahn's algorithm
@@ -823,16 +825,16 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 	dependsOn map[string][]string, dependedBy map[string][]string,
 ) ([][]*Project, error) {
-	logger.Info("performing topological sort for build order")
+	logger.Info(i18n.T("logger.performing_topological_sort_for_build_order"))
 
 	// Calculate dependency popularity to identify fundamental packages
 	popularity := mpc.calculateDependencyPopularity()
 
-	logger.Debug("dependency popularity analysis:")
+	logger.Debug(i18n.T("logger.dependency_popularity_analysis") + ":")
 
 	for pkgName, count := range popularity {
 		if count > 0 {
-			logger.Debug("dependency popularity",
+			logger.Debug(i18n.T("logger.dependency_popularity"),
 				"package", pkgName,
 				"dependent_count", count)
 		}
@@ -884,13 +886,13 @@ func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 				problematicPackages = append(problematicPackages, fmt.Sprintf("%s(%d)", pkgName, degree))
 			}
 
-			logger.Error("circular dependency detected",
+			logger.Error(i18n.T("logger.circular_dependency_detected"),
 				"remaining_packages", problematicPackages)
 
 			return nil, fmt.Errorf("%w: %v", ErrCircularDependency, problematicPackages)
 		}
 
-		logger.Info("build batch determined",
+		logger.Info(i18n.T("logger.build_batch_determined"),
 			"batch_number", batchNum,
 			"batch_size", len(currentBatch),
 			"packages", batchPackages,
@@ -913,7 +915,7 @@ func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 		batchNum++
 	}
 
-	logger.Info("build order determined",
+	logger.Info(i18n.T("logger.build_order_determined"),
 		"total_batches", len(result),
 		"total_packages", len(projectMap))
 
@@ -1003,7 +1005,7 @@ func (mpc *MultipleProject) buildBatchWithDependencyInstall(projects []*Project,
 	}
 
 	// Log the build strategy for the current batch
-	logger.Info("batch build strategy",
+	logger.Info(i18n.T("logger.batch_build_strategy"),
 		"runtime_dependencies", len(runtimeDeps),
 		"regular_packages", len(regularPackages),
 		"batch_number", batchNumber)
@@ -1041,7 +1043,7 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 	}
 
 	logger.Info(
-		"building regular packages",
+		i18n.T("logger.project.building_regular_packages"),
 		"count", len(regularPackages))
 
 	err := mpc.buildProjectsParallel(regularPackages, maxWorkers)
@@ -1060,7 +1062,7 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 
 		// Stop if the target package has been built
 		if ToPkgName != "" && proj.Builder.PKGBUILD.PkgName == ToPkgName {
-			logger.Info("stopping build at target package",
+			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
 				"target_package", ToPkgName)
 
 			return nil // Use a sentinel error or other mechanism if specific exit is needed
@@ -1073,19 +1075,19 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 // installPackage installs a single package.
 func (mpc *MultipleProject) installPackage(proj *Project) error {
 	pkgName := proj.Builder.PKGBUILD.PkgName
-	logger.Info("installing package", "package", pkgName)
+	logger.Info(i18n.T("logger.installing_package"), "package", pkgName)
 
 	err := proj.PackageManager.Install(mpc.Output)
 	if err != nil {
 		logger.Error(
-			"package installation failed",
+			i18n.T("logger.project.package_installation_failed"),
 			"package", pkgName,
 			"error", err)
 
 		return err
 	}
 
-	logger.Info("package installed", "package", pkgName)
+	logger.Info(i18n.T("logger.package_installed"), "package", pkgName)
 
 	return nil
 }
@@ -1096,7 +1098,7 @@ func (mpc *MultipleProject) installPackage(proj *Project) error {
 func (mpc *MultipleProject) buildRuntimeDependenciesInOrder(
 	runtimeDeps []*Project, maxWorkers int) error {
 	logger.Info(
-		"runtime dependencies build optimization",
+		i18n.T("logger.project.runtime_dependencies_build_optimization"),
 		"count", len(runtimeDeps))
 
 	// Build dependency graph for runtime dependencies only
@@ -1111,7 +1113,7 @@ func (mpc *MultipleProject) buildRuntimeDependenciesInOrder(
 	}
 
 	logger.Info(
-		"runtime dependencies batching complete",
+		i18n.T("logger.project.runtime_dependencies_batching_complete"),
 		"batches", len(runtimeBatches))
 
 	return mpc.buildAndInstallRuntimeBatches(runtimeBatches, maxWorkers)
@@ -1152,7 +1154,7 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 			runtimeDependsOn[pkgName] = append(runtimeDependsOn[pkgName], depName)
 			runtimeDependedBy[depName] = append(runtimeDependedBy[depName], pkgName)
 			logger.Info(
-				"runtime dependency found",
+				i18n.T("logger.project.runtime_dependency_found"),
 				"dependent", pkgName,
 				"dependency", depName)
 		}
@@ -1165,7 +1167,7 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 			runtimeDependsOn[pkgName] = append(runtimeDependsOn[pkgName], depName)
 			runtimeDependedBy[depName] = append(runtimeDependedBy[depName], pkgName)
 			logger.Info(
-				"make dependency found",
+				i18n.T("logger.project.make_dependency_found"),
 				"dependent", pkgName,
 				"dependency", depName)
 		}
@@ -1184,7 +1186,7 @@ func (mpc *MultipleProject) buildAndInstallRuntimeBatches(
 			batchPackages = append(batchPackages, proj.Builder.PKGBUILD.PkgName)
 		}
 
-		logger.Info("building runtime dependency batch",
+		logger.Info(i18n.T("logger.project.building_runtime_dependency_batch"),
 			"batch", batchIndex+1,
 			"parallel_packages", batchSize,
 			"packages", batchPackages)
@@ -1211,24 +1213,24 @@ func (mpc *MultipleProject) installRuntimeBatch(batch []*Project) error {
 		pkgName := proj.Builder.PKGBUILD.PkgName
 
 		if !NoBuild {
-			logger.Info("installing runtime dependency",
+			logger.Info(i18n.T("logger.project.installing_runtime_dependency"),
 				"package", pkgName)
 
 			err := proj.PackageManager.Install(mpc.Output)
 			if err != nil {
-				logger.Error("runtime dependency installation failed",
+				logger.Error(i18n.T("logger.project.runtime_dependency_installation_failed"),
 					"package", pkgName,
 					"error", err)
 
 				return err
 			}
 
-			logger.Info("runtime dependency installed",
+			logger.Info(i18n.T("logger.project.runtime_dependency_installed"),
 				"package", pkgName)
 		}
 
 		if ToPkgName != "" && pkgName == ToPkgName {
-			logger.Info("stopping build at target package",
+			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
 				"target_package", ToPkgName)
 		}
 	}
@@ -1334,7 +1336,7 @@ func (mpc *MultipleProject) topologicalSortRuntimeDeps(projectMap map[string]*Pr
 			currentBatch = append(currentBatch, projectMap[pkgName])
 		}
 
-		logger.Info("runtime dependency batch analysis",
+		logger.Info(i18n.T("logger.project.runtime_dependency_batch_analysis"),
 			"batch_number", batchNum,
 			"parallel_packages", len(currentBatch))
 
@@ -1369,18 +1371,18 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 	// Build runtime dependency map to identify packages that are needed by others
 	runtimeDependencyMap := mpc.buildRuntimeDependencyMap()
 
-	logger.Info("dependency-aware build process starting")
-	logger.Info("runtime dependency map:")
+	logger.Info(i18n.T("logger.dependency_aware_build_process_starting"))
+	logger.Info(i18n.T("logger.project.runtime_dependency_map"))
 
 	for pkgName, isRuntimeDep := range runtimeDependencyMap {
 		if isRuntimeDep {
-			logger.Info("runtime dependency detected",
+			logger.Info(i18n.T("logger.project.runtime_dependency_detected"),
 				"package", pkgName,
 				"action", "will_be_installed")
 		}
 	}
 
-	logger.Info("starting dependency-aware build process",
+	logger.Info(i18n.T("logger.project.starting_dependencyaware_build_process"),
 		"total_batches", len(buildOrder),
 		"total_packages", totalPackages,
 		"max_parallel_workers", maxWorkers)
@@ -1391,7 +1393,7 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 		// Filter batch based on FromPkgName and ToPkgName
 		filteredBatch := mpc.filterBatch(batch)
 		if len(filteredBatch) == 0 {
-			logger.Debug("skipping batch (filtered out)",
+			logger.Debug(i18n.T("logger.project.skipping_batch_filtered_out"),
 				"batch_number", batchIndex+1)
 
 			continue
@@ -1404,7 +1406,7 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 			batchPackages = append(batchPackages, proj.Builder.PKGBUILD.PkgName)
 		}
 
-		logger.Debug("processing build batch",
+		logger.Debug(i18n.T("logger.processing_build_batch"),
 			"batch_number", batchIndex+1,
 			"batch_size", len(filteredBatch),
 			"packages", batchPackages,

@@ -12,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -31,12 +32,12 @@ func CalculateSHA256(path string) ([]byte, error) {
 
 	file, err := os.Open(cleanFilePath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open file for SHA256 calculation")
+		return nil, errors.Wrap(err, i18n.T("errors.files.failed_to_open_file_for_sha256"))
 	}
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn("failed to close file", "path", cleanFilePath, "error", closeErr)
+			logger.Warn(i18n.T("logger.files.warn.close_failed"), "path", cleanFilePath, "error", closeErr)
 		}
 	}()
 
@@ -44,7 +45,7 @@ func CalculateSHA256(path string) ([]byte, error) {
 
 	_, err = io.Copy(hash, file)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to calculate SHA256")
+		return nil, errors.Wrap(err, i18n.T("errors.files.failed_to_calculate_sha256"))
 	}
 
 	return hash.Sum(nil), nil
@@ -54,11 +55,11 @@ func CalculateSHA256(path string) ([]byte, error) {
 func CheckWritable(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
-		return errors.Wrap(err, "failed to stat file for writability check")
+		return errors.Wrap(err, i18n.T("errors.files.failed_to_stat_file"))
 	}
 
 	if info.Mode().Perm()&0o200 == 0 {
-		return errors.Errorf("file %s is not writable", path)
+		return errors.Errorf(i18n.T("errors.files.file_not_writable"), path)
 	}
 
 	return nil
@@ -67,8 +68,8 @@ func CheckWritable(path string) error {
 // Chmod changes file permissions.
 func Chmod(path string, perm os.FileMode) error {
 	if err := os.Chmod(path, perm); err != nil {
-		logger.Error("failed to chmod", "path", path, "error", err)
-		return errors.Wrap(err, "failed to change file permissions")
+		logger.Error(i18n.T("logger.chmod.error.failed_to_chmod_1"), "path", path, "error", err)
+		return errors.Wrap(err, i18n.T("errors.files.failed_to_change_permissions"))
 	}
 
 	return nil
@@ -80,7 +81,7 @@ func Create(path string) (*os.File, error) {
 
 	file, err := os.Create(cleanFilePath)
 	if err != nil {
-		logger.Error("failed to create path", "path", path, "error", err)
+		logger.Error(i18n.T("logger.create.error.failed_to_create_path_1"), "path", path, "error", err)
 		return nil, err
 	}
 
@@ -96,12 +97,12 @@ func CreateWrite(path, data string) error {
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn("failed to close file", "path", path, "error", closeErr)
+			logger.Warn(i18n.T("logger.files.warn.close_write"), "path", path, "error", closeErr)
 		}
 	}()
 
 	if _, err = file.WriteString(data); err != nil {
-		logger.Error("failed to write to file", "path", path, "error", err)
+		logger.Error(i18n.T("logger.createwrite.error.failed_to_write_to_1"), "path", path, "error", err)
 		return err
 	}
 
@@ -119,10 +120,10 @@ func ExistsMakeDir(path string) error {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(path, 0o750); err != nil {
-			return errors.Errorf("failed to create directory %s", path)
+			return errors.Errorf(i18n.T("errors.files.failed_to_create_directory"), path)
 		}
 	} else if err != nil {
-		return errors.Errorf("failed to access directory %s", path)
+		return errors.Errorf(i18n.T("errors.files.failed_to_access_directory"), path)
 	}
 
 	return nil
@@ -154,7 +155,7 @@ func GetDirSize(path string) (int64, error) {
 		return nil
 	})
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to calculate directory size")
+		return 0, errors.Wrap(err, i18n.T("errors.files.failed_to_calculate_directory_size"))
 	}
 
 	return size, nil
@@ -166,7 +167,7 @@ func GetFileType(path string) string {
 
 	fileInfo, err := os.Lstat(cleanFilePath)
 	if err != nil {
-		logger.Debug("failed to get file info", "path", cleanFilePath, "error", err)
+		logger.Debug(i18n.T("logger.files.debug.get_info_failed"), "path", cleanFilePath, "error", err)
 		return ""
 	}
 
@@ -176,13 +177,13 @@ func GetFileType(path string) string {
 
 	file, err := os.Open(cleanFilePath)
 	if err != nil {
-		logger.Debug("failed to open file for type detection", "path", cleanFilePath, "error", err)
+		logger.Debug(i18n.T("logger.files.debug.open_failed"), "path", cleanFilePath, "error", err)
 		return ""
 	}
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn("failed to close file", "path", cleanFilePath, "error", closeErr)
+			logger.Warn(i18n.T("logger.files.warn.close_type"), "path", cleanFilePath, "error", closeErr)
 		}
 	}()
 
@@ -225,7 +226,7 @@ func IsStaticLibrary(path string) bool {
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn("failed to close file", "path", cleanFilePath, "error", closeErr)
+			logger.Warn(i18n.T("logger.files.warn.close_lib"), "path", cleanFilePath, "error", closeErr)
 		}
 	}()
 
@@ -245,7 +246,7 @@ func Open(path string) (*os.File, error) {
 
 	file, err := os.Open(cleanFilePath)
 	if err != nil {
-		logger.Error("failed to open file", "path", path, "error", err)
+		logger.Error(i18n.T("logger.open.error.failed_to_open_file_1"), "path", path, "error", err)
 		return nil, err
 	}
 
@@ -263,14 +264,14 @@ func TryHardLink(src, dst string) error {
 	// Fall back to copying the file
 	srcFile, err := os.Open(src) // #nosec G304 - src path is controlled by caller
 	if err != nil {
-		return errors.Wrap(err, "failed to open source file for copying")
+		return errors.Wrap(err, i18n.T("errors.files.failed_to_open_source_file"))
 	}
 
 	defer func() { _ = srcFile.Close() }()
 
 	dstFile, err := os.Create(dst) // #nosec G304 - dst path is controlled by caller
 	if err != nil {
-		return errors.Wrap(err, "failed to create destination file")
+		return errors.Wrap(err, i18n.T("errors.files.failed_to_create_destination_file"))
 	}
 
 	defer func() { _ = dstFile.Close() }()
@@ -280,13 +281,13 @@ func TryHardLink(src, dst string) error {
 	defer bufferPool.Put(&buffer)
 
 	if _, err := io.CopyBuffer(dstFile, srcFile, buffer); err != nil {
-		return errors.Wrap(err, "failed to copy file content")
+		return errors.Wrap(err, i18n.T("errors.files.failed_to_copy_file_content"))
 	}
 
 	// Copy file permissions
 	if srcInfo, err := srcFile.Stat(); err == nil {
 		if err := os.Chmod(dst, srcInfo.Mode()); err != nil {
-			logger.Warn("failed to copy file permissions", "dst", dst, "error", err)
+			logger.Warn(i18n.T("logger.tryhardlink.warn.failed_to_copy_file_1"), "dst", dst, "error", err)
 		}
 	}
 

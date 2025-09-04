@@ -13,6 +13,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
@@ -28,7 +29,7 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 	referenceName plumbing.ReferenceName,
 ) error {
 	if dloadFilePath == "" {
-		return errors.New("download file path cannot be empty")
+		return errors.New(i18n.T("errors.git.empty_download_path"))
 	}
 	// Start multiprinter for consistent output handling
 	_, err := shell.MultiPrinter.Start()
@@ -68,8 +69,8 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 
 		publicKey, err := ssh.NewPublicKeysFromFile("git", sshKeyPath, sshPassword)
 		if err != nil {
-			logger.Error("failed to load ssh key")
-			logger.Warn("try to use an ssh-password with the -p")
+			logger.Error(i18n.T("logger.clone.error.failed_to_load_ssh_1"))
+			logger.Warn(i18n.T("logger.clone.warn.try_to_use_an_1"))
 
 			return err
 		}
@@ -143,7 +144,7 @@ func checkoutReference(repo *ggit.Repository, referenceName plumbing.ReferenceNa
 	// Check if the remote branch exists
 	remoteRef, err := repo.Reference(remoteBranchRef, true)
 	if err != nil {
-		return errors.Errorf("remote branch %s not found: %v", branchName, err)
+		return errors.Errorf(i18n.T("errors.git.remote_branch_not_found"), branchName, err)
 	}
 
 	// Create a new local branch that tracks the remote branch

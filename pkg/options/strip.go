@@ -10,12 +10,13 @@ import (
 
 	binutil "github.com/M0Rf30/yap/v2/pkg/binary"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // Strip walks through the directory to process each file.
 func Strip(packageDir string) error {
-	logger.Info("stripping binaries")
+	logger.Info(i18n.T("logger.strip.info.stripping_binaries_1"))
 
 	return filepath.WalkDir(packageDir, processFile)
 }
