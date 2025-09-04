@@ -10,6 +10,7 @@ import (
 
 	"github.com/mholt/archives"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -47,7 +48,7 @@ func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
 
 	defer func() {
 		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn("failed to close output file",
+			logger.Warn(i18n.T("logger.createtarzst.warn.failed_to_close_output_1"),
 				"path", cleanFilePath,
 				"error", closeErr)
 		}
@@ -90,7 +91,7 @@ func CreateTarGz(sourceDir, outputFile string, formatGNU bool) error {
 
 	defer func() {
 		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn("failed to close output file",
+			logger.Warn(i18n.T("logger.createtargz.warn.failed_to_close_output_1"),
 				"path", cleanFilePath,
 				"error", closeErr)
 		}
@@ -125,7 +126,7 @@ func Extract(source, destination string) error {
 
 	defer func() {
 		if closeErr := sourceFile.Close(); closeErr != nil {
-			logger.Warn("failed to close source file", "path", source, "error", closeErr)
+			logger.Warn(i18n.T("logger.archive.warn.close_failed"), "path", source, "error", closeErr)
 		}
 	}()
 
@@ -168,7 +169,7 @@ func Extract(source, destination string) error {
 			// Check if file already exists and has the same size to avoid re-extraction
 			if existingInfo, err := os.Stat(cleanNewPath); err == nil {
 				if existingInfo.Size() == archiveFile.Size() {
-					logger.Debug("skipping extraction, file exists with same size", "path", cleanNewPath)
+					logger.Debug(i18n.T("logger.archive.debug.skip_exists"), "path", cleanNewPath)
 					return nil
 				}
 			}
@@ -182,7 +183,7 @@ func Extract(source, destination string) error {
 
 			defer func() {
 				if closeErr := newFile.Close(); closeErr != nil {
-					logger.Warn("failed to close new file",
+					logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_new_1"),
 						"path", cleanNewPath,
 						"error", closeErr)
 				}
@@ -195,7 +196,7 @@ func Extract(source, destination string) error {
 
 			defer func() {
 				if closeErr := archiveFileTemp.Close(); closeErr != nil {
-					logger.Warn("failed to close archive file", "error", closeErr)
+					logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_archive_1"), "error", closeErr)
 				}
 			}()
 

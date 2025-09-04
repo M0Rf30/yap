@@ -10,5 +10,7 @@ import (
 // It does not take any parameters.
 // It does not return any values.
 func main() {
+	// Initialize localized descriptions after all commands are registered
+	command.InitializeLocalizedDescriptions()
 	command.Execute()
 }

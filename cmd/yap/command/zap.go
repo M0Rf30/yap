@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/project"
@@ -15,40 +16,11 @@ var zapCmd = &cobra.Command{
 	Use:     "zap [distro] <path>",
 	GroupID: "build",
 	Aliases: []string{"clean"},
-	Short:   "🧹 Deeply clean build environment and artifacts",
-	Long: `Perform deep cleaning of build environments, removing all build artifacts,
-temporary files, and staging directories for the specified project.
-
-This command is useful for:
-  • Freeing disk space occupied by build artifacts
-  • Resolving build issues caused by stale files
-  • Ensuring completely clean builds
-  • Maintenance of build environments
-
-WARNING: This operation is destructive and removes all build outputs
-and intermediate files. Use with caution in production environments.
-
-DISTRIBUTION FORMAT:
-  Use 'distro' or 'distro-release' format (e.g., 'ubuntu-jammy', 'fedora-38')
-  If no distro is specified, uses the current system's distribution.
-
-The zap command automatically:
-  • Skips dependency installation (nomakedeps=true)
-  • Skips package manager sync (skip-sync=true)
-  • Enables deep cleaning mode (zap=true)`,
-	Example: `  # Clean current system distribution
-  yap zap .
-  yap zap /path/to/project
-
-  # Clean specific project for distribution
-  yap zap ubuntu-jammy /path/to/project
-  yap zap fedora-38 .
-  yap zap alpine /home/user/myproject
-
-  # Clean current directory project
-  yap zap rocky-9 .`,
-	Args:   cobra.RangeArgs(1, 2), // Allow 1 or 2 arguments like the build command
-	PreRun: PreRunValidation,
+	Short:   "🧹 Deeply clean build environment and artifacts", // Will be set in init()
+	Long:    "",                                               // Will be set in init()
+	Example: "",                                               // Will be set in init()
+	Args:    cobra.RangeArgs(1, 2),                            // Allow 1-2 arguments
+	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
 		// Parse flexible arguments using shared function
 		distro, release, fullJSONPath, err := ParseFlexibleArgs(args)
@@ -60,15 +32,15 @@ The zap command automatically:
 		if distro == "" {
 			osRelease, _ := platform.ParseOSRelease()
 			distro = osRelease.ID
-			logger.Warn("No distribution specified, using detected",
+			logger.Warn(i18n.T("logger.zap.no_distribution_specified"),
 				"distro", distro)
 		} else {
-			logger.Info("Cleaning for distribution",
+			logger.Info(i18n.T("logger.zap.cleaning_for_distribution"),
 				"distro", distro, "release", release)
 		}
 
 		// Show project path
-		logger.Info("Project path", "path", fullJSONPath)
+		logger.Info(i18n.T("logger.zap.project_path"), "path", fullJSONPath)
 
 		mpc := project.MultipleProject{}
 
@@ -78,19 +50,31 @@ The zap command automatically:
 
 		err = mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
-			logger.Fatal("fatal error",
+			logger.Fatal(i18n.T("logger.zap.fatal_error"),
 				"error", err)
 		}
 
 		err = mpc.Clean()
 		if err != nil {
-			logger.Fatal("fatal error",
+			logger.Fatal(i18n.T("logger.zap.fatal_error"),
 				"error", err)
 		}
 
-		logger.Info("zap done.", "distro", distro, "release", release)
+		logger.Info(i18n.T("logger.zap.done"), "distro", distro, "release", release)
 		return nil
 	},
+}
+
+// InitializeZapDescriptions sets the localized descriptions for the zap command.
+// This must be called after i18n is initialized.
+func InitializeZapDescriptions() {
+	zapCmd.Short = i18n.T("commands.zap.short")
+	zapCmd.Long = i18n.T("commands.zap.long")
+	zapCmd.Example = i18n.T("commands.zap.examples")
+
+	// Update flag descriptions with localized text
+	zapCmd.Flag("from").Usage = i18n.T("flags.zap.from")
+	zapCmd.Flag("to").Usage = i18n.T("flags.zap.to")
 }
 
 //nolint:gochecknoinits // Required for cobra command registration
@@ -121,7 +105,7 @@ func init() {
 
 	// BUILD RANGE CONTROL FLAGS - same as build command for target support
 	zapCmd.Flags().StringVarP(&project.FromPkgName,
-		"from", "", "", "▶️  start cleaning from specified package name (dependency-aware)")
+		"from", "", "", "")
 	zapCmd.Flags().StringVarP(&project.ToPkgName,
-		"to", "", "", "⏹️  stop cleaning at specified package name (dependency-aware)")
+		"to", "", "", "")
 }

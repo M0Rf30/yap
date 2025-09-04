@@ -11,6 +11,7 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/set"
@@ -39,7 +40,7 @@ var OverridePkgVer string
 func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
 	if err != nil {
-		logger.Error("failed to get root directory",
+		logger.Error(i18n.T("logger.parsefile.error.failed_to_get_root_1"),
 			"path", home)
 
 		return nil, err

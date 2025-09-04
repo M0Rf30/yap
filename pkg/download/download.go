@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 
 	ycontext "github.com/M0Rf30/yap/v2/pkg/context"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -42,17 +43,17 @@ func Download(destination, uri string, writer io.Writer) error {
 
 	req, err := grab.NewRequest(destination, uri)
 	if err != nil {
-		return errors.Errorf("download failed %s", err)
+		return errors.Errorf(i18n.T("errors.download.download_failed")+" %s", err)
 	}
 
 	resp := client.Do(req)
 	if resp.HTTPResponse == nil {
-		logger.Fatal("download failed: no response", "error", resp.Err())
+		logger.Fatal(i18n.T("errors.download.download_failed_no_response"), "error", resp.Err())
 	}
 
 	// start download
 	logger.Info("downloading", "url", req.URL())
-	logger.Info("response status: " + resp.HTTPResponse.Status)
+	logger.Info(i18n.T("logger.download.info.response_status") + resp.HTTPResponse.Status)
 
 	// Create enhanced progress bar using the modern helper
 	progressBar := createProgressBar(resp, "yap", "", uri, writer)
@@ -77,7 +78,7 @@ func WithResume(destination, uri string, maxRetries int, writer io.Writer) error
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			logger.Info("retrying download",
+			logger.Info(i18n.T("logger.withresume.info.retrying_download_1"),
 				"attempt", attempt+1,
 				"max_retries", maxRetries+1,
 				"url", uri)
@@ -100,7 +101,8 @@ func WithResume(destination, uri string, maxRetries int, writer io.Writer) error
 		}
 	}
 
-	return errors.Errorf("download failed after %d attempts: %v", maxRetries+1, lastErr)
+	return errors.Errorf(i18n.T("errors.download.download_failed_after_attempts"),
+		maxRetries+1, lastErr)
 }
 
 // WithResumeContext downloads a file with context information for enhanced
@@ -127,7 +129,7 @@ func WithResumeContext(
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			logger.Info("retrying download",
+			logger.Info(i18n.T("logger.withresumecontext.info.retrying_download_1"),
 				"attempt", attempt+1,
 				"max_retries", maxRetries+1,
 				"url", uri)
@@ -152,7 +154,8 @@ func WithResumeContext(
 		}
 	}
 
-	return errors.Errorf("download failed after %d attempts: %v", maxRetries+1, lastErr)
+	return errors.Errorf(i18n.T("errors.download.download_failed_after_attempts"),
+		maxRetries+1, lastErr)
 }
 
 // downloadWithResumeInternal performs the actual download with resume capability.
@@ -167,7 +170,7 @@ func downloadWithResumeInternal(
 
 	resp := client.Do(req)
 	if resp.HTTPResponse == nil {
-		return errors.Errorf("download failed: no response")
+		return errors.Errorf("%s", i18n.T("errors.download.download_failed_no_response"))
 	}
 
 	logDownloadStart(uri, resp)
@@ -185,7 +188,7 @@ func prepareDownloadRequest(
 
 	req, err := grab.NewRequest(destination, uri)
 	if err != nil {
-		return nil, nil, errors.Errorf("download failed %s", err)
+		return nil, nil, errors.Errorf(i18n.T("errors.download.download_failed")+" %s", err)
 	}
 
 	configureResumeIfPossible(req, destination, uri)
@@ -200,7 +203,7 @@ func configureResumeIfPossible(req *grab.Request, destination, uri string) {
 	if err == nil && info.Size() > 0 {
 		req.NoResume = false // Enable resume
 
-		logger.Info("resuming download",
+		logger.Info(i18n.T("logger.configureresumeifpossible.info.resuming_download_1"),
 			"url", uri,
 			"existing_size", formatBytes(info.Size()))
 	}
@@ -209,11 +212,11 @@ func configureResumeIfPossible(req *grab.Request, destination, uri string) {
 // logDownloadStart logs the initial download information.
 func logDownloadStart(uri string, resp *grab.Response) {
 	if resp.CanResume {
-		logger.Info("server supports resume", "url", uri)
+		logger.Info(i18n.T("logger.logdownloadstart.info.server_supports_resume_1"), "url", uri)
 	}
 
 	logger.Info("downloading", "url", resp.Request.URL())
-	logger.Info("response status: " + resp.HTTPResponse.Status)
+	logger.Info(i18n.T("logger.logdownloadstart.info.response_status") + resp.HTTPResponse.Status)
 }
 
 // createProgressBar creates an enhanced progress bar if the response size is known.
@@ -271,7 +274,7 @@ func monitorDownload(
 				return resp.Err()
 			}
 
-			logger.Info("download completed", "path", destination)
+			logger.Info(i18n.T("logger.monitordownload.info.download_completed_1"), "path", destination)
 
 			return nil
 
@@ -418,7 +421,7 @@ func (cdm *ConcurrentDownloadManager) WaitForJob(destination string) error {
 			return result
 		}
 
-		return errors.Errorf("download job not found: %s", destination)
+		return errors.Errorf(i18n.T("errors.download.download_job_not_found"), destination)
 	}
 
 	return <-job.Done
@@ -477,7 +480,7 @@ func Concurrently(
 	defer func() {
 		err := manager.Shutdown(30 * time.Second)
 		if err != nil {
-			logger.Warn("failed to shutdown download manager", "error", err)
+			logger.Warn(i18n.T("logger.concurrently.warn.failed_to_shutdown_download_1"), "error", err)
 		}
 	}()
 

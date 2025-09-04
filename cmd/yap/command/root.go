@@ -6,12 +6,14 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 var (
-	verbose bool
-	noColor bool
+	verbose  bool
+	noColor  bool
+	language string
 )
 
 // getLongDescription returns the long description with conditional logo coloring.
@@ -36,38 +38,38 @@ func getLongDescription() string {
 	}
 
 	return coloredLogo +
-		"\nYAP (Yet Another Packager) is a powerful, container-based package building system" +
-		"\nthat creates packages for multiple GNU/Linux distributions from a single PKGBUILD-like" +
-		"\nspecification format." +
-		"\n\nFor detailed documentation and examples, visit https://github.com/M0Rf30/yap"
+		"\n" + i18n.T("app.description") +
+		"\n\n" + i18n.T("app.documentation_url")
 }
 
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
-	Use:   "yap",
-	Short: "🚀 Yet Another Packager - Multi-distribution package builder",
-	Long:  getLongDescription(),
-	Example: `  # Build all packages in current directory for your current distro
-  yap build .
-
-  # Build for specific distribution and release
-  yap build ubuntu-jammy /path/to/project
-
-  # Generate dependency graph visualization
-  yap graph --output docs/dependencies.svg .
-
-  # Install a package artifact
-  yap install /path/to/package.deb
-
-  # Prepare build environment for Rocky Linux 9
-  yap prepare rocky-9
-
-  # Clean build artifacts
-  yap zap ubuntu-jammy /path/to/project
-
-  # List all supported distributions
-  yap list-distros`,
+	Use:     "yap",
+	Short:   "🚀 Yet Another Packager - Multi-distribution package builder", // Will be set in init()
+	Long:    "",                                                            // Will be set in init()
+	Example: "",                                                            // Will be set in init()
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+		// Re-initialize i18n with user preference if language flag was provided
+		if language != "" {
+			_ = i18n.Init(language) // If i18n fails, continue without localization
+			// Update only basic command descriptions to avoid circular dependency
+			cmd.Root().Short = i18n.T("root.short")
+			cmd.Root().Long = getLongDescription()
+			cmd.Root().Example = i18n.T("root.examples")
+			// Update build command descriptions
+			InitializeBuildDescriptions()
+			// Update zap command descriptions
+			InitializeZapDescriptions()
+			// Update graph command descriptions
+			InitializeGraphDescriptions()
+			// Update install command descriptions
+			InitializeInstallDescriptions()
+			// Update list-distros command descriptions
+			InitializeListDistrosDescriptions()
+			// Update prepare command descriptions
+			InitializePrepareDescriptions()
+		}
+
 		// Set color preference based on --no-color flag and environment variables
 		shouldDisableColor := noColor || os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
 		logger.SetColorDisabled(shouldDisableColor)
@@ -89,8 +91,92 @@ func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
 }
 
+// InitializeLocalizedDescriptions sets all localized command descriptions.
+// This should be called from main() after all commands are registered.
+func InitializeLocalizedDescriptions() {
+	// Update root command descriptions
+	rootCmd.Short = i18n.T("root.short")
+	rootCmd.Long = getLongDescription()
+	rootCmd.Example = i18n.T("root.examples")
+
+	// Update command groups
+	for _, group := range rootCmd.Groups() {
+		switch group.ID {
+		case "build":
+			group.Title = i18n.T("groups.build")
+		case "environment":
+			group.Title = i18n.T("groups.environment")
+		case "utility":
+			group.Title = i18n.T("groups.utility")
+		}
+	}
+
+	// Update build command descriptions
+	InitializeBuildDescriptions()
+
+	// Update zap command descriptions
+	InitializeZapDescriptions()
+
+	// Update graph command descriptions
+	InitializeGraphDescriptions()
+
+	// Update install command descriptions
+	InitializeInstallDescriptions()
+
+	// Update list-distros command descriptions
+	InitializeListDistrosDescriptions()
+
+	// Update prepare command descriptions
+	InitializePrepareDescriptions()
+
+	// Update other command descriptions
+	updateOtherCommandDescriptions()
+}
+
+// updateOtherCommandDescriptions updates descriptions for all other commands
+func updateOtherCommandDescriptions() {
+	// This will be called after all commands are registered
+	// Find and update command descriptions by walking through all subcommands
+	updateCommandShortDescriptions()
+}
+
+// updateCommandShortDescriptions updates the short descriptions of commands
+func updateCommandShortDescriptions() {
+	// Get all commands from the root command and update their descriptions
+	updateSubCommandDescriptions(rootCmd)
+}
+
+// updateSubCommandDescriptions recursively updates command descriptions
+func updateSubCommandDescriptions(cmd *cobra.Command) {
+	for _, subCmd := range cmd.Commands() {
+		switch subCmd.Name() {
+		case "graph":
+			subCmd.Short = i18n.T("commands.graph.short")
+		case "install":
+			subCmd.Short = i18n.T("commands.install.short")
+		case "list-distros":
+			subCmd.Short = i18n.T("commands.list_distros.short")
+		case prepareCommand:
+			subCmd.Short = i18n.T("commands.prepare.short")
+		case "pull":
+			subCmd.Short = i18n.T("commands.pull.short")
+		case "status":
+			subCmd.Short = i18n.T("commands.status.short")
+		case "version":
+			subCmd.Short = i18n.T("commands.version.short")
+		case "zap":
+			subCmd.Short = i18n.T("commands.zap.short")
+		case "completion":
+			subCmd.Short = i18n.T("commands.completion.short")
+		}
+	}
+}
+
 //nolint:gochecknoinits // Required for cobra root command initialization
 func init() {
+	// Initialize i18n system first - this needs to be done before any subcommands are created
+	_ = i18n.Init("") // If i18n fails, continue without localization
+
 	// Check environment variables early for color preference
 	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
 		logger.SetColorDisabled(true)
@@ -106,8 +192,10 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false,
-		"enable verbose output with detailed logging")
-	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
+		i18n.T("flags.verbose"))
+	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, i18n.T("flags.no_color"))
+	rootCmd.PersistentFlags().StringVarP(&language, "language", "l", "",
+		"set language (en, it, ru, zh) - defaults to system locale")
 
 	// Configure completion options
 	rootCmd.CompletionOptions.DisableDefaultCmd = false

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -22,7 +23,7 @@ func CalculateSHA256(path string) ([]byte, error) {
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn("failed to close file during SHA256 calculation",
+			logger.Warn(i18n.T("logger.calculatesha256.warn.failed_to_close_file_5"),
 				"path", cleanFilePath, "error", closeErr)
 		}
 	}()

@@ -10,6 +10,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -88,7 +89,7 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 	defer func() {
 		err := rpmFile.Close()
 		if err != nil {
-			logger.Warn("failed to close RPM file", "path", cleanFilePath,
+			logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_rpm_1"), "path", cleanFilePath,
 				"error", err)
 		}
 	}()
@@ -98,7 +99,7 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	logger.Info("package artifact created",
+	logger.Info(i18n.T("logger.unknown.info.package_artifact_created_1"),
 		"package", r.PKGBUILD.PkgName,
 		"version", r.PKGBUILD.PkgVer,
 		"release", r.PKGBUILD.PkgRel,
@@ -387,7 +388,7 @@ func getModTime(fileInfo os.FileInfo) uint32 {
 	mTime := fileInfo.ModTime().Unix()
 	// Check for overflow in the modification time.
 	if mTime < 0 || mTime > int64(^uint32(0)) {
-		logger.Fatal("modification time is out of range for uint32",
+		logger.Fatal(i18n.T("errors.rpm.modification_time_out_of_range"),
 			"time", mTime)
 	}
 

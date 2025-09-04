@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
@@ -23,33 +24,12 @@ const (
 // installCmd represents the install command.
 var installCmd = &cobra.Command{
 	Use:     "install <artifact-file>",
-	Short:   "📦 Install a package artifact using the appropriate package manager",
+	Short:   "📦 Install a package artifact using the appropriate package manager", // Set in init()
 	GroupID: "utility",
-	Long: `Install a package artifact by automatically detecting the package type
-from the file extension and using the appropriate package manager.
-
-SUPPORTED PACKAGE TYPES:
-  • .deb     - Debian packages (apt-get)
-  • .rpm     - RPM packages (dnf/yum)
-  • .apk     - Alpine packages (apk)
-  • .pkg.tar.* - Arch packages (pacman)
-
-The command will automatically detect the package format and use the
-appropriate system package manager to install the artifact with the
-same arguments used by yap's internal package managers.`,
-	Example: `  # Install a Debian package
-  yap install /path/to/package.deb
-
-  # Install an RPM package
-  yap install /path/to/package.rpm
-
-  # Install an Alpine package
-  yap install /path/to/package.apk
-
-  # Install an Arch package
-  yap install /path/to/package.pkg.tar.zst`,
-	Args: cobra.ExactArgs(1),
-	RunE: runInstall,
+	Long:    "", // Will be set in init()
+	Example: "", // Will be set in init()
+	Args:    cobra.ExactArgs(1),
+	RunE:    runInstall,
 }
 
 // runInstall handles the install command execution.
@@ -58,13 +38,13 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Check if file exists
 	if _, err := os.Stat(artifactPath); os.IsNotExist(err) {
-		return fmt.Errorf("artifact file not found: %s", artifactPath)
+		return fmt.Errorf(i18n.T("errors.install.artifact_not_found"), artifactPath)
 	}
 
 	// Get absolute path
 	absPath, err := filepath.Abs(artifactPath)
 	if err != nil {
-		return fmt.Errorf("failed to resolve artifact path: %w", err)
+		return fmt.Errorf(i18n.T("errors.install.failed_to_resolve_path")+": %w", err)
 	}
 
 	// Detect package type from file extension
@@ -73,7 +53,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	logger.Info("detected package type",
+	logger.Info(i18n.T("logger.runinstall.info.detected_package_type_1"),
 		"artifact", absPath,
 		"type", packageType)
 
@@ -96,8 +76,7 @@ func detectPackageType(filePath string) (string, error) {
 	case strings.Contains(lowerName, ".pkg.tar."):
 		return packageTypePkg, nil
 	default:
-		return "", fmt.Errorf("unsupported package format: %s\n"+
-			"Supported formats: .deb, .rpm, .apk, .pkg.tar.*", fileName)
+		return "", fmt.Errorf(i18n.T("errors.install.unsupported_package_format"), fileName)
 	}
 }
 
@@ -126,10 +105,10 @@ func installPackage(packageType, artifactPath string) error {
 		cmd = "pacman"
 		args = []string{"-U", "--noconfirm", artifactPath}
 	default:
-		return fmt.Errorf("unsupported package type: %s", packageType)
+		return fmt.Errorf(i18n.T("errors.install.unsupported_package_type"), packageType)
 	}
 
-	logger.Info("installing package",
+	logger.Info(i18n.T("logger.installpackage.info.installing_package_1"),
 		"command", cmd,
 		"args", strings.Join(args, " "),
 		"artifact", artifactPath)
@@ -137,14 +116,22 @@ func installPackage(packageType, artifactPath string) error {
 	// Execute the installation command with the same pattern as internal managers
 	err := shell.Exec(false, "", cmd, args...)
 	if err != nil {
-		return fmt.Errorf("failed to install package with %s: %w", cmd, err)
+		return fmt.Errorf(i18n.T("errors.install.installation_failed")+": %w", cmd, err)
 	}
 
-	logger.Info("package installed successfully",
+	logger.Info(i18n.T("logger.installpackage.info.package_installed_successfully_1"),
 		"artifact", artifactPath,
 		"type", packageType)
 
 	return nil
+}
+
+// InitializeInstallDescriptions sets the localized descriptions for the install command.
+// This must be called after i18n is initialized.
+func InitializeInstallDescriptions() {
+	installCmd.Short = i18n.T("commands.install.short")
+	installCmd.Long = i18n.T("commands.install.long")
+	installCmd.Example = i18n.T("commands.install.examples")
 }
 
 //nolint:gochecknoinits // Required for cobra command initialization

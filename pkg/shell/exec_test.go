@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
 func TestNewPackageDecoratedWriter(t *testing.T) {
@@ -298,6 +300,9 @@ func TestLogScriptContent(t *testing.T) {
 
 // TestExecWithSudoValidation tests only the validation logic to avoid CI issues with sudo
 func TestExecWithSudoValidation(t *testing.T) {
+	// Initialize i18n for test
+	_ = i18n.Init("en")
+
 	// Test individual invalid commands (should be rejected by validation before execution)
 	err := ExecWithSudo(true, "", "rm", "test")
 	if err == nil {
@@ -328,6 +333,9 @@ func TestExecWithSudoValidation(t *testing.T) {
 }
 
 func TestExecWithSudoContextValidation(t *testing.T) {
+	// Initialize i18n for test
+	_ = i18n.Init("en")
+
 	ctx := context.Background()
 
 	// Test with invalid command (should be rejected by validation)
