@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -20,34 +21,11 @@ var (
 		Use:     "prepare <distro>",
 		GroupID: "environment",
 		Aliases: []string{"prep", "setup"},
-		Short:   "🛠️  Prepare build environment with development packages",
-		Long: `Install essential development packages required for building on the target distribution.
-
-This command sets up a complete build environment including:
-  • Base development tools (gcc, make, etc.)
-  • Package manager development headers
-  • Build system utilities
-  • Optionally Go language runtime and toolchain
-
-DISTRIBUTION SUPPORT:
-  Automatically detects and installs the appropriate packages for:
-  Alpine, Arch, CentOS, Debian, Fedora, OpenSUSE, Rocky, Ubuntu
-
-The prepare command ensures you have all necessary tools before attempting
-to build packages, reducing build failures due to missing dependencies.`,
-		Example: `  # Prepare basic build environment
-  yap prepare ubuntu-jammy
-  yap prepare fedora-38
-  yap prepare alpine
-
-  # Prepare with Go language support
-  yap prepare --golang arch
-  yap prepare -g debian-bookworm
-
-  # Skip package manager sync (faster, but may miss updates)
-  yap prepare --skip-sync rocky-9`,
-		Args:   createValidateDistroArgs(1),
-		PreRun: PreRunValidation,
+		Short:   "🛠️  Prepare build environment with development packages", // Will be set in init()
+		Long:    "",                                                        // Will be set in init()
+		Example: "",                                                        // Will be set in init()
+		Args:    createValidateDistroArgs(1),
+		PreRun:  PreRunValidation,
 		Run: func(_ *cobra.Command, args []string) {
 			split := strings.Split(args[0], "-")
 			distro := split[0]
@@ -66,14 +44,26 @@ to build packages, reducing build failures due to missing dependencies.`,
 				logger.Error(err.Error())
 			}
 
-			logger.Info("basic build environment successfully prepared")
+			logger.Info(i18n.T("logger.unknown.info.basic_build_environment_successfully_1"))
 
 			if GoLang {
-				logger.Info("go successfully installed")
+				logger.Info(i18n.T("logger.unknown.info.go_successfully_installed_1"))
 			}
 		},
 	}
 )
+
+// InitializePrepareDescriptions sets the localized descriptions for the prepare command.
+// This must be called after i18n is initialized.
+func InitializePrepareDescriptions() {
+	prepareCmd.Short = i18n.T("commands.prepare.short")
+	prepareCmd.Long = i18n.T("commands.prepare.long")
+	prepareCmd.Example = i18n.T("commands.prepare.examples")
+
+	// Update flag descriptions with localized text
+	prepareCmd.Flag("skip-sync").Usage = i18n.T("flags.prepare.skip_sync")
+	prepareCmd.Flag("golang").Usage = i18n.T("flags.prepare.golang")
+}
 
 //nolint:gochecknoinits // Required for cobra command registration
 func init() {
@@ -83,7 +73,7 @@ func init() {
 	prepareCmd.ValidArgsFunction = ValidDistrosCompletion
 
 	prepareCmd.Flags().BoolVarP(&project.SkipSyncDeps,
-		"skip-sync", "s", false, "⚡ skip package manager synchronization (faster but may miss updates)")
+		"skip-sync", "s", false, "")
 	prepareCmd.Flags().BoolVarP(&GoLang,
-		"golang", "g", false, "🐹 additionally install Go language runtime and development tools")
+		"golang", "g", false, "")
 }

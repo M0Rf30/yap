@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
 func TestDetectPackageType(t *testing.T) {
@@ -86,7 +88,8 @@ func TestRunInstall(t *testing.T) {
 	t.Run("non-existent file", func(t *testing.T) {
 		err := runInstall(nil, []string{"/non/existent/file.deb"})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "artifact file not found")
+		// Check that the error mentions the file path, regardless of locale
+		assert.Contains(t, err.Error(), "/non/existent/file.deb")
 	})
 
 	// Test with unsupported file type
@@ -168,6 +171,11 @@ func TestInstallPackage(t *testing.T) {
 }
 
 func TestInstallCommandDefinition(t *testing.T) {
+	// Initialize i18n and descriptions for testing
+	_ = i18n.Init("en")
+
+	InitializeInstallDescriptions()
+
 	// Test that the install command is properly defined
 	assert.NotNil(t, installCmd)
 	assert.Equal(t, "install <artifact-file>", installCmd.Use)

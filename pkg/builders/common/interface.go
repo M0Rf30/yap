@@ -7,6 +7,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
@@ -134,11 +135,11 @@ func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
 		if bb.Format == constants.FormatAPK {
 			platform.CheckGO()
 		} else {
-			logger.Info("go detected: version check is disabled")
+			logger.Info(i18n.T("logger.setupenvironmentdependencies.info.go_detected_version_check_1"))
 
 			err := platform.GOSetup()
 			if err != nil {
-				logger.Warn("Failed to setup Go environment",
+				logger.Warn(i18n.T("logger.setupenvironmentdependencies.warn.failed_to_setup_go_1"),
 					"error", err)
 			}
 		}
@@ -168,7 +169,7 @@ func (bb *BaseBuilder) CreateFileWalker() *files.Walker {
 
 // LogPackageCreated logs successful package creation with consistent formatting.
 func (bb *BaseBuilder) LogPackageCreated(artifactPath string) {
-	logger.Info("package artifact created",
+	logger.Info(i18n.T("logger.logpackagecreated.info.package_artifact_created_3"),
 		"format", bb.Format,
 		"pkgver", bb.PKGBUILD.PkgVer,
 		"pkgrel", bb.PKGBUILD.PkgRel,

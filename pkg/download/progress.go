@@ -7,6 +7,7 @@ import (
 
 	"github.com/pterm/pterm"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -27,7 +28,8 @@ type ProgressBar struct {
 func NewProgressBar(writer io.Writer, packageName, title string,
 	total int64) *ProgressBar {
 	// Create pterm progress bar with log-style format including timestamp and INFO level
-	// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets with yellow component
+	// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets with
+	// yellow component
 	timestamp := pterm.NewStyle(pterm.FgGray).Sprint(time.Now().Format("2006-01-02 15:04:05"))
 	info := pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(" INFO")
 	component := fmt.Sprintf("%s%s%s",
@@ -84,7 +86,8 @@ func (epb *ProgressBar) Update(current int64) {
 			}
 
 			// Update title with log-style format including timestamp and INFO level
-			// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets with yellow component
+			// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets
+			// with yellow component
 			timestamp := pterm.NewStyle(pterm.FgGray).Sprint(time.Now().Format("2006-01-02 15:04:05"))
 			info := pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(" INFO")
 			component := fmt.Sprintf("%s%s%s",
@@ -141,7 +144,8 @@ func (epb *ProgressBar) Finish() {
 
 	if epb.ptermBar != nil {
 		// Final update with completion info in log-style format
-		// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets with yellow component
+		// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets
+		// with yellow component
 		timestamp := pterm.NewStyle(pterm.FgGray).Sprint(time.Now().Format("2006-01-02 15:04:05"))
 		info := pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(" INFO")
 		component := fmt.Sprintf("%s%s%s",
@@ -170,7 +174,7 @@ func (epb *ProgressBar) Finish() {
 
 	// Log final completion message using logger.Info for consistency
 	duration := time.Since(epb.startTime)
-	logger.Info("download completed",
+	logger.Info(i18n.T("logger.finish.info.download_completed_1"),
 		"title", epb.title,
 		"duration", duration)
 }

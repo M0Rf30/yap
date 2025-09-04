@@ -8,6 +8,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
@@ -160,7 +161,7 @@ func (bpm *BasePackageManager) InstallCommon(artifactsPath, packageName string) 
 // LogPackageCreated logs successful package creation.
 func (bpm *BasePackageManager) LogPackageCreated(artifactPath string) {
 	logger.WithComponent(bpm.PKGBUILD.PkgName)
-	logger.Info("package artifact created",
+	logger.Info(i18n.T("logger.logpackagecreated.info.package_artifact_created_1"),
 		"pkgver", bpm.PKGBUILD.PkgVer,
 		"pkgrel", bpm.PKGBUILD.PkgRel,
 		"artifact", artifactPath)
@@ -169,7 +170,7 @@ func (bpm *BasePackageManager) LogPackageCreated(artifactPath string) {
 // ValidateArtifactsPath ensures the artifacts path exists.
 func (bpm *BasePackageManager) ValidateArtifactsPath(artifactsPath string) error {
 	if _, err := os.Stat(artifactsPath); os.IsNotExist(err) {
-		return fmt.Errorf("artifacts path does not exist: %s", artifactsPath)
+		return fmt.Errorf(i18n.T("errors.core.artifacts_path_not_exist"), artifactsPath)
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package command
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
@@ -49,19 +50,19 @@ appropriate completion directory for automatic loading.`,
 		case "bash":
 			err := cmd.Root().GenBashCompletion(shell.MultiPrinter.Writer)
 			if err != nil {
-				logger.Fatal("failed to generate bash completion",
+				logger.Fatal(i18n.T("errors.completion.failed_to_generate_bash_completion"),
 					"error", err)
 			}
 		case "fish":
 			err := cmd.Root().GenFishCompletion(shell.MultiPrinter.Writer, true)
 			if err != nil {
-				logger.Fatal("failed to generate fish completion",
+				logger.Fatal(i18n.T("errors.completion.failed_to_generate_fish_completion"),
 					"error", err)
 			}
 		case "zsh":
 			err := cmd.Root().GenZshCompletion(shell.MultiPrinter.Writer)
 			if err != nil {
-				logger.Fatal("failed to generate zsh completion",
+				logger.Fatal(i18n.T("errors.completion.failed_to_generate_zsh_completion"),
 					"error", err)
 			}
 		}
