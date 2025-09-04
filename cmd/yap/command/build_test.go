@@ -43,6 +43,9 @@ func TestLogStructuredError(t *testing.T) {
 }
 
 func TestBuildCommandDefinition(t *testing.T) {
+	// Initialize localized descriptions for testing
+	InitializeBuildDescriptions()
+
 	if buildCmd.Use != "build [distro] <path>" {
 		t.Errorf("Expected build command use to be 'build [distro] <path>', got %q", buildCmd.Use)
 	}

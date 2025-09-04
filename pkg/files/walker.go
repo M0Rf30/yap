@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -176,7 +177,7 @@ func (w *Walker) calculateSHA256(filePath string) ([]byte, error) {
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
 			// Log error but don't fail the operation
-			logger.Warn("failed to close file during SHA256 calculation",
+			logger.Warn(i18n.T("logger.calculatesha256.warn.failed_to_close_file_1"),
 				"path", filePath,
 				"error", closeErr)
 		}
@@ -235,7 +236,7 @@ func CalculateDataHash(baseDir string, skipPatterns []string) (string, error) {
 
 			defer func() {
 				if closeErr := file.Close(); closeErr != nil {
-					logger.Warn("failed to close file during data hash calculation",
+					logger.Warn(i18n.T("logger.calculatedatahash.warn.failed_to_close_file_1"),
 						"path", path,
 						"error", closeErr)
 				}

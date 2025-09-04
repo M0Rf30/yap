@@ -8,6 +8,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/builders/rpm"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/core"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -50,7 +51,7 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	// Get configuration for the package manager
 	config := core.GetConfig(pkgManager)
 	if config == nil {
-		logger.Fatal("unsupported package manager", "manager", pkgManager)
+		logger.Fatal(i18n.T("errors.packer.unsupported_package_manager"), "manager", pkgManager)
 		return nil
 	}
 
@@ -72,7 +73,7 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 			PKGBUILD: pkgBuild,
 		}
 	default:
-		logger.Fatal("unsupported linux distro",
+		logger.Fatal(i18n.T("errors.packer.unsupported_linux_distro"),
 			"distro", distro)
 	}
 

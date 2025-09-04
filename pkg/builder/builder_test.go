@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -405,6 +406,9 @@ func TestBuilder_Compile(t *testing.T) {
 }
 
 func TestBuilder_CompileWithFailingInitDirs(t *testing.T) {
+	// Initialize i18n for test
+	_ = i18n.Init("en")
+
 	t.Parallel()
 
 	bldr := &builder.Builder{
@@ -422,6 +426,9 @@ func TestBuilder_CompileWithFailingInitDirs(t *testing.T) {
 }
 
 func TestBuilder_CompileErrorContexts(t *testing.T) {
+	// Initialize i18n for test
+	_ = i18n.Init("en")
+
 	t.Parallel()
 	tempDir := t.TempDir()
 	sourceDir := filepath.Join(tempDir, "src")

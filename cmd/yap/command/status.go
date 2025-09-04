@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
@@ -122,7 +123,7 @@ func showSystemStatus() {
 				pterm.FgWhite.Sprint(fmt.Sprintf("%d variants", len(distros))))
 		}
 	} else {
-		logger.Tips("💡 Use --verbose to see full list")
+		logger.Tips(i18n.T("logger.tips.use_verbose"))
 	}
 
 	pterm.Println()

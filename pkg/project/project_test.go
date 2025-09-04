@@ -237,8 +237,8 @@ func TestErrors(t *testing.T) {
 	// Test error constants are accessible
 	assert.NotNil(t, project.ErrCircularDependency)
 	assert.NotNil(t, project.ErrCircularRuntimeDependency)
-	assert.Contains(t, project.ErrCircularDependency.Error(), "circular dependency detected")
-	assert.Contains(t, project.ErrCircularRuntimeDependency.Error(), "circular dependency in runtime dependencies")
+	assert.Contains(t, project.ErrCircularDependency.Error(), "errors.project.circular_dependency_detected")
+	assert.Contains(t, project.ErrCircularRuntimeDependency.Error(), "errors.project.circular_runtime_dependency_detected")
 }
 
 func TestSingleProjectSetup(t *testing.T) {
@@ -639,12 +639,12 @@ func TestErrorConstants(t *testing.T) {
 		{
 			name: "ErrCircularDependency",
 			err:  project.ErrCircularDependency,
-			want: "circular dependency detected",
+			want: "errors.project.circular_dependency_detected",
 		},
 		{
 			name: "ErrCircularRuntimeDependency",
 			err:  project.ErrCircularRuntimeDependency,
-			want: "circular dependency in runtime dependencies",
+			want: "errors.project.circular_runtime_dependency_detected",
 		},
 	}
 
