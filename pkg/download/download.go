@@ -239,11 +239,17 @@ func determineSourceName(sourceName, uri string) string {
 		return sourceName
 	}
 
-	if filename := filepath.Base(uri); filename != "" {
-		return filename
+	if uri == "" {
+		return "download"
 	}
 
-	return "download"
+	filename := filepath.Base(uri)
+	// Handle special cases where filepath.Base doesn't return what we want
+	if filename == "." || filename == "/" || strings.HasSuffix(uri, "/") {
+		return "download"
+	}
+
+	return filename
 }
 
 // monitorDownload handles the download monitoring loop.

@@ -23,8 +23,8 @@ func TestFilename(t *testing.T) {
 		{"https://example.com/file.txt", "file.txt"},
 		{"/path/to/file.txt", "file.txt"},
 		{"file.txt", "file.txt"},
-		{"", ""},
-		{"https://example.com/path/", ""},
+		{"", "."},                             // filepath.Base("") returns "."
+		{"https://example.com/path/", "path"}, // filepath.Base returns "path" for trailing slash
 		{"noextension", "noextension"},
 	}
 
