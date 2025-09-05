@@ -2,6 +2,7 @@
 package git
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"strings"
@@ -75,8 +76,8 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 			return err
 		}
 
-		sshURL := constants.Git + "@" + sourceURL.Hostname() +
-			strings.Replace(sourceURL.EscapedPath(), "/", ":", 1)
+		sshURL := fmt.Sprintf("%s@%s%s", constants.Git, sourceURL.Hostname(),
+			strings.Replace(sourceURL.EscapedPath(), "/", ":", 1))
 		cloneOptions.Auth = publicKey
 		cloneOptions.URL = sshURL
 

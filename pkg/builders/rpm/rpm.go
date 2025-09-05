@@ -1,6 +1,7 @@
 package rpm
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -28,16 +29,20 @@ type RPM struct {
 	PKGBUILD *pkgbuild.PKGBUILD
 }
 
+// NewBuilder creates a new RPM package builder.
+func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *RPM {
+	return &RPM{
+		PKGBUILD: pkgBuild,
+	}
+}
+
 // BuildPackage creates an RPM package based on the provided PKGBUILD information.
 func (r *RPM) BuildPackage(artifactsPath string) error {
-	pkgName := r.PKGBUILD.PkgName +
-		"-" +
-		r.PKGBUILD.PkgVer +
-		"-" +
-		r.PKGBUILD.PkgRel +
-		"." +
-		r.PKGBUILD.ArchComputed +
-		".rpm"
+	pkgName := fmt.Sprintf("%s-%s-%s.%s.rpm",
+		r.PKGBUILD.PkgName,
+		r.PKGBUILD.PkgVer,
+		r.PKGBUILD.PkgRel,
+		r.PKGBUILD.ArchComputed)
 
 	epoch, _ := strconv.ParseUint(r.PKGBUILD.Epoch, 10, 32)
 	if epoch == 0 {
