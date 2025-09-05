@@ -1,0 +1,962 @@
+- id: app.name
+  translation: YAP
+- id: app.full_name
+  translation: Yet Another Packager
+- id: app.description
+  translation: 'YAP（Yet Another Packager）是一个强大的基于容器的包构建系统，
+
+    可以从单一的类PKGBUILD规范格式为多个GNU/Linux发行版创建包。'
+- id: app.documentation_url
+  translation: 详细文档和示例请访问 https://github.com/M0Rf30/yap
+- id: root.short
+  translation: 🚀 Yet Another Packager - 多发行版包构建器
+- id: root.examples
+  translation: '# 为当前发行版构建当前目录中的所有包
+
+    yap build .
+
+
+    # 为特定发行版和版本构建
+
+    yap build ubuntu-jammy /path/to/project
+
+
+    # 生成依赖关系图可视化
+
+    yap graph --output docs/dependencies.svg .
+
+
+    # 安装包工件
+
+    yap install /path/to/package.deb
+
+
+    # 为Rocky Linux 9准备构建环境
+
+    yap prepare rocky-9
+
+
+    # 清理构建工件
+
+    yap zap ubuntu-jammy /path/to/project
+
+
+    # 列出所有支持的发行版
+
+    yap list-distros
+
+    '
+- id: groups.build
+  translation: 构建命令
+- id: groups.environment
+  translation: 环境命令
+- id: groups.utility
+  translation: 实用命令
+- id: groups.additional
+  translation: 附加命令
+- id: commands.build.short
+  translation: 🔨 从yap.json项目定义构建包
+- id: commands.build.long
+  translation: "使用yap.json项目文件为一个或多个发行版构建包。\n\nbuild命令协调整个包构建过程：\n  • 解析yap.json项目配置\n\
+    \  • 解决构建依赖和顺序\n  • 创建隔离的容器环境\n  • 根据PKGBUILD规范构建包\n  • 处理跨发行版兼容性\n\n发行版格式：\n\
+    \  使用'distro'或'distro-release'格式（例如，'ubuntu-jammy'，'fedora-38'）\n  如果未指定发行版，则使用当前系统的发行版。\n\
+    \n依赖解析：\n  构建顺序根据包依赖自动确定。\n  使用--from和--to标志构建特定的包范围。\n"
+- id: commands.build.examples
+  translation: '# 为当前系统发行版构建
+
+    yap build .
+
+    yap build /path/to/project
+
+
+    # 为特定发行版构建
+
+    yap build ubuntu-jammy .
+
+    yap build fedora-38 /path/to/project
+
+    yap build alpine /home/user/myproject
+
+    '
+- id: commands.graph.short
+  translation: 🎨 生成美观的依赖关系图
+- id: commands.install.short
+  translation: 📦 使用适当的包管理器安装包工件
+- id: commands.list_distros.short
+  translation: 📋 列出所有支持的发行版和版本
+- id: commands.prepare.short
+  translation: 🛠️  使用开发包准备构建环境
+- id: commands.pull.short
+  translation: 📦 拉取用于构建的预构建容器镜像
+- id: commands.status.short
+  translation: 📊 显示系统状态和环境信息
+- id: commands.version.short
+  translation: 📊 显示YAP版本和系统信息
+- id: commands.zap.short
+  translation: 🧹 深度清理构建环境和工件
+- id: commands.completion.short
+  translation: 🔧 生成shell补全脚本
+- id: flags.verbose
+  translation: 启用详细输出和详细日志记录
+- id: flags.no_color
+  translation: 禁用彩色输出
+- id: flags.build.cleanbuild
+  translation: 🧹 构建前删除$srcdir/目录（确保干净构建）
+- id: flags.build.from
+  translation: ▶️  从指定包名开始构建（依赖感知）
+- id: flags.build.nobuild
+  translation: 📥 仅下载和提取源文件（无编译）
+- id: flags.build.nomakedeps
+  translation: ⏭️  跳过所有make依赖（makedeps）安装和检查
+- id: flags.build.pkgrel
+  translation: 🔢 覆盖所有包的包发布号（pkgrel）
+- id: flags.build.pkgver
+  translation: 🏷️  覆盖项目中所有包的包版本（pkgver）
+- id: flags.build.skip_sync
+  translation: 🚫 跳过包管理器与远程同步
+- id: flags.build.ssh_password
+  translation: 🔐 访问私有仓库的SSH密码
+- id: flags.build.to
+  translation: ⏹️  在指定包名处停止构建（依赖感知）
+- id: flags.build.zap
+  translation: 💥 构建前删除整个staging目录（深度清理）
+- id: commands.zap.long
+  translation: "对构建环境执行深度清理，删除指定项目的所有构建工件、\n临时文件和staging目录。\n\n此命令用于：\n  • 释放构建工件占用的磁盘空间\n\
+    \  • 解决由陈旧文件引起的构建问题\n  • 确保完全干净的构建\n  • 维护构建环境\n\n警告：此操作是破坏性的，会删除所有构建输出\n和中间文件。在生产环境中请谨慎使用。\n\
+    \n发行版格式：\n  使用'distro'或'distro-release'格式（例如，'ubuntu-jammy'，'fedora-38'）\n  如果未指定发行版，则使用当前系统的发行版。\n\
+    \nzap命令会自动：\n  • 跳过依赖安装（nomakedeps=true）\n  • 跳过包管理器同步（skip-sync=true）\n  • 启用深度清理模式（zap=true）\n"
+- id: commands.zap.examples
+  translation: '# 清理当前系统发行版
+
+    yap zap .
+
+    yap zap /path/to/project
+
+
+    # 为发行版清理特定项目
+
+    yap zap ubuntu-jammy /path/to/project
+
+    yap zap fedora-38 .
+
+    yap zap alpine /home/user/myproject
+
+
+    # 清理当前目录项目
+
+    yap zap rocky-9 .
+
+    '
+- id: flags.zap.from
+  translation: ▶️  从指定包名开始清理（依赖感知）
+- id: flags.zap.to
+  translation: ⏹️  在指定包名处停止清理（依赖感知）
+- id: commands.graph.long
+  translation: "生成项目的现代交互式依赖关系图可视化。\n\ngraph命令分析您的yap.json项目文件并创建美观的\n依赖关系可视化，显示包之间的关系。输出\n\
+    包括拓扑排序、依赖流行度分析和现代样式。\n\n特性：\n  • 基于依赖级别的分层布局\n  • 按流行度和类型的颜色编码节点\n  • 具有悬停效果和工具提示的交互式SVG\n\
+    \  • 外部依赖过滤\n  • 多种主题（modern、classic、dark）\n  • 适合文档的高质量输出\n\n可视化元素：\n  • 节点大小反映依赖流行度\n\
+    \  • 颜色表示包类型（内部vs外部）\n  • 箭头显示依赖方向\n  • 级别显示构建顺序\n  • 工具提示提供详细的包信息\n"
+- id: commands.graph.examples
+  translation: '# 为当前目录生成SVG图
+
+    yap graph .
+
+
+    # 使用深色主题生成PNG图
+
+    yap graph --format png --theme dark /path/to/project
+
+
+    # 在可视化中包含外部依赖
+
+    yap graph --show-external --output dependencies.svg .
+
+
+    # 生成文档就绪图
+
+    yap graph --theme modern --format svg --output docs/architecture.svg .
+
+    '
+- id: flags.graph.format
+  translation: 输出格式：svg、png
+- id: flags.graph.output
+  translation: 输出文件路径（默认：dependencies.svg）
+- id: flags.graph.show_external
+  translation: 在图中包含外部依赖
+- id: flags.graph.theme
+  translation: 视觉主题：modern、classic、dark
+- id: commands.install.long
+  translation: "使用系统的适当包管理器安装包工件。\n\n此命令自动检测包格式并使用正确的\n包管理器在您的系统上安装工件。\n\n支持的格式：\n\
+    \  • .deb包（通过apt/dpkg）\n  • .rpm包（通过yum/dnf/rpm）\n  • .pkg.tar.xz包（通过pacman）\n\
+    \  • .apk包（通过apk）\n\n安装程序将处理依赖关系并在\n安装过程中提供适当的反馈。\n"
+- id: commands.install.examples
+  translation: '# 安装Debian包
+
+    yap install package.deb
+
+
+    # 安装RPM包
+
+    yap install package.rpm
+
+
+    # 安装Arch包
+
+    yap install package.pkg.tar.xz
+
+
+    # 安装Alpine包
+
+    yap install package.apk
+
+    '
+- id: commands.list_distros.long
+  translation: "列出所有支持的发行版及其可用版本。\n\n此命令显示YAP可以为哪些发行版构建包，\n包括适用的特定发布版本。\n\n输出包括：\n\
+    \  • 发行版名称和ID\n  • 可用的发布版本\n  • 架构支持信息\n  • 容器可用性状态\n"
+- id: commands.list_distros.examples
+  translation: '# 列出所有支持的发行版
+
+    yap list-distros
+
+
+    # 与过滤一起使用（如果可用）
+
+    yap list-distros | grep ubuntu
+
+    '
+- id: commands.prepare.long
+  translation: "使用开发包和依赖项准备构建环境。\n\n此命令通过安装必要的\n开发工具、编译器和指定发行版的\n构建依赖来设置构建环境。\n\n\
+    准备包括：\n  • 基本开发工具（gcc、make等）\n  • 包特定的构建依赖\n  • 构建环境配置\n  • 容器镜像准备\n"
+- id: commands.prepare.examples
+  translation: '# 准备当前系统
+
+    yap prepare
+
+
+    # 准备特定发行版
+
+    yap prepare ubuntu-jammy
+
+
+    # 为Rocky Linux准备
+
+    yap prepare rocky-9
+
+    '
+- id: flags.prepare.skip_sync
+  translation: ⚡ 跳过包管理器同步（更快但可能错过更新）
+- id: flags.prepare.golang
+  translation: 🐹 另外安装Go语言运行时和开发工具
+- id: footer.documentation
+  translation: 📖 文档：
+- id: footer.report_issues
+  translation: 🐛 报告问题：
+- id: footer.more_info
+  translation: 使用"yap [命令] --help"获取有关命令的更多信息。
+- id: logger.tips.use_help
+  translation: 💡 使用'%s --help'查看可用选项
+- id: logger.tips.use_verbose
+  translation: 💡 使用--verbose查看完整列表
+- id: logger.pull.specify_codename
+  translation: 除了alpine和arch之外，还要指定代号（例如，rocky-9，ubuntu-jammy）
+- id: logger.pull.failed_to_pull
+  translation: 拉取镜像失败
+- id: logger.zap.no_distribution_specified
+  translation: 未指定发行版，使用检测到的
+- id: logger.zap.cleaning_for_distribution
+  translation: 正在清理发行版
+- id: logger.zap.project_path
+  translation: 项目路径
+- id: logger.zap.fatal_error
+  translation: 致命错误
+- id: logger.zap.done
+  translation: zap完成。
+- id: logger.operation_started
+  translation: 操作已开始
+- id: logger.operation_completed
+  translation: 操作已完成
+- id: logger.operation_failed
+  translation: 操作失败
+- id: logger.build.starting_verbose
+  translation: 启动详细日志记录的构建过程
+- id: logger.build.no_distribution_specified
+  translation: 未指定发行版，使用检测到的
+- id: logger.build.building_for_distribution
+  translation: 正在为发行版构建
+- id: logger.build.project_path
+  translation: 项目路径
+- id: logger.build.initializing_project
+  translation: 正在初始化项目...
+- id: logger.build.project_init_failed
+  translation: 项目初始化失败
+- id: logger.build.project_init_success
+  translation: 项目初始化成功
+- id: logger.build.building_packages
+  translation: 正在构建包...
+- id: logger.build.build_failed
+  translation: 构建失败
+- id: logger.build.build_completed
+  translation: 所有包已成功构建
+- id: logger.fatal_error
+  translation: 致命错误
+- id: logger.installing_external_runtime_dependencies
+  translation: 安装外部运行时依赖
+- id: logger.creating_package
+  translation: 创建包
+- id: logger.invalid_package_order
+  translation: 无效的包顺序
+- id: logger.failed_to_remove_package_directory
+  translation: 无法删除包目录
+- id: logger.building_resulting_package
+  translation: 构建结果包
+- id: logger.package_not_found
+  translation: 找不到包
+- id: logger.external_runtime_dependencies_collected
+  translation: 收集到外部运行时依赖
+- id: logger.multi_project_file_found
+  translation: 找到多项目文件
+- id: logger.single_project_file_found
+  translation: 找到单项目文件
+- id: logger.failed_to_close_project_file
+  translation: 无法关闭项目文件
+- id: logger.dependency_analysis_starting
+  translation: 依赖分析开始
+- id: logger.dependency_analysis_complete
+  translation: 依赖分析完成
+- id: logger.package_information
+  translation: 包信息
+- id: logger.dependency_category
+  translation: 依赖类别
+- id: logger.internal_dependency
+  translation: 内部依赖
+- id: logger.external_dependency
+  translation: 外部依赖
+- id: logger.analyzing_package_dependencies
+  translation: 分析包依赖
+- id: logger.package_declares_dependencies
+  translation: 包声明依赖
+- id: logger.package_dependencies_found
+  translation: 找到包依赖
+- id: logger.retrieving_sources
+  translation: 正在获取源码
+- id: logger.failed_to_preserve_ownership
+  translation: 无法保留SourceDir的所有权
+- id: logger.preparing_sources
+  translation: 准备源码
+- id: logger.building
+  translation: 构建中
+- id: logger.generating_package
+  translation: 生成包
+- id: logger.skip_integrity_check_for
+  translation: 跳过完整性检查
+- id: logger.integrity_check_for
+  translation: 完整性检查
+- id: logger.performing_topological_sort_for_build_order
+  translation: 执行构建顺序的拓扑排序
+- id: logger.dependency_popularity_analysis
+  translation: 依赖流行度分析
+- id: logger.build_batch_determined
+  translation: 依赖分析完成
+- id: logger.batch_build_strategy
+  translation: 批量构建策略
+- id: logger.processing_build_batch
+  translation: 处理构建批次
+- id: logger.dependency_aware_build_process_starting
+  translation: 启动依赖感知构建过程
+- id: logger.circular_dependency_detected
+  translation: 检测到循环依赖
+- id: logger.package_installation_planned
+  translation: 计划安装包
+- id: logger.project.dependency_popularity
+  translation: 依赖流行度
+- id: logger.project.build_order_determined
+  translation: 构建顺序已确定
+- id: logger.project.stopping_build_at_target_package
+  translation: 在目标包处停止构建
+- id: logger.project.installing_package
+  translation: 正在安装包
+- id: logger.project.package_installed
+  translation: 包已安装
+- id: logger.project.builder_completed_for_package
+  translation: 构建器已完成包
+- id: logger.project.batch_build_started
+  translation: 批量构建已开始
+- id: logger.project.batch_build_completed
+  translation: 批量构建已完成
+- id: logger.project.processing_package_batch
+  translation: 处理包批次
+- id: logger.project.build_cache_stats
+  translation: 构建缓存统计
+- id: logger.project.package_build_skipped
+  translation: 包构建已跳过
+- id: logger.project.parallel_build_workers
+  translation: 并行构建工作器
+- id: logger.project.package_build_started
+  translation: 包构建已开始
+- id: logger.project.package_build_finished
+  translation: 包构建已完成
+- id: logger.project.building_dependency_graph
+  translation: 构建依赖图
+- id: logger.project.building_regular_packages
+  translation: 构建常规包
+- id: logger.project.package_installation_failed
+  translation: 包安装失败
+- id: logger.project.runtime_dependencies_build_optimization
+  translation: 运行时依赖构建优化
+- id: logger.project.runtime_dependencies_batching_complete
+  translation: 运行时依赖批处理完成
+- id: logger.project.runtime_dependency_found
+  translation: 找到运行时依赖
+- id: logger.project.make_dependency_found
+  translation: 找到make依赖
+- id: logger.project.building_runtime_dependency_batch
+  translation: 构建运行时依赖批次
+- id: logger.project.installing_runtime_dependency
+  translation: 安装运行时依赖
+- id: logger.project.runtime_dependency_installation_failed
+  translation: 运行时依赖安装失败
+- id: logger.project.runtime_dependency_installed
+  translation: 运行时依赖已安装
+- id: logger.project.runtime_dependency_batch_analysis
+  translation: 运行时依赖批次分析
+- id: logger.project.runtime_dependency_map
+  translation: 运行时依赖映射
+- id: logger.project.runtime_dependency_detected
+  translation: 检测到运行时依赖
+- id: logger.project.starting_dependencyaware_build_process
+  translation: 启动依赖感知构建过程
+- id: logger.project.skipping_batch_filtered_out
+  translation: 跳过批次（已过滤）
+- id: logger.project.found_from_package
+  translation: 找到 --from 过滤器的起始包
+- id: logger.project.found_to_package
+  translation: 找到 --to 过滤器的目标包
+- id: errors.build.failed_to_retrieve_sources
+  translation: 无法获取源码
+- id: errors.build.failed_to_initialize_directories
+  translation: 无法初始化目录
+- id: errors.build.build_stage_failed
+  translation: 构建阶段失败
+- id: errors.build.failed_to_retrieve_source
+  translation: 无法获取源码
+- id: errors.download.download_failed
+  translation: 下载失败
+- id: errors.download.download_failed_after_attempts
+  translation: '重试%d次后下载失败: %v'
+- id: errors.download.download_failed_no_response
+  translation: '下载失败: 无响应'
+- id: errors.download.download_job_not_found
+  translation: '未找到下载任务: %s'
+- id: errors.source.unsupported_source_type
+  translation: 不支持的源类型
+- id: errors.source.failed_to_open_file_for_hash
+  translation: 无法打开文件进行哈希计算 %s
+- id: errors.source.unsupported_hash_length
+  translation: 不支持的哈希长度 %d
+- id: errors.source.failed_to_copy_file
+  translation: 无法复制文件 %s
+- id: errors.source.hash_verification_failed
+  translation: 哈希验证失败 %s
+- id: errors.source.failed_to_start_multiprinter
+  translation: 无法启动多重打印器
+- id: errors.source.download_failed_for
+  translation: '下载失败 %s: %v'
+- id: errors.shell.failed_to_start_multiprinter
+  translation: 无法启动多重打印器
+- id: errors.shell.failed_to_parse_script
+  translation: 无法解析脚本
+- id: errors.shell.failed_to_create_script_runner
+  translation: 无法创建脚本运行器
+- id: errors.shell.script_execution_failed
+  translation: 脚本执行失败
+- id: errors.shell.command_not_allowed_for_sudo
+  translation: 命令 '%s' 不允许使用 sudo 执行
+- id: errors.files.failed_to_open_file_for_sha256
+  translation: 无法打开文件进行SHA256计算
+- id: errors.files.failed_to_calculate_sha256
+  translation: 无法计算SHA256
+- id: errors.files.failed_to_stat_file
+  translation: 无法获取文件信息进行可写性检查
+- id: errors.files.file_not_writable
+  translation: 文件 %s 不可写
+- id: errors.files.failed_to_change_permissions
+  translation: 无法更改文件权限
+- id: errors.files.failed_to_create_directory
+  translation: 无法创建目录 %s
+- id: errors.files.failed_to_access_directory
+  translation: 无法访问目录 %s
+- id: errors.files.failed_to_calculate_directory_size
+  translation: 无法计算目录大小
+- id: errors.files.failed_to_open_source_file
+  translation: 无法打开源文件进行复制
+- id: errors.files.failed_to_create_destination_file
+  translation: 无法创建目标文件
+- id: errors.files.failed_to_copy_file_content
+  translation: 无法复制文件内容
+- id: errors.pkgbuild.invalid_directive_use
+  translation: 在 %s 中无效使用 '__' 指令
+- id: errors.rpm.modification_time_out_of_range
+  translation: 修改时间超出uint32范围
+- id: errors.pkgbuild.unsupported_architecture
+  translation: 不支持的架构
+- id: errors.pkgbuild.failed_to_set_variable_pkgdir
+  translation: 设置变量pkgdir失败
+- id: errors.pkgbuild.failed_to_set_variable_srcdir
+  translation: 设置变量srcdir失败
+- id: errors.pkgbuild.failed_to_set_variable_startdir
+  translation: 设置变量startdir失败
+- id: errors.pkgbuild.failed_to_set_variable
+  translation: 设置变量失败
+- id: errors.set.empty_array
+  translation: 空数组，请提供值
+- id: errors.set.empty_variable
+  translation: 空变量，请提供值
+- id: errors.set.empty_function
+  translation: 空函数，请提供值
+- id: errors.completion.failed_to_generate_bash_completion
+  translation: 生成bash补全失败
+- id: errors.completion.failed_to_generate_fish_completion
+  translation: 生成fish补全失败
+- id: errors.completion.failed_to_generate_zsh_completion
+  translation: 生成zsh补全失败
+- id: errors.packer.unsupported_package_manager
+  translation: 不支持的包管理器
+- id: errors.packer.unsupported_linux_distro
+  translation: 不支持的linux发行版
+- id: errors.git.empty_download_path
+  translation: 下载文件路径不能为空
+- id: errors.git.remote_branch_not_found
+  translation: '远程分支 %s 未找到: %v'
+- id: errors.platform.open_os_release_failed
+  translation: 打开 /etc/os-release 失败
+- id: errors.platform.scan_os_release_failed
+  translation: 扫描 os-release 文件失败
+- id: errors.platform.start_multiprinter_failed
+  translation: 启动 multiprinter 失败
+- id: errors.platform.download_go_archive_failed
+  translation: 下载 Go 存档失败
+- id: errors.platform.extract_go_archive_failed
+  translation: 提取 Go 存档失败
+- id: errors.platform.create_go_symlink_failed
+  translation: 创建 go 符号链接失败
+- id: errors.platform.create_gofmt_symlink_failed
+  translation: 创建 gofmt 符号链接失败
+- id: errors.platform.remove_go_archive_failed
+  translation: 删除 go 存档失败
+- id: errors.platform.no_container_app_found
+  translation: 未找到容器应用程序
+- id: errors.platform.parse_sudo_uid_failed
+  translation: 解析 SUDO_UID 失败
+- id: errors.platform.parse_sudo_gid_failed
+  translation: 解析 SUDO_GID 失败
+- id: errors.platform.chown_failed
+  translation: chown %s 到 %s (%d:%d) 失败
+- id: errors.platform.chown_root_directory_failed
+  translation: chown 根目录 %s 失败
+- id: errors.project.circular_dependency_detected
+  translation: 检测到循环依赖
+- id: errors.project.circular_runtime_dependency_detected
+  translation: 运行时依赖中的循环依赖
+- id: errors.validation.distribution_empty
+  translation: 分发版本不能为空
+- id: errors.validation.project_path_empty
+  translation: 项目路径不能为空
+- id: errors.validation.path_not_exist
+  translation: 路径不存在
+- id: errors.validation.project_file_not_found
+  translation: 项目文件未找到
+- id: errors.validation.insufficient_args
+  translation: 至少需要一个参数
+- id: errors.validation.unsupported_distribution
+  translation: '不支持的分发版本 ''%s''
+
+
+    支持的分发版本：
+
+    %s
+
+
+    使用 ''yap list-distros'' 查看所有可用选项'
+- id: errors.validation.invalid_path
+  translation: 无效路径 '%s'
+- id: errors.validation.no_project_files
+  translation: '在 %s 中未找到 yap.json 或 PKGBUILD
+
+
+    请确保您的项目目录包含以下文件之一：
+
+    - yap.json（推荐用于多包项目）
+
+    - PKGBUILD（用于单包项目）'
+- id: errors.validation.insufficient_args_detailed
+  translation: '至少需要 %d 个参数，只收到 %d 个
+
+
+    用法：%s
+
+
+    更多信息请使用：%s --help'
+- id: errors.install.artifact_not_found
+  translation: 未找到制品文件：%s
+- id: errors.install.failed_to_resolve_path
+  translation: 无法解析制品路径
+- id: errors.install.unsupported_package_format
+  translation: '不支持的包格式：%s
+
+    支持的格式：.deb, .rpm, .apk, .pkg.tar.*'
+- id: errors.install.unsupported_package_type
+  translation: 不支持的包类型：%s
+- id: errors.install.installation_failed
+  translation: 使用 %s 安装包失败
+- id: errors.graph.failed_to_resolve_project_path
+  translation: 解析项目路径失败
+- id: errors.graph.failed_to_load_project
+  translation: 加载项目失败
+- id: errors.core.artifacts_path_not_exist
+  translation: 制品路径不存在：%s
+- id: messages.verbose_mode_enabled
+  translation: 详细模式已启用
+- id: logger.strip.info.stripping_binaries
+  translation: 剥离二进制文件
+- id: logger.strip.info.stripping_binaries_1
+  translation: 剥离二进制文件
+- id: logger.execwithcontext.debug.executing_command
+  translation: 执行命令
+- id: logger.execwithcontext.debug.executing_command_1
+  translation: 执行命令
+- id: logger.execwithcontext.error.command_execution_failed
+  translation: 命令执行失败
+- id: logger.execwithcontext.error.command_execution_failed_1
+  translation: 命令执行失败
+- id: logger.execwithcontext.debug.command_execution_completed
+  translation: 命令执行完成
+- id: logger.execwithcontext.debug.command_execution_completed_1
+  translation: 命令执行完成
+- id: logger.runscriptwithpackage.info.executing_shell_script
+  translation: 执行shell脚本
+- id: logger.runscriptwithpackage.info.executing_shell_script_1
+  translation: 执行shell脚本
+- id: logger.runscriptwithpackage.info.executing_shell_script_2
+  translation: 执行shell脚本
+- id: logger.runscriptwithpackage.info.executing_shell_script_3
+  translation: 执行shell脚本
+- id: logger.runscriptwithpackage.debug.starting_script_execution
+  translation: 开始脚本执行
+- id: logger.runscriptwithpackage.debug.starting_script_execution_1
+  translation: 开始脚本执行
+- id: logger.runscriptwithpackage.error.script_execution_failed
+  translation: 脚本执行失败
+- id: logger.runscriptwithpackage.error.script_execution_failed_1
+  translation: 脚本执行失败
+- id: logger.runscriptwithpackage.error.script_execution_failed_2
+  translation: 脚本执行失败
+- id: logger.runscriptwithpackage.error.script_execution_failed_3
+  translation: 脚本执行失败
+- id: logger.unknown.info.shell_script_execution_completed
+  translation: shell脚本执行成功完成
+- id: logger.unknown.info.shell_script_execution_completed_1
+  translation: shell脚本执行成功完成
+- id: logger.unknown.info.shell_script_execution_completed_2
+  translation: shell脚本执行成功完成
+- id: logger.unknown.info.shell_script_execution_completed_3
+  translation: shell脚本执行成功完成
+- id: logger.execwithsudocontext.debug.executing_command_with_sudo
+  translation: 使用sudo执行命令
+- id: logger.execwithsudocontext.debug.executing_command_with_sudo_1
+  translation: 使用sudo执行命令
+- id: logger.execwithsudocontext.debug.executing_command
+  translation: 执行命令
+- id: logger.execwithsudocontext.debug.executing_command_1
+  translation: 执行命令
+- id: logger.unknown.error.command_execution_failed
+  translation: 命令执行失败
+- id: logger.unknown.error.command_execution_failed_1
+  translation: 命令执行失败
+- id: logger.unknown.debug.command_execution_completed
+  translation: 命令执行完成
+- id: logger.unknown.debug.command_execution_completed_1
+  translation: 命令执行完成
+- id: logger.stringifyarray.error.unable_to_parse_array
+  translation: 无法解析数组元素
+- id: logger.stringifyarray.error.unable_to_parse_array_1
+  translation: 无法解析数组元素
+- id: logger.stringifyfuncdecl.error.unable_to_parse_function
+  translation: 无法解析函数
+- id: logger.stringifyfuncdecl.error.unable_to_parse_function_1
+  translation: 无法解析函数
+- id: logger.download.info.response_status
+  translation: '响应状态：'
+- id: logger.withresume.info.retrying_download
+  translation: 重试下载
+- id: logger.withresume.info.retrying_download_1
+  translation: 重试下载
+- id: logger.withresumecontext.info.retrying_download
+  translation: 重试下载
+- id: logger.withresumecontext.info.retrying_download_1
+  translation: 重试下载
+- id: logger.configureresumeifpossible.info.resuming_download
+  translation: 恢复下载
+- id: logger.configureresumeifpossible.info.resuming_download_1
+  translation: 恢复下载
+- id: logger.logdownloadstart.info.server_supports_resume
+  translation: 服务器支持断点续传
+- id: logger.logdownloadstart.info.server_supports_resume_1
+  translation: 服务器支持断点续传
+- id: logger.logdownloadstart.info.response_status
+  translation: '响应状态：'
+- id: logger.monitordownload.info.download_completed
+  translation: 下载完成
+- id: logger.monitordownload.info.download_completed_1
+  translation: 下载完成
+- id: logger.concurrently.warn.failed_to_shutdown_download
+  translation: 关闭下载管理器失败
+- id: logger.concurrently.warn.failed_to_shutdown_download_1
+  translation: 关闭下载管理器失败
+- id: logger.finish.info.download_completed
+  translation: 下载完成
+- id: logger.finish.info.download_completed_1
+  translation: 下载完成
+- id: logger.calculatesha256.warn.failed_to_close_file
+  translation: SHA256计算期间关闭文件失败
+- id: logger.calculatesha256.warn.failed_to_close_file_1
+  translation: SHA256计算期间关闭文件失败
+- id: logger.calculatedatahash.warn.failed_to_close_file
+  translation: 数据哈希计算期间关闭文件失败
+- id: logger.calculatedatahash.warn.failed_to_close_file_1
+  translation: 数据哈希计算期间关闭文件失败
+- id: logger.calculatesha256.warn.failed_to_close_file_2
+  translation: 关闭文件失败
+- id: logger.calculatesha256.warn.failed_to_close_file_3
+  translation: 关闭文件失败
+- id: logger.chmod.error.failed_to_chmod
+  translation: chmod失败
+- id: logger.chmod.error.failed_to_chmod_1
+  translation: chmod失败
+- id: logger.create.error.failed_to_create_path
+  translation: 创建路径失败
+- id: logger.create.error.failed_to_create_path_1
+  translation: 创建路径失败
+- id: logger.createwrite.warn.failed_to_close_file
+  translation: 关闭文件失败
+- id: logger.createwrite.warn.failed_to_close_file_1
+  translation: 关闭文件失败
+- id: logger.createwrite.error.failed_to_write_to
+  translation: 写入文件失败
+- id: logger.createwrite.error.failed_to_write_to_1
+  translation: 写入文件失败
+- id: logger.getfiletype.debug.failed_to_get_file
+  translation: 获取文件信息失败
+- id: logger.getfiletype.debug.failed_to_get_file_1
+  translation: 获取文件信息失败
+- id: logger.getfiletype.debug.failed_to_open_file
+  translation: 打开文件进行类型检测失败
+- id: logger.getfiletype.debug.failed_to_open_file_1
+  translation: 打开文件进行类型检测失败
+- id: logger.getfiletype.warn.failed_to_close_file
+  translation: 关闭文件失败
+- id: logger.getfiletype.warn.failed_to_close_file_1
+  translation: 关闭文件失败
+- id: logger.isstaticlibrary.warn.failed_to_close_file
+  translation: 关闭文件失败
+- id: logger.isstaticlibrary.warn.failed_to_close_file_1
+  translation: 关闭文件失败
+- id: logger.open.error.failed_to_open_file
+  translation: 打开文件失败
+- id: logger.open.error.failed_to_open_file_1
+  translation: 打开文件失败
+- id: logger.tryhardlink.warn.failed_to_copy_file
+  translation: 复制文件权限失败
+- id: logger.tryhardlink.warn.failed_to_copy_file_1
+  translation: 复制文件权限失败
+- id: logger.createtarzst.warn.failed_to_close_output
+  translation: 关闭输出文件失败
+- id: logger.createtarzst.warn.failed_to_close_output_1
+  translation: 关闭输出文件失败
+- id: logger.createtargz.warn.failed_to_close_output
+  translation: 关闭输出文件失败
+- id: logger.createtargz.warn.failed_to_close_output_1
+  translation: 关闭输出文件失败
+- id: logger.extract.warn.failed_to_close_source
+  translation: 关闭源文件失败
+- id: logger.extract.warn.failed_to_close_source_1
+  translation: 关闭源文件失败
+- id: logger.unknown.debug.skipping_extraction_file_exists
+  translation: 跳过提取，文件已存在且大小相同
+- id: logger.unknown.debug.skipping_extraction_file_exists_1
+  translation: 跳过提取，文件已存在且大小相同
+- id: logger.unknown.warn.failed_to_close_new
+  translation: 关闭新文件失败
+- id: logger.unknown.warn.failed_to_close_new_1
+  translation: 关闭新文件失败
+- id: logger.unknown.warn.failed_to_close_archive
+  translation: 关闭归档文件失败
+- id: logger.unknown.warn.failed_to_close_archive_1
+  translation: 关闭归档文件失败
+- id: logger.calculatesha256.warn.failed_to_close_file_4
+  translation: SHA256计算期间关闭文件失败
+- id: logger.calculatesha256.warn.failed_to_close_file_5
+  translation: SHA256计算期间关闭文件失败
+- id: logger.parsefile.error.failed_to_get_root
+  translation: 获取根目录失败
+- id: logger.parsefile.error.failed_to_get_root_1
+  translation: 获取根目录失败
+- id: logger.clone.error.failed_to_load_ssh
+  translation: 加载ssh密钥失败
+- id: logger.clone.error.failed_to_load_ssh_1
+  translation: 加载ssh密钥失败
+- id: logger.clone.warn.try_to_use_an
+  translation: 尝试使用-p参数的ssh密码
+- id: logger.clone.warn.try_to_use_an_1
+  translation: 尝试使用-p参数的ssh密码
+- id: logger.getoriginaluser.warn.failed_to_lookup_sudo
+  translation: 查找sudo用户信息失败
+- id: logger.getoriginaluser.warn.failed_to_lookup_sudo_1
+  translation: 查找sudo用户信息失败
+- id: logger.chowntooriginaluser.debug.changed_ownership_to_original
+  translation: 更改所有权为原用户
+- id: logger.chowntooriginaluser.debug.changed_ownership_to_original_1
+  translation: 更改所有权为原用户
+- id: logger.chownrecursivetooriginaluser.warn.failed_to_chown_file
+  translation: chown文件失败
+- id: logger.chownrecursivetooriginaluser.warn.failed_to_chown_file_1
+  translation: chown文件失败
+- id: logger.preserveownership.warn.failed_to_get_original
+  translation: 获取原用户信息失败
+- id: logger.preserveownership.warn.failed_to_get_original_1
+  translation: 获取原用户信息失败
+- id: logger.preserveownership.info.preserving_ownership_for_original
+  translation: 为原用户保留所有权
+- id: logger.preserveownership.info.preserving_ownership_for_original_1
+  translation: 为原用户保留所有权
+- id: logger.preserveownershiprecursive.warn.failed_to_get_original
+  translation: 获取原用户信息失败
+- id: logger.preserveownershiprecursive.warn.failed_to_get_original_1
+  translation: 获取原用户信息失败
+- id: logger.preserveownershiprecursive.info.preserving_ownership_recursively_for
+  translation: 为原用户递归保留所有权
+- id: logger.preserveownershiprecursive.info.preserving_ownership_recursively_for_1
+  translation: 为原用户递归保留所有权
+- id: logger.parseosrelease.warn.failed_to_close_osrelease
+  translation: 关闭os-release文件失败
+- id: logger.parseosrelease.warn.failed_to_close_osrelease_1
+  translation: 关闭os-release文件失败
+- id: logger.getarchitecture.warn.unknown_architecture_falling_back
+  translation: 未知架构，回退到GOARCH
+- id: logger.getarchitecture.warn.unknown_architecture_falling_back_1
+  translation: 未知架构，回退到GOARCH
+- id: logger.checkgo.info.go_is_already_installed
+  translation: go已经安装
+- id: logger.checkgo.info.go_is_already_installed_1
+  translation: go已经安装
+- id: logger.gosetup.info.go_successfully_installed
+  translation: go安装成功
+- id: logger.gosetup.info.go_successfully_installed_1
+  translation: go安装成功
+- id: logger.logpackagecreated.info.package_artifact_created
+  translation: 包工件已创建
+- id: logger.logpackagecreated.info.package_artifact_created_1
+  translation: 包工件已创建
+- id: logger.createspec.warn.failed_to_close_pkgbuild
+  translation: 关闭pkgbuild文件失败
+- id: logger.createspec.warn.failed_to_close_pkgbuild_1
+  translation: 关闭pkgbuild文件失败
+- id: logger.validategeneral.error.invalid_spdx_license_identifier
+  translation: 无效的SPDX许可证标识符
+- id: logger.validategeneral.error.invalid_spdx_license_identifier_1
+  translation: 无效的SPDX许可证标识符
+- id: logger.validategeneral.info.you_can_find_valid
+  translation: 您可以在此处找到有效的SPDX许可证标识符
+- id: logger.validategeneral.info.you_can_find_valid_1
+  translation: 您可以在此处找到有效的SPDX许可证标识符
+- id: logger.validategeneral.error.number_of_sources_and
+  translation: 源码数量和哈希数量不一致
+- id: logger.validategeneral.error.number_of_sources_and_1
+  translation: 源码数量和哈希数量不一致
+- id: logger.validategeneral.error.missing_package_function
+  translation: 缺少package()函数
+- id: logger.validategeneral.error.missing_package_function_1
+  translation: 缺少package()函数
+- id: logger.setupenvironmentdependencies.info.go_detected_version_check
+  translation: '检测到go：版本检查已禁用'
+- id: logger.setupenvironmentdependencies.info.go_detected_version_check_1
+  translation: '检测到go：版本检查已禁用'
+- id: logger.setupenvironmentdependencies.warn.failed_to_setup_go
+  translation: 设置Go环境失败
+- id: logger.setupenvironmentdependencies.warn.failed_to_setup_go_1
+  translation: 设置Go环境失败
+- id: logger.logpackagecreated.info.package_artifact_created_2
+  translation: 包工件已创建
+- id: logger.logpackagecreated.info.package_artifact_created_3
+  translation: 包工件已创建
+- id: logger.unknown.warn.failed_to_close_rpm
+  translation: 关闭RPM文件失败
+- id: logger.unknown.warn.failed_to_close_rpm_1
+  translation: 关闭RPM文件失败
+- id: logger.unknown.info.package_artifact_created
+  translation: 包工件已创建
+- id: logger.unknown.info.package_artifact_created_1
+  translation: 包工件已创建
+- id: logger.buildpackage.info.package_artifact_created
+  translation: 包工件已创建
+- id: logger.buildpackage.info.package_artifact_created_1
+  translation: 包工件已创建
+- id: logger.createmtreegzip.warn.failed_to_close_output
+  translation: 关闭输出文件失败
+- id: logger.createmtreegzip.warn.failed_to_close_output_1
+  translation: 关闭输出文件失败
+- id: logger.createmtreegzip.warn.failed_to_close_gzip
+  translation: 关闭gzip写入器失败
+- id: logger.createmtreegzip.warn.failed_to_close_gzip_1
+  translation: 关闭gzip写入器失败
+- id: logger.buildpackage.warn.failed_to_remove_temporary
+  translation: 删除临时目录失败
+- id: logger.buildpackage.warn.failed_to_remove_temporary_1
+  translation: 删除临时目录失败
+- id: logger.createdeb.warn.failed_to_close_debian
+  translation: 关闭debian包文件失败
+- id: logger.createdeb.warn.failed_to_close_debian_1
+  translation: 关闭debian包文件失败
+- id: logger.unknown.info.package_artifact_created_2
+  translation: 包工件已创建
+- id: logger.unknown.info.package_artifact_created_3
+  translation: 包工件已创建
+- id: logger.generatesvggraph.error.failed_to_close_file
+  translation: 关闭文件失败
+- id: logger.generatesvggraph.error.failed_to_close_file_1
+  translation: 关闭文件失败
+- id: logger.generatesvggraph.info.svg_graph_generated_successfully
+  translation: SVG图表生成成功
+- id: logger.generatesvggraph.info.svg_graph_generated_successfully_1
+  translation: SVG图表生成成功
+- id: logger.generatepnggraph.info.svg_graph_generated_for
+  translation: 为PNG转换生成SVG图表
+- id: logger.generatepnggraph.info.svg_graph_generated_for_1
+  translation: 为PNG转换生成SVG图表
+- id: logger.generatepnggraph.warn.png_conversion_requires_external
+  translation: PNG转换需要外部工具
+- id: logger.generatepnggraph.warn.png_conversion_requires_external_1
+  translation: PNG转换需要外部工具
+- id: logger.runinstall.info.detected_package_type
+  translation: 检测到包类型
+- id: logger.runinstall.info.detected_package_type_1
+  translation: 检测到包类型
+- id: logger.installpackage.info.installing_package
+  translation: 正在安装包
+- id: logger.installpackage.info.installing_package_1
+  translation: 正在安装包
+- id: logger.installpackage.info.package_installed_successfully
+  translation: 包安装成功
+- id: logger.installpackage.info.package_installed_successfully_1
+  translation: 包安装成功
+- id: logger.unknown.info.basic_build_environment_successfully
+  translation: 基本构建环境准备成功
+- id: logger.unknown.info.basic_build_environment_successfully_1
+  translation: 基本构建环境准备成功
+- id: logger.unknown.info.go_successfully_installed
+  translation: go安装成功
+- id: logger.unknown.info.go_successfully_installed_1
+  translation: go安装成功
+- id: logger.rungraphcommand.info.generating_dependency_graph
+  translation: 生成依赖关系图
+- id: logger.rungraphcommand.info.generating_dependency_graph_1
+  translation: 生成依赖关系图

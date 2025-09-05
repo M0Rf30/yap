@@ -1,0 +1,1002 @@
+- id: app.name
+  translation: YAP
+- id: app.full_name
+  translation: Yet Another Packager
+- id: app.description
+  translation: 'YAP (Yet Another Packager) — это мощная система сборки пакетов на
+    основе контейнеров,
+
+    которая создает пакеты для нескольких дистрибутивов GNU/Linux из единой спецификации
+
+    в формате, похожем на PKGBUILD.'
+- id: app.documentation_url
+  translation: Для подробной документации и примеров посетите https://github.com/M0Rf30/yap
+- id: root.short
+  translation: 🚀 Yet Another Packager - Мультидистрибутивный сборщик пакетов
+- id: root.examples
+  translation: '# Собрать все пакеты в текущей директории для вашего дистрибутива
+
+    yap build .
+
+
+    # Собрать для конкретного дистрибутива и релиза
+
+    yap build ubuntu-jammy /path/to/project
+
+
+    # Создать визуализацию графа зависимостей
+
+    yap graph --output docs/dependencies.svg .
+
+
+    # Установить артефакт пакета
+
+    yap install /path/to/package.deb
+
+
+    # Подготовить среду сборки для Rocky Linux 9
+
+    yap prepare rocky-9
+
+
+    # Очистить артефакты сборки
+
+    yap zap ubuntu-jammy /path/to/project
+
+
+    # Показать все поддерживаемые дистрибутивы
+
+    yap list-distros
+
+    '
+- id: groups.build
+  translation: Команды сборки
+- id: groups.environment
+  translation: Команды окружения
+- id: groups.utility
+  translation: Утилитарные команды
+- id: groups.additional
+  translation: Дополнительные команды
+- id: commands.build.short
+  translation: 🔨 Собрать пакеты из определения проекта yap.json
+- id: commands.build.long
+  translation: "Собрать пакеты для одного или нескольких дистрибутивов, используя\
+    \ файл проекта yap.json.\n\nКоманда build организует весь процесс сборки пакетов:\n\
+    \  • Парсит конфигурацию проекта yap.json\n  • Разрешает зависимости сборки и\
+    \ порядок\n  • Создает изолированные контейнерные среды\n  • Собирает пакеты согласно\
+    \ спецификациям PKGBUILD\n  • Обрабатывает кросс-дистрибутивную совместимость\n\
+    \nФОРМАТ ДИСТРИБУТИВА:\n  Используйте формат 'distro' или 'distro-release' (например,\
+    \ 'ubuntu-jammy', 'fedora-38')\n  Если дистрибутив не указан, используется дистрибутив\
+    \ текущей системы.\n\nРАЗРЕШЕНИЕ ЗАВИСИМОСТЕЙ:\n  Порядок сборки автоматически\
+    \ определяется из зависимостей пакетов.\n  Используйте флаги --from и --to для\
+    \ сборки конкретных диапазонов пакетов.\n"
+- id: commands.build.examples
+  translation: '# Собрать для дистрибутива текущей системы
+
+    yap build .
+
+    yap build /path/to/project
+
+
+    # Собрать для конкретных дистрибутивов
+
+    yap build ubuntu-jammy .
+
+    yap build fedora-38 /path/to/project
+
+    yap build alpine /home/user/myproject
+
+    '
+- id: commands.graph.short
+  translation: 🎨 Создать красивые графы зависимостей
+- id: commands.install.short
+  translation: 📦 Установить артефакт пакета, используя соответствующий менеджер пакетов
+- id: commands.list_distros.short
+  translation: 📋 Показать все поддерживаемые дистрибутивы и релизы
+- id: commands.prepare.short
+  translation: 🛠️  Подготовить среду сборки с пакетами разработки
+- id: commands.pull.short
+  translation: 📦 Загрузить предварительно собранные образы контейнеров для сборки
+- id: commands.status.short
+  translation: 📊 Показать состояние системы и информацию об окружении
+- id: commands.version.short
+  translation: 📊 Показать версию YAP и информацию о системе
+- id: commands.zap.short
+  translation: 🧹 Глубоко очистить среду сборки и артефакты
+- id: commands.completion.short
+  translation: 🔧 Создать скрипты автодополнения для shell
+- id: flags.verbose
+  translation: включить подробный вывод с детальным логированием
+- id: flags.no_color
+  translation: отключить цветной вывод
+- id: flags.build.cleanbuild
+  translation: 🧹 удалить директорию $srcdir/ перед сборкой (обеспечивает чистую сборку)
+- id: flags.build.from
+  translation: ▶️  начать сборку с указанного имени пакета (с учетом зависимостей)
+- id: flags.build.nobuild
+  translation: 📥 только загрузить и извлечь исходные файлы (без компиляции)
+- id: flags.build.nomakedeps
+  translation: ⏭️  пропустить все установки и проверки make dependency (makedeps)
+- id: flags.build.pkgrel
+  translation: 🔢 переопределить номер релиза пакета (pkgrel) для всех пакетов
+- id: flags.build.pkgver
+  translation: 🏷️  переопределить версию пакета (pkgver) для всех пакетов в проекте
+- id: flags.build.skip_sync
+  translation: 🚫 пропустить синхронизацию менеджера пакетов с удаленными репозиториями
+- id: flags.build.ssh_password
+  translation: 🔐 SSH пароль для доступа к приватным репозиториям
+- id: flags.build.to
+  translation: ⏹️  остановить сборку на указанном имени пакета (с учетом зависимостей)
+- id: flags.build.zap
+  translation: 💥 удалить всю директорию staging перед сборкой (глубокая очистка)
+- id: commands.zap.long
+  translation: "Выполнить глубокую очистку сред сборки, удалив все артефакты сборки,\n\
+    временные файлы и директории staging для указанного проекта.\n\nЭта команда полезна\
+    \ для:\n  • Освобождения дискового пространства, занятого артефактами сборки\n\
+    \  • Решения проблем сборки, вызванных устаревшими файлами\n  • Обеспечения полностью\
+    \ чистых сборок\n  • Обслуживания сред сборки\n\nПРЕДУПРЕЖДЕНИЕ: Эта операция\
+    \ деструктивна и удаляет все выходные данные сборки\nи промежуточные файлы. Используйте\
+    \ с осторожностью в производственных средах.\n\nФОРМАТ ДИСТРИБУТИВА:\n  Используйте\
+    \ формат 'distro' или 'distro-release' (например, 'ubuntu-jammy', 'fedora-38')\n\
+    \  Если дистрибутив не указан, используется дистрибутив текущей системы.\n\nКоманда\
+    \ zap автоматически:\n  • Пропускает установку зависимостей (nomakedeps=true)\n\
+    \  • Пропускает синхронизацию менеджера пакетов (skip-sync=true)\n  • Включает\
+    \ режим глубокой очистки (zap=true)\n"
+- id: commands.zap.examples
+  translation: '# Очистить дистрибутив текущей системы
+
+    yap zap .
+
+    yap zap /path/to/project
+
+
+    # Очистить конкретный проект для дистрибутива
+
+    yap zap ubuntu-jammy /path/to/project
+
+    yap zap fedora-38 .
+
+    yap zap alpine /home/user/myproject
+
+
+    # Очистить проект текущей директории
+
+    yap zap rocky-9 .
+
+    '
+- id: flags.zap.from
+  translation: ▶️  начать очистку с указанного имени пакета (с учетом зависимостей)
+- id: flags.zap.to
+  translation: ⏹️  остановить очистку на указанном имени пакета (с учетом зависимостей)
+- id: commands.graph.long
+  translation: "Создать современные, интерактивные визуализации графов зависимостей\
+    \ вашего проекта.\n\nКоманда graph анализирует ваш файл проекта yap.json и создает\
+    \ красивые\nвизуализации зависимостей, показывающие отношения между пакетами.\
+    \ Выходные данные\nвключают топологическое упорядочивание, анализ популярности\
+    \ зависимостей и современный стиль.\n\nОСОБЕННОСТИ:\n  • Иерархический макет на\
+    \ основе уровней зависимостей\n  • Узлы с цветовой кодировкой по популярности\
+    \ и типу\n  • Интерактивный SVG с эффектами наведения и всплывающими подсказками\n\
+    \  • Фильтрация внешних зависимостей\n  • Множественные темы (modern, classic,\
+    \ dark)\n  • Высококачественный вывод, подходящий для документации\n\nЭЛЕМЕНТЫ\
+    \ ВИЗУАЛИЗАЦИИ:\n  • Размер узла отражает популярность зависимости\n  • Цвета\
+    \ указывают типы пакетов (внутренние vs внешние)\n  • Стрелки показывают направление\
+    \ зависимостей\n  • Уровни показывают порядок сборки\n  • Всплывающие подсказки\
+    \ предоставляют подробную информацию о пакетах\n"
+- id: commands.graph.examples
+  translation: '# Создать SVG граф для текущей директории
+
+    yap graph .
+
+
+    # Создать PNG граф с темной темой
+
+    yap graph --format png --theme dark /path/to/project
+
+
+    # Включить внешние зависимости в визуализацию
+
+    yap graph --show-external --output dependencies.svg .
+
+
+    # Создать граф готовый для документации
+
+    yap graph --theme modern --format svg --output docs/architecture.svg .
+
+    '
+- id: flags.graph.format
+  translation: 'формат вывода: svg, png'
+- id: flags.graph.output
+  translation: 'путь к выходному файлу (по умолчанию: dependencies.svg)'
+- id: flags.graph.show_external
+  translation: включить внешние зависимости в граф
+- id: flags.graph.theme
+  translation: 'визуальная тема: modern, classic, dark'
+- id: commands.install.long
+  translation: "Установить артефакт пакета, используя соответствующий менеджер пакетов\
+    \ системы.\n\nЭта команда автоматически определяет формат пакета и использует\
+    \ правильный\nменеджер пакетов для установки артефакта в вашей системе.\n\nПОДДЕРЖИВАЕМЫЕ\
+    \ ФОРМАТЫ:\n  • пакеты .deb (через apt/dpkg)\n  • пакеты .rpm (через yum/dnf/rpm)\n\
+    \  • пакеты .pkg.tar.xz (через pacman)\n  • пакеты .apk (через apk)\n\nУстановщик\
+    \ будет обрабатывать зависимости и предоставлять соответствующую обратную связь\n\
+    во время процесса установки.\n"
+- id: commands.install.examples
+  translation: '# Установить пакет Debian
+
+    yap install package.deb
+
+
+    # Установить пакет RPM
+
+    yap install package.rpm
+
+
+    # Установить пакет Arch
+
+    yap install package.pkg.tar.xz
+
+
+    # Установить пакет Alpine
+
+    yap install package.apk
+
+    '
+- id: commands.list_distros.long
+  translation: "Показать все поддерживаемые дистрибутивы и их доступные релизы.\n\n\
+    Эта команда показывает, для каких дистрибутивов YAP может собирать пакеты,\nвключая\
+    \ конкретные версии релизов, где применимо.\n\nВывод включает:\n  • Имена и ID\
+    \ дистрибутивов\n  • Доступные версии релизов\n  • Информацию о поддержке архитектуры\n\
+    \  • Статус доступности контейнера\n"
+- id: commands.list_distros.examples
+  translation: '# Показать все поддерживаемые дистрибутивы
+
+    yap list-distros
+
+
+    # Использовать с фильтрацией (если доступно)
+
+    yap list-distros | grep ubuntu
+
+    '
+- id: commands.prepare.long
+  translation: "Подготовить среду сборки с пакетами разработки и зависимостями.\n\n\
+    Эта команда настраивает среду сборки, устанавливая необходимые\nинструменты разработки,\
+    \ компиляторы и зависимости сборки для\nуказанного дистрибутива.\n\nПОДГОТОВКА\
+    \ ВКЛЮЧАЕТ:\n  • Базовые инструменты разработки (gcc, make, и т.д.)\n  • Специфические\
+    \ зависимости сборки пакетов\n  • Конфигурацию среды сборки\n  • Подготовку образа\
+    \ контейнера\n"
+- id: commands.prepare.examples
+  translation: '# Подготовить текущую систему
+
+    yap prepare
+
+
+    # Подготовить конкретный дистрибутив
+
+    yap prepare ubuntu-jammy
+
+
+    # Подготовить для Rocky Linux
+
+    yap prepare rocky-9
+
+    '
+- id: flags.prepare.skip_sync
+  translation: ⚡ пропустить синхронизацию менеджера пакетов (быстрее, но может пропустить
+    обновления)
+- id: flags.prepare.golang
+  translation: 🐹 дополнительно установить среду выполнения Go и инструменты разработки
+- id: footer.documentation
+  translation: '📖 Документация:'
+- id: footer.report_issues
+  translation: '🐛 Сообщить о проблемах:'
+- id: footer.more_info
+  translation: Используйте "yap [команда] --help" для получения дополнительной информации
+    о команде.
+- id: logger.tips.use_help
+  translation: 💡 Используйте '%s --help' для просмотра доступных опций
+- id: logger.tips.use_verbose
+  translation: 💡 Используйте --verbose для просмотра полного списка
+- id: logger.pull.specify_codename
+  translation: кроме alpine и arch, также укажите кодовое имя (например, rocky-9,
+    ubuntu-jammy)
+- id: logger.pull.failed_to_pull
+  translation: не удалось загрузить образ
+- id: logger.zap.no_distribution_specified
+  translation: Дистрибутив не указан, использую обнаруженный
+- id: logger.zap.cleaning_for_distribution
+  translation: Очистка для дистрибутива
+- id: logger.zap.project_path
+  translation: Путь проекта
+- id: logger.zap.fatal_error
+  translation: фатальная ошибка
+- id: logger.zap.done
+  translation: zap завершен.
+- id: logger.operation_started
+  translation: операция запущена
+- id: logger.operation_completed
+  translation: операция завершена
+- id: logger.operation_failed
+  translation: операция не удалась
+- id: logger.build.starting_verbose
+  translation: Запуск процесса сборки с включенным подробным логированием
+- id: logger.build.no_distribution_specified
+  translation: Дистрибутив не указан, использую обнаруженный
+- id: logger.build.building_for_distribution
+  translation: Сборка для дистрибутива
+- id: logger.build.project_path
+  translation: Путь проекта
+- id: logger.build.initializing_project
+  translation: Инициализация проекта...
+- id: logger.build.project_init_failed
+  translation: Инициализация проекта не удалась
+- id: logger.build.project_init_success
+  translation: Проект инициализирован успешно
+- id: logger.build.building_packages
+  translation: Сборка пакетов...
+- id: logger.build.build_failed
+  translation: Сборка не удалась
+- id: logger.build.build_completed
+  translation: Все пакеты собраны успешно
+- id: logger.fatal_error
+  translation: фатальная ошибка
+- id: logger.installing_external_runtime_dependencies
+  translation: установка внешних зависимостей времени выполнения
+- id: logger.creating_package
+  translation: создание пакета
+- id: logger.invalid_package_order
+  translation: недопустимый порядок пакетов
+- id: logger.failed_to_remove_package_directory
+  translation: не удалось удалить каталог пакета
+- id: logger.building_resulting_package
+  translation: сборка результирующего пакета
+- id: logger.package_not_found
+  translation: пакет не найден
+- id: logger.external_runtime_dependencies_collected
+  translation: внешние зависимости времени выполнения собраны
+- id: logger.multi_project_file_found
+  translation: найден файл мультипроекта
+- id: logger.single_project_file_found
+  translation: найден файл одиночного проекта
+- id: logger.failed_to_close_project_file
+  translation: не удалось закрыть файл проекта
+- id: logger.dependency_analysis_starting
+  translation: начало анализа зависимостей
+- id: logger.dependency_analysis_complete
+  translation: анализ зависимостей завершен
+- id: logger.package_information
+  translation: информация о пакете
+- id: logger.dependency_category
+  translation: категория зависимости
+- id: logger.internal_dependency
+  translation: внутренняя зависимость
+- id: logger.external_dependency
+  translation: внешняя зависимость
+- id: logger.analyzing_package_dependencies
+  translation: анализ зависимостей пакета
+- id: logger.package_declares_dependencies
+  translation: пакет объявляет зависимости
+- id: logger.package_dependencies_found
+  translation: найдены зависимости пакета
+- id: logger.retrieving_sources
+  translation: получение исходных кодов
+- id: logger.failed_to_preserve_ownership
+  translation: не удалось сохранить права собственности для SourceDir
+- id: logger.preparing_sources
+  translation: подготовка исходных кодов
+- id: logger.building
+  translation: сборка
+- id: logger.generating_package
+  translation: генерация пакета
+- id: logger.skip_integrity_check_for
+  translation: пропустить проверку целостности для
+- id: logger.integrity_check_for
+  translation: проверка целостности для
+- id: logger.performing_topological_sort_for_build_order
+  translation: выполнение топологической сортировки для порядка сборки
+- id: logger.dependency_popularity_analysis
+  translation: анализ популярности зависимостей
+- id: logger.build_batch_determined
+  translation: анализ зависимостей завершен
+- id: logger.batch_build_strategy
+  translation: стратегия пакетной сборки
+- id: logger.processing_build_batch
+  translation: обработка пакета сборки
+- id: logger.dependency_aware_build_process_starting
+  translation: запуск процесса сборки с учетом зависимостей
+- id: logger.circular_dependency_detected
+  translation: обнаружена циклическая зависимость
+- id: logger.package_installation_planned
+  translation: планируется установка пакета
+- id: logger.project.dependency_popularity
+  translation: популярность зависимости
+- id: logger.project.build_order_determined
+  translation: порядок сборки определен
+- id: logger.project.stopping_build_at_target_package
+  translation: остановка сборки на целевом пакете
+- id: logger.project.installing_package
+  translation: установка пакета
+- id: logger.project.package_installed
+  translation: пакет установлен
+- id: logger.project.builder_completed_for_package
+  translation: сборщик завершил работу для пакета
+- id: logger.project.batch_build_started
+  translation: началась пакетная сборка
+- id: logger.project.batch_build_completed
+  translation: пакетная сборка завершена
+- id: logger.project.processing_package_batch
+  translation: обработка пакета из партии
+- id: logger.project.build_cache_stats
+  translation: статистика кеша сборки
+- id: logger.project.package_build_skipped
+  translation: сборка пакета пропущена
+- id: logger.project.parallel_build_workers
+  translation: параллельные рабочие процессы сборки
+- id: logger.project.package_build_started
+  translation: началась сборка пакета
+- id: logger.project.package_build_finished
+  translation: сборка пакета завершена
+- id: logger.project.building_dependency_graph
+  translation: построение графа зависимостей
+- id: logger.project.building_regular_packages
+  translation: сборка обычных пакетов
+- id: logger.project.package_installation_failed
+  translation: установка пакета не удалась
+- id: logger.project.runtime_dependencies_build_optimization
+  translation: оптимизация сборки зависимостей времени выполнения
+- id: logger.project.runtime_dependencies_batching_complete
+  translation: пакетирование зависимостей времени выполнения завершено
+- id: logger.project.runtime_dependency_found
+  translation: найдена зависимость времени выполнения
+- id: logger.project.make_dependency_found
+  translation: найдена зависимость make
+- id: logger.project.building_runtime_dependency_batch
+  translation: сборка пакета зависимостей времени выполнения
+- id: logger.project.installing_runtime_dependency
+  translation: установка зависимости времени выполнения
+- id: logger.project.runtime_dependency_installation_failed
+  translation: установка зависимости времени выполнения не удалась
+- id: logger.project.runtime_dependency_installed
+  translation: зависимость времени выполнения установлена
+- id: logger.project.runtime_dependency_batch_analysis
+  translation: анализ пакета зависимостей времени выполнения
+- id: logger.project.runtime_dependency_map
+  translation: карта зависимостей времени выполнения
+- id: logger.project.runtime_dependency_detected
+  translation: обнаружена зависимость времени выполнения
+- id: logger.project.starting_dependencyaware_build_process
+  translation: запуск процесса сборки с учетом зависимостей
+- id: logger.project.skipping_batch_filtered_out
+  translation: пропуск пакета (отфильтрован)
+- id: logger.project.found_from_package
+  translation: найден начальный пакет для фильтра --from
+- id: logger.project.found_to_package
+  translation: найден целевой пакет для фильтра --to
+- id: errors.build.failed_to_retrieve_sources
+  translation: не удалось получить исходные коды
+- id: errors.build.failed_to_initialize_directories
+  translation: не удалось инициализировать каталоги
+- id: errors.build.build_stage_failed
+  translation: этап сборки не удался
+- id: errors.build.failed_to_retrieve_source
+  translation: не удалось получить исходный код
+- id: errors.download.download_failed
+  translation: загрузка не удалась
+- id: errors.download.download_failed_after_attempts
+  translation: 'загрузка не удалась после %d попыток: %v'
+- id: errors.download.download_failed_no_response
+  translation: 'загрузка не удалась: нет ответа'
+- id: errors.download.download_job_not_found
+  translation: 'задача загрузки не найдена: %s'
+- id: errors.source.unsupported_source_type
+  translation: неподдерживаемый тип источника
+- id: errors.source.failed_to_open_file_for_hash
+  translation: не удалось открыть файл для хеширования %s
+- id: errors.source.unsupported_hash_length
+  translation: неподдерживаемая длина хеша %d
+- id: errors.source.failed_to_copy_file
+  translation: не удалось скопировать файл %s
+- id: errors.source.hash_verification_failed
+  translation: проверка хеша не удалась %s
+- id: errors.source.failed_to_start_multiprinter
+  translation: не удалось запустить multiprinter
+- id: errors.source.download_failed_for
+  translation: 'загрузка не удалась для %s: %v'
+- id: errors.shell.failed_to_start_multiprinter
+  translation: не удалось запустить multiprinter
+- id: errors.shell.failed_to_parse_script
+  translation: не удалось разобрать скрипт
+- id: errors.shell.failed_to_create_script_runner
+  translation: не удалось создать исполнитель скрипта
+- id: errors.shell.script_execution_failed
+  translation: выполнение скрипта не удалось
+- id: errors.shell.command_not_allowed_for_sudo
+  translation: команда '%s' не разрешена для выполнения с sudo
+- id: errors.files.failed_to_open_file_for_sha256
+  translation: не удалось открыть файл для расчета SHA256
+- id: errors.files.failed_to_calculate_sha256
+  translation: не удалось вычислить SHA256
+- id: errors.files.failed_to_stat_file
+  translation: не удалось получить информацию о файле для проверки записи
+- id: errors.files.file_not_writable
+  translation: файл %s недоступен для записи
+- id: errors.files.failed_to_change_permissions
+  translation: не удалось изменить права доступа к файлу
+- id: errors.files.failed_to_create_directory
+  translation: не удалось создать директорию %s
+- id: errors.files.failed_to_access_directory
+  translation: не удалось получить доступ к директории %s
+- id: errors.files.failed_to_calculate_directory_size
+  translation: не удалось рассчитать размер директории
+- id: errors.files.failed_to_open_source_file
+  translation: не удалось открыть исходный файл для копирования
+- id: errors.files.failed_to_create_destination_file
+  translation: не удалось создать файл назначения
+- id: errors.files.failed_to_copy_file_content
+  translation: не удалось скопировать содержимое файла
+- id: errors.pkgbuild.invalid_directive_use
+  translation: неверное использование директивы '__' в %s
+- id: errors.rpm.modification_time_out_of_range
+  translation: время модификации вне диапазона для uint32
+- id: errors.pkgbuild.unsupported_architecture
+  translation: неподдерживаемая архитектура
+- id: errors.pkgbuild.failed_to_set_variable_pkgdir
+  translation: не удалось установить переменную pkgdir
+- id: errors.pkgbuild.failed_to_set_variable_srcdir
+  translation: не удалось установить переменную srcdir
+- id: errors.pkgbuild.failed_to_set_variable_startdir
+  translation: не удалось установить переменную startdir
+- id: errors.pkgbuild.failed_to_set_variable
+  translation: не удалось установить переменную
+- id: errors.set.empty_array
+  translation: пустой массив, пожалуйста, задайте значение
+- id: errors.set.empty_variable
+  translation: пустая переменная, пожалуйста, задайте значение
+- id: errors.set.empty_function
+  translation: пустая функция, пожалуйста, задайте значение
+- id: errors.completion.failed_to_generate_bash_completion
+  translation: не удалось сгенерировать автодополнение для bash
+- id: errors.completion.failed_to_generate_fish_completion
+  translation: не удалось сгенерировать автодополнение для fish
+- id: errors.completion.failed_to_generate_zsh_completion
+  translation: не удалось сгенерировать автодополнение для zsh
+- id: errors.packer.unsupported_package_manager
+  translation: неподдерживаемый менеджер пакетов
+- id: errors.packer.unsupported_linux_distro
+  translation: неподдерживаемый дистрибутив linux
+- id: errors.git.empty_download_path
+  translation: путь к файлу загрузки не может быть пустым
+- id: errors.git.remote_branch_not_found
+  translation: 'удаленная ветка %s не найдена: %v'
+- id: errors.platform.open_os_release_failed
+  translation: не удалось открыть /etc/os-release
+- id: errors.platform.scan_os_release_failed
+  translation: не удалось сканировать файл os-release
+- id: errors.platform.start_multiprinter_failed
+  translation: не удалось запустить multiprinter
+- id: errors.platform.download_go_archive_failed
+  translation: не удалось загрузить архив Go
+- id: errors.platform.extract_go_archive_failed
+  translation: не удалось извлечь архив Go
+- id: errors.platform.create_go_symlink_failed
+  translation: не удалось создать символическую ссылку go
+- id: errors.platform.create_gofmt_symlink_failed
+  translation: не удалось создать символическую ссылку gofmt
+- id: errors.platform.remove_go_archive_failed
+  translation: не удалось удалить архив go
+- id: errors.platform.no_container_app_found
+  translation: приложение контейнера не найдено
+- id: errors.platform.parse_sudo_uid_failed
+  translation: не удалось парсить SUDO_UID
+- id: errors.platform.parse_sudo_gid_failed
+  translation: не удалось парсить SUDO_GID
+- id: errors.platform.chown_failed
+  translation: не удалось chown %s к %s (%d:%d)
+- id: errors.platform.chown_root_directory_failed
+  translation: не удалось chown корневой каталог %s
+- id: errors.project.circular_dependency_detected
+  translation: обнаружена циклическая зависимость
+- id: errors.project.circular_runtime_dependency_detected
+  translation: циклическая зависимость в runtime зависимостях
+- id: errors.validation.distribution_empty
+  translation: дистрибутив не может быть пустым
+- id: errors.validation.project_path_empty
+  translation: путь к проекту не может быть пустым
+- id: errors.validation.path_not_exist
+  translation: путь не существует
+- id: errors.validation.project_file_not_found
+  translation: файл проекта не найден
+- id: errors.validation.insufficient_args
+  translation: требуется как минимум один аргумент
+- id: errors.validation.unsupported_distribution
+  translation: 'неподдерживаемый дистрибутив ''%s''
+
+
+    Поддерживаемые дистрибутивы:
+
+    %s
+
+
+    Используйте ''yap list-distros'' для просмотра всех доступных опций'
+- id: errors.validation.invalid_path
+  translation: неверный путь '%s'
+- id: errors.validation.no_project_files
+  translation: 'ни yap.json, ни PKGBUILD не найдены в %s
+
+
+    Убедитесь, что директория проекта содержит один из этих файлов:
+
+    - yap.json (рекомендуется для многопакетных проектов)
+
+    - PKGBUILD (для однопакетных проектов)'
+- id: errors.validation.insufficient_args_detailed
+  translation: 'требуется как минимум %d аргумент(ов), получено только %d
+
+
+    Использование: %s
+
+
+    Для получения дополнительной информации используйте: %s --help'
+- id: errors.install.artifact_not_found
+  translation: 'файл артефакта не найден: %s'
+- id: errors.install.failed_to_resolve_path
+  translation: не удалось разрешить путь к артефакту
+- id: errors.install.unsupported_package_format
+  translation: 'неподдерживаемый формат пакета: %s
+
+    Поддерживаемые форматы: .deb, .rpm, .apk, .pkg.tar.*'
+- id: errors.install.unsupported_package_type
+  translation: 'неподдерживаемый тип пакета: %s'
+- id: errors.install.installation_failed
+  translation: не удалось установить пакет с помощью %s
+- id: errors.graph.failed_to_resolve_project_path
+  translation: не удалось разрешить путь к проекту
+- id: errors.graph.failed_to_load_project
+  translation: не удалось загрузить проект
+- id: errors.core.artifacts_path_not_exist
+  translation: 'путь к артефактам не существует: %s'
+- id: messages.verbose_mode_enabled
+  translation: подробный режим включён
+- id: logger.strip.info.stripping_binaries
+  translation: удаление символов из бинарных файлов
+- id: logger.strip.info.stripping_binaries_1
+  translation: удаление символов из бинарных файлов
+- id: logger.execwithcontext.debug.executing_command
+  translation: выполнение команды
+- id: logger.execwithcontext.debug.executing_command_1
+  translation: выполнение команды
+- id: logger.execwithcontext.error.command_execution_failed
+  translation: выполнение команды не удалось
+- id: logger.execwithcontext.error.command_execution_failed_1
+  translation: выполнение команды не удалось
+- id: logger.execwithcontext.debug.command_execution_completed
+  translation: выполнение команды завершено
+- id: logger.execwithcontext.debug.command_execution_completed_1
+  translation: выполнение команды завершено
+- id: logger.runscriptwithpackage.info.executing_shell_script
+  translation: выполнение shell скрипта
+- id: logger.runscriptwithpackage.info.executing_shell_script_1
+  translation: выполнение shell скрипта
+- id: logger.runscriptwithpackage.info.executing_shell_script_2
+  translation: выполнение shell скрипта
+- id: logger.runscriptwithpackage.info.executing_shell_script_3
+  translation: выполнение shell скрипта
+- id: logger.runscriptwithpackage.debug.starting_script_execution
+  translation: запуск выполнения скрипта
+- id: logger.runscriptwithpackage.debug.starting_script_execution_1
+  translation: запуск выполнения скрипта
+- id: logger.runscriptwithpackage.error.script_execution_failed
+  translation: выполнение скрипта не удалось
+- id: logger.runscriptwithpackage.error.script_execution_failed_1
+  translation: выполнение скрипта не удалось
+- id: logger.runscriptwithpackage.error.script_execution_failed_2
+  translation: выполнение скрипта не удалось
+- id: logger.runscriptwithpackage.error.script_execution_failed_3
+  translation: выполнение скрипта не удалось
+- id: logger.unknown.info.shell_script_execution_completed
+  translation: выполнение shell скрипта завершено успешно
+- id: logger.unknown.info.shell_script_execution_completed_1
+  translation: выполнение shell скрипта завершено успешно
+- id: logger.unknown.info.shell_script_execution_completed_2
+  translation: выполнение shell скрипта завершено успешно
+- id: logger.unknown.info.shell_script_execution_completed_3
+  translation: выполнение shell скрипта завершено успешно
+- id: logger.execwithsudocontext.debug.executing_command_with_sudo
+  translation: выполнение команды с sudo
+- id: logger.execwithsudocontext.debug.executing_command_with_sudo_1
+  translation: выполнение команды с sudo
+- id: logger.execwithsudocontext.debug.executing_command
+  translation: выполнение команды
+- id: logger.execwithsudocontext.debug.executing_command_1
+  translation: выполнение команды
+- id: logger.unknown.error.command_execution_failed
+  translation: выполнение команды не удалось
+- id: logger.unknown.error.command_execution_failed_1
+  translation: выполнение команды не удалось
+- id: logger.unknown.debug.command_execution_completed
+  translation: выполнение команды завершено
+- id: logger.unknown.debug.command_execution_completed_1
+  translation: выполнение команды завершено
+- id: logger.stringifyarray.error.unable_to_parse_array
+  translation: невозможно разобрать элемент массива
+- id: logger.stringifyarray.error.unable_to_parse_array_1
+  translation: невозможно разобрать элемент массива
+- id: logger.stringifyfuncdecl.error.unable_to_parse_function
+  translation: невозможно разобрать функцию
+- id: logger.stringifyfuncdecl.error.unable_to_parse_function_1
+  translation: невозможно разобрать функцию
+- id: logger.download.info.response_status
+  translation: 'статус ответа:'
+- id: logger.withresume.info.retrying_download
+  translation: повторная попытка загрузки
+- id: logger.withresume.info.retrying_download_1
+  translation: повторная попытка загрузки
+- id: logger.withresumecontext.info.retrying_download
+  translation: повторная попытка загрузки
+- id: logger.withresumecontext.info.retrying_download_1
+  translation: повторная попытка загрузки
+- id: logger.configureresumeifpossible.info.resuming_download
+  translation: возобновление загрузки
+- id: logger.configureresumeifpossible.info.resuming_download_1
+  translation: возобновление загрузки
+- id: logger.logdownloadstart.info.server_supports_resume
+  translation: сервер поддерживает возобновление
+- id: logger.logdownloadstart.info.server_supports_resume_1
+  translation: сервер поддерживает возобновление
+- id: logger.logdownloadstart.info.response_status
+  translation: 'статус ответа:'
+- id: logger.monitordownload.info.download_completed
+  translation: загрузка завершена
+- id: logger.monitordownload.info.download_completed_1
+  translation: загрузка завершена
+- id: logger.concurrently.warn.failed_to_shutdown_download
+  translation: не удалось завершить менеджер загрузок
+- id: logger.concurrently.warn.failed_to_shutdown_download_1
+  translation: не удалось завершить менеджер загрузок
+- id: logger.finish.info.download_completed
+  translation: загрузка завершена
+- id: logger.finish.info.download_completed_1
+  translation: загрузка завершена
+- id: logger.calculatesha256.warn.failed_to_close_file
+  translation: не удалось закрыть файл во время вычисления SHA256
+- id: logger.calculatesha256.warn.failed_to_close_file_1
+  translation: не удалось закрыть файл во время вычисления SHA256
+- id: logger.calculatedatahash.warn.failed_to_close_file
+  translation: не удалось закрыть файл во время вычисления хеша данных
+- id: logger.calculatedatahash.warn.failed_to_close_file_1
+  translation: не удалось закрыть файл во время вычисления хеша данных
+- id: logger.calculatesha256.warn.failed_to_close_file_2
+  translation: не удалось закрыть файл
+- id: logger.calculatesha256.warn.failed_to_close_file_3
+  translation: не удалось закрыть файл
+- id: logger.chmod.error.failed_to_chmod
+  translation: не удалось chmod
+- id: logger.chmod.error.failed_to_chmod_1
+  translation: не удалось chmod
+- id: logger.create.error.failed_to_create_path
+  translation: не удалось создать путь
+- id: logger.create.error.failed_to_create_path_1
+  translation: не удалось создать путь
+- id: logger.createwrite.warn.failed_to_close_file
+  translation: не удалось закрыть файл
+- id: logger.createwrite.warn.failed_to_close_file_1
+  translation: не удалось закрыть файл
+- id: logger.createwrite.error.failed_to_write_to
+  translation: не удалось записать в файл
+- id: logger.createwrite.error.failed_to_write_to_1
+  translation: не удалось записать в файл
+- id: logger.getfiletype.debug.failed_to_get_file
+  translation: не удалось получить информацию о файле
+- id: logger.getfiletype.debug.failed_to_get_file_1
+  translation: не удалось получить информацию о файле
+- id: logger.getfiletype.debug.failed_to_open_file
+  translation: не удалось открыть файл для определения типа
+- id: logger.getfiletype.debug.failed_to_open_file_1
+  translation: не удалось открыть файл для определения типа
+- id: logger.getfiletype.warn.failed_to_close_file
+  translation: не удалось закрыть файл
+- id: logger.getfiletype.warn.failed_to_close_file_1
+  translation: не удалось закрыть файл
+- id: logger.isstaticlibrary.warn.failed_to_close_file
+  translation: не удалось закрыть файл
+- id: logger.isstaticlibrary.warn.failed_to_close_file_1
+  translation: не удалось закрыть файл
+- id: logger.open.error.failed_to_open_file
+  translation: не удалось открыть файл
+- id: logger.open.error.failed_to_open_file_1
+  translation: не удалось открыть файл
+- id: logger.tryhardlink.warn.failed_to_copy_file
+  translation: не удалось скопировать права файла
+- id: logger.tryhardlink.warn.failed_to_copy_file_1
+  translation: не удалось скопировать права файла
+- id: logger.createtarzst.warn.failed_to_close_output
+  translation: не удалось закрыть выходной файл
+- id: logger.createtarzst.warn.failed_to_close_output_1
+  translation: не удалось закрыть выходной файл
+- id: logger.createtargz.warn.failed_to_close_output
+  translation: не удалось закрыть выходной файл
+- id: logger.createtargz.warn.failed_to_close_output_1
+  translation: не удалось закрыть выходной файл
+- id: logger.extract.warn.failed_to_close_source
+  translation: не удалось закрыть исходный файл
+- id: logger.extract.warn.failed_to_close_source_1
+  translation: не удалось закрыть исходный файл
+- id: logger.unknown.debug.skipping_extraction_file_exists
+  translation: пропуск извлечения, файл существует с таким же размером
+- id: logger.unknown.debug.skipping_extraction_file_exists_1
+  translation: пропуск извлечения, файл существует с таким же размером
+- id: logger.unknown.warn.failed_to_close_new
+  translation: не удалось закрыть новый файл
+- id: logger.unknown.warn.failed_to_close_new_1
+  translation: не удалось закрыть новый файл
+- id: logger.unknown.warn.failed_to_close_archive
+  translation: не удалось закрыть файл архива
+- id: logger.unknown.warn.failed_to_close_archive_1
+  translation: не удалось закрыть файл архива
+- id: logger.calculatesha256.warn.failed_to_close_file_4
+  translation: не удалось закрыть файл во время вычисления SHA256
+- id: logger.calculatesha256.warn.failed_to_close_file_5
+  translation: не удалось закрыть файл во время вычисления SHA256
+- id: logger.parsefile.error.failed_to_get_root
+  translation: не удалось получить корневую директорию
+- id: logger.parsefile.error.failed_to_get_root_1
+  translation: не удалось получить корневую директорию
+- id: logger.clone.error.failed_to_load_ssh
+  translation: не удалось загрузить ssh ключ
+- id: logger.clone.error.failed_to_load_ssh_1
+  translation: не удалось загрузить ssh ключ
+- id: logger.clone.warn.try_to_use_an
+  translation: попробуйте использовать ssh-пароль с -p
+- id: logger.clone.warn.try_to_use_an_1
+  translation: попробуйте использовать ssh-пароль с -p
+- id: logger.getoriginaluser.warn.failed_to_lookup_sudo
+  translation: не удалось найти информацию о sudo пользователе
+- id: logger.getoriginaluser.warn.failed_to_lookup_sudo_1
+  translation: не удалось найти информацию о sudo пользователе
+- id: logger.chowntooriginaluser.debug.changed_ownership_to_original
+  translation: изменена собственность на исходного пользователя
+- id: logger.chowntooriginaluser.debug.changed_ownership_to_original_1
+  translation: изменена собственность на исходного пользователя
+- id: logger.chownrecursivetooriginaluser.warn.failed_to_chown_file
+  translation: не удалось chown файл
+- id: logger.chownrecursivetooriginaluser.warn.failed_to_chown_file_1
+  translation: не удалось chown файл
+- id: logger.preserveownership.warn.failed_to_get_original
+  translation: не удалось получить информацию об исходном пользователе
+- id: logger.preserveownership.warn.failed_to_get_original_1
+  translation: не удалось получить информацию об исходном пользователе
+- id: logger.preserveownership.info.preserving_ownership_for_original
+  translation: сохранение собственности для исходного пользователя
+- id: logger.preserveownership.info.preserving_ownership_for_original_1
+  translation: сохранение собственности для исходного пользователя
+- id: logger.preserveownershiprecursive.warn.failed_to_get_original
+  translation: не удалось получить информацию об исходном пользователе
+- id: logger.preserveownershiprecursive.warn.failed_to_get_original_1
+  translation: не удалось получить информацию об исходном пользователе
+- id: logger.preserveownershiprecursive.info.preserving_ownership_recursively_for
+  translation: рекурсивное сохранение собственности для исходного пользователя
+- id: logger.preserveownershiprecursive.info.preserving_ownership_recursively_for_1
+  translation: рекурсивное сохранение собственности для исходного пользователя
+- id: logger.parseosrelease.warn.failed_to_close_osrelease
+  translation: не удалось закрыть файл os-release
+- id: logger.parseosrelease.warn.failed_to_close_osrelease_1
+  translation: не удалось закрыть файл os-release
+- id: logger.getarchitecture.warn.unknown_architecture_falling_back
+  translation: неизвестная архитектура, использую GOARCH
+- id: logger.getarchitecture.warn.unknown_architecture_falling_back_1
+  translation: неизвестная архитектура, использую GOARCH
+- id: logger.checkgo.info.go_is_already_installed
+  translation: go уже установлен
+- id: logger.checkgo.info.go_is_already_installed_1
+  translation: go уже установлен
+- id: logger.gosetup.info.go_successfully_installed
+  translation: go успешно установлен
+- id: logger.gosetup.info.go_successfully_installed_1
+  translation: go успешно установлен
+- id: logger.logpackagecreated.info.package_artifact_created
+  translation: артефакт пакета создан
+- id: logger.logpackagecreated.info.package_artifact_created_1
+  translation: артефакт пакета создан
+- id: logger.createspec.warn.failed_to_close_pkgbuild
+  translation: не удалось закрыть файл pkgbuild
+- id: logger.createspec.warn.failed_to_close_pkgbuild_1
+  translation: не удалось закрыть файл pkgbuild
+- id: logger.validategeneral.error.invalid_spdx_license_identifier
+  translation: недопустимый идентификатор лицензии SPDX
+- id: logger.validategeneral.error.invalid_spdx_license_identifier_1
+  translation: недопустимый идентификатор лицензии SPDX
+- id: logger.validategeneral.info.you_can_find_valid
+  translation: вы можете найти действительные идентификаторы лицензий SPDX здесь
+- id: logger.validategeneral.info.you_can_find_valid_1
+  translation: вы можете найти действительные идентификаторы лицензий SPDX здесь
+- id: logger.validategeneral.error.number_of_sources_and
+  translation: количество источников и хешсумм отличается
+- id: logger.validategeneral.error.number_of_sources_and_1
+  translation: количество источников и хешсумм отличается
+- id: logger.validategeneral.error.missing_package_function
+  translation: отсутствует функция package()
+- id: logger.validategeneral.error.missing_package_function_1
+  translation: отсутствует функция package()
+- id: logger.setupenvironmentdependencies.info.go_detected_version_check
+  translation: 'go обнаружен: проверка версии отключена'
+- id: logger.setupenvironmentdependencies.info.go_detected_version_check_1
+  translation: 'go обнаружен: проверка версии отключена'
+- id: logger.setupenvironmentdependencies.warn.failed_to_setup_go
+  translation: Не удалось настроить окружение Go
+- id: logger.setupenvironmentdependencies.warn.failed_to_setup_go_1
+  translation: Не удалось настроить окружение Go
+- id: logger.logpackagecreated.info.package_artifact_created_2
+  translation: артефакт пакета создан
+- id: logger.logpackagecreated.info.package_artifact_created_3
+  translation: артефакт пакета создан
+- id: logger.unknown.warn.failed_to_close_rpm
+  translation: не удалось закрыть файл RPM
+- id: logger.unknown.warn.failed_to_close_rpm_1
+  translation: не удалось закрыть файл RPM
+- id: logger.unknown.info.package_artifact_created
+  translation: артефакт пакета создан
+- id: logger.unknown.info.package_artifact_created_1
+  translation: артефакт пакета создан
+- id: logger.buildpackage.info.package_artifact_created
+  translation: артефакт пакета создан
+- id: logger.buildpackage.info.package_artifact_created_1
+  translation: артефакт пакета создан
+- id: logger.createmtreegzip.warn.failed_to_close_output
+  translation: не удалось закрыть выходной файл
+- id: logger.createmtreegzip.warn.failed_to_close_output_1
+  translation: не удалось закрыть выходной файл
+- id: logger.createmtreegzip.warn.failed_to_close_gzip
+  translation: не удалось закрыть gzip writer
+- id: logger.createmtreegzip.warn.failed_to_close_gzip_1
+  translation: не удалось закрыть gzip writer
+- id: logger.buildpackage.warn.failed_to_remove_temporary
+  translation: не удалось удалить временную директорию
+- id: logger.buildpackage.warn.failed_to_remove_temporary_1
+  translation: не удалось удалить временную директорию
+- id: logger.createdeb.warn.failed_to_close_debian
+  translation: не удалось закрыть файл пакета debian
+- id: logger.createdeb.warn.failed_to_close_debian_1
+  translation: не удалось закрыть файл пакета debian
+- id: logger.unknown.info.package_artifact_created_2
+  translation: артефакт пакета создан
+- id: logger.unknown.info.package_artifact_created_3
+  translation: артефакт пакета создан
+- id: logger.generatesvggraph.error.failed_to_close_file
+  translation: не удалось закрыть файл
+- id: logger.generatesvggraph.error.failed_to_close_file_1
+  translation: не удалось закрыть файл
+- id: logger.generatesvggraph.info.svg_graph_generated_successfully
+  translation: SVG граф создан успешно
+- id: logger.generatesvggraph.info.svg_graph_generated_successfully_1
+  translation: SVG граф создан успешно
+- id: logger.generatepnggraph.info.svg_graph_generated_for
+  translation: SVG граф создан для преобразования в PNG
+- id: logger.generatepnggraph.info.svg_graph_generated_for_1
+  translation: SVG граф создан для преобразования в PNG
+- id: logger.generatepnggraph.warn.png_conversion_requires_external
+  translation: преобразование PNG требует внешних инструментов
+- id: logger.generatepnggraph.warn.png_conversion_requires_external_1
+  translation: преобразование PNG требует внешних инструментов
+- id: logger.runinstall.info.detected_package_type
+  translation: обнаружен тип пакета
+- id: logger.runinstall.info.detected_package_type_1
+  translation: обнаружен тип пакета
+- id: logger.installpackage.info.installing_package
+  translation: установка пакета
+- id: logger.installpackage.info.installing_package_1
+  translation: установка пакета
+- id: logger.installpackage.info.package_installed_successfully
+  translation: пакет установлен успешно
+- id: logger.installpackage.info.package_installed_successfully_1
+  translation: пакет установлен успешно
+- id: logger.unknown.info.basic_build_environment_successfully
+  translation: базовая среда сборки успешно подготовлена
+- id: logger.unknown.info.basic_build_environment_successfully_1
+  translation: базовая среда сборки успешно подготовлена
+- id: logger.unknown.info.go_successfully_installed
+  translation: go успешно установлен
+- id: logger.unknown.info.go_successfully_installed_1
+  translation: go успешно установлен
+- id: logger.rungraphcommand.info.generating_dependency_graph
+  translation: генерация графа зависимостей
+- id: logger.rungraphcommand.info.generating_dependency_graph_1
+  translation: генерация графа зависимостей

@@ -3,21 +3,29 @@ package command
 import (
 	"strings"
 
-	"github.com/M0Rf30/yap/pkg/osutils"
-	"github.com/M0Rf30/yap/pkg/packer"
-	"github.com/M0Rf30/yap/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/pkg/project"
 	"github.com/spf13/cobra"
+
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/packer"
+	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/project"
 )
 
 var (
+	// GoLang indicates whether to prepare Go language environment.
 	GoLang bool
 
-	// prepareCmd represents the listDistros command.
+	// prepareCmd represents the prepare command.
 	prepareCmd = &cobra.Command{
-		Use:   "prepare [distro]",
-		Short: "Install base development packages for every supported distro",
-		Args:  cobra.MinimumNArgs(1),
+		Use:     "prepare <distro>",
+		GroupID: "environment",
+		Aliases: []string{"prep", "setup"},
+		Short:   "🛠️  Prepare build environment with development packages", // Will be set in init()
+		Long:    "",                                                        // Will be set in init()
+		Example: "",                                                        // Will be set in init()
+		Args:    createValidateDistroArgs(1),
+		PreRun:  PreRunValidation,
 		Run: func(_ *cobra.Command, args []string) {
 			split := strings.Split(args[0], "-")
 			distro := split[0]
@@ -26,29 +34,46 @@ var (
 			if !project.SkipSyncDeps {
 				err := packageManager.Update()
 				if err != nil {
-					osutils.Logger.Error(err.Error(),
-						osutils.Logger.Args("error", err))
+					logger.Error(err.Error(),
+						"error", err)
 				}
 			}
 
 			err := packageManager.PrepareEnvironment(GoLang)
 			if err != nil {
-				osutils.Logger.Error(err.Error())
+				logger.Error(err.Error())
 			}
 
-			osutils.Logger.Info("basic build environment successfully prepared")
+			logger.Info(i18n.T("logger.unknown.info.basic_build_environment_successfully_1"))
 
 			if GoLang {
-				osutils.Logger.Info("go successfully installed")
+				logger.Info(i18n.T("logger.unknown.info.go_successfully_installed_1"))
 			}
 		},
 	}
 )
 
+// InitializePrepareDescriptions sets the localized descriptions for the prepare command.
+// This must be called after i18n is initialized.
+func InitializePrepareDescriptions() {
+	prepareCmd.Short = i18n.T("commands.prepare.short")
+	prepareCmd.Long = i18n.T("commands.prepare.long")
+	prepareCmd.Example = i18n.T("commands.prepare.examples")
+
+	// Update flag descriptions with localized text
+	prepareCmd.Flag("skip-sync").Usage = i18n.T("flags.prepare.skip_sync")
+	prepareCmd.Flag("golang").Usage = i18n.T("flags.prepare.golang")
+}
+
+//nolint:gochecknoinits // Required for cobra command registration
 func init() {
 	rootCmd.AddCommand(prepareCmd)
+
+	// Add completion for distribution argument
+	prepareCmd.ValidArgsFunction = ValidDistrosCompletion
+
 	prepareCmd.Flags().BoolVarP(&project.SkipSyncDeps,
-		"skip-sync", "s", false, "Skip sync with remotes for package managers")
+		"skip-sync", "s", false, "")
 	prepareCmd.Flags().BoolVarP(&GoLang,
-		"golang", "g", false, "Additionally install golang")
+		"golang", "g", false, "")
 }
