@@ -2,6 +2,7 @@
 package apk
 
 import (
+	"path/filepath"
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
@@ -31,7 +32,7 @@ func (a *Apk) BuildPackage(artifactsPath string) error {
 
 	// Build the package name
 	pkgName := a.BuildPackageName(".apk")
-	pkgFilePath := artifactsPath + "/" + pkgName
+	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
 	// Create the APK package using the existing complex logic
 	// For now, we'll use a simplified approach
@@ -78,7 +79,7 @@ func (a *Apk) PrepareFakeroot(artifactsPath string) error {
 // Install installs the APK package.
 func (a *Apk) Install(artifactsPath string) error {
 	pkgName := a.BuildPackageName(".apk")
-	pkgFilePath := artifactsPath + "/" + pkgName
+	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 	installArgs := constants.GetInstallArgs("apk")
 	installArgs = append(installArgs, pkgFilePath)
 

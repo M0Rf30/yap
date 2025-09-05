@@ -37,12 +37,12 @@ func createTestPKGBUILD() *pkgbuild.PKGBUILD {
 	}
 }
 
-func TestNewPackage(t *testing.T) {
+func TestNewBuilder(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	if pkg == nil {
-		t.Fatal("NewPackage returned nil")
+		t.Fatal("NewBuilder returned nil")
 	}
 
 	if pkg.PKGBUILD != pkgBuild {
@@ -52,7 +52,7 @@ func TestNewPackage(t *testing.T) {
 
 func TestBuildPackage(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -108,7 +108,7 @@ func TestInstall(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -131,7 +131,7 @@ func TestPrepare(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	makeDepends := []string{"make", "gcc"}
 	err := pkg.Prepare(makeDepends)
@@ -148,7 +148,7 @@ func TestPrepareEnvironment(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	err := pkg.PrepareEnvironment(false)
 	// This will likely fail since apt-get isn't available, but we test the method call
@@ -164,7 +164,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	err := pkg.PrepareEnvironment(true)
 	// This will likely fail since apt-get isn't available, but we test the method call
@@ -175,7 +175,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 
 func TestPrepareFakeroot(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -218,7 +218,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	err := pkg.Update()
 	// This will likely fail since apt-get isn't available, but we test the method call
@@ -229,7 +229,7 @@ func TestUpdate(t *testing.T) {
 
 func TestGetRelease(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	originalRel := pkg.PKGBUILD.PkgRel
 	pkg.getRelease()
@@ -247,7 +247,7 @@ func TestGetRelease(t *testing.T) {
 func TestGetReleaseWithDistro(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkgBuild.Codename = "" // Remove codename to test distro fallback
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	originalRel := pkg.PKGBUILD.PkgRel
 	pkg.getRelease()
@@ -263,7 +263,7 @@ func TestGetReleaseWithDistro(t *testing.T) {
 
 func TestProcessDepends(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	testCases := []struct {
 		input    []string
@@ -300,7 +300,7 @@ func TestProcessDepends(t *testing.T) {
 
 func TestCreateDebResources(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -344,7 +344,7 @@ func TestCreateDebResources(t *testing.T) {
 
 func TestCreateConfFiles(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -385,7 +385,7 @@ func TestCreateConfFiles(t *testing.T) {
 func TestCreateConfFilesEmpty(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkgBuild.Backup = []string{} // No backup files
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -410,7 +410,7 @@ func TestCreateConfFilesEmpty(t *testing.T) {
 
 func TestAddScriptlets(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewPackage(pkgBuild)
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
