@@ -115,6 +115,10 @@ type MultipleProject struct {
 	Output      string     `json:"output"      validate:"required"`
 	Projects    []*Project `json:"projects"    validate:"required,dive,required"`
 	Config      *Config    // Configuration for this project build
+
+	// Internal state for --from --to filtering across batches
+	startProcessing bool // tracks if we should start processing (found FromPkgName)
+	stopProcessing  bool // tracks if we should stop processing (found ToPkgName)
 }
 
 // Project represents a single project.
@@ -1428,10 +1432,23 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 		"total_packages", totalPackages,
 		"max_parallel_workers", maxWorkers)
 
+	// Initialize filtering state based on --from flag
+	// If no --from is specified, start processing immediately
+	mpc.startProcessing = (FromPkgName == "")
+	mpc.stopProcessing = false
+
 	processedPackages := 0
 
 	for batchIndex, batch := range buildOrder {
-		// Filter batch based on FromPkgName and ToPkgName
+		// Check if we should stop processing (found ToPkgName in previous batch)
+		if mpc.stopProcessing {
+			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
+				"target_package", ToPkgName)
+
+			break
+		}
+
+		// Filter batch based on FromPkgName and ToPkgName with global state
 		filteredBatch := mpc.filterBatch(batch)
 		if len(filteredBatch) == 0 {
 			logger.Debug(i18n.T("logger.project.skipping_batch_filtered_out"),
@@ -1468,23 +1485,33 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 	return nil
 }
 
-// filterBatch filters a batch of projects based on FromPkgName criteria.
+// filterBatch filters a batch of projects based on FromPkgName and ToPkgName criteria
+// with global state tracking across batches.
 func (mpc *MultipleProject) filterBatch(batch []*Project) []*Project {
-	if FromPkgName == "" {
-		return batch
-	}
-
 	var filtered []*Project
 
-	startProcessing := false
-
 	for _, proj := range batch {
-		if proj.Builder.PKGBUILD.PkgName == FromPkgName {
-			startProcessing = true
+		pkgName := proj.Builder.PKGBUILD.PkgName
+
+		// Check if this is the FromPkgName - start processing from here
+		if FromPkgName != "" && !mpc.startProcessing && pkgName == FromPkgName {
+			mpc.startProcessing = true
+
+			logger.Debug(i18n.T("logger.project.found_from_package"),
+				"package", FromPkgName)
 		}
 
-		if startProcessing {
+		// If we should be processing, include this package
+		if mpc.startProcessing && !mpc.stopProcessing {
 			filtered = append(filtered, proj)
+
+			// Check if this is the ToPkgName - mark to stop after this batch
+			if ToPkgName != "" && pkgName == ToPkgName {
+				mpc.stopProcessing = true
+
+				logger.Debug(i18n.T("logger.project.found_to_package"),
+					"package", ToPkgName)
+			}
 		}
 	}
 

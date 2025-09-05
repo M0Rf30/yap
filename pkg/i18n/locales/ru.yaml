@@ -467,6 +467,10 @@
   translation: запуск процесса сборки с учетом зависимостей
 - id: logger.project.skipping_batch_filtered_out
   translation: пропуск пакета (отфильтрован)
+- id: logger.project.found_from_package
+  translation: найден начальный пакет для фильтра --from
+- id: logger.project.found_to_package
+  translation: найден целевой пакет для фильтра --to
 - id: errors.build.failed_to_retrieve_sources
   translation: не удалось получить исходные коды
 - id: errors.build.failed_to_initialize_directories
