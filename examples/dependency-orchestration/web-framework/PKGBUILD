@@ -10,6 +10,16 @@ url="https://github.com/example/web-framework"
 # Runtime dependency on foundation library
 depends=('foundation-lib')
 
+# Build dependencies for compilation
+makedepends=('gcc' 'make')
+
+# Check dependencies for testing
+checkdepends=('valgrind' 'cppcheck')
+
+# Optional dependencies for enhanced features
+optdepends=('compression-lib: for gzip compression support'
+           'ssl-lib: for HTTPS support')
+
 build() {
   # Create local foundation.h for build-time
   cat > foundation.h << 'EOF'

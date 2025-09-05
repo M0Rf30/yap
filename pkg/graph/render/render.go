@@ -4,6 +4,7 @@ package render
 import (
 	"encoding/xml"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,7 +144,7 @@ func createSVGStyles(theme *graph.Theme) string {
         fill: %s;
         stroke: %s;
         stroke-width: 2;
-        filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+        filter: drop-shadow(3px 3px 6px rgba(0,0,0,0.4));
         cursor: pointer;
         transition: all 0.3s ease;
       }
@@ -151,7 +152,7 @@ func createSVGStyles(theme *graph.Theme) string {
         fill: %s;
         stroke: %s;
         stroke-width: 2;
-        filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+        filter: drop-shadow(3px 3px 6px rgba(0,0,0,0.4));
         cursor: pointer;
         transition: all 0.3s ease;
       }
@@ -159,44 +160,52 @@ func createSVGStyles(theme *graph.Theme) string {
         fill: %s;
         stroke: %s;
         stroke-width: 3;
-        filter: drop-shadow(3px 3px 6px rgba(0,0,0,0.4));
+        filter: drop-shadow(4px 4px 8px rgba(0,0,0,0.5));
         cursor: pointer;
         transition: all 0.3s ease;
       }
       .node:hover rect {
         transform: scale(1.05);
-        filter: drop-shadow(4px 4px 8px rgba(0,0,0,0.5));
+        filter: drop-shadow(6px 6px 12px rgba(0,0,0,0.6));
       }
       .edge-runtime {
         stroke: %s;
-        stroke-width: 3;
+        stroke-width: 4;
         fill: none;
         marker-end: url(#arrowhead-runtime);
         opacity: 0.9;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       .edge-make {
         stroke: %s;
-        stroke-width: 2;
-        stroke-dasharray: 8,4;
+        stroke-width: 3;
+        stroke-dasharray: 10,5;
         fill: none;
         marker-end: url(#arrowhead-make);
         opacity: 0.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       .edge-check {
         stroke: %s;
-        stroke-width: 2;
-        stroke-dasharray: 4,4;
+        stroke-width: 3;
+        stroke-dasharray: 6,6;
         fill: none;
         marker-end: url(#arrowhead-check);
-        opacity: 0.7;
+        opacity: 0.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       .edge-optional {
         stroke: %s;
-        stroke-width: 1;
-        stroke-dasharray: 2,6;
+        stroke-width: 2;
+        stroke-dasharray: 3,8;
         fill: none;
         marker-end: url(#arrowhead-optional);
-        opacity: 0.6;
+        opacity: 0.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       .node-text {
         fill: %s;
@@ -206,7 +215,7 @@ func createSVGStyles(theme *graph.Theme) string {
         text-anchor: middle;
         dominant-baseline: central;
         pointer-events: none;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
       }
       .version-text {
         fill: %s;
@@ -216,7 +225,7 @@ func createSVGStyles(theme *graph.Theme) string {
         dominant-baseline: central;
         pointer-events: none;
         opacity: 0.9;
-        text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
       }
       .title-text {
         fill: %s;
@@ -224,7 +233,7 @@ func createSVGStyles(theme *graph.Theme) string {
         font-size: 24px;
         font-weight: 700;
         text-anchor: middle;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
       }
       .subtitle-text {
         fill: %s;
@@ -232,42 +241,43 @@ func createSVGStyles(theme *graph.Theme) string {
         font-size: 14px;
         text-anchor: middle;
         opacity: 0.9;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
       }
       .legend-text {
         fill: %s;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         font-size: 12px;
         font-weight: 500;
-        text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
       }
     </style>
     <defs>
-      <marker id="arrowhead-runtime" markerWidth="10" markerHeight="7"
-       refX="9" refY="3.5" orient="auto">
-        <polygon points="0 0, 10 3.5, 0 7" fill="%s" />
+      <marker id="arrowhead-runtime" markerWidth="12" markerHeight="9"
+       refX="11" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
+        <polygon points="0 0, 12 4.5, 0 9" fill="%s" stroke="%s" stroke-width="0.5"/>
       </marker>
-      <marker id="arrowhead-make" markerWidth="10" markerHeight="7"
-       refX="9" refY="3.5" orient="auto">
-        <polygon points="0 0, 10 3.5, 0 7" fill="%s" />
+      <marker id="arrowhead-make" markerWidth="12" markerHeight="9"
+       refX="11" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
+        <polygon points="0 0, 12 4.5, 0 9" fill="%s" stroke="%s" stroke-width="0.5"/>
       </marker>
-      <marker id="arrowhead-check" markerWidth="10" markerHeight="7"
-       refX="9" refY="3.5" orient="auto">
-        <polygon points="0 0, 10 3.5, 0 7" fill="%s" />
+      <marker id="arrowhead-check" markerWidth="12" markerHeight="9"
+       refX="11" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
+        <polygon points="0 0, 12 4.5, 0 9" fill="%s" stroke="%s" stroke-width="0.5"/>
       </marker>
-      <marker id="arrowhead-optional" markerWidth="10" markerHeight="7"
-       refX="9" refY="3.5" orient="auto">
-        <polygon points="0 0, 10 3.5, 0 7" fill="%s" />
+      <marker id="arrowhead-optional" markerWidth="12" markerHeight="9"
+       refX="11" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
+        <polygon points="0 0, 12 4.5, 0 9" fill="%s" stroke="%s" stroke-width="0.5"/>
       </marker>
       <filter id="shadow" x="-20%%" y="-20%%" width="140%%" height="140%%">
-        <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+        <feDropShadow dx="3" dy="3" stdDeviation="4" flood-opacity="0.4"/>
       </filter>
     </defs>`,
 		theme.Background, theme.NodeInternal, theme.BorderColor,
 		theme.NodeExternal, theme.BorderColor, theme.NodePopular, theme.BorderColor,
 		theme.EdgeRuntime, theme.EdgeMake, theme.EdgeCheck, theme.EdgeOptional,
 		theme.TextColor, theme.TextColor, theme.TextColor, theme.TextColor, theme.TextColor,
-		theme.EdgeRuntime, theme.EdgeMake, theme.EdgeCheck, theme.EdgeOptional)
+		theme.EdgeRuntime, theme.EdgeRuntime, theme.EdgeMake, theme.EdgeMake,
+		theme.EdgeCheck, theme.EdgeCheck, theme.EdgeOptional, theme.EdgeOptional)
 }
 
 // createSVGContentBody creates the main SVG content body.
@@ -334,39 +344,124 @@ func addEdges(content *strings.Builder, graphData *graph.Data, showExternal bool
 		// Determine edge class based on dependency type
 		var class string
 
+		var strokeWidth int
+
 		switch edge.Type {
 		case "make", "makedepends":
 			class = "edge-make"
+			strokeWidth = 3
 		case "check", "checkdepends":
 			class = "edge-check"
+			strokeWidth = 3
 		case "opt", "optdepends", "optional":
 			class = "edge-optional"
+			strokeWidth = 2
 		default:
 			class = "edge-runtime"
+			strokeWidth = 4
 		}
 
 		// Calculate connection points on rectangle edges
 		fromX, fromY := calculateConnectionPoint(fromNode, toNode)
 		toX, toY := calculateConnectionPoint(toNode, fromNode)
 
-		// Create curved path for better visualization
+		// Create improved curved path for better visualization
+		// Calculate control points for smooth bezier curve
 		midX := (fromX + toX) / 2
 		midY := (fromY + toY) / 2
-		controlY := midY - 30 // Curve upward
 
-		fmt.Fprintf(content, `
-  <path d="M %.1f %.1f Q %.1f %.1f %.1f %.1f" class="%s">
+		// Add curvature based on distance and direction
+		distance := math.Sqrt((toX-fromX)*(toX-fromX) + (toY-fromY)*(toY-fromY))
+		curvature := math.Min(distance*0.3, 50) // Adaptive curvature
+
+		// Perpendicular offset for curve
+		dx := toX - fromX
+		dy := toY - fromY
+
+		// Normalize and rotate 90 degrees for perpendicular
+		if distance > 0 {
+			perpX := -dy / distance * curvature
+			perpY := dx / distance * curvature
+
+			controlX := midX + perpX
+			controlY := midY + perpY
+
+			fmt.Fprintf(content, `
+  <path d="M %.1f %.1f Q %.1f %.1f %.1f %.1f" class="%s" stroke-width="%d">
     <title>%s → %s (%s dependency)</title>
   </path>`,
-			fromX, fromY, midX, controlY, toX, toY, class,
-			fromNode.Name, toNode.Name, edge.Type)
+				fromX, fromY, controlX, controlY, toX, toY, class, strokeWidth,
+				fromNode.Name, toNode.Name, edge.Type)
+		} else {
+			// Fallback for zero distance (shouldn't happen but safety first)
+			fmt.Fprintf(content, `
+  <line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" class="%s" stroke-width="%d">
+    <title>%s → %s (%s dependency)</title>
+  </line>`,
+				fromX, fromY, toX, toY, class, strokeWidth,
+				fromNode.Name, toNode.Name, edge.Type)
+		}
 	}
 }
 
 // calculateConnectionPoint finds the best point on a node's edge to connect an edge.
-func calculateConnectionPoint(fromNode, _ *graph.Node) (x, y float64) {
-	// For now, return center points - could be enhanced to find edge intersections
-	return fromNode.X, fromNode.Y
+func calculateConnectionPoint(fromNode, toNode *graph.Node) (x, y float64) {
+	// Calculate direction vector from fromNode to toNode
+	dx := toNode.X - fromNode.X
+	dy := toNode.Y - fromNode.Y
+
+	// Calculate distance
+	distance := math.Sqrt(dx*dx + dy*dy)
+	if distance == 0 {
+		return fromNode.X, fromNode.Y
+	}
+
+	// Normalize direction vector
+	dx /= distance
+	dy /= distance
+
+	// Calculate intersection point on the edge of the rectangle
+	halfWidth := fromNode.Width / 2
+	halfHeight := fromNode.Height / 2
+
+	// Calculate intersection with rectangle edges
+	// We want the intersection point where the line from center to target
+	// crosses the rectangle boundary
+
+	var t float64
+
+	// Check which edge we intersect first
+	if math.Abs(dx) > 0 {
+		// Time to reach vertical edges
+		if dx > 0 {
+			t = halfWidth / dx // Right edge
+		} else {
+			t = -halfWidth / dx // Left edge
+		}
+	} else {
+		t = math.Inf(1) // Infinite time if no horizontal movement
+	}
+
+	if math.Abs(dy) > 0 {
+		// Time to reach horizontal edges
+		var tVertical float64
+		if dy > 0 {
+			tVertical = halfHeight / dy // Bottom edge
+		} else {
+			tVertical = -halfHeight / dy // Top edge
+		}
+
+		// Take the minimum time (first intersection)
+		if tVertical < t {
+			t = tVertical
+		}
+	}
+
+	// Calculate the actual intersection point
+	connectionX := fromNode.X + dx*t
+	connectionY := fromNode.Y + dy*t
+
+	return connectionX, connectionY
 }
 
 // addNodes adds all nodes to the SVG content.

@@ -38,7 +38,7 @@ RUN if [ "${TARGETARCH}" = "$(go env GOARCH)" ]; then \
     fi
 
 # Runtime stage
-FROM rockylinux:10
+FROM rockylinux/rockylinux:10
 
 # Build arguments for runtime stage
 ARG VERSION=dev
