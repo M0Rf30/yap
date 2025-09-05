@@ -45,15 +45,6 @@ YAP eliminates the need to learn multiple packaging formats and build systems by
 
 ## 📥 Installation
 
-### Quick Install (Recommended)
-
-```bash
-# Download and install the latest release
-curl -fsSL https://raw.githubusercontent.com/M0Rf30/yap/main/install.sh | sh
-```
-
-### Manual Installation
-
 ```bash
 # Download the latest release
 wget https://github.com/M0Rf30/yap/releases/latest/download/yap_Linux_x86_64.tar.gz
@@ -161,7 +152,7 @@ package() {
 # Build for current system distribution
 yap build .
 
-# Build for specific distribution  
+# Build for specific distribution
 yap build ubuntu-jammy .
 yap build fedora-38 /path/to/project
 
@@ -206,7 +197,7 @@ The project configuration file defines build settings and project structure:
       "depends": []
     },
     {
-      "name": "package-two", 
+      "name": "package-two",
       "depends": ["package-one"]
     }
   ]
@@ -233,7 +224,7 @@ YAP supports distribution-specific variable overrides using the `__` (double und
 **Priority System (Highest to Lowest):**
 
 1. **Priority 3** - Full distribution with codename: `variable__ubuntu_noble`
-2. **Priority 2** - Distribution name only: `variable__ubuntu`  
+2. **Priority 2** - Distribution name only: `variable__ubuntu`
 3. **Priority 1** - Package manager: `variable__apt`
 4. **Priority 0** - Base variable (fallback): `variable`
 
@@ -285,7 +276,7 @@ depends__ubuntu_noble="noble-optimized"  # Priority 3 (most specific)
 
 **Supported Distribution Codes:**
 - **Ubuntu**: `ubuntu_focal`, `ubuntu_jammy`, `ubuntu_noble`
-- **Debian**: `debian_bullseye`, `debian_bookworm` 
+- **Debian**: `debian_bullseye`, `debian_bookworm`
 - **Fedora**: `fedora_38`, `fedora_39`, `fedora_40`
 - **Rocky**: `rocky_8`, `rocky_9`
 - **CentOS**: `centos_7`, `centos_8`
@@ -301,7 +292,7 @@ YAP also supports architecture-specific variable overrides using the `_` (single
 1. **Priority 4+** - Combined architecture + distribution: `variable_x86_64__ubuntu_noble`
 2. **Priority 4** - Architecture-specific: `variable_x86_64`
 3. **Priority 3** - Full distribution with codename: `variable__ubuntu_noble`
-4. **Priority 2** - Distribution name only: `variable__ubuntu`  
+4. **Priority 2** - Distribution name only: `variable__ubuntu`
 5. **Priority 1** - Package manager: `variable__apt`
 6. **Priority 0** - Base variable (fallback): `variable`
 
@@ -355,7 +346,7 @@ depends=('base-lib')
 # Package manager specific (Priority 1)
 depends__apt=('libbase-dev')
 
-# Distribution specific (Priority 2) 
+# Distribution specific (Priority 2)
 depends__ubuntu=('libbase-ubuntu')
 
 # Full distribution specific (Priority 3)
@@ -372,7 +363,7 @@ depends_x86_64__ubuntu_noble=('libbase-x86_64-ubuntu-noble-super-optimized')
 # Result on x86_64 Ubuntu Jammy: uses 'libbase-x86_64-optimized'
 ```
 
-**Note:** 
+**Note:**
 - Architecture-specific variables only apply when building for that specific architecture. If the current build architecture doesn't match the suffix, the variable is ignored and the next highest priority variable is used.
 - **Combined syntax** `variable_arch__distribution` allows for the most specific targeting, combining both architecture and distribution requirements for maximum flexibility.
 
@@ -392,7 +383,7 @@ package() {
     for config in "${config_files[@]}"; do
         install -Dm644 "configs/$(basename $config)" "${pkgdir}${config}"
     done
-    
+
     # Custom variable usage
     install -d "${pkgdir}${custom_prefix}"
     install -Dm644 myapp.conf "${pkgdir}/etc/myapp/"
@@ -405,7 +396,7 @@ YAP supports all standard Arch Linux checksum types, providing comprehensive fil
 
 **Supported Checksum Types (in order of cryptographic strength):**
 - `b2sums` - BLAKE2b checksums (512-bit, strongest and fastest)
-- `sha512sums` - SHA-512 checksums  
+- `sha512sums` - SHA-512 checksums
 - `sha384sums` - SHA-384 checksums
 - `sha256sums` - SHA-256 checksums (most common)
 - `sha224sums` - SHA-224 checksums
@@ -455,7 +446,7 @@ cksums_x86_64=('9876543210 2097152')
 section=utils
 priority=optional
 
-# RPM specific  
+# RPM specific
 group="Applications/System"
 requires_pre=('shadow-utils')
 
@@ -491,7 +482,7 @@ YAP supports building packages for the following distributions:
 yap build [distro] <path>        # Build packages from yap.json project
 yap zap <distro> <path>          # Deeply clean build environment
 
-# Environment Commands  
+# Environment Commands
 yap prepare <distro>             # Prepare build environment
 yap pull <distro>                # Pull container images
 
@@ -539,7 +530,7 @@ YAP provides auto-completion for popular shells:
 # Bash
 yap completion bash > /etc/bash_completion.d/yap
 
-# Zsh  
+# Zsh
 yap completion zsh > /usr/share/zsh/site-functions/_yap
 
 # Fish
@@ -598,7 +589,7 @@ Build multiple related packages with dependency management:
       "depends": []
     },
     {
-      "name": "main-application", 
+      "name": "main-application",
       "depends": ["core-library"]
     },
     {
@@ -638,16 +629,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Install YAP
         run: |
           wget https://github.com/M0Rf30/yap/releases/latest/download/yap_Linux_x86_64.tar.gz
           tar -xzf yap_Linux_x86_64.tar.gz
           sudo mv yap /usr/local/bin/
-          
+
       - name: Build Packages
         run: yap build
-        
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -720,7 +711,7 @@ YAP provides a comprehensive Makefile with various targets for development:
 ```bash
 # Development targets
 make build            # Build the application
-make clean            # Clean build artifacts  
+make clean            # Clean build artifacts
 make test             # Run tests
 make test-coverage    # Run tests with coverage report
 make deps             # Download dependencies
@@ -854,7 +845,7 @@ build() {
 }
 
 package() {
-    cd "${srcdir}/myapp-${pkgver}"  
+    cd "${srcdir}/myapp-${pkgver}"
     python3 setup.py install --root="${pkgdir}" --optimize=1
 }
 ```
@@ -880,18 +871,18 @@ build() {
 
 package() {
     cd "${srcdir}/web-service-${pkgver}"
-    
+
     # Install binary
     install -Dm755 web-service "${pkgdir}/usr/bin/web-service"
-    
+
     # Install systemd service
     install -Dm644 ../web-service.service \
         "${pkgdir}/usr/lib/systemd/system/web-service.service"
-    
+
     # Install configuration
     install -Dm644 config.yml \
         "${pkgdir}/etc/web-service/config.yml"
-        
+
     # Create user and directories
     install -dm755 "${pkgdir}/var/lib/web-service"
     install -dm755 "${pkgdir}/var/log/web-service"
