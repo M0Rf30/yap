@@ -8,6 +8,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -19,16 +20,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
-
-// Filename returns the filename from a given path.
-func Filename(path string) string {
-	n := strings.LastIndex(path, "/")
-	if n == -1 {
-		return path
-	}
-
-	return path[n+1:]
-}
 
 // Download downloads a file from the given URL and saves it to the specified destination.
 // Uses a simple writer for output.
@@ -248,7 +239,7 @@ func determineSourceName(sourceName, uri string) string {
 		return sourceName
 	}
 
-	if filename := Filename(uri); filename != "" {
+	if filename := filepath.Base(uri); filename != "" {
 		return filename
 	}
 

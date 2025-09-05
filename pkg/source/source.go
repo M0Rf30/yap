@@ -29,6 +29,22 @@ const (
 	fileProtocol = "file"
 )
 
+// Manager encapsulates source management state and configuration.
+type Manager struct {
+	SSHPassword string // SSH password for authentication
+	// downloadMutexes tracks ongoing downloads to prevent duplicate downloads
+	downloadMutexes map[string]*sync.Mutex
+	mutex           sync.Mutex //nolint:unused // Reserved for future migration
+}
+
+// NewManager creates a new Manager with initialized state.
+func NewManager() *Manager {
+	return &Manager{
+		downloadMutexes: make(map[string]*sync.Mutex),
+	}
+}
+
+// Legacy global variables for backward compatibility - to be deprecated
 var (
 	// SSHPassword contains the SSH password for authentication.
 	SSHPassword string
@@ -64,6 +80,8 @@ type Source struct {
 	// StartDir is the root where a copied PKGBUILD lives and all the source items
 	// are downloaded. It generally contains the src and pkg folders.
 	StartDir string
+	// Manager encapsulates source management state
+	Manager *Manager
 }
 
 // Get retrieves the source file from the specified URI.
@@ -203,7 +221,7 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 // No parameters.
 // No return types.
 func (src *Source) parseURI() {
-	src.SourceItemPath = download.Filename(src.SourceItemURI)
+	src.SourceItemPath = filepath.Base(src.SourceItemURI)
 
 	if strings.Contains(src.SourceItemURI, "::") {
 		split := strings.SplitN(src.SourceItemURI, "::", 2)
@@ -220,8 +238,8 @@ func (src *Source) parseURI() {
 		src.RefValue = splitFragment[1]
 
 		// Update SourceItemPath to remove the fragment only if no custom name was used
-		if src.SourceItemPath == files.Filename(split[0]+"#"+fragment) {
-			src.SourceItemPath = files.Filename(src.SourceItemURI)
+		if src.SourceItemPath == filepath.Base(split[0]+"#"+fragment) {
+			src.SourceItemPath = filepath.Base(src.SourceItemURI)
 		}
 	}
 }

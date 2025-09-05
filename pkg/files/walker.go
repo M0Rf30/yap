@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/crypto"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -123,7 +124,7 @@ func (w *Walker) createEntry(path string, dirEntry fs.DirEntry) (*Entry, error) 
 		entry.Type = TypeFile
 		// Calculate SHA256 for regular files
 		if fileInfo.Mode().IsRegular() {
-			sha256Hash, err := w.calculateSHA256(path)
+			sha256Hash, err := crypto.CalculateSHA256(path)
 			if err != nil {
 				return nil, err
 			}
@@ -165,30 +166,6 @@ func (w *Walker) isBackupFile(path string) bool {
 	}
 
 	return false
-}
-
-// calculateSHA256 calculates the SHA256 hash of a file.
-func (w *Walker) calculateSHA256(filePath string) ([]byte, error) {
-	file, err := os.Open(filepath.Clean(filePath))
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			// Log error but don't fail the operation
-			logger.Warn(i18n.T("logger.calculatesha256.warn.failed_to_close_file_1"),
-				"path", filePath,
-				"error", closeErr)
-		}
-	}()
-
-	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return nil, err
-	}
-
-	return hasher.Sum(nil), nil
 }
 
 // CalculateDataHash calculates a hash of all data files for package metadata.
