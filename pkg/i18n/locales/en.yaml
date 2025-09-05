@@ -461,6 +461,10 @@
   translation: starting dependency-aware build process
 - id: logger.project.skipping_batch_filtered_out
   translation: skipping batch (filtered out)
+- id: logger.project.found_from_package
+  translation: found starting package for --from filter
+- id: logger.project.found_to_package
+  translation: found target package for --to filter
 - id: errors.build.failed_to_retrieve_sources
   translation: failed to retrieve sources
 - id: errors.build.failed_to_initialize_directories

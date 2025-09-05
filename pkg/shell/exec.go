@@ -311,6 +311,11 @@ func normalizeScriptContent(script string) string {
 }
 
 func logScriptContent(cmds string) {
+	// Only log script content in verbose mode
+	if !logger.IsVerboseEnabled() {
+		return
+	}
+
 	_, err := MultiPrinter.Start()
 	if err != nil {
 		return
