@@ -479,7 +479,7 @@ func TestFilename(t *testing.T) {
 		},
 		{
 			path:     "",
-			expected: "",
+			expected: ".", // filepath.Base("") returns "."
 		},
 	}
 

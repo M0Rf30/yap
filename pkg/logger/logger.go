@@ -220,6 +220,11 @@ func SetVerbose(verbose bool) {
 	Logger.ptermLogger = ptermLogger
 }
 
+// IsVerboseEnabled returns true if verbose logging is enabled.
+func IsVerboseEnabled() bool {
+	return verboseEnabled
+}
+
 // ComponentLogger wraps a logger with component-specific formatting.
 type ComponentLogger struct {
 	Component   string
