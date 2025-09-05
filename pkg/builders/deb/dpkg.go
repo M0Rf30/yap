@@ -31,8 +31,8 @@ type Package struct {
 	PKGBUILD *pkgbuild.PKGBUILD
 }
 
-// NewPackage creates a new Debian package manager.
-func NewPackage(pkgBuild *pkgbuild.PKGBUILD) *Package {
+// NewBuilder creates a new Debian package manager.
+func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Package {
 	return &Package{
 		PKGBUILD: pkgBuild,
 	}

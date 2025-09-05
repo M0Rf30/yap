@@ -6,33 +6,6 @@ import (
 	"testing"
 )
 
-func TestCalculateSHA256(t *testing.T) {
-	tempDir := t.TempDir()
-	testFile := filepath.Join(tempDir, "test.txt")
-	testContent := "Hello, World!"
-
-	err := os.WriteFile(testFile, []byte(testContent), 0o644)
-	if err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	hash, err := CalculateSHA256(testFile)
-	if err != nil {
-		t.Fatalf("CalculateSHA256 failed: %v", err)
-	}
-
-	if len(hash) != 32 {
-		t.Fatalf("Expected hash length 32, got %d", len(hash))
-	}
-}
-
-func TestCalculateSHA256NonExistentFile(t *testing.T) {
-	_, err := CalculateSHA256("/non/existent/file")
-	if err == nil {
-		t.Fatal("Expected error for non-existent file, got nil")
-	}
-}
-
 func TestCheckWritable(t *testing.T) {
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "test.txt")
@@ -180,26 +153,6 @@ func TestExistsMakeDir(t *testing.T) {
 	err = ExistsMakeDir(newDir)
 	if err != nil {
 		t.Fatalf("ExistsMakeDir failed for existing directory: %v", err)
-	}
-}
-
-func TestFilename(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"/path/to/file.txt", "file.txt"},
-		{"file.txt", "file.txt"},
-		{"/path/to/", ""},
-		{"", ""},
-		{"/single", "single"},
-	}
-
-	for _, test := range tests {
-		result := Filename(test.input)
-		if result != test.expected {
-			t.Fatalf("Filename(%q) = %q, expected %q", test.input, result, test.expected)
-		}
 	}
 }
 

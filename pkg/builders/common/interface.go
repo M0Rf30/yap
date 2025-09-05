@@ -2,6 +2,7 @@
 package common
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -49,6 +50,29 @@ func NewBaseBuilder(pkgBuild *pkgbuild.PKGBUILD, format string) *BaseBuilder {
 	}
 }
 
+// BuilderConstructor defines the signature for builder constructor functions.
+type BuilderConstructor func(*pkgbuild.PKGBUILD) Builder
+
+// builderRegistry holds registered builder constructors
+var builderRegistry = make(map[string]BuilderConstructor)
+
+// RegisterBuilder registers a builder constructor for a specific format.
+func RegisterBuilder(format string, constructor BuilderConstructor) {
+	builderRegistry[format] = constructor
+}
+
+// NewBuilder creates a new builder for the specified package format.
+// This provides a unified factory interface for all package builders.
+func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, format string) Builder {
+	constructor, exists := builderRegistry[format]
+	if !exists {
+		logger.Fatal(i18n.T("errors.builder.unsupported_format"), "format", format)
+		return nil
+	}
+
+	return constructor(pkgBuild)
+}
+
 // ProcessDependencies processes dependency strings with version operators.
 // This consolidates the duplicated dependency processing logic across package formats.
 func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
@@ -65,9 +89,9 @@ func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
 
 			switch bb.Format {
 			case "deb":
-				processed[index] = name + " (" + operator + " " + version + ")"
+				processed[index] = fmt.Sprintf("%s (%s %s)", name, operator, version)
 			case "rpm":
-				processed[index] = name + " " + operator + " " + version
+				processed[index] = fmt.Sprintf("%s %s %s", name, operator, version)
 			default:
 				processed[index] = depend
 			}
@@ -81,20 +105,20 @@ func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
 
 // BuildPackageName constructs standardized package names for different formats.
 func (bb *BaseBuilder) BuildPackageName(extension string) string {
-	name := bb.PKGBUILD.PkgName + "-" + bb.PKGBUILD.PkgVer + "-" + bb.PKGBUILD.PkgRel
+	name := fmt.Sprintf("%s-%s-%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.PkgVer, bb.PKGBUILD.PkgRel)
 
 	// Handle epoch for certain package types
 	if bb.PKGBUILD.Epoch != "" && (extension == ".pkg.tar.zst" || extension == ".rpm") {
-		name = bb.PKGBUILD.PkgName + "-" + bb.PKGBUILD.Epoch + ":" +
-			bb.PKGBUILD.PkgVer + "-" + bb.PKGBUILD.PkgRel
+		name = fmt.Sprintf("%s-%s:%s-%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.Epoch,
+			bb.PKGBUILD.PkgVer, bb.PKGBUILD.PkgRel)
 	}
 
 	switch extension {
 	case ".apk":
 		name += "." + bb.PKGBUILD.ArchComputed
 	case ".deb":
-		name = bb.PKGBUILD.PkgName + "_" + bb.PKGBUILD.PkgVer + "-" +
-			bb.PKGBUILD.PkgRel + "_" + bb.PKGBUILD.ArchComputed
+		name = fmt.Sprintf("%s_%s-%s_%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.PkgVer,
+			bb.PKGBUILD.PkgRel, bb.PKGBUILD.ArchComputed)
 	default:
 		name += "-" + bb.PKGBUILD.ArchComputed
 	}

@@ -3,6 +3,7 @@ package pacman
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/crypto"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -30,6 +32,13 @@ type Pkg struct {
 	pacmanDir string
 }
 
+// NewBuilder creates a new Pacman package builder.
+func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Pkg {
+	return &Pkg{
+		PKGBUILD: pkgBuild,
+	}
+}
+
 // BuildPackage initiates the package building process for the Makepkg instance.
 //
 // It takes a single parameter:
@@ -41,17 +50,14 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 	completeVersion := m.PKGBUILD.PkgVer
 
 	if m.PKGBUILD.Epoch != "" {
-		completeVersion = m.PKGBUILD.Epoch + ":" + m.PKGBUILD.PkgVer
+		completeVersion = fmt.Sprintf("%s:%s", m.PKGBUILD.Epoch, m.PKGBUILD.PkgVer)
 	}
 
-	pkgName := m.PKGBUILD.PkgName +
-		"-" +
-		completeVersion +
-		"-" +
-		m.PKGBUILD.PkgRel +
-		"-" +
-		m.PKGBUILD.ArchComputed +
-		".pkg.tar.zst"
+	pkgName := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst",
+		m.PKGBUILD.PkgName,
+		completeVersion,
+		m.PKGBUILD.PkgRel,
+		m.PKGBUILD.ArchComputed)
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
@@ -95,7 +101,7 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 		}
 	}
 
-	checksumBytes, err := files.CalculateSHA256(pkgBuildFile)
+	checksumBytes, err := crypto.CalculateSHA256(pkgBuildFile)
 	if err != nil {
 		return err
 	}
@@ -161,13 +167,11 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 // artifactsPath: the path where the package artifacts are located.
 // error: an error if the installation fails.
 func (m *Pkg) Install(artifactsPath string) error {
-	pkgName := m.PKGBUILD.PkgName + "-" +
-		m.PKGBUILD.PkgVer +
-		"-" +
-		m.PKGBUILD.PkgRel +
-		"-" +
-		m.PKGBUILD.ArchComputed +
-		".pkg.tar.zst"
+	pkgName := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst",
+		m.PKGBUILD.PkgName,
+		m.PKGBUILD.PkgVer,
+		m.PKGBUILD.PkgRel,
+		m.PKGBUILD.ArchComputed)
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 

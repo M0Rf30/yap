@@ -26,6 +26,43 @@ import (
 )
 
 var (
+	// ErrCircularDependency indicates a circular dependency was detected.
+	// Static errors for linting compliance.
+	ErrCircularDependency = errors.New(i18n.T("errors.project.circular_dependency_detected"))
+	// ErrCircularRuntimeDependency indicates a circular runtime dependency was detected.
+	ErrCircularRuntimeDependency = errors.New(
+		i18n.T("errors.project.circular_runtime_dependency_detected"))
+)
+
+// Config encapsulates all build configuration and state variables.
+type Config struct {
+	// Build configuration flags
+	Verbose      bool   // Enables verbose output for debugging
+	CleanBuild   bool   // Enables clean build mode
+	NoBuild      bool   // Disables the build process
+	NoMakeDeps   bool   // Disables make dependencies installation
+	SkipSyncDeps bool   // Controls whether to skip dependency synchronization
+	Zap          bool   // Controls whether to use zap functionality
+	FromPkgName  string // Specifies the source package name for transformation
+	ToPkgName    string // Specifies the target package name for transformation
+
+	// Internal state
+	singleProject  bool          //nolint:unused // Reserved for future migration
+	packageManager packer.Packer //nolint:unused // Reserved for future migration
+	makeDepends    []string
+	runtimeDepends []string
+}
+
+// NewConfig creates a new Config with default values.
+func NewConfig() *Config {
+	return &Config{
+		makeDepends:    make([]string, 0),
+		runtimeDepends: make([]string, 0),
+	}
+}
+
+// Legacy global variables for backward compatibility - to be deprecated
+var (
 	// Verbose enables verbose output for debugging.
 	Verbose bool
 	// CleanBuild enables clean build mode.
@@ -48,15 +85,6 @@ var (
 	packageManager packer.Packer
 	makeDepends    []string
 	runtimeDepends []string
-)
-
-var (
-	// ErrCircularDependency indicates a circular dependency was detected.
-	// Static errors for linting compliance.
-	ErrCircularDependency = errors.New(i18n.T("errors.project.circular_dependency_detected"))
-	// ErrCircularRuntimeDependency indicates a circular runtime dependency was detected.
-	ErrCircularRuntimeDependency = errors.New(
-		i18n.T("errors.project.circular_runtime_dependency_detected"))
 )
 
 // DistroProject is an interface that defines the methods for creating and
@@ -86,6 +114,7 @@ type MultipleProject struct {
 	Name        string     `json:"name"        validate:"required"`
 	Output      string     `json:"output"      validate:"required"`
 	Projects    []*Project `json:"projects"    validate:"required,dive,required"`
+	Config      *Config    // Configuration for this project build
 }
 
 // Project represents a single project.
@@ -104,6 +133,18 @@ type Project struct {
 	Root           string
 	Name           string `json:"name"    validate:"required,startsnotwith=.,startsnotwith=./"`
 	HasToInstall   bool   `json:"install" validate:""`
+}
+
+// NewMultipleProject creates a new MultipleProject with the provided config.
+func NewMultipleProject(config *Config) *MultipleProject {
+	if config == nil {
+		config = NewConfig()
+	}
+
+	return &MultipleProject{
+		Config:   config,
+		Projects: make([]*Project, 0),
+	}
 }
 
 // BuildAll builds all the projects in the MultipleProject struct with optimizations.

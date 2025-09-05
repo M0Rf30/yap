@@ -7,13 +7,20 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 
-	"github.com/M0Rf30/yap/v2/pkg/buffers"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
+
+// Buffer pool for file operations to reduce memory allocations
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 32*1024) // 32KB buffer
+	},
+}
 
 // CheckWritable checks if a file is writable.
 func CheckWritable(path string) error {
@@ -93,89 +100,6 @@ func ExistsMakeDir(path string) error {
 	return nil
 }
 
-// GetDirSize calculates the total size of a directory.
-func GetDirSize(path string) (int64, error) {
-	var size int64
-
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() {
-			size += info.Size()
-		}
-
-		return nil
-	})
-
-	return size, err
-}
-
-// GetFileType returns the ELF type of a file, or empty string for non-ELF files.
-func GetFileType(path string) string {
-	file, err := elf.Open(path)
-	if err != nil {
-		return ""
-	}
-
-	defer func() {
-		_ = file.Close() // Ignore close error for this function
-	}()
-
-	switch file.Type {
-	case elf.ET_EXEC:
-		return "ET_EXEC"
-	case elf.ET_DYN:
-		return "ET_DYN"
-	case elf.ET_REL:
-		return "ET_REL"
-	default:
-		return "ET_NONE"
-	}
-}
-
-// IsEmptyDir checks if a directory is empty.
-func IsEmptyDir(path string, dirEntry os.DirEntry) bool {
-	if !dirEntry.IsDir() {
-		return false
-	}
-
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return false
-	}
-
-	return len(entries) == 0
-}
-
-// IsStaticLibrary checks if a file is a static library (.a file or archive).
-func IsStaticLibrary(path string) bool {
-	// Check by extension first
-	if strings.HasSuffix(path, ".a") {
-		return true
-	}
-
-	// Check by archive magic number
-	file, err := os.Open(path) // #nosec G304 - path is validated by caller
-	if err != nil {
-		return false
-	}
-
-	defer func() {
-		_ = file.Close() // Ignore close error for this function
-	}()
-
-	magic := make([]byte, 8)
-
-	n, err := file.Read(magic)
-	if err != nil || n < 8 {
-		return false
-	}
-
-	return string(magic) == "!<arch>\n"
-}
-
 // Open opens a file for reading.
 func Open(path string) (*os.File, error) {
 	cleanFilePath := filepath.Clean(path)
@@ -213,8 +137,125 @@ func TryHardLink(src, dst string) error {
 	defer func() { _ = dstFile.Close() }()
 
 	// Use buffer from pool for better performance
-	buffer := buffers.GetDefaultBuffer()
-	defer buffers.PutDefaultBuffer(buffer)
+	buffer := bufferPool.Get().([]byte)
+	defer bufferPool.Put(&buffer)
+
+	if _, err := io.CopyBuffer(dstFile, srcFile, buffer); err != nil {
+		return errors.Wrap(err, i18n.T("errors.files.failed_to_copy_file_content"))
+	}
+
+	// Copy file permissions
+	if srcInfo, err := srcFile.Stat(); err == nil {
+		if err := os.Chmod(dst, srcInfo.Mode()); err != nil {
+			logger.Warn(i18n.T("logger.tryhardlink.warn.failed_to_copy_file_1"), "dst", dst, "error", err)
+		}
+	}
+
+	return nil
+}
+
+// GetDirSize calculates the total size of a directory.
+func GetDirSize(path string) (int64, error) {
+	var size int64
+	
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	
+	return size, err
+}
+
+// GetFileType returns the ELF type of a file, or empty string for non-ELF files.
+func GetFileType(path string) string {
+	file, err := elf.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+	
+	switch file.Type {
+	case elf.ET_EXEC:
+		return "ET_EXEC"
+	case elf.ET_DYN:
+		return "ET_DYN" 
+	case elf.ET_REL:
+		return "ET_REL"
+	default:
+		return "ET_NONE"
+	}
+}
+
+// IsEmptyDir checks if a directory is empty.
+func IsEmptyDir(path string, dirEntry os.DirEntry) bool {
+	if !dirEntry.IsDir() {
+		return false
+	}
+	
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false
+	}
+	
+	return len(entries) == 0
+}
+
+// IsStaticLibrary checks if a file is a static library (.a file or archive).
+func IsStaticLibrary(path string) bool {
+	// Check by extension first
+	if strings.HasSuffix(path, ".a") {
+		return true
+	}
+	
+	// Check by archive magic number
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	
+	magic := make([]byte, 8)
+	n, err := file.Read(magic)
+	if err != nil || n < 8 {
+		return false
+	}
+	
+	return string(magic) == "!<arch>\n"
+}
+
+// Filename extracts the filename from a path.
+func Filename(path string) string {
+	n := strings.LastIndex(path, "/")
+	if n == -1 {
+		return path
+	}
+	
+	return path[n+1:]
+}
+
+	// Fall back to copying the file
+	srcFile, err := os.Open(src) // #nosec G304 - src path is controlled by caller
+	if err != nil {
+		return errors.Wrap(err, i18n.T("errors.files.failed_to_open_source_file"))
+	}
+
+	defer func() { _ = srcFile.Close() }()
+
+	dstFile, err := os.Create(dst) // #nosec G304 - dst path is controlled by caller
+	if err != nil {
+		return errors.Wrap(err, i18n.T("errors.files.failed_to_create_destination_file"))
+	}
+
+	defer func() { _ = dstFile.Close() }()
+
+	// Use buffer from pool for better performance
+	buffer := bufferPool.Get().([]byte)
+	defer bufferPool.Put(&buffer)
 
 	if _, err := io.CopyBuffer(dstFile, srcFile, buffer); err != nil {
 		return errors.Wrap(err, i18n.T("errors.files.failed_to_copy_file_content"))

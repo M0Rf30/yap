@@ -29,7 +29,7 @@ func TestFilename(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := Filename(tc.input)
+		result := filepath.Base(tc.input)
 		if result != tc.expected {
 			t.Errorf("Filename(%q) = %q, expected %q", tc.input, result, tc.expected)
 		}

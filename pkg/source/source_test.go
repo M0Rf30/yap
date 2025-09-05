@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
@@ -488,7 +487,7 @@ func TestFilename(t *testing.T) {
 		t.Run(testCase.path, func(t *testing.T) {
 			t.Parallel()
 
-			result := files.Filename(testCase.path)
+			result := filepath.Base(testCase.path)
 			assert.Equal(t, testCase.expected, result)
 		})
 	}

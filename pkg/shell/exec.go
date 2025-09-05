@@ -17,6 +17,7 @@ import (
 	"mvdan.cc/sh/v3/interp"
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/M0Rf30/yap/v2/pkg/buffers"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -53,7 +54,7 @@ func NewPackageDecoratedWriter(writer io.Writer, packageName string) *PackageDec
 	return &PackageDecoratedWriter{
 		writer:      writer,
 		packageName: packageName,
-		buffer:      make([]byte, 0, 1024),
+		buffer:      buffers.GetSmallBuffer()[:0], // Start with empty slice but allocated backing array
 	}
 }
 
@@ -62,8 +63,8 @@ func NewGitProgressWriter(writer io.Writer, packageName string) *GitProgressWrit
 	return &GitProgressWriter{
 		writer:      writer,
 		packageName: packageName,
-		buffer:      make([]byte, 0, 1024),
-		lastLine:    make([]byte, 0, 256),
+		buffer:      buffers.GetSmallBuffer()[:0], // Start with empty slice but allocated backing array
+		lastLine:    make([]byte, 0, 256),         // Keep lastLine as fixed since it's small
 	}
 }
 
@@ -86,6 +87,21 @@ func (pdw *PackageDecoratedWriter) Write(p []byte) (int, error) {
 	}
 
 	return originalLen, nil
+}
+
+// Close returns the buffer to the pool and should be called when done with the writer.
+func (pdw *PackageDecoratedWriter) Close() error {
+	if pdw.buffer != nil {
+		// Reset buffer to original capacity before returning to pool
+		if cap(pdw.buffer) >= 1024 {
+			pdw.buffer = pdw.buffer[:1024]
+			buffers.PutSmallBuffer(pdw.buffer)
+		}
+
+		pdw.buffer = nil
+	}
+
+	return nil
 }
 
 // formatDecoratedLine creates a decorated log line with timestamp and package name.
@@ -176,6 +192,21 @@ func (gpw *GitProgressWriter) writeDecoratedLine(lineContent string) error {
 	_, err := gpw.writer.Write([]byte(decoratedLine))
 
 	return err
+}
+
+// Close returns the buffer to the pool and should be called when done with the writer.
+func (gpw *GitProgressWriter) Close() error {
+	if gpw.buffer != nil {
+		// Reset buffer to original capacity before returning to pool
+		if cap(gpw.buffer) >= 1024 {
+			gpw.buffer = gpw.buffer[:1024]
+			buffers.PutSmallBuffer(gpw.buffer)
+		}
+
+		gpw.buffer = nil
+	}
+
+	return nil
 }
 
 // Exec executes a command in the specified directory with optional stdout exclusion.

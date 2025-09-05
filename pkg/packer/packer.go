@@ -59,15 +59,11 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	case "apk":
 		return apk.NewBuilder(pkgBuild)
 	case "apt":
-		return deb.NewPackage(pkgBuild)
+		return deb.NewBuilder(pkgBuild)
 	case "pacman":
-		return &pacman.Pkg{
-			PKGBUILD: pkgBuild,
-		}
+		return pacman.NewBuilder(pkgBuild)
 	case "yum":
-		return &rpm.RPM{
-			PKGBUILD: pkgBuild,
-		}
+		return rpm.NewBuilder(pkgBuild)
 	case "zypper":
 		return &rpm.RPM{
 			PKGBUILD: pkgBuild,
