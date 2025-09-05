@@ -123,8 +123,8 @@ func createMultiPackageGraph(projects []struct {
 		graphData.Nodes[proj.Name] = node
 	}
 
-	// Add some sample dependencies to demonstrate different types
-	addSampleDependencies(graphData, projects)
+	// Add dependencies by parsing PKGBUILD files
+	addDependenciesFromPKGBUILD(graphData, projects, projectPath)
 
 	return graphData
 }
@@ -192,93 +192,232 @@ func extractQuotedValue(line, prefix string) string {
 	return value
 }
 
-// addSampleDependencies adds realistic dependencies for common packages.
-func addSampleDependencies(graphData *graph.Data, projects []struct {
+// addDependenciesFromPKGBUILD parses actual dependencies from PKGBUILD files.
+func addDependenciesFromPKGBUILD(graphData *graph.Data, projects []struct {
 	Name string `json:"name"`
-}) {
-	// Common dependency patterns for the packages in carbonio-thirds
-	dependencies := map[string][]graph.Edge{
-		"postfix": {
-			{From: "postfix", To: "openssl", Type: "runtime"},
-			{From: "postfix", To: "krb5", Type: "runtime"},
-			{From: "postfix", To: "glibc", Type: "runtime"}, // External dependency
-			{From: "postfix", To: "gcc", Type: "make"},      // External dependency
-		},
-		"openldap": {
-			{From: "openldap", To: "openssl", Type: "runtime"},
-			{From: "openldap", To: "krb5", Type: "runtime"},
-			{From: "openldap", To: "systemd", Type: "runtime"}, // External dependency
-		},
-		"clamav": {
-			{From: "clamav", To: "libxml2", Type: "runtime"},
-			{From: "clamav", To: "curl", Type: "runtime"},
-			{From: "clamav", To: "pcre2", Type: "runtime"}, // External dependency
-		},
-		"nginx": {
-			{From: "nginx", To: "openssl", Type: "runtime"},
-			{From: "nginx", To: "zlib", Type: "runtime"}, // External dependency
-		},
-		"mariadb": {
-			{From: "mariadb", To: "openssl", Type: "runtime"},
-			{From: "mariadb", To: "jemalloc", Type: "optional"},
-			{From: "mariadb", To: "ncurses", Type: "runtime"}, // External dependency
-		},
-		"curl": {
-			{From: "curl", To: "openssl", Type: "runtime"},
-			{From: "curl", To: "krb5", Type: "optional"},
-			{From: "curl", To: "ca-certificates", Type: "runtime"}, // External dependency
-		},
-		"krb5": {
-			{From: "krb5", To: "openssl", Type: "runtime"},
-			{From: "krb5", To: "keyutils", Type: "runtime"}, // External dependency
-		},
-		"memcached": {
-			{From: "memcached", To: "libevent", Type: "runtime"},
-			{From: "memcached", To: "libc6", Type: "runtime"}, // External dependency
-		},
-		"opendkim": {
-			{From: "opendkim", To: "openssl", Type: "runtime"},
-			{From: "opendkim", To: "libdb", Type: "runtime"}, // External dependency
-		},
-	}
-
+}, projectPath string) {
 	// Create a map of existing projects for quick lookup
 	projectMap := make(map[string]bool)
 	for _, proj := range projects {
 		projectMap[proj.Name] = true
 	}
 
-	// Add all dependencies and create external nodes for missing targets
-	for _, deps := range dependencies {
-		for _, edge := range deps {
-			// Only add edge if the source package exists in the project
-			if projectMap[edge.From] {
+	// Parse dependencies from each PKGBUILD file
+	for _, proj := range projects {
+		pkgbuildPath := filepath.Join(projectPath, proj.Name, "PKGBUILD")
+		dependencies := parseDependenciesFromPKGBUILD(pkgbuildPath)
+
+		for depType, deps := range dependencies {
+			for _, dep := range deps {
+				// Clean up dependency name (remove version constraints)
+				depName := cleanDependencyName(dep)
+
 				// Create external node if target doesn't exist in project
-				if !projectMap[edge.To] {
+				if !projectMap[depName] && depName != "" {
 					// Create external node
-					nodeWidth := float64(len(edge.To)*8 + 40)
+					nodeWidth := float64(len(depName)*8 + 40)
 					if nodeWidth < 100 {
 						nodeWidth = 100
 					}
 
 					externalNode := &graph.Node{
-						Name:         edge.To,
-						PkgName:      edge.To, // External packages use their name directly
+						Name:         depName,
+						PkgName:      depName,
 						Version:      "external",
 						Release:      "1",
 						Width:        nodeWidth,
 						Height:       60,
-						IsExternal:   true, // Mark as external
+						IsExternal:   true,
 						IsPopular:    false,
 						Dependencies: make([]string, 0),
-						Level:        1, // External deps are typically at a different level
+						Level:        1,
 					}
-					graphData.Nodes[edge.To] = externalNode
+					graphData.Nodes[depName] = externalNode
+					projectMap[depName] = true // Add to map to avoid duplicates
 				}
 
-				// Add the edge
-				graphData.Edges = append(graphData.Edges, edge)
+				// Add the edge if target exists
+				if projectMap[depName] && depName != "" {
+					edge := graph.Edge{
+						From: proj.Name,
+						To:   depName,
+						Type: depType,
+					}
+					graphData.Edges = append(graphData.Edges, edge)
+				}
 			}
 		}
 	}
+}
+
+// parseDependenciesFromPKGBUILD extracts dependency arrays from a PKGBUILD file.
+func parseDependenciesFromPKGBUILD(pkgbuildPath string) map[string][]string {
+	dependencies := make(map[string][]string)
+
+	content, err := os.ReadFile(filepath.Clean(pkgbuildPath))
+	if err != nil {
+		return dependencies
+	}
+
+	lines := strings.Split(string(content), "\n")
+	currentArray := ""
+
+	var currentDeps []string
+
+	inArray := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Skip comments and empty lines
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+
+		currentArray, currentDeps, inArray = processDependencyLine(
+			line, currentArray, currentDeps, inArray, dependencies,
+		)
+	}
+
+	return dependencies
+}
+
+// processDependencyLine processes a single line for dependency parsing.
+func processDependencyLine(
+	line, currentArray string,
+	currentDeps []string,
+	inArray bool,
+	dependencies map[string][]string,
+) (newArray string, newDeps []string, newInArray bool) {
+	// Check for dependency array declarations
+	switch {
+	case strings.HasPrefix(line, "depends=("):
+		return handleDependencyArrayStart(line, "depends=(", "runtime", dependencies)
+	case strings.HasPrefix(line, "makedepends=("):
+		return handleDependencyArrayStart(line, "makedepends=(", "make", dependencies)
+	case strings.HasPrefix(line, "checkdepends=("):
+		return handleDependencyArrayStart(line, "checkdepends=(", "check", dependencies)
+	case strings.HasPrefix(line, "optdepends=("):
+		return handleDependencyArrayStart(line, "optdepends=(", "optional", dependencies)
+	case inArray:
+		return handleArrayContinuation(line, currentArray, currentDeps, dependencies)
+	default:
+		return currentArray, currentDeps, inArray
+	}
+}
+
+// handleDependencyArrayStart handles the start of a dependency array.
+func handleDependencyArrayStart(
+	line, prefix, arrayType string,
+	dependencies map[string][]string,
+) (newArray string, newDeps []string, newInArray bool) {
+	currentDeps := parseDependencyArray(line, prefix)
+	if !strings.HasSuffix(line, ")") {
+		return arrayType, currentDeps, true
+	}
+
+	dependencies[arrayType] = currentDeps
+
+	return "", nil, false
+}
+
+// handleArrayContinuation handles continuation of multi-line arrays.
+func handleArrayContinuation(
+	line, currentArray string,
+	currentDeps []string,
+	dependencies map[string][]string,
+) (newArray string, newDeps []string, newInArray bool) {
+	if strings.HasSuffix(line, ")") {
+		// End of array
+		line = strings.TrimSuffix(line, ")")
+		if line != "" {
+			moreDeps := parseDependencyLine(line)
+			currentDeps = append(currentDeps, moreDeps...)
+		}
+
+		if currentArray != "" {
+			dependencies[currentArray] = currentDeps
+		}
+
+		return "", nil, false
+	}
+
+	// Continue parsing array items
+	moreDeps := parseDependencyLine(line)
+	currentDeps = append(currentDeps, moreDeps...)
+
+	return currentArray, currentDeps, true
+}
+
+// parseDependencyArray parses a dependency array line like depends=('pkg1' 'pkg2').
+func parseDependencyArray(line, prefix string) []string {
+	line = strings.TrimPrefix(line, prefix)
+	line = strings.TrimSuffix(line, ")")
+
+	return parseDependencyLine(line)
+}
+
+// parseDependencyLine parses individual dependency items from a line.
+func parseDependencyLine(line string) []string {
+	var deps []string
+
+	// Split by spaces but respect quoted strings
+	inQuote := false
+
+	var currentDep strings.Builder
+
+	quoteChar := byte(0)
+
+	for i := 0; i < len(line); i++ {
+		char := line[i]
+
+		switch {
+		case !inQuote && (char == '\'' || char == '"'):
+			inQuote = true
+			quoteChar = char
+		case inQuote && char == quoteChar:
+			inQuote = false
+
+			dep := strings.TrimSpace(currentDep.String())
+			if dep != "" {
+				deps = append(deps, dep)
+			}
+
+			currentDep.Reset()
+
+			quoteChar = 0
+		case inQuote:
+			currentDep.WriteByte(char)
+		case char == ' ' || char == '\t':
+			// Space outside quotes - potential separator
+			dep := strings.TrimSpace(currentDep.String())
+			if dep != "" && !inQuote {
+				deps = append(deps, dep)
+
+				currentDep.Reset()
+			}
+		default:
+			currentDep.WriteByte(char)
+		}
+	}
+
+	// Add final dependency if any
+	dep := strings.TrimSpace(currentDep.String())
+	if dep != "" {
+		deps = append(deps, dep)
+	}
+
+	return deps
+}
+
+// cleanDependencyName removes version constraints from dependency names.
+func cleanDependencyName(dep string) string {
+	// Remove version constraints like >=1.0, <2.0, etc.
+	for _, op := range []string{">=", "<=", "=", ">", "<"} {
+		if idx := strings.Index(dep, op); idx != -1 {
+			return strings.TrimSpace(dep[:idx])
+		}
+	}
+
+	return strings.TrimSpace(dep)
 }

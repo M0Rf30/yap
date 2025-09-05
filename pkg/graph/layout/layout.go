@@ -45,7 +45,7 @@ func CalculateHierarchicalLayout(graphData *graph.Data) {
 	}
 
 	// Calculate dynamic spacing based on node sizes in each level
-	levelSpacing := 140.0 // Increased vertical spacing between levels
+	levelSpacing := 100.0 // Optimized vertical spacing between levels
 
 	// Position nodes level by level
 	for level := 0; level <= maxLevel; level++ {
@@ -63,9 +63,9 @@ func CalculateHierarchicalLayout(graphData *graph.Data) {
 		}
 
 		// Calculate minimum spacing based on widest node + padding
-		minNodeSpacing := maxWidthInLevel + 60.0 // Increased padding between nodes
-		if minNodeSpacing < 180.0 {
-			minNodeSpacing = 180.0 // Ensure minimum spacing
+		minNodeSpacing := maxWidthInLevel + 40.0 // Optimized padding between nodes
+		if minNodeSpacing < 140.0 {
+			minNodeSpacing = 140.0 // Ensure minimum spacing
 		}
 
 		// Calculate total width needed for this level
@@ -129,17 +129,17 @@ func CalculateGridLayout(graphData *graph.Data) {
 	}
 
 	// Calculate spacing with generous padding
-	minPadding := 40.0                           // Minimum padding between nodes
+	minPadding := 30.0                           // Minimum padding between nodes
 	nodeSpacingX := maxNodeWidth + minPadding*2  // Horizontal spacing based on widest node
 	nodeSpacingY := maxNodeHeight + minPadding*2 // Vertical spacing based on tallest node
 
 	// Ensure minimum spacing for readability
-	if nodeSpacingX < 200.0 {
-		nodeSpacingX = 200.0
+	if nodeSpacingX < 160.0 {
+		nodeSpacingX = 160.0
 	}
 
-	if nodeSpacingY < 120.0 {
-		nodeSpacingY = 120.0
+	if nodeSpacingY < 100.0 {
+		nodeSpacingY = 100.0
 	}
 
 	// Position nodes in grid
@@ -210,7 +210,7 @@ func CalculateGraphBounds(graphData *graph.Data) *graph.Bounds {
 		}
 	}
 
-	padding := 100.0 // Increased padding for better visualization
+	padding := 60.0 // Optimized padding for better visualization
 	minX, minY := float64(1000000), float64(1000000)
 	maxX, maxY := float64(-1000000), float64(-1000000)
 
@@ -248,18 +248,18 @@ func CalculateGraphBounds(graphData *graph.Data) *graph.Bounds {
 	width := maxX - minX
 	height := maxY - minY
 
-	if width < 600 { // Increased minimum width
-		width = 600
+	if width < 500 { // Optimized minimum width
+		width = 500
 		center := (minX + maxX) / 2
-		minX = center - 300
-		maxX = center + 300
+		minX = center - 250
+		maxX = center + 250
 	}
 
-	if height < 400 { // Increased minimum height
-		height = 400
+	if height < 350 { // Optimized minimum height
+		height = 350
 		center := (minY + maxY) / 2
-		minY = center - 200
-		maxY = center + 200
+		minY = center - 175
+		maxY = center + 175
 	}
 
 	return &graph.Bounds{
