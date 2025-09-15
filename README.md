@@ -985,8 +985,6 @@ We welcome contributions from the community! Whether it's:
 - 🧪 **Testing** on different distributions
 - 💡 **Ideas** for new features
 
-See our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
 ### Community Guidelines
 
 - Be respectful and inclusive
