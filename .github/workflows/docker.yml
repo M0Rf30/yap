@@ -46,7 +46,7 @@ jobs:
           fetch-depth: 0
 
       - name: 🔍 Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.2.0
         with:
           dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
           config: .hadolint.yaml
