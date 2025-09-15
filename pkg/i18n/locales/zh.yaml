@@ -2,16 +2,10 @@
   translation: YAP
 - id: app.full_name
   translation: Yet Another Packager
-- id: app.description
-  translation: 'YAP（Yet Another Packager）是一个强大的基于容器的包构建系统，
-
-    可以从单一的类PKGBUILD规范格式为多个GNU/Linux发行版创建包。'
-- id: app.documentation_url
-  translation: 详细文档和示例请访问 https://github.com/M0Rf30/yap
 - id: root.short
   translation: 🚀 Yet Another Packager - 多发行版包构建器
 - id: root.examples
-  translation: '# 为当前发行版构建当前目录中的所有包
+  translation: "# 为当前发行版构建当前目录中的所有包
 
     yap build .
 
@@ -45,7 +39,7 @@
 
     yap list-distros
 
-    '
+    "
 - id: groups.build
   translation: 构建命令
 - id: groups.environment
@@ -57,12 +51,13 @@
 - id: commands.build.short
   translation: 🔨 从yap.json项目定义构建包
 - id: commands.build.long
-  translation: "使用yap.json项目文件为一个或多个发行版构建包。\n\nbuild命令协调整个包构建过程：\n  • 解析yap.json项目配置\n\
+  translation:
+    "使用yap.json项目文件为一个或多个发行版构建包。\n\nbuild命令协调整个包构建过程：\n  • 解析yap.json项目配置\n\
     \  • 解决构建依赖和顺序\n  • 创建隔离的容器环境\n  • 根据PKGBUILD规范构建包\n  • 处理跨发行版兼容性\n\n发行版格式：\n\
     \  使用'distro'或'distro-release'格式（例如，'ubuntu-jammy'，'fedora-38'）\n  如果未指定发行版，则使用当前系统的发行版。\n\
     \n依赖解析：\n  构建顺序根据包依赖自动确定。\n  使用--from和--to标志构建特定的包范围。\n"
 - id: commands.build.examples
-  translation: '# 为当前系统发行版构建
+  translation: "# 为当前系统发行版构建
 
     yap build .
 
@@ -77,7 +72,7 @@
 
     yap build alpine /home/user/myproject
 
-    '
+    "
 - id: commands.graph.short
   translation: 🎨 生成美观的依赖关系图
 - id: commands.install.short
@@ -121,12 +116,13 @@
 - id: flags.build.zap
   translation: 💥 构建前删除整个staging目录（深度清理）
 - id: commands.zap.long
-  translation: "对构建环境执行深度清理，删除指定项目的所有构建工件、\n临时文件和staging目录。\n\n此命令用于：\n  • 释放构建工件占用的磁盘空间\n\
+  translation:
+    "对构建环境执行深度清理，删除指定项目的所有构建工件、\n临时文件和staging目录。\n\n此命令用于：\n  • 释放构建工件占用的磁盘空间\n\
     \  • 解决由陈旧文件引起的构建问题\n  • 确保完全干净的构建\n  • 维护构建环境\n\n警告：此操作是破坏性的，会删除所有构建输出\n和中间文件。在生产环境中请谨慎使用。\n\
     \n发行版格式：\n  使用'distro'或'distro-release'格式（例如，'ubuntu-jammy'，'fedora-38'）\n  如果未指定发行版，则使用当前系统的发行版。\n\
     \nzap命令会自动：\n  • 跳过依赖安装（nomakedeps=true）\n  • 跳过包管理器同步（skip-sync=true）\n  • 启用深度清理模式（zap=true）\n"
 - id: commands.zap.examples
-  translation: '# 清理当前系统发行版
+  translation: "# 清理当前系统发行版
 
     yap zap .
 
@@ -146,18 +142,19 @@
 
     yap zap rocky-9 .
 
-    '
+    "
 - id: flags.zap.from
   translation: ▶️  从指定包名开始清理（依赖感知）
 - id: flags.zap.to
   translation: ⏹️  在指定包名处停止清理（依赖感知）
 - id: commands.graph.long
-  translation: "生成项目的现代交互式依赖关系图可视化。\n\ngraph命令分析您的yap.json项目文件并创建美观的\n依赖关系可视化，显示包之间的关系。输出\n\
+  translation:
+    "生成项目的现代交互式依赖关系图可视化。\n\ngraph命令分析您的yap.json项目文件并创建美观的\n依赖关系可视化，显示包之间的关系。输出\n\
     包括拓扑排序、依赖流行度分析和现代样式。\n\n特性：\n  • 基于依赖级别的分层布局\n  • 按流行度和类型的颜色编码节点\n  • 具有悬停效果和工具提示的交互式SVG\n\
     \  • 外部依赖过滤\n  • 多种主题（modern、classic、dark）\n  • 适合文档的高质量输出\n\n可视化元素：\n  • 节点大小反映依赖流行度\n\
     \  • 颜色表示包类型（内部vs外部）\n  • 箭头显示依赖方向\n  • 级别显示构建顺序\n  • 工具提示提供详细的包信息\n"
 - id: commands.graph.examples
-  translation: '# 为当前目录生成SVG图
+  translation: "# 为当前目录生成SVG图
 
     yap graph .
 
@@ -176,7 +173,7 @@
 
     yap graph --theme modern --format svg --output docs/architecture.svg .
 
-    '
+    "
 - id: flags.graph.format
   translation: 输出格式：svg、png
 - id: flags.graph.output
@@ -186,11 +183,12 @@
 - id: flags.graph.theme
   translation: 视觉主题：modern、classic、dark
 - id: commands.install.long
-  translation: "使用系统的适当包管理器安装包工件。\n\n此命令自动检测包格式并使用正确的\n包管理器在您的系统上安装工件。\n\n支持的格式：\n\
+  translation:
+    "使用系统的适当包管理器安装包工件。\n\n此命令自动检测包格式并使用正确的\n包管理器在您的系统上安装工件。\n\n支持的格式：\n\
     \  • .deb包（通过apt/dpkg）\n  • .rpm包（通过yum/dnf/rpm）\n  • .pkg.tar.xz包（通过pacman）\n\
     \  • .apk包（通过apk）\n\n安装程序将处理依赖关系并在\n安装过程中提供适当的反馈。\n"
 - id: commands.install.examples
-  translation: '# 安装Debian包
+  translation: "# 安装Debian包
 
     yap install package.deb
 
@@ -209,12 +207,13 @@
 
     yap install package.apk
 
-    '
+    "
 - id: commands.list_distros.long
-  translation: "列出所有支持的发行版及其可用版本。\n\n此命令显示YAP可以为哪些发行版构建包，\n包括适用的特定发布版本。\n\n输出包括：\n\
+  translation:
+    "列出所有支持的发行版及其可用版本。\n\n此命令显示YAP可以为哪些发行版构建包，\n包括适用的特定发布版本。\n\n输出包括：\n\
     \  • 发行版名称和ID\n  • 可用的发布版本\n  • 架构支持信息\n  • 容器可用性状态\n"
 - id: commands.list_distros.examples
-  translation: '# 列出所有支持的发行版
+  translation: "# 列出所有支持的发行版
 
     yap list-distros
 
@@ -223,12 +222,13 @@
 
     yap list-distros | grep ubuntu
 
-    '
+    "
 - id: commands.prepare.long
-  translation: "使用开发包和依赖项准备构建环境。\n\n此命令通过安装必要的\n开发工具、编译器和指定发行版的\n构建依赖来设置构建环境。\n\n\
+  translation:
+    "使用开发包和依赖项准备构建环境。\n\n此命令通过安装必要的\n开发工具、编译器和指定发行版的\n构建依赖来设置构建环境。\n\n\
     准备包括：\n  • 基本开发工具（gcc、make等）\n  • 包特定的构建依赖\n  • 构建环境配置\n  • 容器镜像准备\n"
 - id: commands.prepare.examples
-  translation: '# 准备当前系统
+  translation: "# 准备当前系统
 
     yap prepare
 
@@ -242,7 +242,7 @@
 
     yap prepare rocky-9
 
-    '
+    "
 - id: flags.prepare.skip_sync
   translation: ⚡ 跳过包管理器同步（更快但可能错过更新）
 - id: flags.prepare.golang
@@ -442,11 +442,11 @@
 - id: errors.download.download_failed
   translation: 下载失败
 - id: errors.download.download_failed_after_attempts
-  translation: '重试%d次后下载失败: %v'
+  translation: "重试%d次后下载失败: %v"
 - id: errors.download.download_failed_no_response
-  translation: '下载失败: 无响应'
+  translation: "下载失败: 无响应"
 - id: errors.download.download_job_not_found
-  translation: '未找到下载任务: %s'
+  translation: "未找到下载任务: %s"
 - id: errors.source.unsupported_source_type
   translation: 不支持的源类型
 - id: errors.source.failed_to_open_file_for_hash
@@ -460,7 +460,7 @@
 - id: errors.source.failed_to_start_multiprinter
   translation: 无法启动多重打印器
 - id: errors.source.download_failed_for
-  translation: '下载失败 %s: %v'
+  translation: "下载失败 %s: %v"
 - id: errors.shell.failed_to_start_multiprinter
   translation: 无法启动多重打印器
 - id: errors.shell.failed_to_parse_script
@@ -526,7 +526,7 @@
 - id: errors.git.empty_download_path
   translation: 下载文件路径不能为空
 - id: errors.git.remote_branch_not_found
-  translation: '远程分支 %s 未找到: %v'
+  translation: "远程分支 %s 未找到: %v"
 - id: errors.platform.open_os_release_failed
   translation: 打开 /etc/os-release 失败
 - id: errors.platform.scan_os_release_failed
@@ -568,7 +568,7 @@
 - id: errors.validation.insufficient_args
   translation: 至少需要一个参数
 - id: errors.validation.unsupported_distribution
-  translation: '不支持的分发版本 ''%s''
+  translation: "不支持的分发版本 '%s'
 
 
     支持的分发版本：
@@ -576,34 +576,34 @@
     %s
 
 
-    使用 ''yap list-distros'' 查看所有可用选项'
+    使用 'yap list-distros' 查看所有可用选项"
 - id: errors.validation.invalid_path
   translation: 无效路径 '%s'
 - id: errors.validation.no_project_files
-  translation: '在 %s 中未找到 yap.json 或 PKGBUILD
+  translation: "在 %s 中未找到 yap.json 或 PKGBUILD
 
 
     请确保您的项目目录包含以下文件之一：
 
     - yap.json（推荐用于多包项目）
 
-    - PKGBUILD（用于单包项目）'
+    - PKGBUILD（用于单包项目）"
 - id: errors.validation.insufficient_args_detailed
-  translation: '至少需要 %d 个参数，只收到 %d 个
+  translation: "至少需要 %d 个参数，只收到 %d 个
 
 
     用法：%s
 
 
-    更多信息请使用：%s --help'
+    更多信息请使用：%s --help"
 - id: errors.install.artifact_not_found
   translation: 未找到制品文件：%s
 - id: errors.install.failed_to_resolve_path
   translation: 无法解析制品路径
 - id: errors.install.unsupported_package_format
-  translation: '不支持的包格式：%s
+  translation: "不支持的包格式：%s
 
-    支持的格式：.deb, .rpm, .apk, .pkg.tar.*'
+    支持的格式：.deb, .rpm, .apk, .pkg.tar.*"
 - id: errors.install.unsupported_package_type
   translation: 不支持的包类型：%s
 - id: errors.install.installation_failed
@@ -685,7 +685,7 @@
 - id: logger.stringifyfuncdecl.error.unable_to_parse_function_1
   translation: 无法解析函数
 - id: logger.download.info.response_status
-  translation: '响应状态：'
+  translation: "响应状态："
 - id: logger.withresume.info.retrying_download
   translation: 重试下载
 - id: logger.withresume.info.retrying_download_1
@@ -703,7 +703,7 @@
 - id: logger.logdownloadstart.info.server_supports_resume_1
   translation: 服务器支持断点续传
 - id: logger.logdownloadstart.info.response_status
-  translation: '响应状态：'
+  translation: "响应状态："
 - id: logger.monitordownload.info.download_completed
   translation: 下载完成
 - id: logger.monitordownload.info.download_completed_1
@@ -877,9 +877,9 @@
 - id: logger.validategeneral.error.missing_package_function_1
   translation: 缺少package()函数
 - id: logger.setupenvironmentdependencies.info.go_detected_version_check
-  translation: '检测到go：版本检查已禁用'
+  translation: "检测到go：版本检查已禁用"
 - id: logger.setupenvironmentdependencies.info.go_detected_version_check_1
-  translation: '检测到go：版本检查已禁用'
+  translation: "检测到go：版本检查已禁用"
 - id: logger.setupenvironmentdependencies.warn.failed_to_setup_go
   translation: 设置Go环境失败
 - id: logger.setupenvironmentdependencies.warn.failed_to_setup_go_1

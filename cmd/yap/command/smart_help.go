@@ -24,9 +24,6 @@ func SmartErrorHandler(cmd *cobra.Command, err error) error {
 
 	errorStr := err.Error()
 
-	// Style the error message
-	pterm.Error.Println(errorStr)
-
 	// Provide context-aware suggestions
 	switch {
 	case strings.Contains(errorStr, "unknown command"):
@@ -40,7 +37,7 @@ func SmartErrorHandler(cmd *cobra.Command, err error) error {
 		provideArgumentHelp(cmd)
 	default:
 		// General help suggestion
-		pterm.Info.Printfln("Use '%s --help' for more information", cmd.CommandPath())
+		pterm.Printfln("Use '%s --help' for more information", cmd.CommandPath())
 	}
 
 	return err

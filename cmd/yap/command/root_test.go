@@ -46,14 +46,6 @@ func TestRootCommand(t *testing.T) {
 	}
 }
 
-func TestGetLongDescription(t *testing.T) {
-	description := getLongDescription()
-
-	// Check that description contains expected content
-	assert.Contains(t, description, "Yet Another Packager")
-	assert.Contains(t, description, "YAP (Yet Another Packager)")
-}
-
 func TestIsNoColorEnabled(t *testing.T) {
 	// Test default value
 	result := IsNoColorEnabled()

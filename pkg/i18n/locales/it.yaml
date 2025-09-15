@@ -2,19 +2,11 @@
   translation: YAP
 - id: app.full_name
   translation: Yet Another Packager
-- id: app.description
-  translation: 'YAP (Yet Another Packager) è un sistema potente di compilazione di
-    pacchetti basato su container
-
-    che crea pacchetti per multiple distribuzioni GNU/Linux da una singola specifica
-
-    in formato simile a PKGBUILD.'
-- id: app.documentation_url
-  translation: Per documentazione dettagliata ed esempi, visita https://github.com/M0Rf30/yap
 - id: root.short
   translation: 🚀 Yet Another Packager - Costruttore di pacchetti multi-distribuzione
 - id: root.examples
-  translation: '# Costruisci tutti i pacchetti nella directory corrente per la tua
+  translation:
+    "# Costruisci tutti i pacchetti nella directory corrente per la tua
     distro
 
     yap build .
@@ -49,7 +41,7 @@
 
     yap list-distros
 
-    '
+    "
 - id: groups.build
   translation: Comandi di Build
 - id: groups.environment
@@ -61,7 +53,8 @@
 - id: commands.build.short
   translation: 🔨 Costruisci pacchetti dalla definizione del progetto yap.json
 - id: commands.build.long
-  translation: "Costruisci pacchetti per una o più distribuzioni usando un file di\
+  translation:
+    "Costruisci pacchetti per una o più distribuzioni usando un file di\
     \ progetto yap.json.\n\nIl comando build orchestra l'intero processo di costruzione\
     \ dei pacchetti:\n  • Analizza la configurazione del progetto yap.json\n  • Risolve\
     \ le dipendenze e l'ordine di compilazione\n  • Crea ambienti container isolati\n\
@@ -72,7 +65,7 @@
     \ di compilazione viene determinato automaticamente dalle dipendenze dei pacchetti.\n\
     \  Usa i flag --from e --to per costruire specifici intervalli di pacchetti.\n"
 - id: commands.build.examples
-  translation: '# Costruisci per la distribuzione del sistema corrente
+  translation: "# Costruisci per la distribuzione del sistema corrente
 
     yap build .
 
@@ -87,11 +80,12 @@
 
     yap build alpine /home/utente/mioprogetto
 
-    '
+    "
 - id: commands.graph.short
   translation: 🎨 Genera bellissimi grafici delle dipendenze
 - id: commands.install.short
-  translation: 📦 Installa un artefatto di pacchetto usando il gestore di pacchetti
+  translation:
+    📦 Installa un artefatto di pacchetto usando il gestore di pacchetti
     appropriato
 - id: commands.list_distros.short
   translation: 📋 Elenca tutte le distribuzioni e rilasci supportati
@@ -114,7 +108,8 @@
 - id: flags.build.cleanbuild
   translation: 🧹 rimuovi directory $srcdir/ prima del build (garantisce build pulito)
 - id: flags.build.from
-  translation: ▶️  inizia a costruire dal pacchetto specificato (consapevole delle
+  translation:
+    ▶️  inizia a costruire dal pacchetto specificato (consapevole delle
     dipendenze)
 - id: flags.build.nobuild
   translation: 📥 scarica ed estrai solo file sorgente (nessuna compilazione)
@@ -123,7 +118,8 @@
 - id: flags.build.pkgrel
   translation: 🔢 sovrascrivi numero di rilascio pacchetto (pkgrel) per tutti i pacchetti
 - id: flags.build.pkgver
-  translation: 🏷️  sovrascrivi versione pacchetto (pkgver) per tutti i pacchetti nel
+  translation:
+    🏷️  sovrascrivi versione pacchetto (pkgver) per tutti i pacchetti nel
     progetto
 - id: flags.build.skip_sync
   translation: 🚫 salta sincronizzazione gestore pacchetti con remote
@@ -134,7 +130,8 @@
 - id: flags.build.zap
   translation: 💥 rimuovi intera directory di staging prima del build (pulizia profonda)
 - id: commands.zap.long
-  translation: "Esegui pulizia profonda degli ambienti di build, rimuovendo tutti\
+  translation:
+    "Esegui pulizia profonda degli ambienti di build, rimuovendo tutti\
     \ gli artefatti di build,\nfile temporanei e directory di staging per il progetto\
     \ specificato.\n\nQuesto comando è utile per:\n  • Liberare spazio su disco occupato\
     \ dagli artefatti di build\n  • Risolvere problemi di build causati da file obsoleti\n\
@@ -147,7 +144,7 @@
     \ delle dipendenze (nomakedeps=true)\n  • Salta la sincronizzazione del gestore\
     \ pacchetti (skip-sync=true)\n  • Abilita la modalità di pulizia profonda (zap=true)\n"
 - id: commands.zap.examples
-  translation: '# Pulisci distribuzione del sistema corrente
+  translation: "# Pulisci distribuzione del sistema corrente
 
     yap zap .
 
@@ -167,13 +164,14 @@
 
     yap zap rocky-9 .
 
-    '
+    "
 - id: flags.zap.from
   translation: ▶️  inizia pulizia dal pacchetto specificato (consapevole delle dipendenze)
 - id: flags.zap.to
   translation: ⏹️  ferma pulizia al pacchetto specificato (consapevole delle dipendenze)
 - id: commands.graph.long
-  translation: "Genera visualizzazioni moderne e interattive dei grafici delle dipendenze\
+  translation:
+    "Genera visualizzazioni moderne e interattive dei grafici delle dipendenze\
     \ del tuo progetto.\n\nIl comando graph analizza il tuo file di progetto yap.json\
     \ e crea bellissime\nvisualizzazioni delle dipendenze che mostrano le relazioni\
     \ tra i pacchetti. L'output\ninclude ordinamento topologico, analisi della popolarità\
@@ -187,7 +185,7 @@
     \  • I livelli mostrano l'ordine di build\n  • I tooltip forniscono informazioni\
     \ dettagliate sui pacchetti\n"
 - id: commands.graph.examples
-  translation: '# Genera grafico SVG per la directory corrente
+  translation: "# Genera grafico SVG per la directory corrente
 
     yap graph .
 
@@ -206,17 +204,18 @@
 
     yap graph --theme modern --format svg --output docs/architecture.svg .
 
-    '
+    "
 - id: flags.graph.format
-  translation: 'formato output: svg, png'
+  translation: "formato output: svg, png"
 - id: flags.graph.output
-  translation: 'percorso file output (default: dependencies.svg)'
+  translation: "percorso file output (default: dependencies.svg)"
 - id: flags.graph.show_external
   translation: includi dipendenze esterne nel grafico
 - id: flags.graph.theme
-  translation: 'tema visuale: modern, classic, dark'
+  translation: "tema visuale: modern, classic, dark"
 - id: commands.install.long
-  translation: "Installa un artefatto di pacchetto usando il gestore di pacchetti\
+  translation:
+    "Installa un artefatto di pacchetto usando il gestore di pacchetti\
     \ appropriato del sistema.\n\nQuesto comando rileva automaticamente il formato\
     \ del pacchetto e usa il gestore\ndi pacchetti corretto per installare l'artefatto\
     \ sul tuo sistema.\n\nFORMATI SUPPORTATI:\n  • pacchetti .deb (via apt/dpkg)\n\
@@ -224,7 +223,7 @@
     \  • pacchetti .apk (via apk)\n\nL'installer gestirà le dipendenze e fornirà feedback\
     \ appropriato\ndurante il processo di installazione.\n"
 - id: commands.install.examples
-  translation: '# Installa un pacchetto Debian
+  translation: "# Installa un pacchetto Debian
 
     yap install package.deb
 
@@ -243,16 +242,17 @@
 
     yap install package.apk
 
-    '
+    "
 - id: commands.list_distros.long
-  translation: "Elenca tutte le distribuzioni supportate e i loro rilasci disponibili.\n\
+  translation:
+    "Elenca tutte le distribuzioni supportate e i loro rilasci disponibili.\n\
     \nQuesto comando mostra per quali distribuzioni YAP può costruire pacchetti,\n\
     incluse versioni di rilascio specifiche dove applicabile.\n\nL'output include:\n\
     \  • Nomi e ID delle distribuzioni\n  • Versioni di rilascio disponibili\n  •\
     \ Informazioni sul supporto dell'architettura\n  • Stato di disponibilità del\
     \ container\n"
 - id: commands.list_distros.examples
-  translation: '# Elenca tutte le distribuzioni supportate
+  translation: "# Elenca tutte le distribuzioni supportate
 
     yap list-distros
 
@@ -261,16 +261,17 @@
 
     yap list-distros | grep ubuntu
 
-    '
+    "
 - id: commands.prepare.long
-  translation: "Prepara ambiente di build con pacchetti di sviluppo e dipendenze.\n\
+  translation:
+    "Prepara ambiente di build con pacchetti di sviluppo e dipendenze.\n\
     \nQuesto comando configura un ambiente di build installando strumenti\ndi sviluppo\
     \ necessari, compilatori e dipendenze di build per la\ndistribuzione specificata.\n\
     \nLA PREPARAZIONE INCLUDE:\n  • Strumenti di sviluppo base (gcc, make, ecc.)\n\
     \  • Dipendenze di build specifiche del pacchetto\n  • Configurazione ambiente\
     \ di build\n  • Preparazione immagine container\n"
 - id: commands.prepare.examples
-  translation: '# Prepara sistema corrente
+  translation: "# Prepara sistema corrente
 
     yap prepare
 
@@ -284,16 +285,17 @@
 
     yap prepare rocky-9
 
-    '
+    "
 - id: flags.prepare.skip_sync
-  translation: ⚡ salta sincronizzazione gestore pacchetti (più veloce ma può perdere
+  translation:
+    ⚡ salta sincronizzazione gestore pacchetti (più veloce ma può perdere
     aggiornamenti)
 - id: flags.prepare.golang
   translation: 🐹 installa inoltre runtime Go e strumenti di sviluppo
 - id: footer.documentation
-  translation: '📖 Documentazione:'
+  translation: "📖 Documentazione:"
 - id: footer.report_issues
-  translation: '🐛 Segnala problemi:'
+  translation: "🐛 Segnala problemi:"
 - id: footer.more_info
   translation: Usa "yap [comando] --help" per maggiori informazioni su un comando.
 - id: logger.tips.use_help
@@ -301,7 +303,8 @@
 - id: logger.tips.use_verbose
   translation: 💡 Usa --verbose per vedere la lista completa
 - id: logger.pull.specify_codename
-  translation: tranne per alpine e arch, specifica anche il codename (es. rocky-9,
+  translation:
+    tranne per alpine e arch, specifica anche il codename (es. rocky-9,
     ubuntu-jammy)
 - id: logger.pull.failed_to_pull
   translation: impossibile scaricare immagine
@@ -484,11 +487,11 @@
 - id: errors.download.download_failed
   translation: download fallito
 - id: errors.download.download_failed_after_attempts
-  translation: 'download fallito dopo %d tentativi: %v'
+  translation: "download fallito dopo %d tentativi: %v"
 - id: errors.download.download_failed_no_response
-  translation: 'download fallito: nessuna risposta'
+  translation: "download fallito: nessuna risposta"
 - id: errors.download.download_job_not_found
-  translation: 'lavoro di download non trovato: %s'
+  translation: "lavoro di download non trovato: %s"
 - id: errors.source.unsupported_source_type
   translation: tipo di sorgente non supportato
 - id: errors.source.failed_to_open_file_for_hash
@@ -502,7 +505,7 @@
 - id: errors.source.failed_to_start_multiprinter
   translation: impossibile avviare multiprinter
 - id: errors.source.download_failed_for
-  translation: 'download fallito per %s: %v'
+  translation: "download fallito per %s: %v"
 - id: errors.shell.failed_to_start_multiprinter
   translation: impossibile avviare multiprinter
 - id: errors.shell.failed_to_parse_script
@@ -570,7 +573,7 @@
 - id: errors.git.empty_download_path
   translation: il percorso del file di download non può essere vuoto
 - id: errors.git.remote_branch_not_found
-  translation: 'ramo remoto %s non trovato: %v'
+  translation: "ramo remoto %s non trovato: %v"
 - id: errors.platform.open_os_release_failed
   translation: apertura di /etc/os-release fallita
 - id: errors.platform.scan_os_release_failed
@@ -612,7 +615,7 @@
 - id: errors.validation.insufficient_args
   translation: richiede almeno un argomento
 - id: errors.validation.unsupported_distribution
-  translation: 'distribuzione non supportata ''%s''
+  translation: "distribuzione non supportata '%s'
 
 
     Distribuzioni supportate:
@@ -620,36 +623,36 @@
     %s
 
 
-    Usa ''yap list-distros'' per vedere tutte le opzioni disponibili'
+    Usa 'yap list-distros' per vedere tutte le opzioni disponibili"
 - id: errors.validation.invalid_path
   translation: percorso non valido '%s'
 - id: errors.validation.no_project_files
-  translation: 'né yap.json né PKGBUILD trovati in %s
+  translation: "né yap.json né PKGBUILD trovati in %s
 
 
     Assicurati che la directory del progetto contenga uno di questi file:
 
     - yap.json (raccomandato per progetti multi-pacchetto)
 
-    - PKGBUILD (per progetti a singolo pacchetto)'
+    - PKGBUILD (per progetti a singolo pacchetto)"
 - id: errors.validation.insufficient_args_detailed
-  translation: 'richiede almeno %d argomento/i, ricevuto solo %d
+  translation: "richiede almeno %d argomento/i, ricevuto solo %d
 
 
     Uso: %s
 
 
-    Per maggiori informazioni, usa: %s --help'
+    Per maggiori informazioni, usa: %s --help"
 - id: errors.install.artifact_not_found
-  translation: 'file artifact non trovato: %s'
+  translation: "file artifact non trovato: %s"
 - id: errors.install.failed_to_resolve_path
   translation: fallito nel risolvere il percorso dell'artifact
 - id: errors.install.unsupported_package_format
-  translation: 'formato pacchetto non supportato: %s
+  translation: "formato pacchetto non supportato: %s
 
-    Formati supportati: .deb, .rpm, .apk, .pkg.tar.*'
+    Formati supportati: .deb, .rpm, .apk, .pkg.tar.*"
 - id: errors.install.unsupported_package_type
-  translation: 'tipo di pacchetto non supportato: %s'
+  translation: "tipo di pacchetto non supportato: %s"
 - id: errors.install.installation_failed
   translation: fallito nell'installare il pacchetto con %s
 - id: errors.graph.failed_to_resolve_project_path
@@ -657,7 +660,7 @@
 - id: errors.graph.failed_to_load_project
   translation: fallito nel caricare il progetto
 - id: errors.core.artifacts_path_not_exist
-  translation: 'il percorso degli artifacts non esiste: %s'
+  translation: "il percorso degli artifacts non esiste: %s"
 - id: messages.verbose_mode_enabled
   translation: modalità verbose abilitata
 - id: logger.strip.info.stripping_binaries
@@ -729,7 +732,7 @@
 - id: logger.stringifyfuncdecl.error.unable_to_parse_function_1
   translation: impossibile analizzare funzione
 - id: logger.download.info.response_status
-  translation: 'stato risposta:'
+  translation: "stato risposta:"
 - id: logger.withresume.info.retrying_download
   translation: nuovo tentativo download
 - id: logger.withresume.info.retrying_download_1
@@ -747,7 +750,7 @@
 - id: logger.logdownloadstart.info.server_supports_resume_1
   translation: server supporta ripresa
 - id: logger.logdownloadstart.info.response_status
-  translation: 'stato risposta:'
+  translation: "stato risposta:"
 - id: logger.monitordownload.info.download_completed
   translation: download completato
 - id: logger.monitordownload.info.download_completed_1
@@ -921,9 +924,9 @@
 - id: logger.validategeneral.error.missing_package_function_1
   translation: funzione package() mancante
 - id: logger.setupenvironmentdependencies.info.go_detected_version_check
-  translation: 'go rilevato: controllo versione disabilitato'
+  translation: "go rilevato: controllo versione disabilitato"
 - id: logger.setupenvironmentdependencies.info.go_detected_version_check_1
-  translation: 'go rilevato: controllo versione disabilitato'
+  translation: "go rilevato: controllo versione disabilitato"
 - id: logger.setupenvironmentdependencies.warn.failed_to_setup_go
   translation: Errore configurazione ambiente Go
 - id: logger.setupenvironmentdependencies.warn.failed_to_setup_go_1
