@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/graph"
@@ -198,6 +199,7 @@ func addDependenciesFromPKGBUILD(graphData *graph.Data, projects []struct {
 }, projectPath string) {
 	// Create a map from pkgname to project name for quick lookup
 	pkgnameToProject := make(map[string]string)
+
 	for _, proj := range projects {
 		node, exists := graphData.Nodes[proj.Name]
 		if exists && node.PkgName != "" {
@@ -241,6 +243,7 @@ func addDependenciesFromPKGBUILD(graphData *graph.Data, projects []struct {
 						}
 						graphData.Nodes[depName] = externalNode
 					}
+
 					targetProjectName = depName // Use depName for edge to external node
 				}
 
@@ -297,7 +300,9 @@ func processDependencyLine(
 	inArray bool,
 	dependencies map[string][]string,
 ) (newArray string, newDeps []string, newInArray bool) {
-	// Check for dependency array declarations
+	// Regex to match dynamic dependency declarations like depends__{distro}
+	re := regexp.MustCompile(`^(depends|makedepends|checkdepends|optdepends)__\w+=\(`)
+
 	switch {
 	case strings.HasPrefix(line, "depends=("):
 		return handleDependencyArrayStart(line, "depends=(", "runtime", dependencies)
@@ -307,6 +312,11 @@ func processDependencyLine(
 		return handleDependencyArrayStart(line, "checkdepends=(", "check", dependencies)
 	case strings.HasPrefix(line, "optdepends=("):
 		return handleDependencyArrayStart(line, "optdepends=(", "optional", dependencies)
+	case re.MatchString(line):
+		prefix := re.FindString(line)
+		arrayType := strings.Split(prefix, "__")[0]
+
+		return handleDependencyArrayStart(line, prefix, arrayType, dependencies)
 	case inArray:
 		return handleArrayContinuation(line, currentArray, currentDeps, dependencies)
 	default:
