@@ -144,7 +144,7 @@ jobs:
 
       - name: 💬 Comment vulnerability results on PR
         if: github.event_name == 'pull_request' && steps.vulncheck.outputs.result == 'vulnerabilities_found'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
