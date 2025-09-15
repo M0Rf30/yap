@@ -35,6 +35,7 @@ jobs:
           - alpine
           - rocky-8
           - rocky-9
+          - rocky-10
           - ubuntu-focal
           - ubuntu-jammy
           - ubuntu-noble
@@ -49,7 +50,7 @@ jobs:
         uses: hadolint/hadolint-action@v3.2.0
         with:
           dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
-          config: .hadolint.yaml
+          config: .hadolint.yml
           output-file: hadolint-${{ matrix.os }}.sarif
           format: sarif
 
@@ -118,24 +119,6 @@ jobs:
             VERSION=${{ github.ref_name }}
             BUILD_TIME=${{ github.run_id }}
             COMMIT=${{ github.sha }}
-
-      - name: 🔒 Run Trivy vulnerability scanner
-        if: github.event_name != 'pull_request'
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: '${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.os }}:latest'
-          format: 'sarif'
-          output: 'trivy-${{ matrix.os }}.sarif'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
-
-      - name: 📋 Upload Trivy scan results
-        if: github.event_name != 'pull_request'
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'trivy-${{ matrix.os }}.sarif'
-          category: trivy-${{ matrix.os }}
 
       - name: 📝 Output image details
         run: |

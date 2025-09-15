@@ -2,19 +2,11 @@
   translation: YAP
 - id: app.full_name
   translation: Yet Another Packager
-- id: app.description
-  translation: 'YAP (Yet Another Packager) is a powerful, container-based package
-    building system
-
-    that creates packages for multiple GNU/Linux distributions from a single PKGBUILD-like
-
-    specification format.'
-- id: app.documentation_url
-  translation: For detailed documentation and examples, visit https://github.com/M0Rf30/yap
 - id: root.short
   translation: 🚀 Yet Another Packager - Multi-distribution package builder
 - id: root.examples
-  translation: '# Build all packages in current directory for your current distro
+  translation:
+    "# Build all packages in current directory for your current distro
 
     yap build .
 
@@ -48,7 +40,7 @@
 
     yap list-distros
 
-    '
+    "
 - id: groups.build
   translation: Build Commands
 - id: groups.environment
@@ -60,7 +52,8 @@
 - id: commands.build.short
   translation: 🔨 Build packages from yap.json project definition
 - id: commands.build.long
-  translation: "Build packages for one or more distributions using a yap.json project\
+  translation:
+    "Build packages for one or more distributions using a yap.json project\
     \ file.\n\nThe build command orchestrates the entire package building process:\n\
     \  • Parses yap.json project configuration\n  • Resolves build dependencies and\
     \ order\n  • Creates isolated container environments\n  • Builds packages according\
@@ -70,7 +63,7 @@
     \nDEPENDENCY RESOLUTION:\n  Build order is automatically determined from package\
     \ dependencies.\n  Use --from and --to flags to build specific package ranges.\n"
 - id: commands.build.examples
-  translation: '# Build for current system distribution
+  translation: "# Build for current system distribution
 
     yap build .
 
@@ -85,7 +78,7 @@
 
     yap build alpine /home/user/myproject
 
-    '
+    "
 - id: commands.graph.short
   translation: 🎨 Generate beautiful dependency graphs
 - id: commands.install.short
@@ -129,7 +122,8 @@
 - id: flags.build.zap
   translation: 💥 remove entire staging directory before building (deep clean)
 - id: commands.zap.long
-  translation: "Perform deep cleaning of build environments, removing all build artifacts,\n\
+  translation:
+    "Perform deep cleaning of build environments, removing all build artifacts,\n\
     temporary files, and staging directories for the specified project.\n\nThis command\
     \ is useful for:\n  • Freeing disk space occupied by build artifacts\n  • Resolving\
     \ build issues caused by stale files\n  • Ensuring completely clean builds\n \
@@ -141,7 +135,7 @@
     \ installation (nomakedeps=true)\n  • Skips package manager sync (skip-sync=true)\n\
     \  • Enables deep cleaning mode (zap=true)\n"
 - id: commands.zap.examples
-  translation: '# Clean current system distribution
+  translation: "# Clean current system distribution
 
     yap zap .
 
@@ -161,13 +155,14 @@
 
     yap zap rocky-9 .
 
-    '
+    "
 - id: flags.zap.from
   translation: ▶️  start cleaning from specified package name (dependency-aware)
 - id: flags.zap.to
   translation: ⏹️  stop cleaning at specified package name (dependency-aware)
 - id: commands.graph.long
-  translation: "Generate modern, interactive dependency graph visualizations of your\
+  translation:
+    "Generate modern, interactive dependency graph visualizations of your\
     \ project.\n\nThe graph command analyzes your yap.json project file and creates\
     \ beautiful\ndependency visualizations showing the relationships between packages.\
     \ The output\nincludes topological ordering, dependency popularity analysis, and\
@@ -179,7 +174,7 @@
     \ indicate package types (internal vs external)\n  • Arrows show dependency direction\n\
     \  • Levels show build order\n  • Tooltips provide detailed package information\n"
 - id: commands.graph.examples
-  translation: '# Generate SVG graph for current directory
+  translation: "# Generate SVG graph for current directory
 
     yap graph .
 
@@ -198,17 +193,18 @@
 
     yap graph --theme modern --format svg --output docs/architecture.svg .
 
-    '
+    "
 - id: flags.graph.format
-  translation: 'output format: svg, png'
+  translation: "output format: svg, png"
 - id: flags.graph.output
-  translation: 'output file path (default: dependencies.svg)'
+  translation: "output file path (default: dependencies.svg)"
 - id: flags.graph.show_external
   translation: include external dependencies in the graph
 - id: flags.graph.theme
-  translation: 'visual theme: modern, classic, dark'
+  translation: "visual theme: modern, classic, dark"
 - id: commands.install.long
-  translation: "Install a package artifact using the system's appropriate package\
+  translation:
+    "Install a package artifact using the system's appropriate package\
     \ manager.\n\nThis command automatically detects the package format and uses the\
     \ correct\npackage manager to install the artifact on your system.\n\nSUPPORTED\
     \ FORMATS:\n  • .deb packages (via apt/dpkg)\n  • .rpm packages (via yum/dnf/rpm)\n\
@@ -216,7 +212,7 @@
     \ will handle dependencies and provide appropriate feedback\nduring the installation\
     \ process.\n"
 - id: commands.install.examples
-  translation: '# Install a Debian package
+  translation: "# Install a Debian package
 
     yap install package.deb
 
@@ -235,15 +231,16 @@
 
     yap install package.apk
 
-    '
+    "
 - id: commands.list_distros.long
-  translation: "List all supported distributions and their available releases.\n\n\
+  translation:
+    "List all supported distributions and their available releases.\n\n\
     This command shows which distributions YAP can build packages for,\nincluding\
     \ specific release versions where applicable.\n\nThe output includes:\n  • Distribution\
     \ names and IDs\n  • Available release versions\n  • Architecture support information\n\
     \  • Container availability status\n"
 - id: commands.list_distros.examples
-  translation: '# List all supported distributions
+  translation: "# List all supported distributions
 
     yap list-distros
 
@@ -252,16 +249,17 @@
 
     yap list-distros | grep ubuntu
 
-    '
+    "
 - id: commands.prepare.long
-  translation: "Prepare build environment with development packages and dependencies.\n\
+  translation:
+    "Prepare build environment with development packages and dependencies.\n\
     \nThis command sets up a build environment by installing necessary\ndevelopment\
     \ tools, compilers, and build dependencies for the\nspecified distribution.\n\n\
     PREPARATION INCLUDES:\n  • Base development tools (gcc, make, etc.)\n  • Package-specific\
     \ build dependencies\n  • Build environment configuration\n  • Container image\
     \ preparation\n"
 - id: commands.prepare.examples
-  translation: '# Prepare current system
+  translation: "# Prepare current system
 
     yap prepare
 
@@ -275,15 +273,15 @@
 
     yap prepare rocky-9
 
-    '
+    "
 - id: flags.prepare.skip_sync
   translation: ⚡ skip package manager synchronization (faster but may miss updates)
 - id: flags.prepare.golang
   translation: 🐹 additionally install Go language runtime and development tools
 - id: footer.documentation
-  translation: '📖 Documentation:'
+  translation: "📖 Documentation:"
 - id: footer.report_issues
-  translation: '🐛 Report issues:'
+  translation: "🐛 Report issues:"
 - id: footer.more_info
   translation: Use "yap [command] --help" for more information about a command.
 - id: logger.tips.use_help
@@ -291,7 +289,8 @@
 - id: logger.tips.use_verbose
   translation: 💡 Use --verbose to see full list
 - id: logger.pull.specify_codename
-  translation: except for alpine and arch, specify also the codename (i.e. rocky-9,
+  translation:
+    except for alpine and arch, specify also the codename (i.e. rocky-9,
     ubuntu-jammy)
 - id: logger.pull.failed_to_pull
   translation: failed to pull image
@@ -476,11 +475,11 @@
 - id: errors.download.download_failed
   translation: download failed
 - id: errors.download.download_failed_after_attempts
-  translation: 'download failed after %d attempts: %v'
+  translation: "download failed after %d attempts: %v"
 - id: errors.download.download_failed_no_response
-  translation: 'download failed: no response'
+  translation: "download failed: no response"
 - id: errors.download.download_job_not_found
-  translation: 'download job not found: %s'
+  translation: "download job not found: %s"
 - id: errors.source.unsupported_source_type
   translation: unsupported source type
 - id: errors.source.failed_to_open_file_for_hash
@@ -494,7 +493,7 @@
 - id: errors.source.failed_to_start_multiprinter
   translation: failed to start multiprinter
 - id: errors.source.download_failed_for
-  translation: 'download failed for %s: %v'
+  translation: "download failed for %s: %v"
 - id: errors.shell.failed_to_start_multiprinter
   translation: failed to start multiprinter
 - id: errors.shell.failed_to_parse_script
@@ -564,7 +563,7 @@
 - id: errors.git.empty_download_path
   translation: download file path cannot be empty
 - id: errors.git.remote_branch_not_found
-  translation: 'remote branch %s not found: %v'
+  translation: "remote branch %s not found: %v"
 - id: errors.platform.open_os_release_failed
   translation: failed to open /etc/os-release
 - id: errors.platform.scan_os_release_failed
@@ -606,7 +605,7 @@
 - id: errors.validation.insufficient_args
   translation: requires at least one argument
 - id: errors.validation.unsupported_distribution
-  translation: 'unsupported distribution ''%s''
+  translation: "unsupported distribution '%s'
 
 
     Supported distributions:
@@ -614,36 +613,36 @@
     %s
 
 
-    Use ''yap list-distros'' to see all available options'
+    Use 'yap list-distros' to see all available options"
 - id: errors.validation.invalid_path
   translation: invalid path '%s'
 - id: errors.validation.no_project_files
-  translation: 'neither yap.json nor PKGBUILD found in %s
+  translation: "neither yap.json nor PKGBUILD found in %s
 
 
     Please ensure your project directory contains one of these files:
 
     - yap.json (recommended for multi-package projects)
 
-    - PKGBUILD (for single-package projects)'
+    - PKGBUILD (for single-package projects)"
 - id: errors.validation.insufficient_args_detailed
-  translation: 'requires at least %d argument(s), only received %d
+  translation: "requires at least %d argument(s), only received %d
 
 
     Usage: %s
 
 
-    For more information, use: %s --help'
+    For more information, use: %s --help"
 - id: errors.install.artifact_not_found
-  translation: 'artifact file not found: %s'
+  translation: "artifact file not found: %s"
 - id: errors.install.failed_to_resolve_path
   translation: failed to resolve artifact path
 - id: errors.install.unsupported_package_format
-  translation: 'unsupported package format: %s
+  translation: "unsupported package format: %s
 
-    Supported formats: .deb, .rpm, .apk, .pkg.tar.*'
+    Supported formats: .deb, .rpm, .apk, .pkg.tar.*"
 - id: errors.install.unsupported_package_type
-  translation: 'unsupported package type: %s'
+  translation: "unsupported package type: %s"
 - id: errors.install.installation_failed
   translation: failed to install package with %s
 - id: errors.graph.failed_to_resolve_project_path
@@ -651,7 +650,7 @@
 - id: errors.graph.failed_to_load_project
   translation: failed to load project
 - id: errors.core.artifacts_path_not_exist
-  translation: 'artifacts path does not exist: %s'
+  translation: "artifacts path does not exist: %s"
 - id: messages.verbose_mode_enabled
   translation: verbose mode enabled
 - id: logger.strip.info.stripping_binaries
@@ -723,7 +722,7 @@
 - id: logger.stringifyfuncdecl.error.unable_to_parse_function_1
   translation: unable to parse function
 - id: logger.download.info.response_status
-  translation: 'response status: '
+  translation: "response status: "
 - id: logger.withresume.info.retrying_download
   translation: retrying download
 - id: logger.withresume.info.retrying_download_1
@@ -741,7 +740,7 @@
 - id: logger.logdownloadstart.info.server_supports_resume_1
   translation: server supports resume
 - id: logger.logdownloadstart.info.response_status
-  translation: 'response status: '
+  translation: "response status: "
 - id: logger.monitordownload.info.download_completed
   translation: download completed
 - id: logger.monitordownload.info.download_completed_1
@@ -915,9 +914,9 @@
 - id: logger.validategeneral.error.missing_package_function_1
   translation: missing package() function
 - id: logger.setupenvironmentdependencies.info.go_detected_version_check
-  translation: 'go detected: version check is disabled'
+  translation: "go detected: version check is disabled"
 - id: logger.setupenvironmentdependencies.info.go_detected_version_check_1
-  translation: 'go detected: version check is disabled'
+  translation: "go detected: version check is disabled"
 - id: logger.setupenvironmentdependencies.warn.failed_to_setup_go
   translation: Failed to setup Go environment
 - id: logger.setupenvironmentdependencies.warn.failed_to_setup_go_1

@@ -3,7 +3,6 @@ package command
 import (
 	"os"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -15,32 +14,6 @@ var (
 	noColor  bool
 	language string
 )
-
-// getLongDescription returns the long description with conditional logo coloring.
-func getLongDescription() string {
-	// Create stylized YAP logo
-	logo := `
-	██╗   ██╗ █████╗ ██████╗
-	╚██╗ ██╔╝██╔══██╗██╔══██╗
-	 ╚████╔╝ ███████║██████╔╝
-	  ╚██╔╝  ██╔══██║██╔═══╝
-	   ██║   ██║  ██║██║
-	   ╚═╝   ╚═╝  ╚═╝╚═╝
-	Yet Another Packager
-	`
-
-	// Check if colors should be disabled
-	var coloredLogo string
-	if logger.IsColorDisabled() {
-		coloredLogo = logo
-	} else {
-		coloredLogo = pterm.FgCyan.Sprint(logo)
-	}
-
-	return coloredLogo +
-		"\n" + i18n.T("app.description") +
-		"\n\n" + i18n.T("app.documentation_url")
-}
 
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
@@ -54,7 +27,6 @@ var rootCmd = &cobra.Command{
 			_ = i18n.Init(language) // If i18n fails, continue without localization
 			// Update only basic command descriptions to avoid circular dependency
 			cmd.Root().Short = i18n.T("root.short")
-			cmd.Root().Long = getLongDescription()
 			cmd.Root().Example = i18n.T("root.examples")
 			// Update build command descriptions
 			InitializeBuildDescriptions()
@@ -96,7 +68,6 @@ func Execute() {
 func InitializeLocalizedDescriptions() {
 	// Update root command descriptions
 	rootCmd.Short = i18n.T("root.short")
-	rootCmd.Long = getLongDescription()
 	rootCmd.Example = i18n.T("root.examples")
 
 	// Update command groups
