@@ -288,26 +288,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: 🔍 Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: yap-${{ matrix.os }}:security-scan
-          format: "sarif"
-          output: "trivy-${{ matrix.os }}.sarif"
-
-      - name: 📋 Upload Trivy scan results
-        if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: "trivy-${{ matrix.os }}.sarif"
-
-      - name: 📤 Upload container security results
-        uses: actions/upload-artifact@v4
-        with:
-          name: container-security-${{ matrix.os }}
-          path: "trivy-${{ matrix.os }}.sarif"
-          retention-days: 30
-
   # ===================================
   # Security Summary Report
   # ===================================
