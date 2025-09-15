@@ -196,10 +196,13 @@ func extractQuotedValue(line, prefix string) string {
 func addDependenciesFromPKGBUILD(graphData *graph.Data, projects []struct {
 	Name string `json:"name"`
 }, projectPath string) {
-	// Create a map of existing projects for quick lookup
-	projectMap := make(map[string]bool)
+	// Create a map from pkgname to project name for quick lookup
+	pkgnameToProject := make(map[string]string)
 	for _, proj := range projects {
-		projectMap[proj.Name] = true
+		node, exists := graphData.Nodes[proj.Name]
+		if exists && node.PkgName != "" {
+			pkgnameToProject[node.PkgName] = proj.Name
+		}
 	}
 
 	// Parse dependencies from each PKGBUILD file
@@ -212,35 +215,40 @@ func addDependenciesFromPKGBUILD(graphData *graph.Data, projects []struct {
 				// Clean up dependency name (remove version constraints)
 				depName := cleanDependencyName(dep)
 
-				// Create external node if target doesn't exist in project
-				if !projectMap[depName] && depName != "" {
-					// Create external node
-					nodeWidth := float64(len(depName)*8 + 40)
-					if nodeWidth < 100 {
-						nodeWidth = 100
-					}
+				// Find the project name corresponding to the dependency's pkgname
+				targetProjectName, isInternal := pkgnameToProject[depName]
 
-					externalNode := &graph.Node{
-						Name:         depName,
-						PkgName:      depName,
-						Version:      "external",
-						Release:      "1",
-						Width:        nodeWidth,
-						Height:       60,
-						IsExternal:   true,
-						IsPopular:    false,
-						Dependencies: make([]string, 0),
-						Level:        1,
+				// Create external node if target doesn't exist in project
+				if !isInternal && depName != "" {
+					// Avoid creating duplicate external nodes
+					if _, exists := graphData.Nodes[depName]; !exists {
+						nodeWidth := float64(len(depName)*8 + 40)
+						if nodeWidth < 100 {
+							nodeWidth = 100
+						}
+
+						externalNode := &graph.Node{
+							Name:         depName,
+							PkgName:      depName,
+							Version:      "external",
+							Release:      "1",
+							Width:        nodeWidth,
+							Height:       60,
+							IsExternal:   true,
+							IsPopular:    false,
+							Dependencies: make([]string, 0),
+							Level:        1,
+						}
+						graphData.Nodes[depName] = externalNode
 					}
-					graphData.Nodes[depName] = externalNode
-					projectMap[depName] = true // Add to map to avoid duplicates
+					targetProjectName = depName // Use depName for edge to external node
 				}
 
-				// Add the edge if target exists
-				if projectMap[depName] && depName != "" {
+				// Add the edge if the dependency is not empty
+				if depName != "" {
 					edge := graph.Edge{
 						From: proj.Name,
-						To:   depName,
+						To:   targetProjectName,
 						Type: depType,
 					}
 					graphData.Edges = append(graphData.Edges, edge)
