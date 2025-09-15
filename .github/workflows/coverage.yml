@@ -146,7 +146,7 @@ jobs:
 
       - name: 💬 Comment coverage on PR
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
@@ -321,7 +321,7 @@ jobs:
 
       - name: 💬 Report quality gate status
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const status = process.env.QUALITY_GATE;
