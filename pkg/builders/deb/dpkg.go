@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
+	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -27,14 +27,15 @@ import (
 // It contains the directory path of the package and the PKGBUILD struct, which
 // contains the metadata and build instructions for the package.
 type Package struct {
-	debDir   string
-	PKGBUILD *pkgbuild.PKGBUILD
+	*common.BaseBuilder
+	debDir string
 }
 
 // NewBuilder creates a new Debian package manager.
 func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Package {
 	return &Package{
-		PKGBUILD: pkgBuild,
+		BaseBuilder: common.NewBaseBuilder(pkgBuild, "deb"),
+		debDir:      "",
 	}
 }
 
@@ -152,9 +153,8 @@ func (d *Package) PrepareEnvironment(golang bool) error {
 func (d *Package) PrepareFakeroot(_ string) error {
 	d.getRelease()
 
-	// Use centralized architecture mapping
-	archMapping := constants.GetArchMapping()
-	d.PKGBUILD.ArchComputed = archMapping.TranslateArch(constants.FormatDEB, d.PKGBUILD.ArchComputed)
+	// Use centralized architecture mapping from BaseBuilder
+	d.TranslateArchitecture()
 
 	err := os.RemoveAll(d.debDir)
 	if err != nil {
@@ -404,9 +404,9 @@ func (d *Package) createDebResources() error {
 
 	size, _ := files.GetDirSize(d.PKGBUILD.PackageDir)
 	d.PKGBUILD.InstalledSize = size / 1024
-	d.PKGBUILD.Depends = d.processDepends(d.PKGBUILD.Depends)
-	d.PKGBUILD.MakeDepends = d.processDepends(d.PKGBUILD.MakeDepends)
-	d.PKGBUILD.OptDepends = d.processDepends(d.PKGBUILD.OptDepends)
+	d.PKGBUILD.Depends = d.ProcessDependencies(d.PKGBUILD.Depends)
+	d.PKGBUILD.MakeDepends = d.ProcessDependencies(d.PKGBUILD.MakeDepends)
+	d.PKGBUILD.OptDepends = d.ProcessDependencies(d.PKGBUILD.OptDepends)
 
 	tmpl := d.PKGBUILD.RenderSpec(specFile)
 
@@ -455,31 +455,8 @@ func (d *Package) getRelease() {
 	}
 }
 
-// processDepends takes a slice of strings and processes each string in order to
-// modify it and return a new slice of strings for deb syntax.
-//
-// It splits each string into three parts: name, operator, and version. If the
-// string is split successfully, it combines the three parts into a new format
-// and replaces the original string in the slice.
-//
-// Parameters:
-//   - depends: a slice of strings to be processed.
-//
-// Returns:
-//   - a new slice of strings with modified elements for deb syntax.
+// processDepends is kept for backward compatibility with tests.
+// It delegates to the common ProcessDependencies method.
 func (d *Package) processDepends(depends []string) []string {
-	pattern := `(?m)(<|<=|>=|=|>|<)`
-	regex := regexp.MustCompile(pattern)
-
-	for index, depend := range depends {
-		result := regex.Split(depend, -1)
-		if len(result) == 2 {
-			name := result[0]
-			operator := strings.Trim(depend, result[0]+result[1])
-			version := result[1]
-			depends[index] = name + " (" + operator + " " + version + ")"
-		}
-	}
-
-	return depends
+	return d.ProcessDependencies(depends)
 }
