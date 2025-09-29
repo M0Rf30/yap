@@ -494,6 +494,8 @@
   translation: failed to start multiprinter
 - id: errors.source.download_failed_for
   translation: "download failed for %s: %v"
+- id: errors.source.directory_not_supported
+  translation: directory not supported as source for non-VCS protocols: %s
 - id: errors.shell.failed_to_start_multiprinter
   translation: failed to start multiprinter
 - id: errors.shell.failed_to_parse_script

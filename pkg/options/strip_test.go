@@ -111,13 +111,13 @@ func TestProcessFile(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Regular text file should be processed",
+			name: "Valid regular file",
 			setup: func(t *testing.T) (string, fs.DirEntry) {
-				t.Helper()
 				tempDir := t.TempDir()
 				filePath := filepath.Join(tempDir, "test.txt")
-				err := os.WriteFile(filePath, []byte("test content"), 0o600)
+				err := os.WriteFile(filePath, []byte("test content"), 0o644)
 				require.NoError(t, err)
+
 				info, err := os.Stat(filePath)
 				require.NoError(t, err)
 
@@ -311,6 +311,7 @@ func TestProcessFileErrorScenarios(t *testing.T) {
 
 				info, err := os.Stat(filePath)
 				require.NoError(t, err)
+
 				dirEntry := fs.FileInfoToDirEntry(info)
 
 				// Delete the file after getting the DirEntry
@@ -333,6 +334,7 @@ func TestProcessFileErrorScenarios(t *testing.T) {
 
 				info, err := os.Stat(tempFile)
 				require.NoError(t, err)
+
 				dirEntry := fs.FileInfoToDirEntry(info)
 
 				// Return path to non-existent location
@@ -430,6 +432,7 @@ func TestProcessFileAdvanced(t *testing.T) {
 				require.NoError(t, err)
 				info, err := os.Stat(filePath)
 				require.NoError(t, err)
+
 				return filePath, fs.FileInfoToDirEntry(info)
 			},
 			description: "Should process regular files without error",
@@ -446,6 +449,7 @@ func TestProcessFileAdvanced(t *testing.T) {
 				require.NoError(t, err)
 				info, err := os.Stat(filePath)
 				require.NoError(t, err)
+
 				return filePath, fs.FileInfoToDirEntry(info)
 			},
 			description: "Should process binary files",
@@ -580,6 +584,7 @@ func TestProcessFileStatErrors(t *testing.T) {
 
 				info, err := os.Stat(filePath)
 				require.NoError(t, err)
+
 				dirEntry := fs.FileInfoToDirEntry(info)
 
 				// Delete the file after getting the DirEntry

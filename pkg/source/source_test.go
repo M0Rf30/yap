@@ -230,7 +230,7 @@ func TestSource_validateSource(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Directory should not validate",
+			name: "Directory should not validate (for non-VCS protocols)",
 			setupFile: func(t *testing.T) (string, string) {
 				t.Helper()
 				tempDir := t.TempDir()
@@ -241,7 +241,7 @@ func TestSource_validateSource(t *testing.T) {
 				return subDir, "somehash"
 			},
 			pkgName:     "test-pkg",
-			expectError: false,
+			expectError: true, // Now directories should fail validation (like makepkg)
 		},
 		{
 			name: "Invalid hash should fail",
@@ -429,7 +429,8 @@ func TestSource_Get_UnsupportedProtocol(t *testing.T) {
 
 	err := src.Get()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported source type")
+	// The error should contain the translated message
+	assert.Contains(t, err.Error(), i18n.T("errors.source.unsupported_source_type"))
 }
 
 func TestSource_Get_WithSKIPHash(t *testing.T) {

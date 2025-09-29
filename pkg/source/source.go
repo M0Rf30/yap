@@ -277,7 +277,23 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return errors.Errorf(i18n.T("errors.source.failed_to_open_file_for_hash"), sourceFilePath)
 	}
 
-	if src.Hash == "SKIP" || info.IsDir() {
+	// If it's a directory, handle based on protocol (like makepkg)
+	if info.IsDir() {
+		protocol := src.getProtocol()
+		// For VCS protocols (git), directories are expected (cloned repos)
+		if protocol == constants.Git {
+			logger.Info(i18n.T("logger.skip_integrity_check_for"),
+				"source", src.SourceItemURI)
+
+			return nil
+		}
+		// For non-VCS, non-file protocols, directories are not supported (like makepkg)
+		// The file protocol (local files) also shouldn't accept directories in source arrays
+
+		return errors.Errorf(i18n.T("errors.source.directory_not_supported"), sourceFilePath)
+	}
+
+	if src.Hash == "SKIP" {
 		logger.Info(i18n.T("logger.skip_integrity_check_for"),
 			"source", src.SourceItemURI)
 

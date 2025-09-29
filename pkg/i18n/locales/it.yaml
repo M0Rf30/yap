@@ -506,6 +506,8 @@
   translation: impossibile avviare multiprinter
 - id: errors.source.download_failed_for
   translation: "download fallito per %s: %v"
+- id: errors.source.directory_not_supported
+  translation: "cartella non supportata come sorgente per protocolli non VCS: %s"
 - id: errors.shell.failed_to_start_multiprinter
   translation: impossibile avviare multiprinter
 - id: errors.shell.failed_to_parse_script

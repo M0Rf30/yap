@@ -461,6 +461,8 @@
   translation: 无法启动多重打印器
 - id: errors.source.download_failed_for
   translation: "下载失败 %s: %v"
+- id: errors.source.directory_not_supported
+  translation: "目录不支持作为非VCS协议的源: %s"
 - id: errors.shell.failed_to_start_multiprinter
   translation: 无法启动多重打印器
 - id: errors.shell.failed_to_parse_script

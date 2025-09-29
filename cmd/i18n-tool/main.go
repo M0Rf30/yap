@@ -22,11 +22,14 @@ func main() {
 		Short: "Check integrity of localization files",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Checking localization file integrity...")
+
 			if err := i18n.CheckIntegrity(); err != nil {
 				fmt.Printf("❌ Integrity check failed: %v\n", err)
 				return err
 			}
+
 			fmt.Println("✅ All localization files passed integrity checks")
+
 			return nil
 		},
 	}
@@ -41,10 +44,13 @@ func main() {
 			}
 
 			fmt.Println("Message IDs:")
+
 			for _, id := range ids {
 				fmt.Printf("  - %s\n", id)
 			}
+
 			fmt.Printf("\nTotal: %d message IDs\n", len(ids))
+
 			return nil
 		},
 	}
@@ -64,6 +70,7 @@ func main() {
 			if err != nil {
 				return err
 			}
+
 			fmt.Printf("Total messages: %d\n", len(ids))
 
 			return nil
