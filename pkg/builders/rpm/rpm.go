@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 
 	rpmpack "github.com/google/rpmpack"
@@ -26,13 +26,13 @@ import (
 // It contains the directory path of the package and the PKGBUILD struct, which
 // contains the metadata and build instructions for the package.
 type RPM struct {
-	PKGBUILD *pkgbuild.PKGBUILD
+	*common.BaseBuilder
 }
 
 // NewBuilder creates a new RPM package builder.
 func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *RPM {
 	return &RPM{
-		PKGBUILD: pkgBuild,
+		BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm"),
 	}
 }
 
@@ -104,11 +104,8 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	logger.Info(i18n.T("logger.unknown.info.package_artifact_created_1"),
-		"package", r.PKGBUILD.PkgName,
-		"version", r.PKGBUILD.PkgVer,
-		"release", r.PKGBUILD.PkgRel,
-		"artifact", cleanFilePath)
+	// Log package creation using common functionality
+	r.LogPackageCreated(cleanFilePath)
 
 	return nil
 }
@@ -122,9 +119,8 @@ func (r *RPM) PrepareFakeroot(_ string) error {
 	r.getGroup()
 	r.getRelease()
 
-	// Use centralized architecture mapping
-	archMapping := constants.GetArchMapping()
-	r.PKGBUILD.ArchComputed = archMapping.TranslateArch(constants.FormatRPM, r.PKGBUILD.ArchComputed)
+	// Use centralized architecture mapping from common package
+	r.TranslateArchitecture()
 
 	if r.PKGBUILD.StripEnabled {
 		return options.Strip(r.PKGBUILD.PackageDir)
@@ -140,15 +136,7 @@ func (r *RPM) PrepareFakeroot(_ string) error {
 //
 // It returns an error if there was an issue during the installation process.
 func (r *RPM) Install(artifactsPath string) error {
-	pkgName := r.PKGBUILD.PkgName +
-		"-" +
-		r.PKGBUILD.PkgVer +
-		"-" +
-		r.PKGBUILD.PkgRel +
-		"." +
-		r.PKGBUILD.ArchComputed +
-		".rpm"
-
+	pkgName := r.BuildPackageName(".rpm")
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
 	// Use centralized install arguments
@@ -179,24 +167,8 @@ func (r *RPM) Prepare(makeDepends []string) error {
 // Go environment.
 // It returns an error if there was an issue with the environment preparation.
 func (r *RPM) PrepareEnvironment(golang bool) error {
-	// Use centralized build dependencies and install arguments
-	buildDeps := constants.GetBuildDeps()
-	installArgs := constants.GetInstallArgs(constants.FormatRPM)
-	installArgs = append(installArgs, buildDeps.RPM...)
-
-	err := shell.ExecWithSudo(false, "", "dnf", installArgs...)
-	if err != nil {
-		return err
-	}
-
-	if golang {
-		err = platform.GOSetup()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	allArgs := r.SetupEnvironmentDependencies(golang)
+	return shell.ExecWithSudo(false, "", "dnf", allArgs...)
 }
 
 // Update updates the RPM object.

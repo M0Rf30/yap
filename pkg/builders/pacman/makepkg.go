@@ -14,13 +14,13 @@ import (
 	"github.com/klauspost/pgzip"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
+	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/crypto"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
@@ -28,14 +28,14 @@ import (
 //
 // It contains methods for building, installing, and updating packages.
 type Pkg struct {
-	PKGBUILD  *pkgbuild.PKGBUILD
+	*common.BaseBuilder
 	pacmanDir string
 }
 
 // NewBuilder creates a new Pacman package builder.
 func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Pkg {
 	return &Pkg{
-		PKGBUILD: pkgBuild,
+		BaseBuilder: common.NewBaseBuilder(pkgBuild, "pacman"),
 	}
 }
 
@@ -47,18 +47,21 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Pkg {
 // The method calls the internal pacmanBuild function to perform the actual build process.
 // It returns an error if the build process encounters any issues.
 func (m *Pkg) BuildPackage(artifactsPath string) error {
+	// Translate architecture for Pacman format
+	m.TranslateArchitecture()
+
 	completeVersion := m.PKGBUILD.PkgVer
 
 	if m.PKGBUILD.Epoch != "" {
 		completeVersion = fmt.Sprintf("%s:%s", m.PKGBUILD.Epoch, m.PKGBUILD.PkgVer)
 	}
 
+	// Build package name with the complete version for Pacman format
 	pkgName := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst",
 		m.PKGBUILD.PkgName,
 		completeVersion,
 		m.PKGBUILD.PkgRel,
 		m.PKGBUILD.ArchComputed)
-
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
 	err := archive.CreateTarZst(m.PKGBUILD.PackageDir, pkgFilePath, false)
@@ -66,11 +69,8 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 		return err
 	}
 
-	logger.Info(i18n.T("logger.buildpackage.info.package_artifact_created_1"),
-		"package", m.PKGBUILD.PkgName,
-		"version", m.PKGBUILD.PkgVer,
-		"release", m.PKGBUILD.PkgRel,
-		"artifact", pkgFilePath)
+	// Log package creation using common functionality
+	m.LogPackageCreated(pkgFilePath)
 
 	return nil
 }
@@ -126,10 +126,8 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 
 	var mtreeEntries []*files.Entry
 
-	// Create file walker
-	walker := files.NewWalker(m.PKGBUILD.PackageDir, files.WalkOptions{
-		SkipDotFiles: true, // makepkg skips dot files
-	})
+	// Create file walker using common functionality
+	walker := m.CreateFileWalker()
 
 	// Walk through the package directory and retrieve the contents.
 	entries, err := walker.Walk()
@@ -167,9 +165,15 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 // artifactsPath: the path where the package artifacts are located.
 // error: an error if the installation fails.
 func (m *Pkg) Install(artifactsPath string) error {
+	completeVersion := m.PKGBUILD.PkgVer
+
+	if m.PKGBUILD.Epoch != "" {
+		completeVersion = fmt.Sprintf("%s:%s", m.PKGBUILD.Epoch, m.PKGBUILD.PkgVer)
+	}
+
 	pkgName := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst",
 		m.PKGBUILD.PkgName,
-		m.PKGBUILD.PkgVer,
+		completeVersion,
 		m.PKGBUILD.PkgRel,
 		m.PKGBUILD.ArchComputed)
 
@@ -202,18 +206,8 @@ func (m *Pkg) Prepare(makeDepends []string) error {
 // should be prepared for Golang.
 // It returns an error if there is any issue in preparing the environment.
 func (m *Pkg) PrepareEnvironment(golang bool) error {
-	// Use centralized build dependencies
-	buildDeps := constants.GetBuildDeps()
-	installArgs := getBaseInstallArgs()
-	installArgs = append(installArgs, buildDeps.Pacman...)
-
-	if golang {
-		platform.CheckGO()
-
-		installArgs = append(installArgs, "go")
-	}
-
-	return shell.ExecWithSudo(false, "", "pacman", installArgs...)
+	allArgs := m.SetupEnvironmentDependencies(golang)
+	return shell.ExecWithSudo(false, "", "pacman", allArgs...)
 }
 
 // Update updates the Makepkg package manager.

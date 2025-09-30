@@ -9,6 +9,7 @@ import (
 
 	rpmpack "github.com/google/rpmpack"
 
+	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -48,7 +49,7 @@ func createTestPKGBUILD() *pkgbuild.PKGBUILD {
 
 func TestBuildPackage(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	tempDir, err := os.MkdirTemp("", "rpm-test")
 	if err != nil {
@@ -99,7 +100,7 @@ func TestBuildPackage(t *testing.T) {
 func TestBuildPackageWithoutEpoch(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkgBuild.Epoch = "" // Remove epoch
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	tempDir, err := os.MkdirTemp("", "rpm-test")
 	if err != nil {
@@ -133,7 +134,7 @@ func TestBuildPackageWithoutEpoch(t *testing.T) {
 
 func TestPrepareFakeroot(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	tempDir, err := os.MkdirTemp("", "rpm-test")
 	if err != nil {
@@ -170,7 +171,7 @@ func TestInstall(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	tempDir, err := os.MkdirTemp("", "rpm-test")
 	if err != nil {
@@ -193,7 +194,7 @@ func TestPrepare(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	makeDepends := []string{"make", "gcc"}
 	err := rpm.Prepare(makeDepends)
@@ -210,7 +211,7 @@ func TestPrepareEnvironment(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	err := rpm.PrepareEnvironment(false)
 	// This will likely fail since dnf isn't available, but we test the method call
@@ -226,7 +227,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	err := rpm.PrepareEnvironment(true)
 	// This will likely fail since dnf isn't available, but we test the method call
@@ -237,7 +238,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	err := rpm.Update()
 	if err != nil {
@@ -247,7 +248,7 @@ func TestUpdate(t *testing.T) {
 
 func TestGetGroup(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	originalSection := rpm.PKGBUILD.Section
 	rpm.getGroup()
@@ -262,7 +263,7 @@ func TestGetGroup(t *testing.T) {
 
 func TestGetRelease(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	originalRel := rpm.PKGBUILD.PkgRel
 	rpm.getRelease()
@@ -276,7 +277,7 @@ func TestGetRelease(t *testing.T) {
 func TestGetReleaseWithoutCodename(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkgBuild.Codename = "" // Remove codename
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	originalRel := rpm.PKGBUILD.PkgRel
 	rpm.getRelease()
@@ -289,7 +290,7 @@ func TestGetReleaseWithoutCodename(t *testing.T) {
 
 func TestPrepareBackupFiles(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	backupFiles := rpm.prepareBackupFiles()
 
@@ -358,7 +359,7 @@ func TestProcessDepends(t *testing.T) {
 
 func TestCreateFilesInsideRPM(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	tempDir, err := os.MkdirTemp("", "rpm-test")
 	if err != nil {
@@ -401,7 +402,7 @@ func TestCreateFilesInsideRPM(t *testing.T) {
 
 func TestAddScriptlets(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	rpm := &RPM{PKGBUILD: pkgBuild}
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	// Create RPM object
 	rpmObj, _ := rpmpack.NewRPM(rpmpack.RPMMetaData{

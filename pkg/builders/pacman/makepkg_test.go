@@ -34,7 +34,7 @@ func createTestPKGBUILD() *pkgbuild.PKGBUILD {
 
 func TestBuildPackage(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := &Pkg{PKGBUILD: pkgBuild}
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "pacman-test")
 	if err != nil {
@@ -85,7 +85,7 @@ func TestBuildPackage(t *testing.T) {
 func TestBuildPackageWithoutEpoch(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkgBuild.Epoch = "" // Remove epoch
-	pkg := &Pkg{PKGBUILD: pkgBuild}
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "pacman-test")
 	if err != nil {
@@ -127,7 +127,7 @@ func TestBuildPackageWithoutEpoch(t *testing.T) {
 
 func TestPrepareFakeroot(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := &Pkg{PKGBUILD: pkgBuild}
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "pacman-test")
 	if err != nil {
@@ -225,7 +225,7 @@ arch=('x86_64')
 
 func TestPrepareFakerootWithSpecCreation(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := &Pkg{PKGBUILD: pkgBuild}
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "pacman-test")
 	if err != nil {
@@ -297,7 +297,7 @@ func TestInstall(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := &Pkg{PKGBUILD: pkgBuild}
+	pkg := NewBuilder(pkgBuild)
 
 	tempDir, err := os.MkdirTemp("", "pacman-test")
 	if err != nil {
@@ -320,7 +320,7 @@ func TestPrepare(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := &Pkg{PKGBUILD: pkgBuild}
+	pkg := NewBuilder(pkgBuild)
 
 	makeDepends := []string{"make", "gcc"}
 	err := pkg.Prepare(makeDepends)
@@ -337,7 +337,7 @@ func TestPrepareEnvironment(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := &Pkg{PKGBUILD: pkgBuild}
+	pkg := NewBuilder(pkgBuild)
 
 	err := pkg.PrepareEnvironment(false)
 	// This will likely fail since pacman isn't available, but we test the method call
@@ -353,7 +353,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := &Pkg{PKGBUILD: pkgBuild}
+	pkg := NewBuilder(pkgBuild)
 
 	err := pkg.PrepareEnvironment(true)
 	// This will likely fail since pacman isn't available, but we test the method call
@@ -375,7 +375,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := &Pkg{PKGBUILD: pkgBuild}
+	pkg := NewBuilder(pkgBuild)
 
 	err := pkg.Update()
 	// This will likely fail since pacman isn't available, but we test the method call

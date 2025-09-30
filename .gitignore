@@ -81,3 +81,4 @@ temp/
 # Air live reload
 .air.toml
 tmp/
+.claude_consciousness.m8

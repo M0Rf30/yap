@@ -65,9 +65,7 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	case "yum":
 		return rpm.NewBuilder(pkgBuild)
 	case "zypper":
-		return &rpm.RPM{
-			PKGBUILD: pkgBuild,
-		}
+		return rpm.NewBuilder(pkgBuild)
 	default:
 		logger.Fatal(i18n.T("errors.packer.unsupported_linux_distro"),
 			"distro", distro)
