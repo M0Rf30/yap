@@ -185,10 +185,16 @@ func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
 	// Prepare a list of backup files by calling the prepareBackupFiles method.
 	backupFiles := r.prepareBackupFiles()
 
+	// Temporarily set the backup files for the walker
+	originalBackup := r.PKGBUILD.Backup
+	r.PKGBUILD.Backup = backupFiles
+
+	defer func() {
+		r.PKGBUILD.Backup = originalBackup // Restore original backup files after walker is used
+	}()
+
 	// Walk through the package directory and retrieve the contents.
-	walker := files.NewWalker(r.PKGBUILD.PackageDir, files.WalkOptions{
-		BackupFiles: backupFiles,
-	})
+	walker := r.CreateFileWalker()
 
 	entries, err := walker.Walk()
 	if err != nil {

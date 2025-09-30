@@ -458,20 +458,23 @@ maintainer="John Doe <john@example.com>"
 
 YAP supports building packages for the following distributions:
 
-| Distribution | Package Format | Container Base | Package Manager |
-|-------------|----------------|----------------|-----------------|
-| **Debian** | `.deb` | debian:stable | apt |
-| **Ubuntu** | `.deb` | ubuntu:latest | apt |
-| **Linux Mint** | `.deb` | linuxmint/mintbox | apt |
-| **Pop!_OS** | `.deb` | pop-os/ubuntu | apt |
-| **Fedora** | `.rpm` | fedora:latest | dnf |
-| **CentOS** | `.rpm` | centos:latest | yum |
-| **Rocky Linux** | `.rpm` | rockylinux:latest | dnf |
-| **AlmaLinux** | `.rpm` | almalinux:latest | dnf |
-| **Red Hat Enterprise Linux** | `.rpm` | redhat/ubi8 | yum |
-| **openSUSE Leap** | `.rpm` | opensuse/leap | zypper |
-| **Alpine Linux** | `.apk` | alpine:latest | apk |
-| **Arch Linux** | `.pkg.tar.zst` | archlinux:latest | pacman |
+| Distribution ID | Package Format | Container Base | Package Manager |
+|----------------|----------------|----------------|-----------------|
+| `almalinux` | `.rpm` | rockylinux/rockylinux:* | yum |
+| `alpine` | `.apk` | alpine:latest | apk |
+| `amzn` | `.rpm` | amazonlinux:1/2 | yum |
+| `arch` | `.pkg.tar.zst` | archlinux:latest | pacman |
+| `centos` | `.rpm` | rockylinux/rockylinux:* | yum |
+| `debian` | `.deb` | debian:* (jessie/stretch/buster) | apt |
+| `fedora` | `.rpm` | fedora:* (version-specific) | dnf |
+| `linuxmint` | `.deb` | ubuntu:* (based on Ubuntu version) | apt |
+| `opensuse-leap` | `.rpm` | opensuse/leap:latest | zypper |
+| `opensuse-tumbleweed` | `.rpm` | opensuse/tumbleweed:latest | zypper |
+| `ol` | `.rpm` | oraclelinux:* | yum |
+| `pop` | `.deb` | ubuntu:* (based on Ubuntu version) | apt |
+| `rhel` | `.rpm` | redhat/ubi:* | yum |
+| `rocky` | `.rpm` | rockylinux:* (version-specific) | yum |
+| `ubuntu` | `.deb` | ubuntu:* (bionic/focal/jammy/noble) | apt |
 
 ### Command Line Interface
 

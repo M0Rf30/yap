@@ -495,7 +495,7 @@
 - id: errors.source.download_failed_for
   translation: "download failed for %s: %v"
 - id: errors.source.directory_not_supported
-  translation: directory not supported as source for non-VCS protocols: %s
+  translation: "directory not supported as source for non-VCS protocols: %s"
 - id: errors.shell.failed_to_start_multiprinter
   translation: failed to start multiprinter
 - id: errors.shell.failed_to_parse_script
@@ -508,7 +508,7 @@
   translation: command execution failed
 - id: errors.shell.command_not_allowed_for_sudo
   translation: command '%s' is not allowed for sudo execution
-- id: errors.shell.command_execution_failed
+- id: errors.shell.failed_to_execute_command
   translation: failed to execute command %s
 - id: errors.files.failed_to_open_file_for_sha256
   translation: failed to open file for SHA256 calculation

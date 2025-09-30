@@ -52,8 +52,7 @@ func TestConstants(t *testing.T) {
 func TestReleases(t *testing.T) {
 	expectedReleases := []string{
 		"almalinux", "alpine", "amzn", "arch", "centos",
-		"debian", "fedora", "linuxmint", "opensuse-leap",
-		"ol", "pop", "rhel", "rocky", "ubuntu",
+		"debian", "fedora", "linuxmint", "opensuse-leap", "opensuse-tumbleweed", "ol", "pop", "rhel", "rocky", "ubuntu",
 	}
 
 	if len(Releases) == 0 {
@@ -81,20 +80,21 @@ func TestReleases(t *testing.T) {
 func TestDistroToPackageManager(t *testing.T) {
 	// Test that all known distros have package managers
 	expectedMappings := map[string]string{
-		"almalinux":     "yum",
-		"alpine":        "apk",
-		"amzn":          "yum",
-		"arch":          "pacman",
-		"centos":        "yum",
-		"debian":        "apt",
-		"fedora":        "yum",
-		"linuxmint":     "apt",
-		"ol":            "yum",
-		"opensuse-leap": "zypper",
-		"pop":           "apt",
-		"rhel":          "yum",
-		"rocky":         "yum",
-		"ubuntu":        "apt",
+		"almalinux":           "yum",
+		"alpine":              "apk",
+		"amzn":                "yum",
+		"arch":                "pacman",
+		"centos":              "yum",
+		"debian":              "apt",
+		"fedora":              "yum",
+		"linuxmint":           "apt",
+		"ol":                  "yum",
+		"opensuse-leap":       "zypper",
+		"opensuse-tumbleweed": "zypper",
+		"pop":                 "apt",
+		"rhel":                "yum",
+		"rocky":               "yum",
+		"ubuntu":              "apt",
 	}
 
 	if len(DistroToPackageManager) == 0 {

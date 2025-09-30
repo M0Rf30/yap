@@ -122,13 +122,14 @@ func TestGetPackageManager_Integration(t *testing.T) {
 
 	// Test all supported distros return valid packers
 	testCases := map[string]any{
-		"alpine":        (*apk.Apk)(nil),
-		"debian":        (*deb.Package)(nil),
-		"ubuntu":        (*deb.Package)(nil),
-		"arch":          (*pacman.Pkg)(nil),
-		"fedora":        (*rpm.RPM)(nil),
-		"centos":        (*rpm.RPM)(nil),
-		"opensuse-leap": (*rpm.RPM)(nil),
+		"alpine":              (*apk.Apk)(nil),
+		"debian":              (*deb.Package)(nil),
+		"ubuntu":              (*deb.Package)(nil),
+		"arch":                (*pacman.Pkg)(nil),
+		"fedora":              (*rpm.RPM)(nil),
+		"centos":              (*rpm.RPM)(nil),
+		"opensuse-leap":       (*rpm.RPM)(nil),
+		"opensuse-tumbleweed": (*rpm.RPM)(nil),
 	}
 
 	for distro, expectedType := range testCases {
@@ -186,7 +187,7 @@ func TestGetPackageManager_ValidatesInterface(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	distros := []string{"alpine", "debian", "arch", "fedora", "opensuse-leap"}
+	distros := []string{"alpine", "debian", "arch", "fedora", "opensuse-leap", "opensuse-tumbleweed"}
 
 	for _, distro := range distros {
 		t.Run(distro, func(t *testing.T) {

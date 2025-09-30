@@ -37,6 +37,7 @@ var (
 		"fedora",
 		"linuxmint",
 		"opensuse-leap",
+		"opensuse-tumbleweed",
 		"ol",
 		"pop",
 		"rhel",
@@ -46,20 +47,21 @@ var (
 
 	// DistroToPackageManager maps distribution names to their package managers.
 	DistroToPackageManager = map[string]string{
-		"almalinux":     "yum",
-		"alpine":        "apk",
-		"amzn":          "yum",
-		"arch":          "pacman",
-		"centos":        "yum",
-		"debian":        "apt",
-		"fedora":        "yum",
-		"linuxmint":     "apt",
-		"ol":            "yum",
-		"opensuse-leap": "zypper",
-		"pop":           "apt",
-		"rhel":          "yum",
-		"rocky":         "yum",
-		"ubuntu":        "apt",
+		"almalinux":           "yum",
+		"alpine":              "apk",
+		"amzn":                "yum",
+		"arch":                "pacman",
+		"centos":              "yum",
+		"debian":              "apt",
+		"fedora":              "yum",
+		"linuxmint":           "apt",
+		"ol":                  "yum",
+		"opensuse-leap":       "zypper",
+		"opensuse-tumbleweed": "zypper",
+		"pop":                 "apt",
+		"rhel":                "yum",
+		"rocky":               "yum",
+		"ubuntu":              "apt",
 	}
 
 	// Packers defines the supported package managers for different distributions.

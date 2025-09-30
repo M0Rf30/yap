@@ -18,7 +18,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
@@ -95,14 +94,12 @@ func (d *Package) BuildPackage(artifactsPath string) error {
 // executes the `apt-get install` command. Returns an error if the
 // installation fails.
 func (d *Package) Install(artifactsPath string) error {
-	artifactFilePath := filepath.Join(artifactsPath,
-		fmt.Sprintf("%s_%s-%s_%s.deb",
-			d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
-			d.PKGBUILD.ArchComputed))
+	pkgName := d.BuildPackageName(".deb")
+	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
 	// Use centralized install arguments
 	installArgs := constants.GetInstallArgs(constants.FormatDEB)
-	installArgs = append(installArgs, artifactFilePath)
+	installArgs = append(installArgs, pkgFilePath)
 
 	err := shell.ExecWithSudo(false, "", "apt-get", installArgs...)
 	if err != nil {
@@ -127,24 +124,8 @@ func (d *Package) Prepare(makeDepends []string) error {
 // It takes a boolean parameter `golang` which indicates whether or not to set up Go.
 // It returns an error if there was a problem during the environment preparation.
 func (d *Package) PrepareEnvironment(golang bool) error {
-	// Use centralized build dependencies and install arguments
-	buildDeps := constants.GetBuildDeps()
-	installArgs := constants.GetInstallArgs(constants.FormatDEB)
-	installArgs = append(installArgs, buildDeps.DEB...)
-
-	err := shell.ExecWithSudo(false, "", "apt-get", installArgs...)
-	if err != nil {
-		return err
-	}
-
-	if golang {
-		err := platform.GOSetup()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	allArgs := d.SetupEnvironmentDependencies(golang)
+	return shell.ExecWithSudo(false, "", "apt-get", allArgs...)
 }
 
 // PrepareFakeroot sets up the environment for building a Debian package in a fakeroot context.
@@ -371,11 +352,8 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	logger.Info(i18n.T("logger.unknown.info.package_artifact_created_3"),
-		"package", d.PKGBUILD.PkgName,
-		"version", d.PKGBUILD.PkgVer,
-		"release", d.PKGBUILD.PkgRel,
-		"artifact", artifactFilePath)
+	// Log package creation using common functionality
+	d.LogPackageCreated(artifactFilePath)
 
 	return nil
 }
