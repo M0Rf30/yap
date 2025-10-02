@@ -135,32 +135,6 @@ func TestOperation(t *testing.T) {
 	}
 }
 
-func TestTimeoutManager(t *testing.T) {
-	t.Parallel()
-
-	timeoutManager := NewTimeoutManager()
-	if timeoutManager == nil {
-		t.Fatal("Expected TimeoutManager to be created")
-	}
-
-	ctx := timeoutManager.AddTimeout(context.Background(), "test", 100*time.Millisecond)
-	if ctx == nil {
-		t.Fatal("Expected context to be returned")
-	}
-
-	active := timeoutManager.GetActiveTimeouts()
-	if len(active) != 1 || active[0] != "test" {
-		t.Errorf("Expected 1 active timeout named 'test', got %v", active)
-	}
-
-	timeoutManager.CancelTimeout("test")
-
-	active = timeoutManager.GetActiveTimeouts()
-	if len(active) != 0 {
-		t.Errorf("Expected 0 active timeouts after cancel, got %v", active)
-	}
-}
-
 func TestSemaphore(t *testing.T) {
 	t.Parallel()
 
@@ -211,25 +185,6 @@ func TestWorkerPool(t *testing.T) {
 	err = workerPool.Shutdown(1 * time.Second)
 	if err != nil {
 		t.Fatalf("Unexpected error shutting down: %v", err)
-	}
-}
-
-func TestDoWithTimeout(t *testing.T) {
-	t.Parallel()
-
-	executed := false
-
-	err := DoWithTimeout(100*time.Millisecond, func(_ context.Context) error {
-		executed = true
-
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !executed {
-		t.Error("Expected function to be executed")
 	}
 }
 

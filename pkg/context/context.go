@@ -179,119 +179,6 @@ func BackgroundWithTimeout(timeout time.Duration) (context.Context, context.Canc
 	return WithTimeout(context.Background(), timeout)
 }
 
-// TimeoutManager manages multiple timeouts and provides graceful shutdown.
-type TimeoutManager struct {
-	timeouts map[string]*timeoutEntry
-	mu       sync.RWMutex
-}
-
-type timeoutEntry struct {
-	cancel context.CancelFunc
-	name   string
-}
-
-// NewTimeoutManager creates a new timeout manager.
-func NewTimeoutManager() *TimeoutManager {
-	return &TimeoutManager{
-		timeouts: make(map[string]*timeoutEntry),
-	}
-}
-
-// AddTimeout adds a named timeout to the manager.
-func (tm *TimeoutManager) AddTimeout(
-	parent context.Context, name string, timeout time.Duration) context.Context {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
-
-	ctx, cancel := WithTimeout(parent, timeout)
-	tm.timeouts[name] = &timeoutEntry{
-		cancel: cancel,
-		name:   name,
-	}
-
-	return ctx
-}
-
-// CancelTimeout cancels a specific timeout by name.
-func (tm *TimeoutManager) CancelTimeout(name string) {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
-
-	if entry, exists := tm.timeouts[name]; exists {
-		entry.cancel()
-		delete(tm.timeouts, name)
-	}
-}
-
-// CancelAll cancels all timeouts.
-func (tm *TimeoutManager) CancelAll() {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
-
-	for name, entry := range tm.timeouts {
-		entry.cancel()
-		delete(tm.timeouts, name)
-	}
-}
-
-// GetActiveTimeouts returns names of all active timeouts.
-func (tm *TimeoutManager) GetActiveTimeouts() []string {
-	tm.mu.RLock()
-	defer tm.mu.RUnlock()
-
-	names := make([]string, 0, len(tm.timeouts))
-	for name := range tm.timeouts {
-		names = append(names, name)
-	}
-
-	return names
-}
-
-// ListActive returns names of all active timeouts.
-func (tm *TimeoutManager) ListActive() []string {
-	tm.mu.RLock()
-	defer tm.mu.RUnlock()
-
-	names := make([]string, 0, len(tm.timeouts))
-	for name := range tm.timeouts {
-		names = append(names, name)
-	}
-
-	return names
-}
-
-// Pool manages a pool of reusable contexts for performance.
-//
-
-// Pool provides a pool of reusable contexts for performance optimization.
-type Pool struct {
-	pool sync.Pool
-}
-
-// NewPool creates a new context pool.
-func NewPool() *Pool {
-	return &Pool{
-		pool: sync.Pool{
-			New: func() any {
-				return context.Background()
-			},
-		},
-	}
-}
-
-// Get retrieves a context from the pool.
-func (cp *Pool) Get() context.Context {
-	return cp.pool.Get().(context.Context)
-}
-
-// Put returns a context to the pool (only useful for custom context types).
-func (cp *Pool) Put(ctx context.Context) {
-	// Only put back if it's a clean background context
-	if ctx == context.Background() {
-		cp.pool.Put(ctx)
-	}
-}
-
 // Semaphore provides context-aware semaphore functionality.
 type Semaphore struct {
 	ch chan struct{}
@@ -329,7 +216,6 @@ func (s *Semaphore) Release() {
 	select {
 	case <-s.ch:
 	default:
-		// Semaphore is already at capacity, this is a programming error
 		panic("semaphore: release called without corresponding acquire")
 	}
 }
@@ -363,11 +249,9 @@ func NewWorkerPool(workers int) *WorkerPool {
 
 // Submit submits work to the pool.
 func (wp *WorkerPool) Submit(ctx context.Context, work func(context.Context) error) error {
-	// Merge the pool context with the work context
 	workCtx, cancel := WithCancel(ctx)
 	defer cancel()
 
-	// Check if pool is shutting down
 	wp.mu.RLock()
 
 	if wp.closed {
@@ -378,7 +262,6 @@ func (wp *WorkerPool) Submit(ctx context.Context, work func(context.Context) err
 
 	wp.mu.RUnlock()
 
-	// Acquire semaphore
 	err := wp.semaphore.Acquire(workCtx)
 	if err != nil {
 		return err
@@ -390,11 +273,9 @@ func (wp *WorkerPool) Submit(ctx context.Context, work func(context.Context) err
 		defer wp.wg.Done()
 		defer wp.semaphore.Release()
 
-		// Create a merged context for the work
 		combinedCtx, combinedCancel := WithCancel(workCtx)
 		defer combinedCancel()
 
-		// Execute work
 		_ = work(combinedCtx)
 	}()
 
@@ -435,32 +316,6 @@ func (wp *WorkerPool) Shutdown(timeout time.Duration) error {
 // Available returns the number of available workers.
 func (wp *WorkerPool) Available() int {
 	return wp.semaphore.Available()
-}
-
-// Utility functions for common context patterns
-
-// DoWithTimeout executes a function with a timeout.
-func DoWithTimeout(timeout time.Duration, fn func(context.Context) error) error {
-	ctx, cancel := BackgroundWithTimeout(timeout)
-	defer cancel()
-
-	return fn(ctx)
-}
-
-// DoWithDeadline executes a function with a deadline.
-func DoWithDeadline(deadline time.Time, fn func(context.Context) error) error {
-	ctx, cancel := WithDeadline(context.Background(), deadline)
-	defer cancel()
-
-	return fn(ctx)
-}
-
-// DoWithCancel executes a function with cancellation support.
-func DoWithCancel(fn func(context.Context) error) (context.CancelFunc, error) {
-	ctx, cancel := WithCancel(context.Background())
-	err := fn(ctx)
-
-	return cancel, err
 }
 
 // RetryWithContext retries a function with exponential backoff and context support.
