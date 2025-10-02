@@ -9,13 +9,11 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
-	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/shell"
 
 	rpmpack "github.com/google/rpmpack"
 )
@@ -125,56 +123,6 @@ func (r *RPM) PrepareFakeroot(_ string) error {
 		return options.Strip(r.PKGBUILD.PackageDir)
 	}
 
-	return nil
-}
-
-// Install installs the RPM package to the specified artifacts path.
-//
-// It takes the following parameter:
-// - artifactsPath: The path to the directory where the artifacts are stored.
-//
-// It returns an error if there was an issue during the installation process.
-func (r *RPM) Install(artifactsPath string) error {
-	pkgName := r.BuildPackageName(".rpm")
-	pkgFilePath := filepath.Join(artifactsPath, pkgName)
-
-	// Use centralized install arguments
-	installArgs := constants.GetInstallArgs(constants.FormatRPM)
-	installArgs = append(installArgs, pkgFilePath)
-
-	err := shell.ExecWithSudo(false, "", "dnf", installArgs...)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Prepare prepares the RPM instance by installing the required dependencies.
-//
-// makeDepends is a slice of strings representing the dependencies to be installed.
-// It returns an error if there is any issue during the installation process.
-func (r *RPM) Prepare(makeDepends []string) error {
-	// Use centralized install arguments
-	installArgs := constants.GetInstallArgs(constants.FormatRPM)
-	return r.PKGBUILD.GetDepends("dnf", installArgs, makeDepends)
-}
-
-// PrepareEnvironment prepares the environment for the RPM struct.
-//
-// It takes a boolean parameter `golang` which indicates whether or not to set up the
-// Go environment.
-// It returns an error if there was an issue with the environment preparation.
-func (r *RPM) PrepareEnvironment(golang bool) error {
-	allArgs := r.SetupEnvironmentDependencies(golang)
-	return shell.ExecWithSudo(false, "", "dnf", allArgs...)
-}
-
-// Update updates the RPM object.
-//
-// It takes no parameters.
-// It returns an error.
-func (r *RPM) Update() error {
 	return nil
 }
 

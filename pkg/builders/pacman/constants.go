@@ -98,14 +98,6 @@ const dotMtree = `#mtree
 {{- end }}
 `
 
-// getBaseInstallArgs returns pacman-specific install arguments
-func getBaseInstallArgs() []string {
-	return []string{
-		"-S",
-		"--noconfirm",
-	}
-}
-
 const postInstall = `
 {{- if .PreInst}}
 pre_install() {

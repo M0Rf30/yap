@@ -284,7 +284,7 @@ func TestProcessDepends(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := pkg.processDepends(tc.input)
+		result := pkg.ProcessDependencies(tc.input)
 		if len(result) != len(tc.expected) {
 			t.Errorf("Expected %d items, got %d", len(tc.expected), len(result))
 			continue

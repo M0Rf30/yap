@@ -2,6 +2,7 @@
 package apk
 
 import (
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // Apk represents the APK package builder.
@@ -77,33 +77,6 @@ func (a *Apk) PrepareFakeroot(artifactsPath string) error {
 	return nil
 }
 
-// Install installs the APK package.
-func (a *Apk) Install(artifactsPath string) error {
-	pkgName := a.BuildPackageName(".apk")
-	pkgFilePath := filepath.Join(artifactsPath, pkgName)
-	installArgs := constants.GetInstallArgs("apk")
-	installArgs = append(installArgs, pkgFilePath)
-
-	return shell.ExecWithSudo(true, "", "apk", installArgs...)
-}
-
-// Prepare prepares the build environment.
-func (a *Apk) Prepare(makeDepends []string) error {
-	installArgs := constants.GetInstallArgs("apk")
-	return a.PKGBUILD.GetDepends("apk", installArgs, makeDepends)
-}
-
-// PrepareEnvironment prepares the build environment.
-func (a *Apk) PrepareEnvironment(golang bool) error {
-	allArgs := a.SetupEnvironmentDependencies(golang)
-	return shell.ExecWithSudo(true, "", "apk", allArgs...)
-}
-
-// Update updates the APK package database.
-func (a *Apk) Update() error {
-	return a.PKGBUILD.GetUpdates("apk", "update")
-}
-
 // TODO: Implement APK package building
 //
 // The following methods are placeholders that need proper implementation:
@@ -127,14 +100,23 @@ func (a *Apk) Update() error {
 //
 // Reference: https://wiki.alpinelinux.org/wiki/Apk_spec
 
-func (a *Apk) createAPKPackage(pkgFilePath, artifactsPath string) error {
-	return nil
+func (a *Apk) createAPKPackage(_, _ string) error {
+	return fmt.Errorf(
+		"APK package building is not yet implemented - " +
+			"see TODO above for required implementation details",
+	)
 }
 
 func (a *Apk) createPkgInfo() error {
-	return nil
+	return fmt.Errorf(
+		"APK .PKGINFO generation is not yet implemented - " +
+			"see TODO above for required implementation details",
+	)
 }
 
 func (a *Apk) createInstallScript() error {
-	return nil
+	return fmt.Errorf(
+		"APK install script generation is not yet implemented - " +
+			"see TODO above for required implementation details",
+	)
 }

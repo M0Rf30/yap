@@ -3,6 +3,7 @@ package common
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -12,6 +13,11 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
+)
+
+const (
+	updateCommand = "update"
 )
 
 // Builder defines the common interface that all package builders must implement.
@@ -228,8 +234,97 @@ func (bb *BaseBuilder) PrepareBackupFilePaths() []string {
 		if !strings.HasPrefix(filePath, "/") {
 			filePath = "/" + filePath
 		}
+
 		backupFiles = append(backupFiles, filePath)
 	}
 
 	return backupFiles
+}
+
+// getPackageManager returns the package manager command for the given format.
+func getPackageManager(format string) string {
+	switch format {
+	case constants.FormatDEB:
+		return "apt-get"
+	case constants.FormatRPM:
+		return "dnf"
+	case constants.FormatPacman:
+		return "pacman"
+	case constants.FormatAPK:
+		return "apk"
+	default:
+		return ""
+	}
+}
+
+// getExtension returns the file extension for the given format.
+func getExtension(format string) string {
+	switch format {
+	case constants.FormatDEB:
+		return ".deb"
+	case constants.FormatRPM:
+		return ".rpm"
+	case constants.FormatPacman:
+		return ".pkg.tar.zst"
+	case constants.FormatAPK:
+		return ".apk"
+	default:
+		return ""
+	}
+}
+
+// getUpdateCommand returns the update command for the given format.
+func getUpdateCommand(format string) string {
+	switch format {
+	case constants.FormatDEB:
+		return updateCommand
+	case constants.FormatRPM:
+		return updateCommand
+	case constants.FormatPacman:
+		return "-Sy"
+	case constants.FormatAPK:
+		return updateCommand
+	default:
+		return ""
+	}
+}
+
+// Install installs the built package using the appropriate package manager.
+// This consolidates duplicated Install methods across all builders.
+func (bb *BaseBuilder) Install(artifactsPath string) error {
+	pkgName := bb.BuildPackageName(getExtension(bb.Format))
+	pkgPath := filepath.Join(artifactsPath, pkgName)
+
+	if bb.Format == constants.FormatPacman {
+		// Pacman uses special install args for local files
+		return shell.Exec(false, "", "pacman", "-U", "--noconfirm", pkgPath)
+	}
+
+	installArgs := constants.GetInstallArgs(bb.Format)
+	installArgs = append(installArgs, pkgPath)
+	useSudo := bb.Format == constants.FormatAPK
+
+	return shell.ExecWithSudo(useSudo, "", getPackageManager(bb.Format), installArgs...)
+}
+
+// Prepare installs build dependencies using the appropriate package manager.
+// This consolidates duplicated Prepare methods across all builders.
+func (bb *BaseBuilder) Prepare(makeDepends []string) error {
+	installArgs := constants.GetInstallArgs(bb.Format)
+	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, makeDepends)
+}
+
+// PrepareEnvironment sets up the build environment with necessary tools.
+// This consolidates duplicated PrepareEnvironment methods across all builders.
+func (bb *BaseBuilder) PrepareEnvironment(golang bool) error {
+	allArgs := bb.SetupEnvironmentDependencies(golang)
+	useSudo := bb.Format == constants.FormatAPK
+
+	return shell.ExecWithSudo(useSudo, "", getPackageManager(bb.Format), allArgs...)
+}
+
+// Update updates the package manager's package database.
+// This consolidates duplicated Update methods across all builders.
+func (bb *BaseBuilder) Update() error {
+	return bb.PKGBUILD.GetUpdates(getPackageManager(bb.Format), getUpdateCommand(bb.Format))
 }

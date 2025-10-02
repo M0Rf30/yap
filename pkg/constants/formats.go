@@ -105,7 +105,7 @@ func GetInstallArgs(format string) []string {
 	case FormatRPM:
 		return []string{"-y", "install"}
 	case FormatPacman:
-		return []string{"-U", "--noconfirm"}
+		return []string{"-S", "--noconfirm"}
 	default:
 		return []string{}
 	}

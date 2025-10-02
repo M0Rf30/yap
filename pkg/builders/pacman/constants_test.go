@@ -5,21 +5,6 @@ import (
 	"testing"
 )
 
-func TestGetBaseInstallArgs(t *testing.T) {
-	args := getBaseInstallArgs()
-	expected := []string{"-S", "--noconfirm"}
-
-	if len(args) != len(expected) {
-		t.Errorf("getBaseInstallArgs() returned %d args, want %d", len(args), len(expected))
-	}
-
-	for i, arg := range expected {
-		if i >= len(args) || args[i] != arg {
-			t.Errorf("getBaseInstallArgs()[%d] = %q, want %q", i, args[i], arg)
-		}
-	}
-}
-
 func TestDotBuildinfoTemplate(t *testing.T) {
 	if dotBuildinfo == "" {
 		t.Error("dotBuildinfo template is empty")

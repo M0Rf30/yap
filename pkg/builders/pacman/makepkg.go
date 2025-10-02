@@ -21,7 +21,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // Pkg represents a package manager for the Pkg distribution.
@@ -158,64 +157,6 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 	}
 
 	return nil
-}
-
-// Install installs the package using the given artifacts path.
-//
-// artifactsPath: the path where the package artifacts are located.
-// error: an error if the installation fails.
-func (m *Pkg) Install(artifactsPath string) error {
-	completeVersion := m.PKGBUILD.PkgVer
-
-	if m.PKGBUILD.Epoch != "" {
-		completeVersion = fmt.Sprintf("%s:%s", m.PKGBUILD.Epoch, m.PKGBUILD.PkgVer)
-	}
-
-	pkgName := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst",
-		m.PKGBUILD.PkgName,
-		completeVersion,
-		m.PKGBUILD.PkgRel,
-		m.PKGBUILD.ArchComputed)
-
-	pkgFilePath := filepath.Join(artifactsPath, pkgName)
-
-	err := shell.Exec(false, "",
-		"pacman",
-		"-U",
-		"--noconfirm",
-		pkgFilePath)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Prepare prepares the Makepkg package by getting the dependencies using the PKGBUILD.
-//
-// makeDepends is a slice of strings representing the dependencies to be included.
-// It returns an error if there is any issue getting the dependencies.
-func (m *Pkg) Prepare(makeDepends []string) error {
-	installArgs := getBaseInstallArgs()
-	return m.PKGBUILD.GetDepends("pacman", installArgs, makeDepends)
-}
-
-// PrepareEnvironment prepares the environment for the Makepkg.
-//
-// It takes a boolean parameter `golang` which indicates whether the environment
-// should be prepared for Golang.
-// It returns an error if there is any issue in preparing the environment.
-func (m *Pkg) PrepareEnvironment(golang bool) error {
-	allArgs := m.SetupEnvironmentDependencies(golang)
-	return shell.ExecWithSudo(false, "", "pacman", allArgs...)
-}
-
-// Update updates the Makepkg package manager.
-//
-// It retrieves the updates using the GetUpdates method of the PKGBUILD struct.
-// It returns an error if there is any issue during the update process.
-func (m *Pkg) Update() error {
-	return m.PKGBUILD.GetUpdates("pacman", "-Sy")
 }
 
 func renderMtree(entries []*files.Entry) (string, error) {

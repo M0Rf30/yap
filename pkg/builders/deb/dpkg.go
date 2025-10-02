@@ -12,13 +12,11 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
-	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // Package represents a Deb package.
@@ -89,45 +87,6 @@ func (d *Package) BuildPackage(artifactsPath string) error {
 	return nil
 }
 
-// Install installs a Debian package from the specified artifacts path. It
-// constructs the package file path using details from the PKGBUILD and
-// executes the `apt-get install` command. Returns an error if the
-// installation fails.
-func (d *Package) Install(artifactsPath string) error {
-	pkgName := d.BuildPackageName(".deb")
-	pkgFilePath := filepath.Join(artifactsPath, pkgName)
-
-	// Use centralized install arguments
-	installArgs := constants.GetInstallArgs(constants.FormatDEB)
-	installArgs = append(installArgs, pkgFilePath)
-
-	err := shell.ExecWithSudo(false, "", "apt-get", installArgs...)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Prepare prepares the Deb package by installing its dependencies using apt-get.
-//
-// makeDepends: a slice of strings representing the dependencies to be installed.
-// Returns an error if there was a problem installing the dependencies.
-func (d *Package) Prepare(makeDepends []string) error {
-	// Use centralized install arguments
-	installArgs := constants.GetInstallArgs(constants.FormatDEB)
-	return d.PKGBUILD.GetDepends("apt-get", installArgs, makeDepends)
-}
-
-// PrepareEnvironment prepares the environment for the Deb package.
-//
-// It takes a boolean parameter `golang` which indicates whether or not to set up Go.
-// It returns an error if there was a problem during the environment preparation.
-func (d *Package) PrepareEnvironment(golang bool) error {
-	allArgs := d.SetupEnvironmentDependencies(golang)
-	return shell.ExecWithSudo(false, "", "apt-get", allArgs...)
-}
-
 // PrepareFakeroot sets up the environment for building a Debian package in a fakeroot context.
 // It retrieves architecture and release information, cleans up the debDir, creates necessary
 // resources, and strips binaries. The method returns an error if any step fails.
@@ -152,18 +111,6 @@ func (d *Package) PrepareFakeroot(_ string) error {
 	}
 
 	return nil
-}
-
-// Update updates the Deb package list.
-//
-// It calls the GetUpdates method of the PKGBUILD field of the Deb struct
-// to retrieve any updates using the "apt-get" command and the "update" argument.
-// If an error occurs during the update, it is returned.
-//
-// Returns:
-// - error: An error if the update fails.
-func (d *Package) Update() error {
-	return d.PKGBUILD.GetUpdates("apt-get", "update")
 }
 
 // addArFile adds a file to an archive writer with the specified name, body,
@@ -433,10 +380,4 @@ func (d *Package) getRelease() {
 	} else {
 		d.PKGBUILD.PkgRel += d.PKGBUILD.Distro
 	}
-}
-
-// processDepends is kept for backward compatibility with tests.
-// It delegates to the common ProcessDependencies method.
-func (d *Package) processDepends(depends []string) []string {
-	return d.ProcessDependencies(depends)
 }
