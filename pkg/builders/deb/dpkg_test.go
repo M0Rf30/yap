@@ -436,12 +436,12 @@ func TestAddScriptlets(t *testing.T) {
 	}
 }
 
-func TestGetModTime(t *testing.T) {
+func TestGetCurrentBuildTime(t *testing.T) {
 	before := time.Now()
-	modTime := getModTime()
+	modTime := getCurrentBuildTime()
 	after := time.Now()
 
 	if modTime.Before(before) || modTime.After(after) {
-		t.Error("getModTime returned time outside expected range")
+		t.Error("getCurrentBuildTime returned time outside expected range")
 	}
 }

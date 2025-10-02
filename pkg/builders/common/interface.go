@@ -199,3 +199,37 @@ func (bb *BaseBuilder) LogPackageCreated(artifactPath string) {
 		"pkgrel", bb.PKGBUILD.PkgRel,
 		"artifact", artifactPath)
 }
+
+// FormatRelease formats the package release string with distribution-specific suffixes.
+// For DEB packages: appends codename or distro name
+// For RPM packages: appends RPM distro suffix and codename
+// For other formats: returns release unchanged
+func (bb *BaseBuilder) FormatRelease(distroSuffixMap map[string]string) {
+	if bb.PKGBUILD.Codename == "" {
+		return
+	}
+
+	switch bb.Format {
+	case "deb":
+		bb.PKGBUILD.PkgRel += bb.PKGBUILD.Codename
+	case "rpm":
+		if suffix, exists := distroSuffixMap[bb.PKGBUILD.Distro]; exists {
+			bb.PKGBUILD.PkgRel += suffix + bb.PKGBUILD.Codename
+		}
+	}
+}
+
+// PrepareBackupFilePaths ensures all backup file paths have a leading slash.
+// This is required by RPM and some other package formats.
+func (bb *BaseBuilder) PrepareBackupFilePaths() []string {
+	backupFiles := make([]string, 0, len(bb.PKGBUILD.Backup))
+
+	for _, filePath := range bb.PKGBUILD.Backup {
+		if !strings.HasPrefix(filePath, "/") {
+			filePath = "/" + filePath
+		}
+		backupFiles = append(backupFiles, filePath)
+	}
+
+	return backupFiles
+}

@@ -292,7 +292,7 @@ func TestPrepareBackupFiles(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
-	backupFiles := rpm.prepareBackupFiles()
+	backupFiles := rpm.PrepareBackupFilePaths()
 
 	if len(backupFiles) != len(rpm.PKGBUILD.Backup) {
 		t.Errorf("Expected %d backup files, got %d", len(rpm.PKGBUILD.Backup), len(backupFiles))
@@ -333,8 +333,9 @@ func TestProcessDepends(t *testing.T) {
 		},
 	}
 
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(createTestPKGBUILD(), "rpm")}
 	for _, tc := range testCases {
-		result := processDepends(tc.input)
+		result := rpm.processDepends(tc.input)
 		if result == nil {
 			t.Error("processDepends returned nil")
 			continue
@@ -588,7 +589,7 @@ func TestCreateRPMFile(t *testing.T) {
 	}
 }
 
-func TestGetModTime(t *testing.T) {
+func TestExtractFileModTimeUint32(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "rpm-test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -608,7 +609,7 @@ func TestGetModTime(t *testing.T) {
 		t.Fatalf("Failed to stat test file: %v", err)
 	}
 
-	modTime := getModTime(fileInfo)
+	modTime := extractFileModTimeUint32(fileInfo)
 	expectedTime := uint32(fileInfo.ModTime().Unix())
 
 	if modTime != expectedTime {

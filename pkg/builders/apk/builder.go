@@ -26,45 +26,46 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Apk {
 }
 
 // BuildPackage creates an APK package in pure Go without external dependencies.
+//
+// NOTE: APK builder is currently incomplete. This is a placeholder implementation
+// that needs to be finished. The APK format requires implementing:
+// - APK package structure (APKINDEX, .PKGINFO, install scripts)
+// - Tar archive creation with proper compression
+// - Signature generation for package verification
 func (a *Apk) BuildPackage(artifactsPath string) error {
-	// Translate architecture for APK format
 	a.TranslateArchitecture()
 
-	// Build the package name
 	pkgName := a.BuildPackageName(".apk")
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-	// Create the APK package using the existing complex logic
-	// For now, we'll use a simplified approach
 	err := a.createAPKPackage(pkgFilePath, artifactsPath)
 	if err != nil {
 		return err
 	}
 
-	// Log package creation
 	a.LogPackageCreated(pkgFilePath)
 
 	return nil
 }
 
 // PrepareFakeroot sets up the APK package metadata.
+//
+// NOTE: APK builder is currently incomplete. This method prepares metadata
+// but the actual package building logic (createPkgInfo, createInstallScript)
+// needs to be implemented.
 func (a *Apk) PrepareFakeroot(artifactsPath string) error {
-	// Translate architecture
 	a.TranslateArchitecture()
 
-	// Calculate installed size and set build date
 	a.PKGBUILD.InstalledSize, _ = files.GetDirSize(a.PKGBUILD.PackageDir)
 	a.PKGBUILD.BuildDate = time.Now().Unix()
 	a.PKGBUILD.PkgDest = artifactsPath
 	a.PKGBUILD.YAPVersion = constants.YAPVersion
 
-	// Create .PKGINFO file
 	err := a.createPkgInfo()
 	if err != nil {
 		return err
 	}
 
-	// Create install scripts if needed
 	if a.PKGBUILD.PreInst != "" || a.PKGBUILD.PostInst != "" ||
 		a.PKGBUILD.PreRm != "" || a.PKGBUILD.PostRm != "" {
 		err = a.createInstallScript()
@@ -103,7 +104,28 @@ func (a *Apk) Update() error {
 	return a.PKGBUILD.GetUpdates("apk", "update")
 }
 
-// Placeholder methods for the APK-specific logic
+// TODO: Implement APK package building
+//
+// The following methods are placeholders that need proper implementation:
+//
+// createAPKPackage should:
+//   - Create APK tar.gz archive with proper structure
+//   - Include .PKGINFO metadata file
+//   - Add all package files with correct permissions
+//   - Generate and sign package checksums
+//
+// createPkgInfo should:
+//   - Generate .PKGINFO file with package metadata
+//   - Include package name, version, architecture
+//   - Add dependencies, conflicts, provides information
+//   - Write to package directory for inclusion in APK
+//
+// createInstallScript should:
+//   - Create install/upgrade/removal scripts
+//   - Handle pre-install, post-install, pre-remove, post-remove hooks
+//   - Follow APK script conventions
+//
+// Reference: https://wiki.alpinelinux.org/wiki/Apk_spec
 
 func (a *Apk) createAPKPackage(pkgFilePath, artifactsPath string) error {
 	return nil

@@ -326,7 +326,7 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	modtime := getModTime()
+	modtime := getCurrentBuildTime()
 
 	err = addArFile(writer,
 		binaryFilename,
@@ -419,12 +419,14 @@ func (d *Package) createDebResources() error {
 	return nil
 }
 
-// getModTime returns the current local time. It uses the time.Now() function
-// from the time package to retrieve the current time.
-func getModTime() time.Time {
+// getCurrentBuildTime returns the current local time for package timestamping.
+// It uses the time.Now() function from the time package to retrieve the current time.
+func getCurrentBuildTime() time.Time {
 	return time.Now()
 }
 
+// getRelease updates the package release with distribution-specific suffix.
+// This delegates to the common FormatRelease method.
 func (d *Package) getRelease() {
 	if d.PKGBUILD.Codename != "" {
 		d.PKGBUILD.PkgRel += d.PKGBUILD.Codename

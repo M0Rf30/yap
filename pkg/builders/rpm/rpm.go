@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -68,12 +67,12 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		Group:       r.PKGBUILD.Section,
 		Compressor:  "zstd",
 		Licence:     license,
-		Obsoletes:   processDepends(r.PKGBUILD.Replaces),
-		Provides:    processDepends(r.PKGBUILD.Provides),
-		Requires:    processDepends(r.PKGBUILD.Depends),
-		Conflicts:   processDepends(r.PKGBUILD.Conflicts),
-		Recommends:  processDepends(r.PKGBUILD.OptDepends),
-		Suggests:    processDepends(r.PKGBUILD.OptDepends),
+		Obsoletes:   r.processDepends(r.PKGBUILD.Replaces),
+		Provides:    r.processDepends(r.PKGBUILD.Provides),
+		Requires:    r.processDepends(r.PKGBUILD.Depends),
+		Conflicts:   r.processDepends(r.PKGBUILD.Conflicts),
+		Recommends:  r.processDepends(r.PKGBUILD.OptDepends),
+		Suggests:    r.processDepends(r.PKGBUILD.OptDepends),
 		BuildTime:   time.Now(),
 	})
 
@@ -182,31 +181,26 @@ func (r *RPM) Update() error {
 // createFilesInsideRPM prepares and adds files to the specified RPM object.
 // It retrieves backup files, walks through the package directory, and adds the contents to the RPM.
 func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
-	// Prepare a list of backup files by calling the prepareBackupFiles method.
-	backupFiles := r.prepareBackupFiles()
+	backupFiles := r.PrepareBackupFilePaths()
 
-	// Temporarily set the backup files for the walker
 	originalBackup := r.PKGBUILD.Backup
 	r.PKGBUILD.Backup = backupFiles
 
 	defer func() {
-		r.PKGBUILD.Backup = originalBackup // Restore original backup files after walker is used
+		r.PKGBUILD.Backup = originalBackup
 	}()
 
-	// Walk through the package directory and retrieve the contents.
 	walker := r.CreateFileWalker()
 
 	entries, err := walker.Walk()
 	if err != nil {
-		return err // Return the error if walking the directory fails.
+		return err
 	}
 
-	// Convert entries to FileContent format
 	var contents []*files.Entry
 
 	contents = append(contents, entries...)
 
-	// Add the retrieved contents to the RPM object and return any error that occurs.
 	return addContentsToRPM(contents, rpm)
 }
 
@@ -272,7 +266,7 @@ func asRPMDirectory(entry *files.Entry) *rpmpack.RPMFile {
 	fileInfo, _ := os.Stat(filepath.Clean(entry.Source))
 
 	// Retrieve the modification time of the directory.
-	mTime := getModTime(fileInfo)
+	mTime := extractFileModTimeUint32(fileInfo)
 
 	// Create and return an RPMFile object for the directory.
 	return &rpmpack.RPMFile{
@@ -300,7 +294,7 @@ func asRPMFile(
 	fileInfo, _ := os.Stat(cleanFilePath)
 
 	// Retrieve the modification time of the file.
-	mTime := getModTime(fileInfo)
+	mTime := extractFileModTimeUint32(fileInfo)
 
 	// Create and return an RPMFile object for the regular file.
 	return &rpmpack.RPMFile{
@@ -322,7 +316,7 @@ func asRPMSymlink(entry *files.Entry) *rpmpack.RPMFile {
 	body, _ := os.Readlink(cleanFilePath)  // Read the target of the symlink.
 
 	// Retrieve the modification time of the symlink.
-	mTime := getModTime(fileInfo)
+	mTime := extractFileModTimeUint32(fileInfo)
 
 	// Create and return an RPMFile object for the symlink.
 	return &rpmpack.RPMFile{
@@ -365,11 +359,10 @@ func (r *RPM) getGroup() {
 	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
 }
 
-// getModTime retrieves the modification time of a file and checks for overflow.
-// It returns the modification time as an uint32.
-func getModTime(fileInfo os.FileInfo) uint32 {
+// extractFileModTimeUint32 retrieves the modification time of a file and converts it to uint32.
+// It checks for overflow and fatally logs if the time is out of range for uint32.
+func extractFileModTimeUint32(fileInfo os.FileInfo) uint32 {
 	mTime := fileInfo.ModTime().Unix()
-	// Check for overflow in the modification time.
 	if mTime < 0 || mTime > int64(^uint32(0)) {
 		logger.Fatal(i18n.T("errors.rpm.modification_time_out_of_range"),
 			"time", mTime)
@@ -378,52 +371,21 @@ func getModTime(fileInfo os.FileInfo) uint32 {
 	return uint32(mTime)
 }
 
-// getRelease updates the release information of the RPM struct.
-//
-// It appends the RPMDistros[r.PKGBUILD.Distro] and r.PKGBUILD.Codename to
-// r.PKGBUILD.PkgRel if r.PKGBUILD.Codename is not empty.
+// getRelease updates the release information with RPM distribution suffix.
+// It uses the common FormatRelease method with RPM-specific distro mappings.
 func (r *RPM) getRelease() {
-	if r.PKGBUILD.Codename != "" {
-		r.PKGBUILD.PkgRel = r.PKGBUILD.PkgRel +
-			RPMDistros[r.PKGBUILD.Distro] +
-			r.PKGBUILD.Codename
-	}
+	r.FormatRelease(RPMDistros)
 }
 
-// prepareBackupFiles prepares a list of backup file paths by ensuring each path
-// has a leading slash and returns the resulting slice of backup file paths.
-func (r *RPM) prepareBackupFiles() []string {
-	backupFiles := make([]string, 0)
-
-	for _, filePath := range r.PKGBUILD.Backup {
-		if !strings.HasPrefix(filePath, "/") {
-			filePath = "/" + filePath
-		}
-
-		backupFiles = append(backupFiles, filePath)
-	}
-
-	return backupFiles
-}
-
-// processDepends converts a slice of strings into a rpmpack.Relations object.
-// It attempts to set each string in the slice as a relation.
-// If any error occurs during the setting process, it returns nil.
-func processDepends(depends []string) rpmpack.Relations {
-	pattern := `(?m)(<|<=|>=|=|>|<)`
-	regex := regexp.MustCompile(pattern)
+// processDepends converts dependency strings to rpmpack.Relations format.
+// It uses the common BaseBuilder.ProcessDependencies for consistent version
+// operator handling, then converts the result to RPM-specific Relations type.
+func (r *RPM) processDepends(depends []string) rpmpack.Relations {
+	processed := r.ProcessDependencies(depends)
 	relations := make(rpmpack.Relations, 0)
 
-	for index, depend := range depends {
-		result := regex.Split(depend, -1)
-		if len(result) == 2 {
-			name := result[0]
-			operator := strings.Trim(depend, result[0]+result[1])
-			version := result[1]
-			depends[index] = name + " " + operator + " " + version
-		}
-
-		err := relations.Set(depends[index])
+	for _, dep := range processed {
+		err := relations.Set(dep)
 		if err != nil {
 			return nil
 		}
