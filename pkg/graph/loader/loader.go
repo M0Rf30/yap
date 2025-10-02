@@ -72,11 +72,11 @@ func createSinglePackageGraph(packageName, themeName string) *graph.Data {
 				Height:       60,
 				IsExternal:   false,
 				IsPopular:    false,
-				Dependencies: make([]string, 0),
+				Dependencies: nil,
 				Level:        0,
 			},
 		},
-		Edges: make([]graph.Edge, 0),
+		Edges: nil,
 		Theme: theme.GetTheme(themeName),
 	}
 
@@ -118,7 +118,7 @@ func createMultiPackageGraph(projects []struct {
 			Height:       60,
 			IsExternal:   false,
 			IsPopular:    i < 3, // Make first 3 projects popular for demo
-			Dependencies: make([]string, 0),
+			Dependencies: nil,
 			Level:        0, // All at same level initially
 		}
 		graphData.Nodes[proj.Name] = node
@@ -238,7 +238,7 @@ func addDependenciesFromPKGBUILD(graphData *graph.Data, projects []struct {
 							Height:       60,
 							IsExternal:   true,
 							IsPopular:    false,
-							Dependencies: make([]string, 0),
+							Dependencies: nil,
 							Level:        1,
 						}
 						graphData.Nodes[depName] = externalNode

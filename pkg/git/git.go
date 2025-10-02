@@ -41,6 +41,10 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 	// Create git progress writer for properly formatted git clone output
 	gitProgressWriter := shell.NewGitProgressWriter(shell.MultiPrinter.Writer, "yap")
 
+	defer func() {
+		_ = gitProgressWriter.Close()
+	}()
+
 	cloneOptions := &ggit.CloneOptions{
 		Progress: gitProgressWriter,
 		URL:      sourceItemURI,
@@ -168,4 +172,25 @@ func checkoutReference(repo *ggit.Repository, referenceName plumbing.ReferenceNa
 	}
 
 	return nil
+}
+
+// GetCommitHash returns the current git commit hash for the given directory.
+// Returns empty string if not a git repository or on error.
+func GetCommitHash(repoPath string) string {
+	plainOpenOptions := &ggit.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+
+	repo, err := ggit.PlainOpenWithOptions(repoPath, plainOpenOptions)
+	if err != nil {
+		return ""
+	}
+
+	head, err := repo.Head()
+	if err != nil {
+		return ""
+	}
+
+	return head.Hash().String()
 }

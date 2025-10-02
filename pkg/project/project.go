@@ -49,16 +49,8 @@ type Config struct {
 	// Internal state
 	singleProject  bool          //nolint:unused // Reserved for future migration
 	packageManager packer.Packer //nolint:unused // Reserved for future migration
-	makeDepends    []string
-	runtimeDepends []string
-}
-
-// NewConfig creates a new Config with default values.
-func NewConfig() *Config {
-	return &Config{
-		makeDepends:    make([]string, 0),
-		runtimeDepends: make([]string, 0),
-	}
+	makeDepends    []string      //nolint:unused // Reserved for dependency tracking
+	runtimeDepends []string      //nolint:unused // Reserved for dependency tracking
 }
 
 // Legacy global variables for backward compatibility - to be deprecated
@@ -86,6 +78,42 @@ var (
 	makeDepends    []string
 	runtimeDepends []string
 )
+
+// extractPackageName extracts the package name from a dependency string,
+// ignoring version constraints and other metadata.
+//
+// Examples:
+//   - "gcc" -> "gcc"
+//   - "gcc>=11.0" -> "gcc"
+//   - "python3 >=3.9" -> "python3"
+//
+// Returns empty string if the input is empty or contains only whitespace.
+func extractPackageName(dep string) string {
+	fields := strings.Fields(dep)
+	if len(fields) == 0 {
+		return ""
+	}
+
+	return fields[0]
+}
+
+// processDependencies iterates through a list of dependencies and processes each one
+// that exists in the packageMap using the provided handler function.
+// This consolidates the common pattern of extracting package names and checking existence.
+func processDependencies(
+	deps []string,
+	packageMap map[string]*Project,
+	handler func(depName string),
+) {
+	for _, dep := range deps {
+		depName := extractPackageName(dep)
+		if depName != "" {
+			if _, exists := packageMap[depName]; exists {
+				handler(depName)
+			}
+		}
+	}
+}
 
 // DistroProject is an interface that defines the methods for creating and
 // preparing a project for a specific distribution.
@@ -137,18 +165,6 @@ type Project struct {
 	Root           string
 	Name           string `json:"name"    validate:"required,startsnotwith=.,startsnotwith=./"`
 	HasToInstall   bool   `json:"install" validate:""`
-}
-
-// NewMultipleProject creates a new MultipleProject with the provided config.
-func NewMultipleProject(config *Config) *MultipleProject {
-	if config == nil {
-		config = NewConfig()
-	}
-
-	return &MultipleProject{
-		Config:   config,
-		Projects: make([]*Project, 0),
-	}
 }
 
 // BuildAll builds all the projects in the MultipleProject struct with optimizations.
@@ -539,7 +555,7 @@ func (mpc *MultipleProject) getRuntimeDeps() {
 	// Collect external runtime dependencies
 	for _, child := range mpc.Projects {
 		for _, dep := range child.Builder.PKGBUILD.Depends {
-			depName := strings.Fields(dep)[0] // Extract package name (ignore version constraints)
+			depName := extractPackageName(dep)
 			// Only add if it's not an internal package
 			if !internalPackages[depName] {
 				runtimeDepends = append(runtimeDepends, dep)
@@ -758,11 +774,10 @@ func (mpc *MultipleProject) displayDependencies(
 	logger.Debug(i18n.T("logger.dependency_category"),
 		"category", title)
 
-	internalDeps := make([]string, 0)
-	externalDeps := make([]string, 0)
+	var internalDeps, externalDeps []string
 
 	for _, dep := range deps {
-		depName := strings.Fields(dep)[0] // Extract package name (ignore version constraints)
+		depName := extractPackageName(dep)
 		if _, exists := packageMap[depName]; exists {
 			internalDeps = append(internalDeps, dep+" (internal)")
 		} else {
@@ -799,8 +814,8 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 	for _, proj := range mpc.Projects {
 		pkgName := proj.Builder.PKGBUILD.PkgName
 		projectMap[pkgName] = proj
-		dependsOn[pkgName] = make([]string, 0)
-		dependedBy[pkgName] = make([]string, 0)
+		dependsOn[pkgName] = nil
+		dependedBy[pkgName] = nil
 	}
 
 	logger.Info(
@@ -812,43 +827,24 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 
 	for _, proj := range mpc.Projects {
 		pkgName := proj.Builder.PKGBUILD.PkgName
-		packageDeps := make([]string, 0)
 
-		// Debug: show what dependencies each package declares
-		allDeps := make(
-			[]string,
-			0,
-			len(proj.Builder.PKGBUILD.Depends)+len(proj.Builder.PKGBUILD.MakeDepends))
-		allDeps = append(allDeps, proj.Builder.PKGBUILD.Depends...)
-		allDeps = append(allDeps, proj.Builder.PKGBUILD.MakeDepends...)
-
-		if len(allDeps) > 0 {
-			logger.Info(i18n.T("logger.package_declares_dependencies"),
-				"package", pkgName,
-				"all_dependencies", allDeps)
-		}
+		var packageDeps []string
 
 		// Check runtime dependencies
-		for _, dep := range proj.Builder.PKGBUILD.Depends {
-			depName := strings.Fields(dep)[0] // Extract package name (ignore version constraints)
-			if _, exists := projectMap[depName]; exists {
-				dependsOn[pkgName] = append(dependsOn[pkgName], depName)
-				dependedBy[depName] = append(dependedBy[depName], pkgName)
-				packageDeps = append(packageDeps, depName+" (runtime)")
-				totalDeps++
-			}
-		}
+		processDependencies(proj.Builder.PKGBUILD.Depends, projectMap, func(depName string) {
+			dependsOn[pkgName] = append(dependsOn[pkgName], depName)
+			dependedBy[depName] = append(dependedBy[depName], pkgName)
+			packageDeps = append(packageDeps, depName+" (runtime)")
+			totalDeps++
+		})
 
 		// Check make dependencies (build-time dependencies)
-		for _, dep := range proj.Builder.PKGBUILD.MakeDepends {
-			depName := strings.Fields(dep)[0] // Extract package name (ignore version constraints)
-			if _, exists := projectMap[depName]; exists {
-				dependsOn[pkgName] = append(dependsOn[pkgName], depName)
-				dependedBy[depName] = append(dependedBy[depName], pkgName)
-				packageDeps = append(packageDeps, depName+" (make)")
-				totalDeps++
-			}
-		}
+		processDependencies(proj.Builder.PKGBUILD.MakeDepends, projectMap, func(depName string) {
+			dependsOn[pkgName] = append(dependsOn[pkgName], depName)
+			dependedBy[depName] = append(dependedBy[depName], pkgName)
+			packageDeps = append(packageDeps, depName+" (make)")
+			totalDeps++
+		})
 
 		if len(packageDeps) > 0 {
 			logger.Info(i18n.T("logger.package_dependencies_found"),
@@ -981,17 +977,9 @@ func (mpc *MultipleProject) buildRuntimeDependencyMap() map[string]bool {
 	// Check which packages are runtime dependencies of others
 	for _, proj := range mpc.Projects {
 		if len(proj.Builder.PKGBUILD.Depends) > 0 {
-			for _, dep := range proj.Builder.PKGBUILD.Depends {
-				fields := strings.Fields(dep)
-				if len(fields) == 0 {
-					continue
-				}
-
-				depName := fields[0] // Extract package name (ignore version constraints)
-				if _, exists := packageMap[depName]; exists {
-					dependencyMap[depName] = true
-				}
-			}
+			processDependencies(proj.Builder.PKGBUILD.Depends, packageMap, func(depName string) {
+				dependencyMap[depName] = true
+			})
 		}
 	}
 
@@ -1014,19 +1002,13 @@ func (mpc *MultipleProject) calculateDependencyPopularity() map[string]int {
 	// Count how many packages depend on each package (both runtime and make dependencies)
 	for _, proj := range mpc.Projects {
 		// Count runtime dependencies
-		for _, dep := range proj.Builder.PKGBUILD.Depends {
-			depName := strings.Fields(dep)[0]
-			if _, exists := packageMap[depName]; exists {
-				popularity[depName]++
-			}
-		}
+		processDependencies(proj.Builder.PKGBUILD.Depends, packageMap, func(depName string) {
+			popularity[depName]++
+		})
 		// Count make dependencies
-		for _, dep := range proj.Builder.PKGBUILD.MakeDepends {
-			depName := strings.Fields(dep)[0]
-			if _, exists := packageMap[depName]; exists {
-				popularity[depName]++
-			}
-		}
+		processDependencies(proj.Builder.PKGBUILD.MakeDepends, packageMap, func(depName string) {
+			popularity[depName]++
+		})
 	}
 
 	return popularity
@@ -1175,8 +1157,8 @@ func (mpc *MultipleProject) buildRuntimeDependencyGraph(runtimeDeps []*Project) 
 	for _, proj := range runtimeDeps {
 		pkgName := proj.Builder.PKGBUILD.PkgName
 		runtimeProjectMap[pkgName] = proj
-		runtimeDependsOn[pkgName] = make([]string, 0)
-		runtimeDependedBy[pkgName] = make([]string, 0)
+		runtimeDependsOn[pkgName] = nil
+		runtimeDependedBy[pkgName] = nil
 	}
 
 	// Build dependency relationships between runtime dependencies only
@@ -1194,7 +1176,7 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 ) {
 	// Check runtime dependencies
 	for _, dep := range proj.Builder.PKGBUILD.Depends {
-		depName := strings.Fields(dep)[0]
+		depName := extractPackageName(dep)
 		if _, exists := runtimeProjectMap[depName]; exists {
 			runtimeDependsOn[pkgName] = append(runtimeDependsOn[pkgName], depName)
 			runtimeDependedBy[depName] = append(runtimeDependedBy[depName], pkgName)
@@ -1207,7 +1189,7 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 
 	// Check make dependencies
 	for _, dep := range proj.Builder.PKGBUILD.MakeDepends {
-		depName := strings.Fields(dep)[0]
+		depName := extractPackageName(dep)
 		if _, exists := runtimeProjectMap[depName]; exists {
 			runtimeDependsOn[pkgName] = append(runtimeDependsOn[pkgName], depName)
 			runtimeDependedBy[depName] = append(runtimeDependedBy[depName], pkgName)

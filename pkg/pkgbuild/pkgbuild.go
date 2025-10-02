@@ -36,6 +36,7 @@ type PKGBUILD struct {
 	BuildDate      int64
 	Checksum       string
 	Codename       string
+	Commit         string
 	Conflicts      []string
 	Copyright      []string
 	DataHash       string
@@ -56,6 +57,7 @@ type PKGBUILD struct {
 	MakeDepends    []string
 	OptDepends     []string
 	Options        []string
+	Origin         string
 	Package        string
 	PackageDir     string
 	PkgDesc        string
@@ -408,6 +410,8 @@ func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 
 // mapVariables reads a variable name and its content and maps them to the
 // PKGBUILD struct.
+//
+//nolint:gocyclo,cyclop // Central dispatch function for PKGBUILD field mapping
 func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	var err error
 
@@ -436,6 +440,10 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	case "url":
 		err = os.Setenv(key, data.(string))
 		pkgBuild.URL = data.(string)
+	case "origin":
+		pkgBuild.Origin = data.(string)
+	case "commit":
+		pkgBuild.Commit = data.(string)
 	case "debconf_template":
 		pkgBuild.DebTemplate = data.(string)
 	case "debconf_config":

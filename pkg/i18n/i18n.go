@@ -58,16 +58,6 @@ func Init(lang string) error {
 	return nil
 }
 
-// GetBundle returns the i18n bundle for advanced use cases.
-func GetBundle() *i18n.Bundle {
-	return bundle
-}
-
-// GetLocalizer returns the i18n localizer for advanced use cases.
-func GetLocalizer() *i18n.Localizer {
-	return localizer
-}
-
 // detectSystemLanguage attempts to detect the system language from environment variables.
 func detectSystemLanguage() string {
 	// Check LANG environment variable first
@@ -126,54 +116,4 @@ func T(messageID string, templateData ...map[string]any) string {
 	}
 
 	return translated
-}
-
-// Tf translates a message with format-style template data.
-func Tf(messageID string, args ...any) string {
-	if localizer == nil {
-		// Fallback if i18n is not initialized
-		return fmt.Sprintf(messageID, args...)
-	}
-
-	config := &i18n.LocalizeConfig{
-		MessageID: messageID,
-	}
-
-	// Convert args to template data if provided
-	if len(args) > 0 {
-		templateData := make(map[string]any)
-		for i, arg := range args {
-			templateData[fmt.Sprintf("Arg%d", i)] = arg
-		}
-
-		config.TemplateData = templateData
-	}
-
-	translated, err := localizer.Localize(config)
-	if err != nil {
-		// Fallback to fmt.Sprintf with original messageID
-		return fmt.Sprintf(messageID, args...)
-	}
-
-	return translated
-}
-
-// GetCurrentLanguage returns the current language code.
-func GetCurrentLanguage() string {
-	if localizer == nil {
-		return "en"
-	}
-	// This is a simplified implementation - in reality we'd need to track this
-	return detectSystemLanguage()
-}
-
-// IsLanguageSupported checks if a language code is supported.
-func IsLanguageSupported(lang string) bool {
-	for _, supported := range SupportedLanguages {
-		if lang == supported {
-			return true
-		}
-	}
-
-	return false
 }

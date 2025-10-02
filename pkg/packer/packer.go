@@ -36,10 +36,6 @@ type Packer interface {
 	Update() error
 }
 
-// PackageManagerConfigs holds all package manager configurations.
-// Deprecated: Use core.PackageManagerConfigs instead.
-var PackageManagerConfigs = core.PackageManagerConfigs
-
 // GetPackageManager returns a Packer interface based on the given package build and distribution.
 //
 // pkgBuild: A pointer to a pkgbuild.PKGBUILD struct.

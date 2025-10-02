@@ -112,8 +112,8 @@ linters:
         text: "avoid meaningless package names"
         linters:
           - revive
-          
-      - path: "(docs|dist|bin)/"
+
+      - path: "(docs|dist|bin|examples)/"
         linters:
           - gosec
           - govet

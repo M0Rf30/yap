@@ -61,12 +61,12 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 		return nil, err
 	}
 
-	pkgBuild.SetMainFolders()
-
 	err = parseSyntaxFile(pkgbuildSyntax, pkgBuild)
 	if err != nil {
 		return nil, err
 	}
+
+	pkgBuild.SetMainFolders()
 
 	if OverridePkgRel != "" {
 		pkgBuild.PkgRel = OverridePkgRel

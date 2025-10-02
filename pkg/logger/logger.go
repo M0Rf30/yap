@@ -3,9 +3,7 @@ package logger
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"time"
 
 	"github.com/pterm/pterm"
 )
@@ -45,26 +43,6 @@ const (
 	// LevelFatal represents the fatal log level.
 	LevelFatal
 )
-
-// Config holds configuration for the logger for compatibility.
-type Config struct {
-	Level      LogLevel
-	Format     string
-	Output     io.Writer
-	TimeFormat string
-	AddSource  bool
-}
-
-// DefaultConfig returns a default logger configuration.
-func DefaultConfig() *Config {
-	return &Config{
-		Level:      LevelInfo,
-		Format:     "text",
-		Output:     os.Stdout,
-		TimeFormat: time.RFC3339,
-		AddSource:  false,
-	}
-}
 
 var (
 	// MultiPrinter is the default multiprinter for concurrent logging.
@@ -166,21 +144,6 @@ func (y *YapLogger) Error(msg string, args ...[]pterm.LoggerArgument) {
 	} else {
 		y.ptermLogger.Error(prefix)
 	}
-}
-
-// WithKeyStyles sets custom styles for specific argument keys
-func (y *YapLogger) WithKeyStyles(styles map[string]pterm.Style) *YapLogger {
-	return &YapLogger{
-		ptermLogger: y.ptermLogger.WithKeyStyles(styles),
-	}
-}
-
-// AppendKeyStyle adds a style for a specific argument key
-func (y *YapLogger) AppendKeyStyle(key string, style pterm.Style) *YapLogger {
-	newLogger := *y
-	newLogger.ptermLogger = y.ptermLogger.AppendKeyStyle(key, style)
-
-	return &newLogger
 }
 
 // Tips logs a tip message with custom formatting and yap prefix.

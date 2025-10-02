@@ -18,13 +18,17 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 
 	"github.com/M0Rf30/yap/v2/pkg/buffers"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 const (
-	timestampFormat = "2006-01-02 15:04:05"
-	logLevelInfo    = " INFO"
+	logLevelInfo = " INFO"
+
+	// Buffer size constants for writer management
+	minBufferPoolSize = 1024 // Minimum buffer size to return to pool
+	lastLineCapacity  = 256  // Initial capacity for git progress lastLine buffer
 )
 
 var (
@@ -64,7 +68,7 @@ func NewGitProgressWriter(writer io.Writer, packageName string) *GitProgressWrit
 		writer:      writer,
 		packageName: packageName,
 		buffer:      buffers.GetSmallBuffer()[:0], // Start with empty slice but allocated backing array
-		lastLine:    make([]byte, 0, 256),         // Keep lastLine as fixed since it's small
+		lastLine:    make([]byte, 0, lastLineCapacity),
 	}
 }
 
@@ -93,8 +97,8 @@ func (pdw *PackageDecoratedWriter) Write(p []byte) (int, error) {
 func (pdw *PackageDecoratedWriter) Close() error {
 	if pdw.buffer != nil {
 		// Reset buffer to original capacity before returning to pool
-		if cap(pdw.buffer) >= 1024 {
-			pdw.buffer = pdw.buffer[:1024]
+		if cap(pdw.buffer) >= minBufferPoolSize {
+			pdw.buffer = pdw.buffer[:minBufferPoolSize]
 			buffers.PutSmallBuffer(pdw.buffer)
 		}
 
@@ -106,7 +110,7 @@ func (pdw *PackageDecoratedWriter) Close() error {
 
 // formatDecoratedLine creates a decorated log line with timestamp and package name.
 func formatDecoratedLine(packageName, lineContent string) string {
-	timestamp := time.Now().Format(timestampFormat)
+	timestamp := time.Now().Format(constants.TimestampFormat)
 
 	if logger.IsColorDisabled() {
 		return fmt.Sprintf("%s %s [%s] %s\n", timestamp, logLevelInfo,
@@ -198,8 +202,8 @@ func (gpw *GitProgressWriter) writeDecoratedLine(lineContent string) error {
 func (gpw *GitProgressWriter) Close() error {
 	if gpw.buffer != nil {
 		// Reset buffer to original capacity before returning to pool
-		if cap(gpw.buffer) >= 1024 {
-			gpw.buffer = gpw.buffer[:1024]
+		if cap(gpw.buffer) >= minBufferPoolSize {
+			gpw.buffer = gpw.buffer[:minBufferPoolSize]
 			buffers.PutSmallBuffer(gpw.buffer)
 		}
 
@@ -227,6 +231,11 @@ func ExecWithContext(
 		}
 
 		decoratedWriter := NewPackageDecoratedWriter(MultiPrinter.Writer, "yap")
+
+		defer func() {
+			_ = decoratedWriter.Close()
+		}()
+
 		cmd.Stdout = decoratedWriter
 		cmd.Stderr = decoratedWriter
 	}
@@ -321,7 +330,7 @@ func logScriptContent(cmds string) {
 		return
 	}
 
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	timestamp := time.Now().Format(constants.TimestampFormat)
 	headerLine := pterm.Sprintf("%s %s %s%s%s %s\n",
 		pterm.FgGray.Sprint(timestamp),
 		pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("DEBUG"),
@@ -338,7 +347,7 @@ func logScriptContent(cmds string) {
 	for line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed != "" {
-			timestamp := time.Now().Format("2006-01-02 15:04:05")
+			timestamp := time.Now().Format(constants.TimestampFormat)
 			scriptLine := pterm.Sprintf("%s %s %s%s%s   %s\n",
 				pterm.FgGray.Sprint(timestamp),
 				pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("DEBUG"),
@@ -382,8 +391,16 @@ func RunScriptWithPackage(cmds, packageName string) error {
 	}
 
 	writer := MultiPrinter.Writer
+
+	var decoratedWriter *PackageDecoratedWriter
 	if packageName != "" {
-		writer = NewPackageDecoratedWriter(MultiPrinter.Writer, packageName)
+		decoratedWriter = NewPackageDecoratedWriter(MultiPrinter.Writer, packageName)
+
+		defer func() {
+			_ = decoratedWriter.Close()
+		}()
+
+		writer = decoratedWriter
 	}
 
 	runner, err := interp.New(
@@ -479,6 +496,11 @@ func ExecWithSudoContext(
 		}
 
 		decoratedWriter := NewPackageDecoratedWriter(MultiPrinter.Writer, "yap")
+
+		defer func() {
+			_ = decoratedWriter.Close()
+		}()
+
 		cmd.Stdout = decoratedWriter
 		cmd.Stderr = decoratedWriter
 	}

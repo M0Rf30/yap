@@ -11,6 +11,7 @@
 - **Dependency Resolution** (`pkg/graph/`) - Build order calculation and dependency management
 - **Source Handling** (`pkg/source/`) - Download and validation of source files
 - **PKGBUILD Parsing** (`pkg/pkgbuild/`, `pkg/parser/`) - Extended PKGBUILD format support
+- **Custom Libraries** - Fork of archives library with APK-specific enhancements
 
 ### Architecture
 ```
@@ -41,6 +42,22 @@
 - `make run` - Build and run yap with current changes
 - `make test` - Run all tests with `-p 1 -v` flags (sequential execution required)
 - `make test-coverage` - Run tests with coverage report (generates coverage.html)
+
+### YAP CLI Commands
+```bash
+# Build packages
+yap build <distro> <project-path>              # Build for specific distribution
+yap build <project-path>                       # Build for all distributions
+
+# Project management
+yap zap <project-path>                         # Clean build environment
+yap list-distros                               # List supported distributions
+yap graph <project-path>                       # Show dependency graph
+
+# Package operations  
+yap build --skip-sync <project-path>           # Skip dependency sync (faster)
+yap build --cleanbuild <project-path>          # Clean source before build
+```
 
 
 ### Package-Specific Testing
@@ -232,6 +249,7 @@ docker build --progress=plain --no-cache -f build/deploy/alpine/Dockerfile .
 2. **Integration Tests** - Multi-package interactions
 3. **Container Tests** - Build environment validation
 4. **End-to-End Tests** - Complete package building workflows
+5. **Format Compliance Tests** - Verify package format against distribution standards
 
 ### Coverage Requirements
 - Minimum 70% coverage for new code
@@ -242,11 +260,34 @@ docker build --progress=plain --no-cache -f build/deploy/alpine/Dockerfile .
 - Use `examples/` directory for realistic test scenarios
 - Mock external dependencies (downloads, containers) in unit tests
 - Use temporary directories for file system tests
+- Compare with official distribution packages for format validation
+
+### Format Validation Testing
+```bash
+# APK Format Testing
+cd test-apk/
+go run tar_format.go                           # Generate test packages
+../scripts/test_apk_format.sh yap-auto.apk     # Quick format check
+../scripts/compare_apk.sh official.apk yap.apk # Detailed comparison
+
+# DEB Format Testing  
+dpkg-deb --info package.deb                    # Validate metadata
+dpkg-deb --contents package.deb                # Check file structure
+
+# RPM Format Testing
+rpm -qip package.rpm                           # Query package info
+rpm2cpio package.rpm | cpio -tv                # Extract and list
+
+# Pacman Format Testing
+tar -tzf package.pkg.tar.zst                   # List package contents
+pacman -Qip package.pkg.tar.zst                # Query package
+```
 
 ### Continuous Integration
 - Tests run on Go 1.24.6 (as specified in go.mod)
 - Multi-architecture builds (amd64, arm64) on Ubuntu runners
 - Integration with GitHub Actions
+- Format compliance checks for all package types
 
 ## Package Builder Development
 
@@ -265,6 +306,75 @@ docker build --progress=plain --no-cache -f build/deploy/alpine/Dockerfile .
 - [ ] Generate correct package format
 - [ ] Write comprehensive tests
 - [ ] Document any special requirements
+
+### APK Builder Compliance Status
+
+The APK builder (`pkg/builders/apk/`) is under active development for full Alpine Linux compliance. Current status:
+
+#### ✅ Completed Features
+- **Tar Format**: Uses PAX format (POSIX.1-2001) matching Alpine's `abuild-tar`
+- **Basic Package Structure**: `.PKGINFO`, `data.tar.gz` generation
+- **Dependency Handling**: Package dependencies and conflicts
+- **Metadata**: Basic package information (name, version, arch, description)
+
+#### 🚧 In Progress / Planned Features
+1. **3-Stream Gzip Format** (Critical)
+   - Alpine APK uses concatenated gzip streams: `.SIGN` + `.CONTROL` + `data.tar.gz`
+   - Current YAP: Single-stream gzip
+   - Required for `apk add` compatibility
+   
+2. **Package Signing** (High Priority)
+   - RSA signature support (`.SIGN.RSA.*` entries)
+   - Integration with Alpine signing keys
+   - Optional for development, required for production
+
+3. **PAX Extended Headers** (Medium Priority)
+   - `APK-TOOLS.checksum.SHA1` headers for file integrity
+   - Used by `apk audit` and verification tools
+   - Currently missing in YAP output
+
+4. **Extended Metadata** (Low Priority)
+   - `origin`: Source package name
+   - `commit`: Git commit hash
+   - `builddate`: Build timestamp  
+   - `datahash`: Additional integrity check
+
+#### Investigation Tools & Scripts
+- `test-apk/tar_format.go` - Test different tar format outputs
+- `scripts/test_apk_format.sh` - Quick tar format verification
+- `scripts/compare_apk.sh` - Detailed APK comparison tool
+- `test-apk/manual/.PKGINFO` - Manual APK structure reference
+
+#### Key Findings Documentation
+- `APK_TAR_FORMAT_FINAL_ANALYSIS.md` - Authoritative tar format analysis
+- `APK_COMPLIANCE_SUMMARY.md` - Overall compliance status
+- `APK_TAR_FORMAT_TEST_RESULTS.md` - Test results and comparisons
+
+#### Testing APK Packages
+```bash
+# Download official Alpine package for comparison
+wget http://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/busybox-1.37.0-r19.apk
+
+# Build YAP APK package
+yap build alpine examples/yap
+
+# Compare tar formats
+gunzip -c package.apk | dd bs=1 skip=257 count=8 2>/dev/null | od -A n -t x1z
+# Expected: 75 73 74 61 72 00 30 30 (PAX format)
+
+# Inspect APK structure
+tar -tzf <(gunzip -c package.apk)
+
+# Test with Alpine tools (in Alpine container)
+apk add --allow-untrusted ./package.apk
+apk info -L package-name
+```
+
+#### Dependencies
+- **Custom Archive Library**: `github.com/M0Rf30/archives` (morfeo branch)
+  - Fork of go-libpack/archives with APK-specific enhancements
+  - PAX format support for extended attributes
+  - Replace in `go.mod` before APK development work
 
 ## Release and Deployment
 
@@ -319,3 +429,54 @@ yap build arch examples/yap           # Arch Linux
 - Container image caching improves build times
 - Parallel builds when possible (dependency-aware)
 - Use `--cleanbuild` flag to clean source directory before builds
+
+## Current Development Focus
+
+### Active Investigations
+1. **APK Format Compliance** - Bringing APK builder to full Alpine Linux compatibility
+2. **Multi-Stream Gzip Support** - Critical for APK package installation
+3. **Package Signing Infrastructure** - RSA signature integration
+
+### Recent Achievements
+- ✅ Verified tar format compliance (PAX matches Alpine)
+- ✅ Created comprehensive APK testing infrastructure
+- ✅ Integrated custom archives library for APK support
+- ✅ Documented APK format requirements and gaps
+
+### Known Limitations
+- **APK Packages**: Not yet installable with `apk add` (3-stream format required)
+- **APK Signing**: No signature support (development builds only)
+- **PAX Checksums**: Missing APK-TOOLS.checksum.SHA1 headers
+
+### Development Priorities
+1. Implement 3-stream gzip format for APK
+2. Add RSA signing support
+3. Integrate PAX extended attributes for checksums
+4. Expand test coverage for APK builder (current: ~70%, target: 85%)
+
+## Agent-Specific Context
+
+### For Code Changes
+- **Always check**: Existing code patterns before adding new features
+- **Never assume**: Library availability - verify in `go.mod` first
+- **Format validation**: Run `make fmt lint` before committing
+- **Test requirements**: Sequential execution (`-p 1`) for all tests
+- **APK work**: Requires `github.com/M0Rf30/archives` (morfeo branch)
+
+### For Documentation
+- Keep `AGENTS.md` updated with current project status
+- Document investigation findings in dedicated analysis files
+- Use markdown lint rules (`.markdownlint.yml`)
+- Include command examples for all workflows
+
+### For Testing
+- Use real Alpine packages as reference (`dl-cdn.alpinelinux.org`)
+- Test APK changes in Alpine containers
+- Compare YAP output with official packages byte-by-byte
+- Document test procedures in `test-apk/` directory
+
+### For Debugging
+- Enable verbose logging for build issues
+- Use container inspection for isolation problems
+- Check binary magic bytes for format validation
+- Compare with working examples before assuming bugs

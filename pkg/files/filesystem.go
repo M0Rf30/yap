@@ -3,14 +3,12 @@ package files
 
 import (
 	"debug/elf"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 
-	"github.com/M0Rf30/yap/v2/pkg/buffers"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -187,45 +185,4 @@ func Open(path string) (*os.File, error) {
 	}
 
 	return file, nil
-}
-
-// TryHardLink attempts to create a hard link instead of copying a file.
-// Falls back to regular file copy if hard linking fails.
-func TryHardLink(src, dst string) error {
-	// Try to create a hard link first
-	if err := os.Link(src, dst); err == nil {
-		return nil
-	}
-
-	// Fall back to copying the file
-	srcFile, err := os.Open(src) // #nosec G304 - src path is controlled by caller
-	if err != nil {
-		return errors.Wrap(err, i18n.T("errors.files.failed_to_open_source_file"))
-	}
-
-	defer func() { _ = srcFile.Close() }()
-
-	dstFile, err := os.Create(dst) // #nosec G304 - dst path is controlled by caller
-	if err != nil {
-		return errors.Wrap(err, i18n.T("errors.files.failed_to_create_destination_file"))
-	}
-
-	defer func() { _ = dstFile.Close() }()
-
-	// Use buffer from pool for better performance
-	buffer := buffers.GetDefaultBuffer()
-	defer buffers.PutDefaultBuffer(buffer)
-
-	if _, err := io.CopyBuffer(dstFile, srcFile, buffer); err != nil {
-		return errors.Wrap(err, i18n.T("errors.files.failed_to_copy_file_content"))
-	}
-
-	// Copy file permissions
-	if srcInfo, err := srcFile.Stat(); err == nil {
-		if err := os.Chmod(dst, srcInfo.Mode()); err != nil {
-			logger.Warn(i18n.T("logger.tryhardlink.warn.failed_to_copy_file_1"), "dst", dst, "error", err)
-		}
-	}
-
-	return nil
 }

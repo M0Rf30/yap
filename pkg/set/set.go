@@ -82,7 +82,8 @@ func Contains(array []string, str string) bool {
 // node: A pointer to the syntax.Assign node representing the array.
 // []string: An array of strings representing the stringified elements of the array.
 func StringifyArray(node *syntax.Assign) []string {
-	fields := make([]string, 0)
+	var fields []string
+
 	printer := syntax.NewPrinter(syntax.Indent(2))
 	out := &strings.Builder{}
 

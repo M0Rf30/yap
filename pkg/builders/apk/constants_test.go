@@ -1,72 +1,74 @@
 package apk
 
 import (
+	"strings"
 	"testing"
 )
 
-func TestAPKArchs(t *testing.T) {
-	if APKArchs == nil {
-		t.Fatal("APKArchs is nil")
+func TestDotPkginfoTemplate(t *testing.T) {
+	if dotPkginfo == "" {
+		t.Error("dotPkginfo template is empty")
 	}
 
-	expectedArchs := map[string]string{
-		"x86_64":  "x86_64",
-		"i686":    "x86",
-		"aarch64": "aarch64",
-		"armv7h":  "armv7h",
-		"armv6h":  "armv6h",
-		"any":     "all",
+	requiredFields := []string{
+		"pkgname =", "pkgver =", "pkgdesc =", "url =", "builddate =",
+		"size =", "arch =",
 	}
 
-	for arch, expected := range expectedArchs {
-		if actual, exists := APKArchs[arch]; !exists {
-			t.Errorf("APKArchs missing arch: %s", arch)
-		} else if actual != expected {
-			t.Errorf("APKArchs[%s] = %s, want %s", arch, actual, expected)
+	for _, field := range requiredFields {
+		if !strings.Contains(dotPkginfo, field) {
+			t.Errorf("dotPkginfo template missing required field: %s", field)
 		}
 	}
 
-	for arch, mapped := range APKArchs {
-		if mapped == "" {
-			t.Errorf("APKArchs[%s] is empty", arch)
+	templateVars := []string{
+		"{{.PkgName}}", "{{.PkgVer}}", "{{.PkgDesc}}", "{{.URL}}",
+		"{{.BuildDate}}", "{{.InstalledSize}}", "{{.ArchComputed}}",
+	}
+
+	for _, templateVar := range templateVars {
+		if !strings.Contains(dotPkginfo, templateVar) {
+			t.Errorf("dotPkginfo template missing template variable: %s", templateVar)
 		}
 	}
 }
 
-func TestAPKArchsMapping(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"x86_64", "x86_64"},
-		{"i686", "x86"},
-		{"aarch64", "aarch64"},
-		{"armv7h", "armv7h"},
-		{"armv6h", "armv6h"},
-		{"any", "all"},
+func TestInstallScriptTemplate(t *testing.T) {
+	if installScript == "" {
+		t.Error("installScript template is empty")
 	}
 
-	for _, tt := range tests {
-		t.Run("mapping_"+tt.input, func(t *testing.T) {
-			if result, exists := APKArchs[tt.input]; !exists {
-				t.Errorf("APKArchs[%s] does not exist", tt.input)
-			} else if result != tt.expected {
-				t.Errorf("APKArchs[%s] = %s, want %s", tt.input, result, tt.expected)
-			}
-		})
+	if !strings.Contains(installScript, "#!/bin/sh") {
+		t.Error("installScript should contain shebang")
 	}
-}
 
-func TestAPKArchsConsistency(t *testing.T) {
-	commonArchs := []string{"x86_64", "aarch64", "any"}
+	requiredFunctions := []string{
+		"pre_install()", "post_install()",
+		"pre_upgrade()", "post_upgrade()",
+		"pre_deinstall()", "post_deinstall()",
+	}
 
-	for _, arch := range commonArchs {
-		if _, exists := APKArchs[arch]; !exists {
-			t.Errorf("APKArchs missing common arch: %s", arch)
+	for _, function := range requiredFunctions {
+		if !strings.Contains(installScript, function) {
+			t.Errorf("installScript template missing function: %s", function)
 		}
 	}
 
-	if len(APKArchs) == 0 {
-		t.Error("APKArchs should not be empty")
+	templateVars := []string{"{{.PreInst}}", "{{.PostInst}}", "{{.PreRm}}", "{{.PostRm}}"}
+
+	for _, templateVar := range templateVars {
+		if !strings.Contains(installScript, templateVar) {
+			t.Errorf("installScript template missing template variable: %s", templateVar)
+		}
+	}
+}
+
+func TestTemplateConsistency(t *testing.T) {
+	if dotPkginfo == "" {
+		t.Error("dotPkginfo should not be empty")
+	}
+
+	if installScript == "" {
+		t.Error("installScript should not be empty")
 	}
 }

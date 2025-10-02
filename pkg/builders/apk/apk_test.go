@@ -44,9 +44,35 @@ func TestBuildPackage(t *testing.T) {
 
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
+	// Create a fake package directory with some content
+	pkgDir := filepath.Join(tempDir, "pkg")
+
+	err = os.MkdirAll(pkgDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create package dir: %v", err)
+	}
+
+	builder.PKGBUILD.PackageDir = pkgDir
+	builder.PKGBUILD.ArchComputed = "x86_64" // Set computed arch before building
+
+	// Create a test file in the package
+	testFile := filepath.Join(pkgDir, "testfile")
+
+	err = os.WriteFile(testFile, []byte("test content"), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
 	err = builder.BuildPackage(tempDir)
-	if err == nil {
-		t.Error("BuildPackage should fail - APK building not implemented")
+	if err != nil {
+		t.Errorf("BuildPackage failed: %v", err)
+	}
+
+	// Check that the package was created
+	// APK format is: name-version-release.arch.apk
+	expectedPkg := filepath.Join(tempDir, "test-package-1.0.0-1.x86_64.apk")
+	if _, err := os.Stat(expectedPkg); os.IsNotExist(err) {
+		t.Errorf("Package file was not created: %s", expectedPkg)
 	}
 }
 
@@ -72,14 +98,19 @@ func TestPrepareFakeroot(t *testing.T) {
 	builder.PKGBUILD.PackageDir = pkgDir
 
 	err = builder.PrepareFakeroot(tempDir)
-	// Should fail because createPkgInfo is not implemented
-	if err == nil {
-		t.Error("PrepareFakeroot should fail - .PKGINFO generation not implemented")
+	if err != nil {
+		t.Errorf("PrepareFakeroot failed: %v", err)
 	}
 
-	// Build date should still be set before error occurs
+	// Build date should be set
 	if builder.PKGBUILD.BuildDate == 0 {
 		t.Error("BuildDate was not set")
+	}
+
+	// Check that .PKGINFO was created
+	pkginfoPath := filepath.Join(pkgDir, ".PKGINFO")
+	if _, err := os.Stat(pkginfoPath); os.IsNotExist(err) {
+		t.Error(".PKGINFO file was not created")
 	}
 }
 
@@ -107,9 +138,14 @@ func TestPrepareFakerootWithScripts(t *testing.T) {
 	builder.PKGBUILD.PackageDir = pkgDir
 
 	err = builder.PrepareFakeroot(tempDir)
-	// Should fail because createPkgInfo is not implemented
-	if err == nil {
-		t.Error("PrepareFakeroot with scripts should fail - .PKGINFO generation not implemented")
+	if err != nil {
+		t.Errorf("PrepareFakeroot with scripts failed: %v", err)
+	}
+
+	// Check that install script was created
+	installPath := filepath.Join(pkgDir, ".install")
+	if _, err := os.Stat(installPath); os.IsNotExist(err) {
+		t.Error(".install file was not created")
 	}
 }
 
@@ -218,11 +254,34 @@ func TestCreateAPKPackage(t *testing.T) {
 
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
+	// Create a package directory with content
+	pkgDir := filepath.Join(tempDir, "pkg")
+
+	err = os.MkdirAll(pkgDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create package dir: %v", err)
+	}
+
+	builder.PKGBUILD.PackageDir = pkgDir
+
+	// Create a test file
+	testFile := filepath.Join(pkgDir, "testfile")
+
+	err = os.WriteFile(testFile, []byte("test content"), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
 	pkgFilePath := filepath.Join(tempDir, "test.apk")
 
 	err = builder.createAPKPackage(pkgFilePath, tempDir)
-	if err == nil {
-		t.Error("createAPKPackage should fail - APK building not implemented")
+	if err != nil {
+		t.Errorf("createAPKPackage failed: %v", err)
+	}
+
+	// Check that package file was created
+	if _, err := os.Stat(pkgFilePath); os.IsNotExist(err) {
+		t.Error("APK package file was not created")
 	}
 }
 
@@ -230,18 +289,99 @@ func TestCreatePkgInfo(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	builder := NewBuilder(pkgBuild)
 
-	err := builder.createPkgInfo()
-	if err == nil {
-		t.Error("createPkgInfo should fail - .PKGINFO generation not implemented")
+	tempDir, err := os.MkdirTemp("", "apk-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
 	}
+
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	builder.PKGBUILD.PackageDir = tempDir
+	builder.PKGBUILD.ArchComputed = "x86_64"
+
+	err = builder.createPkgInfo()
+	if err != nil {
+		t.Errorf("createPkgInfo failed: %v", err)
+	}
+
+	// Check that .PKGINFO was created
+	pkginfoPath := filepath.Join(tempDir, ".PKGINFO")
+	if _, err := os.Stat(pkginfoPath); os.IsNotExist(err) {
+		t.Error(".PKGINFO file was not created")
+	}
+
+	// Read and verify content
+	content, err := os.ReadFile(pkginfoPath)
+	if err != nil {
+		t.Fatalf("Failed to read .PKGINFO: %v", err)
+	}
+
+	contentStr := string(content)
+	if !contains(contentStr, "pkgname = test-package") {
+		t.Error(".PKGINFO missing package name")
+	}
+
+	if !contains(contentStr, "pkgver = 1.0.0-r1") {
+		t.Error(".PKGINFO missing version")
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsInner(s, substr))
+}
+
+func containsInner(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+
+	return false
 }
 
 func TestCreateInstallScript(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
+	pkgBuild.PreInst = "echo 'pre-install'"
+	pkgBuild.PostInst = "echo 'post-install'"
 	builder := NewBuilder(pkgBuild)
 
-	err := builder.createInstallScript()
-	if err == nil {
-		t.Error("createInstallScript should fail - install script generation not implemented")
+	tempDir, err := os.MkdirTemp("", "apk-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	builder.PKGBUILD.PackageDir = tempDir
+
+	err = builder.createInstallScript()
+	if err != nil {
+		t.Errorf("createInstallScript failed: %v", err)
+	}
+
+	// Check that .install was created
+	installPath := filepath.Join(tempDir, ".install")
+	if _, err := os.Stat(installPath); os.IsNotExist(err) {
+		t.Error(".install file was not created")
+	}
+
+	// Read and verify content
+	content, err := os.ReadFile(installPath)
+	if err != nil {
+		t.Fatalf("Failed to read .install: %v", err)
+	}
+
+	contentStr := string(content)
+	if !contains(contentStr, "#!/bin/sh") {
+		t.Error(".install missing shebang")
+	}
+
+	if !contains(contentStr, "pre_install()") {
+		t.Error(".install missing pre_install function")
+	}
+
+	if !contains(contentStr, "post_install()") {
+		t.Error(".install missing post_install function")
 	}
 }
