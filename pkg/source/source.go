@@ -29,21 +29,6 @@ const (
 	fileProtocol = "file"
 )
 
-// Manager encapsulates source management state and configuration.
-type Manager struct {
-	SSHPassword string // SSH password for authentication
-	// downloadMutexes tracks ongoing downloads to prevent duplicate downloads
-	downloadMutexes map[string]*sync.Mutex
-	mutex           sync.Mutex //nolint:unused // Reserved for future migration
-}
-
-// NewManager creates a new Manager with initialized state.
-func NewManager() *Manager {
-	return &Manager{
-		downloadMutexes: make(map[string]*sync.Mutex),
-	}
-}
-
 // Legacy global variables for backward compatibility - to be deprecated
 var (
 	// SSHPassword contains the SSH password for authentication.
@@ -80,8 +65,6 @@ type Source struct {
 	// StartDir is the root where a copied PKGBUILD lives and all the source items
 	// are downloaded. It generally contains the src and pkg folders.
 	StartDir string
-	// Manager encapsulates source management state
-	Manager *Manager
 }
 
 // Get retrieves the source file from the specified URI.
@@ -342,151 +325,4 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		"source", src.SourceItemURI)
 
 	return nil
-}
-
-// GetConcurrently retrieves multiple source files concurrently with enhanced progress tracking.
-// This function downloads all remote sources (http/https/ftp) in parallel while maintaining
-// proper progress reporting and error handling.
-//
-// Parameters:
-// - sources: slice of Source structs to download
-// - maxConcurrent: maximum number of concurrent downloads (0 = default)
-//
-// Returns an error if any critical download fails.
-func GetConcurrently(sources []*Source, maxConcurrent int) error {
-	if len(sources) == 0 {
-		return nil
-	}
-
-	// Separate sources by type for optimal processing
-	var (
-		downloadSources []*Source
-		localSources    []*Source
-	)
-
-	for _, src := range sources {
-		src.parseURI()
-		sourceType := src.getProtocol()
-
-		switch sourceType {
-		case "http", "https", "ftp":
-			downloadSources = append(downloadSources, src)
-		case constants.Git, fileProtocol:
-			localSources = append(localSources, src)
-		}
-	}
-
-	// Process local sources (git/file) sequentially first
-	// These typically need to be processed in order and don't benefit from concurrency
-	for _, src := range localSources {
-		err := src.Get()
-		if err != nil {
-			return err
-		}
-	}
-
-	// Process download sources concurrently if there are multiple
-	if len(downloadSources) > 1 && maxConcurrent > 0 {
-		return processConcurrentDownloads(downloadSources, maxConcurrent)
-	}
-
-	// Process download sources sequentially if only one or concurrency disabled
-	for _, src := range downloadSources {
-		err := src.Get()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// processConcurrentDownloads handles multiple downloads concurrently.
-func processConcurrentDownloads(sources []*Source, maxConcurrent int) error {
-	downloads, sourceMap := prepareDownloadMap(sources)
-	if len(downloads) == 0 {
-		return nil // All files already exist
-	}
-
-	_, err := shell.MultiPrinter.Start()
-	if err != nil {
-		return errors.Wrap(err, i18n.T("errors.source.failed_to_start_multiprinter"))
-	}
-
-	results := download.Concurrently(downloads, maxConcurrent, 3, shell.MultiPrinter.Writer)
-
-	return processDownloadResults(results, sourceMap)
-}
-
-// prepareDownloadMap builds the download map and source mapping.
-func prepareDownloadMap(sources []*Source) (
-	downloads map[string]string, sourceMap map[string]*Source) {
-	downloads = make(map[string]string)
-	sourceMap = make(map[string]*Source)
-
-	for _, src := range sources {
-		sourceFilePath := filepath.Join(src.StartDir, src.SourceItemPath)
-
-		// Skip if file already exists (respecting existing duplicate download prevention)
-		if files.Exists(sourceFilePath) {
-			continue
-		}
-
-		normalizedURI := strings.TrimPrefix(src.SourceItemURI, constants.Git+"+")
-		downloads[sourceFilePath] = normalizedURI
-		sourceMap[sourceFilePath] = src
-	}
-
-	return downloads, sourceMap
-}
-
-// createSourceLogger creates a component logger from the first source if available.
-func createSourceLogger(sources []*Source) *logger.ComponentLogger {
-	if len(sources) > 0 && sources[0].PkgName != "" {
-		return logger.WithComponent(sources[0].PkgName)
-	}
-
-	return nil
-}
-
-// processDownloadResults processes download results and performs post-download operations.
-func processDownloadResults(results map[string]error, sourceMap map[string]*Source) error {
-	var firstError error
-
-	for destination, err := range results {
-		if err != nil {
-			if firstError == nil {
-				firstError = errors.Errorf(i18n.T("errors.source.download_failed_for"), destination, err)
-			}
-
-			continue
-		}
-
-		// Perform validation, symlinking, and extraction for successful downloads
-		processErr := processSuccessfulDownload(destination, sourceMap[destination])
-		if processErr != nil && firstError == nil {
-			firstError = processErr
-		}
-	}
-
-	return firstError
-}
-
-// processSuccessfulDownload handles post-download processing for a successful download.
-func processSuccessfulDownload(destination string, src *Source) error {
-	if src == nil {
-		return nil
-	}
-
-	err := src.validateSource(destination)
-	if err != nil {
-		return err
-	}
-
-	err = src.symlinkSources(destination)
-	if err != nil {
-		return err
-	}
-
-	return archive.Extract(destination, src.SrcDir)
 }
