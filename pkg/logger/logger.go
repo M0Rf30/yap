@@ -2,7 +2,6 @@
 package logger
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -225,100 +224,6 @@ func IsVerboseEnabled() bool {
 	return verboseEnabled
 }
 
-// ComponentLogger wraps a logger with component-specific formatting.
-type ComponentLogger struct {
-	Component   string
-	ptermLogger *pterm.Logger
-}
-
-// WithComponent creates a new ComponentLogger with the specified component name.
-func WithComponent(component string) *ComponentLogger {
-	return &ComponentLogger{
-		Component:   component,
-		ptermLogger: ptermLogger,
-	}
-}
-
-// ServiceLogger creates a ComponentLogger for the yap service.
-func ServiceLogger() *ComponentLogger {
-	return WithComponent("yap")
-}
-
-// Info logs an informational message with component prefix.
-func (cl *ComponentLogger) Info(msg string, args ...[]pterm.LoggerArgument) {
-	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	if len(args) > 0 && len(args[0]) > 0 {
-		cl.ptermLogger.Info(prefix, args...)
-	} else {
-		cl.ptermLogger.Info(prefix)
-	}
-}
-
-// Warn logs a warning message with component prefix.
-func (cl *ComponentLogger) Warn(msg string, args ...[]pterm.LoggerArgument) {
-	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	if len(args) > 0 && len(args[0]) > 0 {
-		cl.ptermLogger.Warn(prefix, args...)
-	} else {
-		cl.ptermLogger.Warn(prefix)
-	}
-}
-
-// Error logs an error message with component prefix.
-func (cl *ComponentLogger) Error(msg string, args ...[]pterm.LoggerArgument) {
-	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	if len(args) > 0 && len(args[0]) > 0 {
-		cl.ptermLogger.Error(prefix, args...)
-	} else {
-		cl.ptermLogger.Error(prefix)
-	}
-}
-
-// Fatal logs a fatal message with component prefix and exits.
-func (cl *ComponentLogger) Fatal(msg string, args ...[]pterm.LoggerArgument) {
-	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	if len(args) > 0 && len(args[0]) > 0 {
-		cl.ptermLogger.Fatal(prefix, args...)
-	} else {
-		cl.ptermLogger.Fatal(prefix)
-	}
-}
-
-// Debug logs a debug message with component prefix.
-func (cl *ComponentLogger) Debug(msg string, args ...[]pterm.LoggerArgument) {
-	if !verboseEnabled {
-		return
-	}
-
-	prefix := fmt.Sprintf("[%s] %s", cl.Component, msg)
-	if len(args) > 0 && len(args[0]) > 0 {
-		cl.ptermLogger.Debug(prefix, args...)
-	} else {
-		cl.ptermLogger.Debug(prefix)
-	}
-}
-
-// WithKeyStyles sets custom styles for specific argument keys for ComponentLogger
-func (cl *ComponentLogger) WithKeyStyles(styles map[string]pterm.Style) *ComponentLogger {
-	return &ComponentLogger{
-		Component:   cl.Component,
-		ptermLogger: cl.ptermLogger.WithKeyStyles(styles),
-	}
-}
-
-// AppendKeyStyle adds a style for a specific argument key for ComponentLogger
-func (cl *ComponentLogger) AppendKeyStyle(key string, style pterm.Style) *ComponentLogger {
-	newLogger := *cl
-	newLogger.ptermLogger = cl.ptermLogger.AppendKeyStyle(key, style)
-
-	return &newLogger
-}
-
-// Args converts arguments to pterm logger arguments.
-func (cl *ComponentLogger) Args(args ...any) []pterm.LoggerArgument {
-	return argsToLoggerArgs(args...)
-}
-
 // IsColorDisabled checks if color output is disabled.
 func IsColorDisabled() bool {
 	// Check programmatically set state first
@@ -341,128 +246,6 @@ func SetColorDisabled(disabled bool) {
 		pterm.DisableColor()
 	} else {
 		pterm.EnableColor()
-	}
-}
-
-// CompatLogger provides compatibility with the old slog-based logger interface
-type CompatLogger struct {
-	yapLogger *YapLogger
-	config    *Config
-}
-
-// New creates a logger with the given configuration for compatibility.
-func New(config *Config) *CompatLogger {
-	if config == nil {
-		config = DefaultConfig()
-	}
-
-	return &CompatLogger{
-		yapLogger: Logger,
-		config:    config,
-	}
-}
-
-// NewDefault creates a logger with default configuration for compatibility.
-func NewDefault() *CompatLogger {
-	return New(DefaultConfig())
-}
-
-// Debug logs a debug message for compatibility.
-func (l *CompatLogger) Debug(msg string, args ...any) {
-	l.yapLogger.Debug(msg, convertArgsToLoggerArgs(args...)...)
-}
-
-// Info logs an informational message for compatibility.
-func (l *CompatLogger) Info(msg string, args ...any) {
-	l.yapLogger.Info(msg, convertArgsToLoggerArgs(args...)...)
-}
-
-// Warn logs a warning message for compatibility.
-func (l *CompatLogger) Warn(msg string, args ...any) {
-	l.yapLogger.Warn(msg, convertArgsToLoggerArgs(args...)...)
-}
-
-// Error logs an error message for compatibility.
-func (l *CompatLogger) Error(msg string, args ...any) {
-	l.yapLogger.Error(msg, convertArgsToLoggerArgs(args...)...)
-}
-
-// Fatal logs a fatal message for compatibility and exits.
-func (l *CompatLogger) Fatal(msg string, args ...any) {
-	l.yapLogger.Fatal(msg, convertArgsToLoggerArgs(args...)...)
-}
-
-// WithError returns a logger with error context for compatibility.
-func (l *CompatLogger) WithError(err error) *CompatLogger {
-	// For compatibility, just return the same logger
-	return l
-}
-
-// WithFields returns a logger with field context for compatibility.
-func (l *CompatLogger) WithFields(fields map[string]any) *CompatLogger {
-	// For compatibility, just return the same logger
-	return l
-}
-
-// DebugContext logs a debug message with context for compatibility.
-func (l *CompatLogger) DebugContext(ctx context.Context, msg string, args ...any) {
-	l.Debug(msg, args...)
-}
-
-// InfoContext logs an informational message with context for compatibility.
-func (l *CompatLogger) InfoContext(ctx context.Context, msg string, args ...any) {
-	l.Info(msg, args...)
-}
-
-// WarnContext logs a warning message with context for compatibility.
-func (l *CompatLogger) WarnContext(ctx context.Context, msg string, args ...any) {
-	l.Warn(msg, args...)
-}
-
-// ErrorContext logs an error message with context for compatibility.
-func (l *CompatLogger) ErrorContext(ctx context.Context, msg string, args ...any) {
-	l.Error(msg, args...)
-}
-
-// LogOperation logs an operation with timing and error handling.
-func (l *CompatLogger) LogOperation(name string, fn func() error) error {
-	start := time.Now()
-	l.Info("operation started", "name", name, "timestamp", start)
-
-	err := fn()
-	duration := time.Since(start)
-
-	if err != nil {
-		l.WithError(err).Error("operation failed",
-			"name", name,
-			"duration", duration,
-			"success", false,
-		)
-
-		return err
-	}
-
-	l.Info("operation completed",
-		"name", name,
-		"duration", duration,
-		"success", true,
-	)
-
-	return nil
-}
-
-// SetGlobal sets the global logger instance for compatibility.
-func SetGlobal(logger *CompatLogger) {
-	if logger != nil {
-		Logger = logger.yapLogger
-	}
-}
-
-// Global returns the global logger instance for compatibility.
-func Global() *CompatLogger {
-	return &CompatLogger{
-		yapLogger: Logger,
-		config:    DefaultConfig(),
 	}
 }
 
@@ -494,16 +277,6 @@ func Fatal(msg string, args ...any) {
 // Tips logs a tip message using the global logger.
 func Tips(msg string, args ...any) {
 	Logger.Tips(msg, convertArgsToLoggerArgs(args...)...)
-}
-
-// WithError returns a global logger with error context.
-func WithError(err error) *CompatLogger {
-	return Global().WithError(err)
-}
-
-// WithFields returns a global logger with field context.
-func WithFields(fields map[string]any) *CompatLogger {
-	return Global().WithFields(fields)
 }
 
 // Helper function to convert args to pterm logger args

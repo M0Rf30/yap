@@ -36,7 +36,6 @@ func (builder *Builder) Compile(noBuild bool) error {
 			WithOperation("initDirs")
 	}
 
-	logger.WithComponent(builder.PKGBUILD.PkgName)
 	logger.Info(i18n.T("logger.retrieving_sources"),
 		"pkgver", builder.PKGBUILD.PkgVer,
 		"pkgrel", builder.PKGBUILD.PkgRel)
@@ -83,8 +82,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	pkgVer := builder.PKGBUILD.PkgVer
 	pkgRel := builder.PKGBUILD.PkgRel
 
-	// Use component logger for consistent formatting
-	logger.WithComponent(pkgName)
+	// Use logger for consistent formatting
 	logger.Info(i18n.T(message), "pkgver", pkgVer, "pkgrel", pkgRel)
 
 	// Execute script with package decoration

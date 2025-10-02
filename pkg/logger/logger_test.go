@@ -52,16 +52,3 @@ func TestLoggerFunctions(t *testing.T) {
 		Debug("This is a debug message")
 	})
 }
-
-func TestWithComponent(t *testing.T) {
-	// Test WithComponent function
-	assert.NotPanics(t, func() {
-		WithComponent("test-component")
-
-		// Test component logger methods (but not Fatal as it exits)
-		Info("test info")
-		Warn("test warning")
-		Error("test error")
-		Debug("test debug")
-	})
-}

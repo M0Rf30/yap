@@ -172,10 +172,6 @@ func (src *Source) getProtocol() string {
 func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 	normalizedURI := strings.TrimPrefix(src.SourceItemURI, constants.Git+"+")
 
-	if src.PkgName != "" {
-		logger.WithComponent(src.PkgName)
-	}
-
 	switch protocol {
 	case constants.Git:
 		referenceName := src.getReferenceType()
@@ -251,10 +247,6 @@ func (src *Source) symlinkSources(symlinkSource string) error {
 //
 // It takes the source file path as a parameter and returns an error if any.
 func (src *Source) validateSource(sourceFilePath string) error {
-	if src.PkgName != "" {
-		logger.WithComponent(src.PkgName)
-	}
-
 	info, err := os.Stat(sourceFilePath)
 	if err != nil {
 		return errors.Errorf(i18n.T("errors.source.failed_to_open_file_for_hash"), sourceFilePath)
