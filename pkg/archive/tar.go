@@ -68,49 +68,6 @@ func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
 	return format.Archive(ctx, out, files)
 }
 
-// CreateTarGz creates a compressed tar.gz archive from the specified source directory.
-func CreateTarGz(sourceDir, outputFile string, formatGNU bool) error {
-	ctx := context.Background()
-	options := &archives.FromDiskOptions{
-		FollowSymlinks: false,
-	}
-
-	files, err := archives.FilesFromDisk(ctx, options, map[string]string{
-		sourceDir + string(os.PathSeparator): "",
-	})
-	if err != nil {
-		return err
-	}
-
-	cleanFilePath := filepath.Clean(outputFile)
-
-	out, err := os.Create(cleanFilePath)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.createtargz.warn.failed_to_close_output_1"),
-				"path", cleanFilePath,
-				"error", closeErr)
-		}
-	}()
-
-	format := archives.CompressedArchive{
-		Compression: archives.Gz{},
-		Archival: archives.Tar{
-			FormatGNU: formatGNU,
-			Uid:       0,
-			Gid:       0,
-			Uname:     "root",
-			Gname:     "root",
-		},
-	}
-
-	return format.Archive(ctx, out, files)
-}
-
 // Extract extracts an archive file to the specified destination directory.
 // It opens the source archive file, identifies its format, and extracts it to the destination.
 //

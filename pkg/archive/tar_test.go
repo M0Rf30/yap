@@ -37,37 +37,6 @@ func TestCreateTarZst(t *testing.T) {
 	}
 }
 
-func TestCreateTarGz(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-	sourceDir := filepath.Join(tempDir, "source")
-	outputFile := filepath.Join(tempDir, "test.tar.gz")
-
-	// Create source directory with a test file
-	err := os.MkdirAll(sourceDir, 0o755)
-	if err != nil {
-		t.Fatalf("Failed to create source directory: %v", err)
-	}
-
-	testFile := filepath.Join(sourceDir, "test.txt")
-
-	err = os.WriteFile(testFile, []byte("test content"), 0o644)
-	if err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	// Test creating tar.gz archive
-	err = CreateTarGz(sourceDir, outputFile, false)
-	if err != nil {
-		t.Fatalf("CreateTarGz failed: %v", err)
-	}
-
-	// Verify the output file exists
-	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
-		t.Fatalf("Output file was not created")
-	}
-}
-
 func TestCreateTarZstWithDirectories(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
@@ -107,17 +76,6 @@ func TestCreateTarZstInvalidSourceDir(t *testing.T) {
 	invalidSourceDir := "/non/existent/directory"
 
 	err := CreateTarZst(invalidSourceDir, outputFile, false)
-	if err == nil {
-		t.Fatal("Expected error for invalid source directory, got nil")
-	}
-}
-
-func TestCreateTarGzInvalidSourceDir(t *testing.T) {
-	tempDir := t.TempDir()
-	outputFile := filepath.Join(tempDir, "test.tar.gz")
-	invalidSourceDir := "/non/existent/directory"
-
-	err := CreateTarGz(invalidSourceDir, outputFile, false)
 	if err == nil {
 		t.Fatal("Expected error for invalid source directory, got nil")
 	}

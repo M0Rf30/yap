@@ -13,21 +13,21 @@ func TestLogStructuredError(t *testing.T) {
 	}{
 		{
 			name: "basic error",
-			err:  yapErrors.NewBuildError("test error"),
+			err:  yapErrors.New(yapErrors.ErrTypeBuild, "test error"),
 		},
 		{
 			name: "error with operation",
-			err:  yapErrors.NewBuildError("test error").WithOperation("test_op"),
+			err:  yapErrors.New(yapErrors.ErrTypeBuild, "test error").WithOperation("test_op"),
 		},
 		{
 			name: "error with context",
-			err: yapErrors.NewBuildError("test error").
+			err: yapErrors.New(yapErrors.ErrTypeBuild, "test error").
 				WithContext("key1", "value1").
 				WithContext("key2", "value2"),
 		},
 		{
 			name: "error with operation and context",
-			err: yapErrors.NewBuildError("test error").
+			err: yapErrors.New(yapErrors.ErrTypeBuild, "test error").
 				WithOperation("complex_op").
 				WithContext("project", "test-project").
 				WithContext("distro", "ubuntu-jammy"),
