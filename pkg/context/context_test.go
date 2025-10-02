@@ -135,59 +135,6 @@ func TestOperation(t *testing.T) {
 	}
 }
 
-func TestSemaphore(t *testing.T) {
-	t.Parallel()
-
-	sem := NewSemaphore(2)
-	if sem.Available() != 2 {
-		t.Errorf("Expected 2 available slots, got %d", sem.Available())
-	}
-
-	ctx := context.Background()
-
-	err := sem.Acquire(ctx)
-	if err != nil {
-		t.Fatalf("Unexpected error acquiring semaphore: %v", err)
-	}
-
-	if sem.Available() != 1 {
-		t.Errorf("Expected 1 available slot after acquire, got %d", sem.Available())
-	}
-
-	sem.Release()
-
-	if sem.Available() != 2 {
-		t.Errorf("Expected 2 available slots after release, got %d", sem.Available())
-	}
-}
-
-func TestWorkerPool(t *testing.T) {
-	t.Parallel()
-
-	workerPool := NewWorkerPool(2)
-	if workerPool.Available() != 2 {
-		t.Errorf("Expected 2 available workers, got %d", workerPool.Available())
-	}
-
-	done := make(chan bool)
-
-	err := workerPool.Submit(context.Background(), func(_ context.Context) error {
-		done <- true
-
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("Unexpected error submitting work: %v", err)
-	}
-
-	<-done
-
-	err = workerPool.Shutdown(1 * time.Second)
-	if err != nil {
-		t.Fatalf("Unexpected error shutting down: %v", err)
-	}
-}
-
 func TestRetryWithContext(t *testing.T) {
 	t.Parallel()
 

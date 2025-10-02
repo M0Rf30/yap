@@ -6,17 +6,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/pkg/errors"
 
-	ycontext "github.com/M0Rf30/yap/v2/pkg/context"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -327,171 +324,4 @@ func formatBytes(size int64) string {
 	units := []string{"B", "KB", "MB", "GB", "TB"}
 
 	return fmt.Sprintf("%.1f %s", float64(size)/float64(div), units[exp+1])
-}
-
-// ConcurrentDownloadManager manages multiple downloads concurrently.
-type ConcurrentDownloadManager struct {
-	workerPool *ycontext.WorkerPool
-	activeJobs map[string]*Job
-	jobResults map[string]error
-	mutex      sync.RWMutex
-	writer     io.Writer
-}
-
-// Job represents a single download task.
-type Job struct {
-	Destination string
-	URL         string
-	MaxRetries  int
-	Done        chan error
-}
-
-// NewConcurrentDownloadManager creates a new concurrent download manager.
-func NewConcurrentDownloadManager(maxConcurrent int, writer io.Writer) *ConcurrentDownloadManager {
-	if maxConcurrent <= 0 {
-		maxConcurrent = 3 // default to 3 concurrent downloads
-	}
-
-	if maxConcurrent > 8 {
-		maxConcurrent = 8 // cap at 8 to avoid overwhelming servers
-	}
-
-	return &ConcurrentDownloadManager{
-		workerPool: ycontext.NewWorkerPool(maxConcurrent),
-		activeJobs: make(map[string]*Job),
-		jobResults: make(map[string]error),
-		writer:     writer,
-	}
-}
-
-// SubmitDownload submits a download job to the concurrent manager.
-func (cdm *ConcurrentDownloadManager) SubmitDownload(
-	destination, downloadURL string,
-	maxRetries int,
-) error {
-	job := &Job{
-		Destination: destination,
-		URL:         downloadURL,
-		MaxRetries:  maxRetries,
-		Done:        make(chan error, 1),
-	}
-
-	jobKey := destination // use destination as unique key
-
-	cdm.mutex.Lock()
-	cdm.activeJobs[jobKey] = job
-	cdm.mutex.Unlock()
-
-	// Submit work to the worker pool
-	return cdm.workerPool.Submit(context.Background(), func(ctx context.Context) error {
-		defer func() {
-			cdm.mutex.Lock()
-			delete(cdm.activeJobs, jobKey)
-			cdm.mutex.Unlock()
-		}()
-
-		err := downloadWithResumeInternal(ctx, job.Destination, job.URL, "", "", cdm.writer)
-
-		cdm.mutex.Lock()
-		cdm.jobResults[jobKey] = err
-		cdm.mutex.Unlock()
-
-		job.Done <- err
-
-		return err
-	})
-}
-
-// WaitForJob waits for a specific download job to complete.
-func (cdm *ConcurrentDownloadManager) WaitForJob(destination string) error {
-	cdm.mutex.RLock()
-	job, exists := cdm.activeJobs[destination]
-	cdm.mutex.RUnlock()
-
-	if !exists {
-		// Check if already completed
-		cdm.mutex.RLock()
-		result, hasResult := cdm.jobResults[destination]
-		cdm.mutex.RUnlock()
-
-		if hasResult {
-			return result
-		}
-
-		return errors.Errorf(i18n.T("errors.download.download_job_not_found"), destination)
-	}
-
-	return <-job.Done
-}
-
-// WaitForAll waits for all active downloads to complete and returns any errors.
-func (cdm *ConcurrentDownloadManager) WaitForAll() map[string]error {
-	// Get current active jobs
-	cdm.mutex.RLock()
-
-	jobs := make([]*Job, 0, len(cdm.activeJobs))
-	for _, job := range cdm.activeJobs {
-		jobs = append(jobs, job)
-	}
-
-	cdm.mutex.RUnlock()
-
-	// Wait for all jobs to complete
-	for _, job := range jobs {
-		<-job.Done
-	}
-
-	// Return results
-	cdm.mutex.RLock()
-
-	results := make(map[string]error)
-	maps.Copy(results, cdm.jobResults)
-
-	cdm.mutex.RUnlock()
-
-	return results
-}
-
-// Shutdown gracefully shuts down the download manager.
-func (cdm *ConcurrentDownloadManager) Shutdown(timeout time.Duration) error {
-	return cdm.workerPool.Shutdown(timeout)
-}
-
-// Concurrently downloads multiple files concurrently with resume capability.
-//
-// Parameters:
-//   - downloads: map of destination -> URL for files to download
-//   - maxConcurrent: maximum number of concurrent downloads (0 = default)
-//   - maxRetries: maximum retry attempts per download (0 = default)
-//   - writer: writer for progress output (can be nil)
-//
-// Returns a map of destination -> error for any failed downloads.
-func Concurrently(
-	downloads map[string]string, maxConcurrent, maxRetries int, writer io.Writer) map[string]error {
-	if len(downloads) == 0 {
-		return make(map[string]error)
-	}
-
-	manager := NewConcurrentDownloadManager(maxConcurrent, writer)
-
-	defer func() {
-		err := manager.Shutdown(30 * time.Second)
-		if err != nil {
-			logger.Warn(i18n.T("logger.concurrently.warn.failed_to_shutdown_download_1"), "error", err)
-		}
-	}()
-
-	// Submit all downloads
-	for destination, url := range downloads {
-		err := manager.SubmitDownload(destination, url, maxRetries)
-		if err != nil {
-			// If we can't submit, record the error immediately
-			manager.mutex.Lock()
-			manager.jobResults[destination] = err
-			manager.mutex.Unlock()
-		}
-	}
-
-	// Wait for all to complete and return results
-	return manager.WaitForAll()
 }
