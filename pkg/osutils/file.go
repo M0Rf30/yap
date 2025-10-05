@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	// Symbolic link.
+	// TagLink is a symbolic link file mode constant.
 	TagLink = 0o120000
-	// Directory.
+	// TagDirectory is a directory file mode constant.
 	TagDirectory = 0o40000
 	// TypeFile is the type of a regular file. This is also the type that is
 	// implied when no type is specified.
@@ -262,7 +262,7 @@ func IsEmptyDir(path string, dirEntry os.DirEntry) bool {
 	return len(entries) == 0
 }
 
-// isStaticLibrary checks if the binary is a static library.
+// IsStaticLibrary checks if the binary is a static library.
 func IsStaticLibrary(path string) bool {
 	// Check the file extension
 	if strings.HasSuffix(path, ".a") {
