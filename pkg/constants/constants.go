@@ -17,8 +17,7 @@ const (
 )
 
 var (
-	// These values are not invented,
-	// but refer to /etc/os-release ID field values.
+	// Releases contains the supported distribution IDs from /etc/os-release.
 	Releases = [...]string{
 		"almalinux",
 		"alpine",

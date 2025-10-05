@@ -1,6 +1,7 @@
 package osutils
 
 import (
+	"context"
 	"os/exec"
 )
 
@@ -13,7 +14,7 @@ import (
 //
 // It returns an error if the command execution fails.
 func Exec(excludeStdout bool, dir, name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	cmd := exec.CommandContext(context.Background(), name, args...)
 	cmd.Stdout = MultiPrinter.Writer
 	cmd.Stderr = MultiPrinter.Writer
 
