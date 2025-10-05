@@ -229,6 +229,12 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 	if err != nil {
 		osutils.Logger.Fatal("failed to set variable startdir")
 	}
+
+	err = osutils.SetupCcache()
+	if err != nil {
+		osutils.Logger.Fatal("failed to setup ccache",
+			osutils.Logger.Args("error", err))
+	}
 }
 
 // ValidateGeneral checks that mandatory items are correctly provided by the PKGBUILD

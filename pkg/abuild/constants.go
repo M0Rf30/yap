@@ -17,6 +17,7 @@ var (
 
 	buildEnvironmentDeps = []string{
 		"alpine-sdk",
+		"ccache",
 	}
 )
 

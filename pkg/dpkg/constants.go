@@ -4,6 +4,7 @@ var buildEnvironmentDeps = []string{
 	"autoconf",
 	"binutils",
 	"ca-certificates",
+	"ccache",
 	"g++",
 	"gcc",
 	"libc-dev",
