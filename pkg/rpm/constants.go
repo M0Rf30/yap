@@ -11,6 +11,7 @@ const (
 var buildEnvironmentDeps = []string{
 	"autoconf",
 	"automake",
+	"ccache",
 	"diffutils",
 	"expect",
 	"gcc",

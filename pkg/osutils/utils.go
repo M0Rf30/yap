@@ -50,6 +50,41 @@ func CheckGO() bool {
 	return false
 }
 
+// SetupCcache checks if ccache is installed and configures environment variables.
+//
+// It does not take any parameters.
+// It returns an error if environment variable setup fails.
+func SetupCcache() error {
+	ccachePath := "/usr/bin/ccache"
+
+	_, err := os.Stat(ccachePath)
+	if os.IsNotExist(err) {
+		Logger.Info("ccache not found, skipping configuration")
+
+		return nil
+	}
+
+	if err != nil {
+		return errors.Errorf("failed to check ccache: %v", err)
+	}
+
+	Logger.Info("ccache detected, configuring environment")
+
+	envVars := map[string]string{
+		"CC":  "ccache gcc",
+		"CXX": "ccache g++",
+	}
+
+	for key, value := range envVars {
+		err := os.Setenv(key, value)
+		if err != nil {
+			return errors.Errorf("failed to set %s environment variable: %v", key, err)
+		}
+	}
+
+	return nil
+}
+
 // CreateTarZst creates a compressed tar.zst archive from the specified source
 // directory. It takes the source directory and the output file path as
 // arguments and returns an error if any occurs.

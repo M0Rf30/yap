@@ -2,6 +2,7 @@ package makepkg
 
 var buildEnvironmentDeps = []string{
 	"base-devel",
+	"ccache",
 }
 
 const dotBuildinfo = `format = 2
