@@ -429,7 +429,7 @@
 - id: logger.skipping_batch_filtered_out
   translation: skipping batch (filtered out)
 - id: logger.project.building_dependency_graph
-  translation: building dependency graph
+  translation: Building dependency graph
 - id: logger.project.building_regular_packages
   translation: building regular packages
 - id: logger.project.package_installation_failed
@@ -999,3 +999,41 @@
   translation: generating dependency graph
 - id: logger.rungraphcommand.info.generating_dependency_graph_1
   translation: generating dependency graph
+- id: logger.project.installing_package
+  translation: installing package
+- id: logger.project.parallel_build_workers
+  translation: parallel build workers
+- id: logger.project.builder_completed_for_package
+  translation: builder completed for package
+- id: logger.project.package_build_skipped
+  translation: package build skipped
+- id: logger.project.batch_build_completed
+  translation: batch build completed
+- id: logger.project.build_cache_stats
+  translation: build cache stats
+- id: logger.project.build_order_determined
+  translation: build order determined
+- id: logger.project.stopping_build_at_target_package
+  translation: stopping build at target package
+- id: logger.project.package_build_finished
+  translation: package build finished
+- id: logger.project.package_build_started
+  translation: package build started
+- id: logger.project.package_installed
+  translation: package installed
+- id: logger.shell.debug.exec_cmd
+  translation: executing command
+- id: logger.shell.debug.exec_sudo
+  translation: executing command with sudo
+- id: logger.shell.debug.exec_sudo_cmd
+  translation: executing sudo command
+- id: logger.setupccache.info.ccache_not_found_skipping_1
+  translation: ccache not found, skipping ccache setup for package
+- id: logger.setupccache.info.ccache_enabled_for_build_1
+  translation: ccache enabled for build
+- id: logger.setupccache.warn.failed_to_create_ccache_dir_1
+  translation: failed to create ccache directory
+- id: logger.setupccache.warn.ccache_setup_failed_1
+  translation: ccache setup failed
+- id: logger.shell.info.exec_script
+  translation: "Executing script for package"

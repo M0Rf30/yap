@@ -69,14 +69,17 @@ func GetBuildDeps() *BuildEnvironmentDeps {
 	return &BuildEnvironmentDeps{
 		APK: []string{
 			"alpine-sdk",
+			"ccache",
 		},
 		DEB: []string{
 			"build-essential",
+			"ccache",
 			"fakeroot",
 		},
 		RPM: []string{
 			"autoconf",
 			"automake",
+			"ccache",
 			"diffutils",
 			"expect",
 			"gcc",
@@ -91,6 +94,7 @@ func GetBuildDeps() *BuildEnvironmentDeps {
 		},
 		Pacman: []string{
 			"base-devel",
+			"ccache",
 		},
 	}
 }

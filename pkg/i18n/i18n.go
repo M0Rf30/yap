@@ -21,7 +21,7 @@ var (
 )
 
 // SupportedLanguages lists all supported language codes.
-var SupportedLanguages = []string{"en", "it", "ru", "zh"}
+var SupportedLanguages = []string{"en", "it"}
 
 // Init initializes the i18n system with the given language preference.
 // If lang is empty, it will try to detect the system language.

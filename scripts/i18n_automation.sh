@@ -258,29 +258,8 @@ generate_basic_translations() {
     sed 's/translation: "failed to"/translation: "impossibile"/' | \
     sed 's/translation: "package installed"/translation: "pacchetto installato"/' \
     >> /tmp/it_keys.yaml
-    
-    # Russian translations (basic)
-    echo "# Auto-generated Russian translations" > /tmp/ru_keys.yaml
-    sed 's/translation: "downloading"/translation: "загрузка"/' /tmp/en_keys.yaml | \
-    sed 's/translation: "executing command"/translation: "выполнение команды"/' | \
-    sed 's/translation: "command execution failed"/translation: "выполнение команды не удалось"/' | \
-    sed 's/translation: "failed to"/translation: "не удалось"/' | \
-    sed 's/translation: "package installed"/translation: "пакет установлен"/' \
-    >> /tmp/ru_keys.yaml
-    
-    # Chinese translations (basic) 
-    echo "# Auto-generated Chinese translations" > /tmp/zh_keys.yaml
-    sed 's/translation: "downloading"/translation: "下载中"/' /tmp/en_keys.yaml | \
-    sed 's/translation: "executing command"/translation: "执行命令"/' | \
-    sed 's/translation: "command execution failed"/translation: "命令执行失败"/' | \
-    sed 's/translation: "failed to"/translation: "失败"/' | \
-    sed 's/translation: "package installed"/translation: "包已安装"/' \
-    >> /tmp/zh_keys.yaml
-    
     echo -e "${GREEN}Basic translations generated:${NC}"
     echo "  - Italian: /tmp/it_keys.yaml"
-    echo "  - Russian: /tmp/ru_keys.yaml"  
-    echo "  - Chinese: /tmp/zh_keys.yaml"
 }
 
 # Function to run tests after conversion
@@ -327,7 +306,7 @@ show_usage() {
 # Function to clean temporary files
 clean_temp() {
     echo -e "${YELLOW}Cleaning temporary files...${NC}"
-    rm -f /tmp/i18n_scanner.go /tmp/scan_results.txt /tmp/en_keys.yaml /tmp/it_keys.yaml /tmp/ru_keys.yaml /tmp/zh_keys.yaml
+    rm -f /tmp/i18n_scanner.go /tmp/scan_results.txt /tmp/en_keys.yaml /tmp/it_keys.yaml
     echo -e "${GREEN}Cleanup complete${NC}"
 }
 

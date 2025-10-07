@@ -4,6 +4,7 @@ package builder
 import (
 	"sync"
 
+	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -84,6 +85,22 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 
 	// Use logger for consistent formatting
 	logger.Info(i18n.T(message), "pkgver", pkgVer, "pkgrel", pkgRel)
+
+	// Set up ccache for the build stage if ccache is available
+	if stage == "build" {
+		// Create a temporary BaseBuilder to access the SetupCcache method
+		// We don't know the exact format, so we'll use a generic one and just call the ccache setup
+		tempBuilder := &common.BaseBuilder{
+			PKGBUILD: builder.PKGBUILD,
+			Format:   "", // Format is not used in SetupCcache, so we can leave it empty
+		}
+
+		err := tempBuilder.SetupCcache()
+		if err != nil {
+			logger.Warn(i18n.T("logger.setupccache.warn.ccache_setup_failed_1"),
+				"package", pkgName, "error", err)
+		}
+	}
 
 	// Execute script with package decoration
 	err := shell.RunScriptWithPackage("  set -e\n"+pkgbuildFunction, pkgName)

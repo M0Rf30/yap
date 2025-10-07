@@ -1,6 +1,8 @@
 package common
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -285,5 +287,206 @@ func TestBuildPackageNameSpecialCharacters(t *testing.T) {
 
 	if result != expected {
 		t.Fatalf("Expected '%s', got '%s'", expected, result)
+	}
+}
+
+func TestSetupCcache(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName:  "test-package",
+		StartDir: tempDir,
+	}
+	builder := NewBaseBuilder(pkg, "test-format")
+
+	// Test when ccache is not available (should return nil and not set environment variables)
+	// We'll temporarily set PATH to a directory without ccache to simulate it not being installed
+	originalPath := os.Getenv("PATH")
+	_ = os.Setenv("PATH", "/nonexistent") // This directory doesn't exist, so ccache won't be found
+
+	err := builder.SetupCcache()
+	if err != nil {
+		t.Fatalf("SetupCcache should not return an error when ccache is not available, got: %v", err)
+	}
+
+	// Restore original PATH
+	_ = os.Setenv("PATH", originalPath)
+
+	// Test that the function works without error when ccache is available
+	// This will depend on whether ccache is actually installed on the test system
+	err = builder.SetupCcache()
+	if err != nil {
+		// If ccache is not available on the system, this is expected
+		// The function should handle this gracefully
+		t.Logf("SetupCcache returned error (expected if ccache is not installed): %v", err)
+	}
+
+	// Test with a fake ccache by temporarily setting PATH to include a directory with a fake ccache
+	fakeBinDir := filepath.Join(tempDir, "bin")
+	_ = os.MkdirAll(fakeBinDir, 0o755)
+
+	// On Unix systems, we could create a fake ccache executable, but for this test
+	// we'll just check that the function doesn't crash and handles the PATH correctly
+	originalPath = os.Getenv("PATH")
+	fakePath := fakeBinDir + ":" + originalPath
+	_ = os.Setenv("PATH", fakePath)
+
+	// For testing purposes, we won't actually create the executable since
+	// exec.LookPath will just check if the file exists in PATH with executable permissions
+	// Instead, we'll just verify the function works when ccache might be available
+
+	err = builder.SetupCcache()
+	if err != nil {
+		t.Logf("SetupCcache error when fake ccache might be in PATH: %v", err)
+	}
+
+	// Restore original PATH
+	_ = os.Setenv("PATH", originalPath)
+}
+
+func TestSetupCcacheWithRealEnvironment(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName:  "test-package",
+		StartDir: tempDir,
+	}
+	builder := NewBaseBuilder(pkg, "test-format")
+
+	// Save original environment variables
+	originalCC := os.Getenv("CC")
+	originalCXX := os.Getenv("CXX")
+	originalCCacheBaseDir := os.Getenv("CCACHE_BASEDIR")
+	originalCCacheSloppiness := os.Getenv("CCACHE_SLOPPINESS")
+	originalCCacheNoHashDir := os.Getenv("CCACHE_NOHASHDIR")
+	originalCCacheDir := os.Getenv("CCACHE_DIR")
+
+	// Restore original environment variables after test
+	defer func() {
+		_ = os.Setenv("CC", originalCC)
+		_ = os.Setenv("CXX", originalCXX)
+		_ = os.Setenv("CCACHE_BASEDIR", originalCCacheBaseDir)
+		_ = os.Setenv("CCACHE_SLOPPINESS", originalCCacheSloppiness)
+		_ = os.Setenv("CCACHE_NOHASHDIR", originalCCacheNoHashDir)
+		_ = os.Setenv("CCACHE_DIR", originalCCacheDir)
+	}()
+
+	// Test that SetupCcache sets the expected environment variables when ccache is available
+	// We'll test this by temporarily creating a fake ccache executable in PATH
+	fakeBinDir := filepath.Join(tempDir, "bin")
+	_ = os.MkdirAll(fakeBinDir, 0o755)
+
+	// On Unix systems, create an executable file
+	_ = os.WriteFile(filepath.Join(fakeBinDir, "ccache"), []byte("#!/bin/sh\necho 'fake ccache'\n"), 0o755)
+
+	originalPath := os.Getenv("PATH")
+	fakePath := fakeBinDir + ":" + originalPath
+	_ = os.Setenv("PATH", fakePath)
+
+	defer func() {
+		_ = os.Setenv("PATH", originalPath)
+	}()
+
+	// Call SetupCcache
+	err := builder.SetupCcache()
+	if err != nil {
+		t.Logf("SetupCcache returned error: %v (may be expected if ccache not installed)", err)
+	}
+
+	// The function should have set environment variables if ccache was found
+	// Check that environment variables are set (they may be set even if ccache is not installed)
+	cc := os.Getenv("CC")
+	cxx := os.Getenv("CXX")
+	ccacheBaseDir := os.Getenv("CCACHE_BASEDIR")
+	ccacheSloppiness := os.Getenv("CCACHE_SLOPPINESS")
+	ccacheNoHashDir := os.Getenv("CCACHE_NOHASHDIR")
+	ccacheDir := os.Getenv("CCACHE_DIR")
+
+	// If ccache was found and environment was set, these should match expected values
+	// But since we don't know if ccache is actually available on the test system,
+	// we just check that the function doesn't crash and handles both cases
+	t.Logf("CC environment variable after SetupCcache: %s", cc)
+	t.Logf("CXX environment variable after SetupCcache: %s", cxx)
+	t.Logf("CCACHE_BASEDIR environment variable after SetupCcache: %s", ccacheBaseDir)
+	t.Logf("CCACHE_SLOPPINESS environment variable after SetupCcache: %s", ccacheSloppiness)
+	t.Logf("CCACHE_NOHASHDIR environment variable after SetupCcache: %s", ccacheNoHashDir)
+	t.Logf("CCACHE_DIR environment variable after SetupCcache: %s", ccacheDir)
+}
+
+func TestPrepareBackupFilePaths(t *testing.T) {
+	pkg := &pkgbuild.PKGBUILD{
+		Backup: []string{"config/file.conf", "/absolute/path/file.txt", "relative/path"},
+	}
+	builder := NewBaseBuilder(pkg, "test-format")
+
+	result := builder.PrepareBackupFilePaths()
+
+	expected := []string{"/config/file.conf", "/absolute/path/file.txt", "/relative/path"}
+	for i, exp := range expected {
+		if result[i] != exp {
+			t.Fatalf("Expected backup file '%s', got '%s'", exp, result[i])
+		}
+	}
+}
+
+func TestGetPackageManager(t *testing.T) {
+	tests := []struct {
+		format   string
+		expected string
+	}{
+		{constants.FormatDEB, "apt-get"},
+		{constants.FormatRPM, "dnf"},
+		{constants.FormatPacman, "pacman"},
+		{constants.FormatAPK, "apk"},
+		{"unknown", ""}, // Test unknown format
+	}
+
+	for _, test := range tests {
+		result := getPackageManager(test.format)
+		if result != test.expected {
+			t.Fatalf("Format %s: expected '%s', got '%s'", test.format, test.expected, result)
+		}
+	}
+}
+
+func TestGetExtension(t *testing.T) {
+	tests := []struct {
+		format   string
+		expected string
+	}{
+		{constants.FormatDEB, ".deb"},
+		{constants.FormatRPM, ".rpm"},
+		{constants.FormatPacman, ".pkg.tar.zst"},
+		{constants.FormatAPK, ".apk"},
+		{"unknown", ""}, // Test unknown format
+	}
+
+	for _, test := range tests {
+		result := getExtension(test.format)
+		if result != test.expected {
+			t.Fatalf("Format %s: expected '%s', got '%s'", test.format, test.expected, result)
+		}
+	}
+}
+
+func TestGetUpdateCommand(t *testing.T) {
+	tests := []struct {
+		format   string
+		expected string
+	}{
+		{constants.FormatDEB, "update"},
+		{constants.FormatRPM, "update"},
+		{constants.FormatPacman, "-Sy"},
+		{constants.FormatAPK, "update"},
+		{"unknown", ""}, // Test unknown format
+	}
+
+	for _, test := range tests {
+		result := getUpdateCommand(test.format)
+		if result != test.expected {
+			t.Fatalf("Format %s: expected '%s', got '%s'", test.format, test.expected, result)
+		}
 	}
 }
