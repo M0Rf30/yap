@@ -47,7 +47,7 @@ jobs:
           fetch-depth: 0
 
       - name: 🔍 Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.2.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
           config: .hadolint.yml
@@ -57,7 +57,7 @@ jobs:
       - name: 📋 Upload Hadolint results
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: hadolint-${{ matrix.os }}.sarif
           wait-for-processing: true

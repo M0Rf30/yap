@@ -166,7 +166,7 @@ func init() {
 		i18n.T("flags.verbose"))
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, i18n.T("flags.no_color"))
 	rootCmd.PersistentFlags().StringVarP(&language, "language", "l", "",
-		"set language (en, it, ru, zh) - defaults to system locale")
+		"set language (en, it) - defaults to system locale")
 
 	// Configure completion options
 	rootCmd.CompletionOptions.DisableDefaultCmd = false

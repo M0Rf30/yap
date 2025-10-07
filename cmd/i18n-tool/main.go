@@ -10,7 +10,8 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
-func main() {
+// NewRootCmd creates the root command for the i18n tool
+func NewRootCmd() *cobra.Command {
 	var rootCmd = &cobra.Command{
 		Use:   "i18n-tool",
 		Short: "YAP Internationalization Tool",
@@ -81,6 +82,11 @@ func main() {
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(statsCmd)
 
+	return rootCmd
+}
+
+func main() {
+	rootCmd := NewRootCmd()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

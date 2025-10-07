@@ -3,6 +3,8 @@ package common
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -304,4 +306,47 @@ func (bb *BaseBuilder) PrepareEnvironment(golang bool) error {
 // This consolidates duplicated Update methods across all builders.
 func (bb *BaseBuilder) Update() error {
 	return bb.PKGBUILD.GetUpdates(getPackageManager(bb.Format), getUpdateCommand(bb.Format))
+}
+
+// SetupCcache checks if ccache is available and configures the build environment to use it.
+// This function sets up environment variables to enable ccache for faster compilation.
+func (bb *BaseBuilder) SetupCcache() error {
+	// Check if ccache is available in the system using Go's exec.LookPath
+	_, err := exec.LookPath("ccache")
+	ccacheAvailable := err == nil // ccache is available if command is found in PATH
+
+	if !ccacheAvailable {
+		// ccache not found, log and continue without ccache
+		logger.Info(i18n.T("logger.setupccache.info.ccache_not_found_skipping_1"),
+			"package", bb.PKGBUILD.PkgName)
+
+		return nil
+	}
+
+	// Set up ccache environment variables
+	// These variables will be used by the build process to enable ccache
+	// CC and CXX are set to use ccache wrapper
+	// Additionally, set some common ccache configuration options
+	_ = os.Setenv("CC", "ccache gcc")
+	_ = os.Setenv("CXX", "ccache g++")
+	_ = os.Setenv("CCACHE_BASEDIR", bb.PKGBUILD.StartDir)
+	_ = os.Setenv("CCACHE_SLOPPINESS", "time_macros,include_file_mtime")
+	_ = os.Setenv("CCACHE_NOHASHDIR", "1")
+
+	logger.Info(i18n.T("logger.setupccache.info.ccache_enabled_for_build_1"),
+		"package", bb.PKGBUILD.PkgName)
+
+	// Create ccache directory if it doesn't exist
+	ccacheDir := filepath.Join(bb.PKGBUILD.StartDir, ".ccache")
+	if _, err := os.Stat(ccacheDir); os.IsNotExist(err) {
+		err = os.MkdirAll(ccacheDir, 0o755)
+		if err != nil {
+			logger.Warn(i18n.T("logger.setupccache.warn.failed_to_create_ccache_dir_1"),
+				"dir", ccacheDir, "error", err)
+		}
+	}
+
+	_ = os.Setenv("CCACHE_DIR", ccacheDir)
+
+	return nil
 }

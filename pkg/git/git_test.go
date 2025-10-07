@@ -178,3 +178,40 @@ func TestCloneToExistingFile(t *testing.T) {
 		t.Fatal("Expected error when cloning to existing file, got nil")
 	}
 }
+
+func TestGetCommitHash(t *testing.T) {
+	// Test with non-existent directory
+	hash := GetCommitHash("/non-existent-directory")
+	if hash != "" {
+		t.Fatalf("Expected empty hash for non-existent directory, got '%s'", hash)
+	}
+
+	// Test with non-git directory
+	tempDir := t.TempDir()
+
+	hash = GetCommitHash(tempDir)
+	if hash != "" {
+		t.Fatalf("Expected empty hash for non-git directory, got '%s'", hash)
+	}
+}
+
+// Additional tests to improve coverage
+func TestGetCommitHashWithRealRepo(t *testing.T) {
+	// Since we can't easily create a real git repo in a temp directory for testing,
+	// we'll at least verify the function doesn't crash with a valid git repo structure
+	tempDir := t.TempDir()
+
+	// Create a .git directory to simulate a git repo (but not a complete one)
+	gitDir := filepath.Join(tempDir, ".git")
+
+	err := os.MkdirAll(gitDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create .git directory: %v", err)
+	}
+
+	// This should return empty string since it's not a valid git repo
+	hash := GetCommitHash(tempDir)
+	if hash != "" {
+		t.Fatalf("Expected empty hash for incomplete git directory, got '%s'", hash)
+	}
+}

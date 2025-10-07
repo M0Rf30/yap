@@ -136,9 +136,22 @@ func isI18nTCall(callExpr *ast.CallExpr) bool {
 
 // readExistingMessages reads the existing English locale file.
 func readExistingMessages() ([]Message, error) {
-	// For now, we'll return an empty slice
-	// In a real implementation, you would read the existing en.yaml file
-	return []Message{}, nil
+	data, err := os.ReadFile("en.yaml")
+	if err != nil {
+		// If the file doesn't exist, return empty slice
+		if os.IsNotExist(err) {
+			return []Message{}, nil
+		}
+
+		return nil, err
+	}
+
+	var messages []Message
+	if err := yaml.Unmarshal(data, &messages); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML in en.yaml: %w", err)
+	}
+
+	return messages, nil
 }
 
 // mergeMessages combines extracted messages with existing translations.

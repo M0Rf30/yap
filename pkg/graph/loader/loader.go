@@ -23,7 +23,13 @@ func LoadProjectForGraph(projectPath, themeName string) (*graph.Data, error) {
 		// Check for single PKGBUILD
 		pkgbuildPath := filepath.Join(projectPath, "PKGBUILD")
 		if fileExists(pkgbuildPath) {
-			return createSinglePackageGraph(filepath.Base(projectPath), themeName), nil
+			pkgName, _, _ := parsePKGBUILD(projectPath)
+			// Use parsed pkgname if available, otherwise fall back to directory name
+			if pkgName == "" {
+				pkgName = filepath.Base(projectPath)
+			}
+
+			return createSinglePackageGraph(pkgName, themeName), nil
 		}
 
 		return nil, fmt.Errorf("no yap.json or PKGBUILD found in %s", projectPath)
@@ -142,8 +148,8 @@ func parsePKGBUILD(projectDir string) (pkgName, version, release string) {
 		return "", "1.0.0", "1"
 	}
 
-	lines := strings.SplitSeq(string(content), "\n")
-	for line := range lines {
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
 
 		// Skip comments and empty lines

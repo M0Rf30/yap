@@ -1002,8 +1002,6 @@ YAP supports multiple languages for its user interface. The following languages 
 
 - 🇬🇧 English (en)
 - 🇮🇹 Italian (it)
-- 🇷🇺 Russian (ru)
-- 🇨🇳 Chinese (zh)
 
 ### Language Detection
 
@@ -1012,9 +1010,6 @@ YAP automatically detects your system language based on environment variables (`
 ```bash
 # Use Italian language
 yap --language=it build .
-
-# Use Russian language
-yap -l ru build .
 ```
 
 ### Integrity Checks

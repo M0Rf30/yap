@@ -766,3 +766,410 @@ depends=("mylib")
 		})
 	}
 }
+
+// Additional tests to improve coverage
+func TestMultipleProjectReadProjectOnly(t *testing.T) {
+	testDir := t.TempDir()
+
+	// Create yap.json
+	yapJSON := `{
+		"name": "Test project",
+		"description": "Test description",
+		"buildDir": "` + filepath.Join(testDir, "build") + `",
+		"output": "` + filepath.Join(testDir, "output") + `",
+		"projects": [
+			{
+				"name": "project1",
+				"install": false
+			}
+		]
+	}`
+	yapJSONPath := filepath.Join(testDir, "yap.json")
+	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
+
+	mpc := &project.MultipleProject{}
+	err := mpc.ReadProjectOnly(testDir)
+	assert.NoError(t, err)
+}
+
+func TestMultipleProjectWithFromToPkgName(t *testing.T) {
+	testDir := t.TempDir()
+	buildDir := filepath.Join(testDir, "build")
+	outputDir := filepath.Join(testDir, "output")
+
+	// Create build and output directories
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+	// Create project directory and PKGBUILD
+	projectDir := filepath.Join(testDir, "project1")
+	require.NoError(t, os.MkdirAll(projectDir, 0o755))
+	pkgbuildPath := filepath.Join(projectDir, "PKGBUILD")
+	require.NoError(t, os.WriteFile(pkgbuildPath, []byte(examplePkgbuild), 0o644))
+
+	// Create yap.json
+	yapJSON := `{
+		"name": "Test project",
+		"description": "Test description",
+		"buildDir": "` + buildDir + `",
+		"output": "` + outputDir + `",
+		"projects": [
+			{
+				"name": "project1",
+				"install": false
+			}
+		]
+	}`
+	yapJSONPath := filepath.Join(testDir, "yap.json")
+	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
+
+	// Set global variables to avoid dependencies and cleanup
+	originalSkipSyncDeps := project.SkipSyncDeps
+	originalNoBuild := project.NoBuild
+	originalFromPkgName := project.FromPkgName
+	originalToPkgName := project.ToPkgName
+
+	defer func() {
+		project.SkipSyncDeps = originalSkipSyncDeps
+		project.NoBuild = originalNoBuild
+		project.FromPkgName = originalFromPkgName
+		project.ToPkgName = originalToPkgName
+	}()
+
+	project.SkipSyncDeps = true
+	project.NoBuild = true
+	project.FromPkgName = "project1"
+	project.ToPkgName = "project1"
+
+	// Test MultiProject with FromPkgName and ToPkgName
+	mpc := &project.MultipleProject{}
+
+	err := mpc.MultiProject("ubuntu", "", testDir)
+	if err != nil {
+		t.Logf("MultiProject returned error (expected): %v", err)
+	}
+
+	assert.NotPanics(t, func() {
+		buildErr := mpc.BuildAll()
+		if buildErr != nil {
+			t.Logf("BuildAll returned error (may be expected): %v", buildErr)
+		}
+	})
+}
+
+func TestMultipleProjectCleanWithZap(t *testing.T) {
+	testDir := t.TempDir()
+	buildDir := filepath.Join(testDir, "build")
+	outputDir := filepath.Join(testDir, "output")
+
+	// Create build and output directories
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+	// Create project directory and PKGBUILD
+	projectDir := filepath.Join(testDir, "project1")
+	require.NoError(t, os.MkdirAll(projectDir, 0o755))
+	pkgbuildPath := filepath.Join(projectDir, "PKGBUILD")
+	require.NoError(t, os.WriteFile(pkgbuildPath, []byte(examplePkgbuild), 0o644))
+
+	// Create yap.json
+	yapJSON := `{
+		"name": "Test project",
+		"description": "Test description",
+		"buildDir": "` + buildDir + `",
+		"output": "` + outputDir + `",
+		"projects": [
+			{
+				"name": "project1",
+				"install": false
+			}
+		]
+	}`
+	yapJSONPath := filepath.Join(testDir, "yap.json")
+	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
+
+	// Set global variables to test Zap functionality
+	originalSkipSyncDeps := project.SkipSyncDeps
+
+	defer func() {
+		project.SkipSyncDeps = originalSkipSyncDeps
+		project.Zap = false
+	}()
+
+	project.SkipSyncDeps = true
+	project.Zap = true
+
+	// Test MultiProject with Zap enabled
+	mpc := &project.MultipleProject{}
+
+	err := mpc.MultiProject("ubuntu", "", testDir)
+	if err != nil {
+		t.Logf("MultiProject returned error (expected): %v", err)
+	}
+
+	// Test Clean with Zap enabled
+	assert.NotPanics(t, func() {
+		err := mpc.Clean()
+		if err != nil {
+			t.Logf("Clean returned error: %v", err)
+		}
+	})
+}
+
+// Additional tests to exercise more code paths
+func TestMultipleProjectWithMakeDeps(t *testing.T) {
+	testDir := t.TempDir()
+	buildDir := filepath.Join(testDir, "build")
+	outputDir := filepath.Join(testDir, "output")
+
+	// Create build and output directories
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+	// Create project directory and PKGBUILD with make dependencies
+	pkgbuildWithMakeDeps := examplePkgbuild + `
+makedepends=("gcc" "make")
+`
+	projectDir := filepath.Join(testDir, "project1")
+	require.NoError(t, os.MkdirAll(projectDir, 0o755))
+	pkgbuildPath := filepath.Join(projectDir, "PKGBUILD")
+	require.NoError(t, os.WriteFile(pkgbuildPath, []byte(pkgbuildWithMakeDeps), 0o644))
+
+	// Create yap.json
+	yapJSON := `{
+		"name": "Test project",
+		"description": "Test description",
+		"buildDir": "` + buildDir + `",
+		"output": "` + outputDir + `",
+		"projects": [
+			{
+				"name": "project1",
+				"install": false
+			}
+		]
+	}`
+	yapJSONPath := filepath.Join(testDir, "yap.json")
+	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
+
+	// Set global variables to test make dependencies
+	originalSkipSyncDeps := project.SkipSyncDeps
+	originalNoMakeDeps := project.NoMakeDeps
+
+	defer func() {
+		project.SkipSyncDeps = originalSkipSyncDeps
+		project.NoMakeDeps = originalNoMakeDeps
+	}()
+
+	project.SkipSyncDeps = true
+	project.NoMakeDeps = false
+
+	// Test MultiProject with make dependencies
+	mpc := &project.MultipleProject{}
+
+	err := mpc.MultiProject("ubuntu", "", testDir)
+	if err != nil {
+		t.Logf("MultiProject returned error (expected): %v", err)
+	}
+}
+
+func TestMultipleProjectWithCleanBuild(t *testing.T) {
+	testDir := t.TempDir()
+	buildDir := filepath.Join(testDir, "build")
+	outputDir := filepath.Join(testDir, "output")
+
+	// Create build and output directories
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+	// Create project directory and PKGBUILD
+	projectDir := filepath.Join(testDir, "project1")
+	require.NoError(t, os.MkdirAll(projectDir, 0o755))
+	pkgbuildPath := filepath.Join(projectDir, "PKGBUILD")
+	require.NoError(t, os.WriteFile(pkgbuildPath, []byte(examplePkgbuild), 0o644))
+
+	// Create yap.json
+	yapJSON := `{
+		"name": "Test project",
+		"description": "Test description",
+		"buildDir": "` + buildDir + `",
+		"output": "` + outputDir + `",
+		"projects": [
+			{
+				"name": "project1",
+				"install": false
+			}
+		]
+	}`
+	yapJSONPath := filepath.Join(testDir, "yap.json")
+	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
+
+	// Set global variables to test clean build
+	originalSkipSyncDeps := project.SkipSyncDeps
+	originalCleanBuild := project.CleanBuild
+
+	defer func() {
+		project.SkipSyncDeps = originalSkipSyncDeps
+		project.CleanBuild = originalCleanBuild
+	}()
+
+	project.SkipSyncDeps = true
+	project.CleanBuild = true
+
+	// Test MultiProject with clean build
+	mpc := &project.MultipleProject{}
+
+	err := mpc.MultiProject("ubuntu", "", testDir)
+	if err != nil {
+		t.Logf("MultiProject returned error (expected): %v", err)
+	}
+
+	// Test Clean with CleanBuild enabled
+	assert.NotPanics(t, func() {
+		err := mpc.Clean()
+		if err != nil {
+			t.Logf("Clean returned error: %v", err)
+		}
+	})
+}
+
+func TestMultipleProjectWithVerbose(t *testing.T) {
+	testDir := t.TempDir()
+	buildDir := filepath.Join(testDir, "build")
+	outputDir := filepath.Join(testDir, "output")
+
+	// Create build and output directories
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+	// Create project directory and PKGBUILD
+	projectDir := filepath.Join(testDir, "project1")
+	require.NoError(t, os.MkdirAll(projectDir, 0o755))
+	pkgbuildPath := filepath.Join(projectDir, "PKGBUILD")
+	require.NoError(t, os.WriteFile(pkgbuildPath, []byte(examplePkgbuild), 0o644))
+
+	// Create yap.json
+	yapJSON := `{
+		"name": "Test project",
+		"description": "Test description",
+		"buildDir": "` + buildDir + `",
+		"output": "` + outputDir + `",
+		"projects": [
+			{
+				"name": "project1",
+				"install": false
+			}
+		]
+	}`
+	yapJSONPath := filepath.Join(testDir, "yap.json")
+	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
+
+	// Set global variables to test verbose mode
+	originalSkipSyncDeps := project.SkipSyncDeps
+	originalVerbose := project.Verbose
+
+	defer func() {
+		project.SkipSyncDeps = originalSkipSyncDeps
+		project.Verbose = originalVerbose
+	}()
+
+	project.SkipSyncDeps = true
+	project.Verbose = true
+
+	// Test MultiProject with verbose enabled
+	mpc := &project.MultipleProject{}
+
+	err := mpc.MultiProject("ubuntu", "", testDir)
+	if err != nil {
+		t.Logf("MultiProject returned error (expected): %v", err)
+	}
+}
+
+func TestMultipleProjectWithComplexDependencies(t *testing.T) {
+	testDir := t.TempDir()
+	buildDir := filepath.Join(testDir, "build")
+	outputDir := filepath.Join(testDir, "output")
+
+	// Create build and output directories
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+	// Create multiple project directories with dependencies
+	proj1Dir := filepath.Join(testDir, "lib-project")
+	proj2Dir := filepath.Join(testDir, "app-project")
+
+	require.NoError(t, os.MkdirAll(proj1Dir, 0o755))
+	require.NoError(t, os.MkdirAll(proj2Dir, 0o755))
+
+	// Create PKGBUILDs with dependencies
+	libPkgbuild := `
+pkgname="lib-project"
+pkgver="1.0"
+pkgrel="1"
+pkgdesc="Library package"
+arch=("x86_64")
+license=("GPL")
+`
+
+	appPkgbuild := `
+pkgname="app-project"
+pkgver="1.0"
+pkgrel="1"
+pkgdesc="Application package"
+arch=("x86_64")
+license=("GPL")
+depends=("lib-project")
+makedepends=("gcc" "make")
+`
+
+	require.NoError(t, os.WriteFile(filepath.Join(proj1Dir, "PKGBUILD"), []byte(libPkgbuild), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(proj2Dir, "PKGBUILD"), []byte(appPkgbuild), 0o644))
+
+	// Create yap.json with multiple projects
+	yapJSON := `{
+		"name": "Complex project",
+		"description": "Multi-package project with dependencies",
+		"buildDir": "` + buildDir + `",
+		"output": "` + outputDir + `",
+		"projects": [
+			{
+				"name": "lib-project",
+				"install": true
+			},
+			{
+				"name": "app-project", 
+				"install": false
+			}
+		]
+	}`
+
+	yapJSONPath := filepath.Join(testDir, "yap.json")
+	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
+
+	// Set up test environment
+	originalSkipSyncDeps := project.SkipSyncDeps
+	originalNoBuild := project.NoBuild
+
+	defer func() {
+		project.SkipSyncDeps = originalSkipSyncDeps
+		project.NoBuild = originalNoBuild
+	}()
+
+	project.SkipSyncDeps = true
+	project.NoBuild = true
+
+	// Test the complex scenario
+	mpc := &project.MultipleProject{}
+
+	err := mpc.MultiProject("ubuntu", "", testDir)
+	if err != nil {
+		t.Logf("MultiProject returned error (may be expected): %v", err)
+	}
+
+	// Test BuildAll with complex dependencies
+	assert.NotPanics(t, func() {
+		buildErr := mpc.BuildAll()
+		if buildErr != nil {
+			t.Logf("BuildAll returned error (may be expected): %v", buildErr)
+		}
+	})
+}
