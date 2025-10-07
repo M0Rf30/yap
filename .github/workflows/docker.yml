@@ -57,7 +57,7 @@ jobs:
       - name: 📋 Upload Hadolint results
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: hadolint-${{ matrix.os }}.sarif
           wait-for-processing: true
