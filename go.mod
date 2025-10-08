@@ -8,7 +8,7 @@ require (
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.3.3
-	github.com/go-git/go-git/v5 v5.16.2
+	github.com/go-git/go-git/v5 v5.16.3
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/google/rpmpack v0.7.1
 	github.com/klauspost/compress v1.18.0
