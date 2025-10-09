@@ -1,0 +1,358 @@
+---
+name: 📊 Code Coverage
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    # Run coverage analysis every Sunday at 12:00 PM UTC
+    - cron: "0 12 * * 0"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.24.6"
+
+jobs:
+  # ===================================
+  # Test Coverage Analysis
+  # ===================================
+  coverage:
+    name: "📊 Coverage Analysis"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 📥 Download dependencies
+        run: go mod download
+
+      - name: 🧪 Run tests with coverage
+        run: |
+          echo "🧪 Running tests with coverage analysis..."
+          go test -v -coverprofile=coverage.out -covermode=atomic ./...
+          # Generate coverage report
+          go tool cover -html=coverage.out -o coverage.html
+
+          # Calculate coverage percentage with error handling
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | \
+            awk '{print $3}' | sed 's/%//')
+
+          # Validate that coverage was extracted successfully
+          if [[ -z "$COVERAGE" || "$COVERAGE" == "" ]]; then
+            echo "❌ Error: Failed to extract coverage percentage"
+            echo "📋 Debug: Contents of go tool cover -func=coverage.out:"
+            go tool cover -func=coverage.out
+            exit 1
+          fi
+
+          # Validate that coverage is a valid number
+          if ! [[ "$COVERAGE" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+            echo "❌ Error: Coverage value '$COVERAGE' is not a valid number"
+            exit 1
+          fi
+
+          echo "COVERAGE_PERCENT=$COVERAGE" >> "$GITHUB_ENV"
+          echo "📊 Coverage: ${COVERAGE}%"
+          
+          # Save coverage percentage to file for other jobs
+          echo "$COVERAGE" > coverage-percentage.txt
+
+      - name: 📊 Generate coverage summary
+        run: |
+          {
+            echo "## 📊 Test Coverage Report"
+            echo ""
+            echo "**Overall Coverage:** ${COVERAGE_PERCENT}%"
+            echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+
+            echo "### 📋 Coverage by Package"
+            echo "| Package | Coverage |"
+            echo "|---------|----------|"
+          } > coverage-summary.md
+
+          # Extract per-package coverage
+          go tool cover -func=coverage.out | grep -v total | \
+            while read -r line; do
+            if [[ $line == *".go:"* ]]; then
+              package=$(echo "$line" | awk '{print $1}' | \
+                sed 's|github.com/M0Rf30/yap/v2/||' | \
+                sed 's|/[^/]*\.go:.*||' | sort -u)
+              coverage=$(echo "$line" | awk '{print $3}')
+              if [[ -n "$package" && "$package" != "." ]]; then
+                echo "| $package | $coverage |" >> coverage-summary.md
+              fi
+            fi
+          done || true
+
+          echo "" >> coverage-summary.md
+
+          # Coverage status (convert to integer for comparison)
+          COVERAGE_INT=$(echo "$COVERAGE_PERCENT" | cut -d'.' -f1)
+          if [[ "$COVERAGE_INT" -ge 80 ]]; then
+            echo "### ✅ Coverage Status: EXCELLENT (≥80%)" >> \
+              coverage-summary.md
+          elif [[ "$COVERAGE_INT" -ge 70 ]]; then
+            echo "### 🟡 Coverage Status: GOOD (≥70%)" >> \
+              coverage-summary.md
+          elif [[ "$COVERAGE_INT" -ge 60 ]]; then
+            echo "### 🟠 Coverage Status: FAIR (≥60%)" >> \
+              coverage-summary.md
+          else
+            echo "### 🔴 Coverage Status: NEEDS IMPROVEMENT (<60%)" >> \
+              coverage-summary.md
+          fi
+
+      - name: 📤 Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            coverage.out
+            coverage.html
+            coverage-summary.md
+            coverage-percentage.txt
+          retention-days: 30
+
+      - name: 📊 Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: 💬 Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+
+            if (fs.existsSync('coverage-summary.md')) {
+              const summary = fs.readFileSync('coverage-summary.md', 'utf8');
+
+              // Look for existing coverage comment
+              const { data: comments } = await github.rest.issues.listComments({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+
+              const existingComment = comments.find(comment =>
+                comment.body.includes('📊 Test Coverage Report') &&
+                comment.user.type === 'Bot'
+              );
+
+              const commentBody = `🤖 **Automated Coverage Report**
+
+            ${summary}
+
+            ---
+
+            *This comment will be updated with each push to the PR.*`;
+
+              if (existingComment) {
+                await github.rest.issues.updateComment({
+                  comment_id: existingComment.id,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: commentBody
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: commentBody
+                });
+              }
+            }
+
+  # ===================================
+  # Coverage Trend Analysis
+  # ===================================
+  trend-analysis:
+    name: "📈 Coverage Trends"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: coverage
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 📥 Download coverage reports
+        uses: actions/download-artifact@v5
+        with:
+          name: coverage-reports
+
+      - name: 📈 Analyze coverage trends
+        run: |
+          echo "📈 Analyzing coverage trends..."
+          
+          # Read coverage percentage from file
+          if [[ -f coverage-percentage.txt ]]; then
+            COVERAGE_PERCENT=$(cat coverage-percentage.txt)
+          else
+            echo "❌ Error: coverage-percentage.txt file not found"
+            exit 1
+          fi
+
+          # Create trends directory if it doesn't exist
+          mkdir -p .coverage-trends
+
+          # Save current coverage to trends file
+          TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S')
+          echo "${TIMESTAMP},${COVERAGE_PERCENT}" >> .coverage-trends/coverage-history.csv
+
+          # Keep only last 30 entries to avoid file growth
+          tail -30 .coverage-trends/coverage-history.csv > .coverage-trends/coverage-history.tmp
+          mv .coverage-trends/coverage-history.tmp .coverage-trends/coverage-history.csv
+
+          echo "📊 Coverage trend data updated"
+          echo "COVERAGE_PERCENT=$COVERAGE_PERCENT" >> "$GITHUB_ENV"
+
+      - name: 📝 Generate trend summary
+        run: |
+          {
+            echo "## 📈 Coverage Trend Analysis"
+            echo ""
+            echo "**Current Coverage:** ${COVERAGE_PERCENT}%"
+            echo "**Analysis Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -f .coverage-trends/coverage-history.csv ]]; then
+            {
+              echo "### 📊 Recent Coverage History"
+              echo "| Date | Coverage |"
+              echo "|------|----------|"
+            } >> "$GITHUB_STEP_SUMMARY"
+            tail -10 .coverage-trends/coverage-history.csv | \
+              while IFS=',' read -r date coverage; do
+              echo "| $date | ${coverage}% |" >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
+
+          {
+            echo ""
+            echo "### 🔗 Coverage Resources"
+          } >> "$GITHUB_STEP_SUMMARY"
+          CODECOV_URL="https://codecov.io/gh/${{ github.repository }}"
+          ARTIFACTS_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "- [Codecov Dashboard](${CODECOV_URL})" >> "$GITHUB_STEP_SUMMARY"
+          echo "- [Coverage Artifacts](${ARTIFACTS_URL})" >> "$GITHUB_STEP_SUMMARY"
+
+  # ===================================
+  # Coverage Quality Gate
+  # ===================================
+  quality-gate:
+    name: "🚪 Coverage Quality Gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: coverage
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: 📥 Download coverage reports
+        uses: actions/download-artifact@v5
+        with:
+          name: coverage-reports
+
+      - name: 🚪 Check coverage quality gate
+        run: |
+          echo "🚪 Checking coverage quality gate..."
+          
+          # Read coverage percentage from file
+          if [[ -f coverage-percentage.txt ]]; then
+            COVERAGE_PERCENT=$(cat coverage-percentage.txt)
+          else
+            echo "❌ Error: coverage-percentage.txt file not found"
+            exit 1
+          fi
+
+          # Define minimum coverage threshold
+          MINIMUM_COVERAGE=60
+
+          echo "📊 Current coverage: ${COVERAGE_PERCENT}%"
+          echo "🎯 Minimum required: ${MINIMUM_COVERAGE}%"
+
+          # Convert coverage to integer for comparison
+          COVERAGE_INT=$(echo "$COVERAGE_PERCENT" | cut -d'.' -f1)
+          
+          if [[ "$COVERAGE_INT" -ge "$MINIMUM_COVERAGE" ]]; then
+            echo "✅ Coverage quality gate PASSED"
+            echo "QUALITY_GATE=passed" >> "$GITHUB_ENV"
+            echo "COVERAGE_PERCENT=$COVERAGE_PERCENT" >> "$GITHUB_ENV"
+            exit 0
+          else
+            echo "❌ Coverage quality gate FAILED"
+            echo "🔍 Coverage is below minimum threshold of ${MINIMUM_COVERAGE}%"
+            echo "QUALITY_GATE=failed" >> "$GITHUB_ENV"
+            echo "COVERAGE_PERCENT=$COVERAGE_PERCENT" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
+      - name: 💬 Report quality gate status
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const status = process.env.QUALITY_GATE;
+            const coverage = process.env.COVERAGE_PERCENT;
+
+            let statusEmoji = '';
+            let statusText = '';
+            let statusColor = '';
+
+            if (status === 'passed') {
+              statusEmoji = '✅';
+              statusText = 'PASSED';
+              statusColor = 'success';
+            } else {
+              statusEmoji = '❌';
+              statusText = 'FAILED';
+              statusColor = 'failure';
+            }
+
+            const body = `${statusEmoji} **Coverage Quality Gate ${statusText}**
+
+            **Current Coverage:** ${coverage}%
+            **Minimum Required:** 60%
+
+            ${status === 'failed' ?
+              '⚠️ Please add more tests to improve coverage before merging.' :
+              '🎉 Coverage meets quality standards!'}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

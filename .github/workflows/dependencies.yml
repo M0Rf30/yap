@@ -1,0 +1,352 @@
+name: 🔄 Dependency Management
+
+on:
+  schedule:
+    # Run every Monday at 9:00 AM UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      update_type:
+        description: "Type of update to perform"
+        required: true
+        default: "minor"
+        type: choice
+        options:
+          - "patch"
+          - "minor"
+          - "major"
+          - "all"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.24.5"
+
+jobs:
+  # ===================================
+  # Dependency Analysis
+  # ===================================
+  analyze:
+    name: 🔍 Analyze Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    outputs:
+      has-updates: ${{ steps.check.outputs.has-updates }}
+      update-summary: ${{ steps.check.outputs.update-summary }}
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 🔍 Check for dependency updates
+        id: check
+        run: |
+          {
+            echo "📋 Current dependencies:"
+            go list -m all
+            echo ""
+            echo "🔍 Checking for available updates..."
+          } > update_summary.txt
+
+          # Get list of modules that can be updated
+          go list -u -m all > current_deps.txt
+
+          # Check if there are any updates available
+          if grep -q '\[' current_deps.txt; then
+            echo "has-updates=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Updates available" >> update_summary.txt
+            grep '\[' current_deps.txt >> update_summary.txt
+          else
+            echo "has-updates=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ No updates available" >> update_summary.txt
+          fi
+
+          # Set update summary for later use
+          {
+            echo 'update-summary<<EOF'
+            cat update_summary.txt
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 🛡️ Security audit
+        run: |
+          {
+            echo ""
+            echo "🛡️ Security audit results:"
+          } >> update_summary.txt
+
+          # Install govulncheck if not available
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+
+          if govulncheck ./...; then
+            echo "✅ No known vulnerabilities found" >> update_summary.txt
+          else
+            echo "⚠️ Potential vulnerabilities detected" >> update_summary.txt
+          fi
+
+      - name: 📤 Upload analysis results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-analysis
+          path: |
+            update_summary.txt
+            current_deps.txt
+          retention-days: 7
+
+  # ===================================
+  # Automated Updates
+  # ===================================
+  update:
+    name: 🔄 Update Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: analyze
+    if: needs.analyze.outputs.has-updates == 'true' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 🔄 Update dependencies
+        id: update
+        run: |
+          # Create update branch
+          BRANCH_NAME="deps/auto-update-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH_NAME"
+          echo "branch-name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+          # Backup current go.mod
+          cp go.mod go.mod.backup
+          cp go.sum go.sum.backup
+
+          UPDATE_TYPE="${{ github.event.inputs.update_type || 'minor' }}"
+          echo "📋 Update type: $UPDATE_TYPE"
+
+          case "$UPDATE_TYPE" in
+            "patch")
+              # Update only patch versions
+              go get -u=patch ./...
+              ;;
+            "minor"|"")
+              # Update minor and patch versions (default)
+              go get -u ./...
+              ;;
+            "major")
+              # Update to latest major versions (more risky)
+              go get -u ./...
+              go mod tidy
+              ;;
+            "all")
+              # Update everything to latest
+              go get -u ./...
+              go mod tidy
+              ;;
+          esac
+
+          # Clean up
+          go mod tidy
+
+          # Check if there are actually changes
+          if git diff --quiet go.mod go.sum; then
+            echo "No dependency changes found"
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has-changes=true" >> "$GITHUB_OUTPUT"
+
+          # Generate update summary
+          {
+            echo "📋 Dependency updates applied:"
+            echo ""
+            echo "### Changed dependencies:"
+            git diff go.mod
+            echo ""
+            echo "### go.sum changes:"
+            git diff --stat go.sum
+          } > update_changes.txt
+
+      - name: 🧪 Test updated dependencies
+        if: steps.update.outputs.has-changes == 'true'
+        run: |
+          echo "🧪 Testing with updated dependencies..."
+
+          # Download new dependencies
+          go mod download
+
+          # Verify module integrity
+          go mod verify
+
+          # Build project
+          if ! go build -v ./...; then
+            echo "❌ Build failed with updated dependencies"
+            exit 1
+          fi
+
+          # Run tests
+          if ! go test -v ./...; then
+            echo "❌ Tests failed with updated dependencies"
+            exit 1
+          fi
+
+          echo "✅ All tests passed with updated dependencies"
+
+      - name: 🛡️ Security check with updates
+        if: steps.update.outputs.has-changes == 'true'
+        run: |
+          echo "🛡️ Running security checks on updated dependencies..."
+
+          # Install govulncheck if not available
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+
+          if govulncheck ./...; then
+            echo "✅ No vulnerabilities found in updated dependencies"
+          else
+            echo "⚠️ Potential security issues detected - review required"
+          fi
+
+      - name: 📝 Commit changes
+        if: steps.update.outputs.has-changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          git add go.mod go.sum
+          git commit -m "chore(deps): update Go dependencies
+
+          - Update type: ${{ github.event.inputs.update_type || 'minor' }}
+          - Automated dependency update via GitHub Actions
+          - All tests passing with updated dependencies
+
+          Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>"
+
+      - name: 🚀 Create Pull Request
+        if: steps.update.outputs.has-changes == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.update.outputs.branch-name }}
+          title: "🔄 chore(deps): automated dependency updates"
+          body: |
+            ## 🔄 Automated Dependency Updates
+
+            This PR contains automated dependency updates generated by GitHub Actions.
+
+            ### 📋 Update Details
+            - **Update Type:** `${{ github.event.inputs.update_type || 'minor' }}`
+            - **Trigger:** ${{ github.event_name }}
+            - **Generated:** ${{ github.run_id }}
+
+            ### 🧪 Validation
+            - ✅ All dependencies downloaded successfully
+            - ✅ Module integrity verified
+            - ✅ Project builds successfully
+            - ✅ All tests pass
+            - ✅ Security scan completed
+
+            ### 📊 Analysis Summary
+            ```
+            ${{ needs.analyze.outputs.update-summary }}
+            ```
+
+            ### 🔍 Review Checklist
+            - [ ] Review dependency changes for breaking changes
+            - [ ] Verify no new security vulnerabilities introduced
+            - [ ] Check that all tests pass in CI
+            - [ ] Validate integration tests
+
+            ---
+
+            🤖 This PR was automatically generated by the dependency management workflow.
+
+            **Note:** This PR will be automatically updated if new dependency updates become available.
+          labels: |
+            dependencies
+            automated
+            maintenance
+          reviewers: M0Rf30
+          draft: false
+
+  # ===================================
+  # Summary Report
+  # ===================================
+  summary:
+    name: 📊 Dependency Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [analyze, update]
+    if: always()
+
+    steps:
+      - name: 📥 Download analysis results
+        if: needs.analyze.outputs.has-updates == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: dependency-analysis
+
+      - name: 📝 Generate summary report
+        run: |
+          {
+            echo "## 🔄 Dependency Management Summary"
+            echo ""
+            echo "**Trigger:** ${{ github.event_name }}"
+            echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${{ needs.analyze.outputs.has-updates }}" == "true" ]]; then
+            {
+              echo "### 📋 Analysis Results"
+              echo "- **Updates Available:** ✅ Yes"
+              echo "- **Update Job:** ${{ needs.update.result }}"
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [[ -f update_summary.txt ]]; then
+              {
+                echo "### 📊 Update Details"
+                echo '```'
+                cat update_summary.txt
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            {
+              echo "### 📋 Analysis Results"
+              echo "- **Updates Available:** ℹ️ No updates found"
+              echo "- **Dependencies:** Up to date"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          {
+            echo ""
+            echo "### 🔗 Related Links"
+            echo "- [Dependency Graph](https://github.com/${{ github.repository }}/network/dependencies)"
+            echo "- [Security Advisories](https://github.com/${{ github.repository }}/security/advisories)"
+            echo "- [Dependabot Settings](https://github.com/${{ github.repository }}/settings/security_analysis)"
+          } >> "$GITHUB_STEP_SUMMARY"

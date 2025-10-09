@@ -1,0 +1,1022 @@
+- id: app.full_name
+  translation: Yet Another Packager
+- id: app.name
+  translation: YAP
+- id: commands.build.examples
+  translation: "# Costruisci per la distribuzione del sistema corrente
+    yap build .
+
+    yap build /percorso/al/progetto
+
+
+    # Costruisci per distribuzioni specifiche
+
+    yap build ubuntu-jammy .
+
+    yap build fedora-38 /percorso/al/progetto
+
+    yap build alpine /home/utente/mioprogetto
+    "
+- id: commands.build.long
+  translation:
+    "Costruisci pacchetti per una o più distribuzioni usando un file di\
+    \ progetto yap.json.\n\nIl comando build orchestra l'intero processo di costruzione\
+    \ dei pacchetti:\n  • Analizza la configurazione del progetto yap.json\n  • Risolve\
+    \ le dipendenze e l'ordine di compilazione\n  • Crea ambienti container isolati\n\
+    \  • Costruisce pacchetti secondo le specifiche PKGBUILD\n  • Gestisce la compatibilità\
+    \ tra distribuzioni\n\nFORMATO DISTRIBUZIONE:\n  Usa il formato 'distro' o 'distro-release'\
+    \ (es. 'ubuntu-jammy', 'fedora-38')\n  Se non viene specificata una distro, usa\
+    \ la distribuzione del sistema corrente.\n\nRISOLUZIONE DIPENDENZE:\n  L'ordine\
+    \ di compilazione viene determinato automaticamente dalle dipendenze dei pacchetti.\n\
+    \  Usa i flag --from e --to per costruire specifici intervalli di pacchetti.\n"
+- id: commands.build.short
+  translation: 🔨 Costruisci pacchetti dalla definizione del progetto yap.json
+- id: commands.completion.short
+  translation: 🔧 Genera script di completamento shell
+- id: commands.graph.examples
+  translation: "# Genera grafico SVG per la directory corrente
+    yap graph .
+    # Genera grafico PNG con tema scuro
+    yap graph --format png --theme dark /percorso/al/progetto
+    # Includi dipendenze esterne nella visualizzazione
+    yap graph --show-external --output dependencies.svg .
+    # Genera grafico pronto per documentazione
+    yap graph --theme modern --format svg --output docs/architecture.svg .
+    "
+- id: commands.graph.long
+  translation:
+    "Genera visualizzazioni moderne e interattive dei grafici delle dipendenze\
+    \ del tuo progetto.\n\nIl comando graph analizza il tuo file di progetto yap.json\
+    \ e crea bellissime\nvisualizzazioni delle dipendenze che mostrano le relazioni\
+    \ tra i pacchetti. L'output\ninclude ordinamento topologico, analisi della popolarità\
+    \ delle dipendenze e stile moderno.\n\nCARATTERISTICHE:\n  • Layout gerarchico\
+    \ basato sui livelli di dipendenza\n  • Nodi color-coded per popolarità e tipo\n\
+    \  • SVG interattivo con effetti hover e tooltip\n  • Filtraggio dipendenze esterne\n\
+    \  • Temi multipli (modern, classic, dark)\n  • Output di alta qualità adatto\
+    \ per documentazione\n\nELEMENTI DI VISUALIZZAZIONE:\n  • La dimensione del nodo\
+    \ riflette la popolarità della dipendenza\n  • I colori indicano i tipi di pacchetto\
+    \ (interno vs esterno)\n  • Le frecce mostrano la direzione delle dipendenze\n\
+    \  • I livelli mostrano l'ordine di build\n  • I tooltip forniscono informazioni\
+    \ dettagliate sui pacchetti\n"
+- id: commands.graph.short
+  translation: 🎨 Genera bellissimi grafici delle dipendenze
+- id: commands.install.examples
+  translation: "# Installa un pacchetto Debian
+    yap install package.deb
+
+
+    # Installa un pacchetto RPM
+
+    yap install package.rpm
+
+
+    # Installa un pacchetto Arch
+
+    yap install package.pkg.tar.xz
+
+
+    # Installa un pacchetto Alpine
+
+    yap install package.apk
+    "
+- id: commands.install.long
+  translation:
+    "Installa un artefatto di pacchetto usando il gestore di pacchetti\
+    \ appropriato del sistema.\n\nQuesto comando rileva automaticamente il formato\
+    \ del pacchetto e usa il gestore\ndi pacchetti corretto per installare l'artefatto\
+    \ sul tuo sistema.\n\nFORMATI SUPPORTATI:\n  • pacchetti .deb (via apt/dpkg)\n\
+    \  • pacchetti .rpm (via yum/dnf/rpm)\n  • pacchetti .pkg.tar.xz (via pacman)\n\
+    \  • pacchetti .apk (via apk)\n\nL'installer gestirà le dipendenze e fornirà feedback\
+    \ appropriato\ndurante il processo di installazione.\n"
+- id: commands.install.short
+  translation:
+    📦 Installa un artefatto di pacchetto usando il gestore di pacchetti
+    appropriato
+- id: commands.list_distros.examples
+  translation: "# Elenca tutte le distribuzioni supportate
+    yap list-distros
+
+
+    # Usa con filtraggio (se disponibile)
+
+    yap list-distros | grep ubuntu
+    "
+- id: commands.list_distros.long
+  translation:
+    "Elenca tutte le distribuzioni supportate e i loro rilasci disponibili.\n\
+    \nQuesto comando mostra per quali distribuzioni YAP può costruire pacchetti,\n\
+    incluse versioni di rilascio specifiche dove applicabile.\n\nL'output include:\n\
+    \  • Nomi e ID delle distribuzioni\n  • Versioni di rilascio disponibili\n  •\
+    \ Informazioni sul supporto dell'architettura\n  • Stato di disponibilità del\
+    \ container\n"
+- id: commands.list_distros.short
+  translation: 📋 Elenca tutte le distribuzioni e rilasci supportati
+- id: commands.prepare.examples
+  translation: "# Prepara sistema corrente
+
+    yap prepare
+
+
+    # Prepara distribuzione specifica
+
+    yap prepare ubuntu-jammy
+
+
+    # Prepara per Rocky Linux
+
+    yap prepare rocky-9
+
+    "
+- id: commands.prepare.long
+  translation:
+    "Prepara ambiente di build con pacchetti di sviluppo e dipendenze.\n\
+    \nQuesto comando configura un ambiente di build installando strumenti\ndi sviluppo\
+    \ necessari, compilatori e dipendenze di build per la\ndistribuzione specificata.\n\
+    \nLA PREPARAZIONE INCLUDE:\n  • Strumenti di sviluppo base (gcc, make, ecc.)\n\
+    \  • Dipendenze di build specifiche del pacchetto\n  • Configurazione ambiente\
+    \ di build\n  • Preparazione immagine container\n"
+- id: commands.prepare.short
+  translation: 🛠️  Prepara ambiente di build con pacchetti di sviluppo
+- id: commands.pull.short
+  translation: 📦 Scarica immagini container pre-compilate per il building
+- id: commands.status.short
+  translation: 📊 Mostra stato del sistema e informazioni dell'ambiente
+- id: commands.version.short
+  translation: 📊 Mostra versione di YAP e informazioni del sistema
+- id: commands.zap.examples
+  translation: "# Pulisci distribuzione del sistema corrente
+
+    yap zap .
+
+    yap zap /percorso/al/progetto
+
+
+    # Pulisci progetto specifico per distribuzione
+
+    yap zap ubuntu-jammy /percorso/al/progetto
+
+    yap zap fedora-38 .
+
+    yap zap alpine /home/utente/mioprogetto
+
+
+    # Pulisci progetto directory corrente
+
+    yap zap rocky-9 .
+
+    "
+- id: commands.zap.long
+  translation:
+    "Esegui pulizia profonda degli ambienti di build, rimuovendo tutti\
+    \ gli artefatti di build,\nfile temporanei e directory di staging per il progetto\
+    \ specificato.\n\nQuesto comando è utile per:\n  • Liberare spazio su disco occupato\
+    \ dagli artefatti di build\n  • Risolvere problemi di build causati da file obsoleti\n\
+    \  • Garantire build completamente puliti\n  • Manutenzione degli ambienti di\
+    \ build\n\nAVVISO: Questa operazione è distruttiva e rimuove tutti gli output\
+    \ di build\ne file intermedi. Usa con cautela negli ambienti di produzione.\n\n\
+    FORMATO DISTRIBUZIONE:\n  Usa il formato 'distro' o 'distro-release' (es. 'ubuntu-jammy',\
+    \ 'fedora-38')\n  Se non viene specificata una distro, usa la distribuzione del\
+    \ sistema corrente.\n\nIl comando zap automaticamente:\n  • Salta l'installazione\
+    \ delle dipendenze (nomakedeps=true)\n  • Salta la sincronizzazione del gestore\
+    \ pacchetti (skip-sync=true)\n  • Abilita la modalità di pulizia profonda (zap=true)\n"
+- id: commands.zap.short
+  translation: 🧹 Pulisci profondamente ambiente di build e artefatti
+- id: errors.build.build_stage_failed
+  translation: fase di build fallita
+- id: errors.build.failed_to_initialize_directories
+  translation: impossibile inizializzare le directory
+- id: errors.build.failed_to_retrieve_source
+  translation: impossibile recuperare il sorgente
+- id: errors.build.failed_to_retrieve_sources
+  translation: impossibile recuperare i sorgenti
+- id: errors.completion.failed_to_generate_bash_completion
+  translation: impossibile generare il completamento per bash
+- id: errors.completion.failed_to_generate_fish_completion
+  translation: impossibile generare il completamento per fish
+- id: errors.completion.failed_to_generate_zsh_completion
+  translation: impossibile generare il completamento per zsh
+- id: errors.core.artifacts_path_not_exist
+  translation: "il percorso degli artefatti non esiste: %s"
+- id: errors.download.download_failed
+  translation: download fallito
+- id: errors.download.download_failed_after_attempts
+  translation: "download fallito dopo %d tentativi: %v"
+- id: errors.download.download_failed_no_response
+  translation: "download fallito: nessuna risposta"
+- id: errors.download.download_job_not_found
+  translation: "job di download non trovato: %s"
+- id: errors.files.failed_to_access_directory
+  translation: impossibile accedere alla directory %s
+- id: errors.files.failed_to_calculate_directory_size
+  translation: impossibile calcolare la dimensione della directory
+- id: errors.files.failed_to_calculate_sha256
+  translation: impossibile calcolare l'hash SHA256
+- id: errors.files.failed_to_change_permissions
+  translation: impossibile modificare i permessi del file
+- id: errors.files.failed_to_copy_file_content
+  translation: impossibile copiare il contenuto del file
+- id: errors.files.failed_to_create_destination_file
+  translation: impossibile creare il file di destinazione
+- id: errors.files.failed_to_create_directory
+  translation: impossibile creare la directory %s
+- id: errors.files.failed_to_open_file_for_sha256
+  translation: impossibile aprire il file per il calcolo SHA256
+- id: errors.files.failed_to_open_source_file
+  translation: impossibile aprire il file sorgente per la copia
+- id: errors.files.failed_to_stat_file
+  translation: impossibile ottenere informazioni sul file per il controllo di scrittura
+- id: errors.files.file_not_writable
+  translation: il file %s non è scrivibile
+- id: errors.git.empty_download_path
+  translation: il percorso di download non può essere vuoto
+- id: errors.git.remote_branch_not_found
+  translation: "branch remoto %s non trovato: %v"
+- id: errors.graph.failed_to_load_project
+  translation: impossibile caricare il progetto
+- id: errors.graph.failed_to_resolve_project_path
+  translation: impossibile risolvere il percorso del progetto
+- id: errors.install.artifact_not_found
+  translation: "file artefatto non trovato: %s"
+- id: errors.install.failed_to_resolve_path
+  translation: impossibile risolvere il percorso dell'artefatto
+- id: errors.install.installation_failed
+  translation: installazione del pacchetto fallita con %s
+- id: errors.install.unsupported_package_format
+  translation: "formato pacchetto non supportato: %s
+    Formati supportati: .deb, .rpm, .apk, .pkg.tar.*"
+- id: errors.install.unsupported_package_type
+  translation: "tipo di pacchetto non supportato: %s"
+- id: errors.packer.unsupported_linux_distro
+  translation: distribuzione Linux non supportata
+- id: errors.packer.unsupported_package_manager
+  translation: gestore di pacchetti non supportato
+- id: errors.pkgbuild.failed_to_set_variable
+  translation: impossibile impostare la variabile
+- id: errors.pkgbuild.failed_to_set_variable_pkgdir
+  translation: impossibile impostare la variabile pkgdir
+- id: errors.pkgbuild.failed_to_set_variable_srcdir
+  translation: impossibile impostare la variabile srcdir
+- id: errors.pkgbuild.failed_to_set_variable_startdir
+  translation: impossibile impostare la variabile startdir
+- id: errors.pkgbuild.invalid_directive_use
+  translation: uso non valido della direttiva '__' in %s
+- id: errors.pkgbuild.unsupported_architecture
+  translation: architettura non supportata
+- id: errors.platform.chown_failed
+  translation: impossibile cambiare il proprietario di %s in %s (%d:%d)
+- id: errors.platform.chown_root_directory_failed
+  translation: impossibile cambiare il proprietario della directory radice %s
+- id: errors.platform.create_go_symlink_failed
+  translation: impossibile creare il collegamento simbolico per go
+- id: errors.platform.create_gofmt_symlink_failed
+  translation: impossibile creare il collegamento simbolico per gofmt
+- id: errors.platform.download_go_archive_failed
+  translation: impossibile scaricare l'archivio Go
+- id: errors.platform.extract_go_archive_failed
+  translation: impossibile estrarre l'archivio Go
+- id: errors.platform.no_container_app_found
+  translation: nessuna applicazione container trovata
+- id: errors.platform.open_os_release_failed
+  translation: impossibile aprire /etc/os-release
+- id: errors.platform.parse_sudo_gid_failed
+  translation: impossibile analizzare SUDO_GID
+- id: errors.platform.parse_sudo_uid_failed
+  translation: impossibile analizzare SUDO_UID
+- id: errors.platform.remove_go_archive_failed
+  translation: impossibile rimuovere l'archivio Go
+- id: errors.platform.scan_os_release_failed
+  translation: impossibile leggere il file os-release
+- id: errors.platform.start_multiprinter_failed
+  translation: impossibile avviare il multiprinter
+- id: errors.project.circular_dependency_detected
+  translation: dipendenza circolare rilevata
+- id: errors.project.circular_runtime_dependency_detected
+  translation: dipendenza circolare nelle dipendenze runtime
+- id: errors.rpm.modification_time_out_of_range
+  translation: data di modifica fuori dall'intervallo consentito per uint32
+- id: errors.set.empty_array
+  translation: array vuoto, specificare un valore
+- id: errors.set.empty_function
+  translation: funzione vuota, specificare un valore
+- id: errors.set.empty_variable
+  translation: variabile vuota, specificare un valore
+- id: errors.shell.command_execution_failed
+  translation: esecuzione del comando fallita
+- id: errors.shell.command_not_allowed_for_sudo
+  translation: il comando '%s' non è consentito per l'esecuzione con sudo
+- id: errors.shell.failed_to_create_script_runner
+  translation: impossibile creare lo script runner
+- id: errors.shell.failed_to_execute_command
+  translation: impossibile eseguire il comando %s
+- id: errors.shell.failed_to_parse_script
+  translation: impossibile analizzare lo script
+- id: errors.shell.failed_to_start_multiprinter
+  translation: impossibile avviare il multiprinter
+- id: errors.shell.script_execution_failed
+  translation: esecuzione dello script fallita
+- id: errors.source.directory_not_supported
+  translation: "directory non supportata come sorgente per protocolli non-VCS: %s"
+- id: errors.source.download_failed_for
+  translation: "download fallito per %s: %v"
+- id: errors.source.failed_to_copy_file
+  translation: impossibile copiare il file %s
+- id: errors.source.failed_to_open_file_for_hash
+  translation: impossibile aprire il file per l'hash %s
+- id: errors.source.failed_to_start_multiprinter
+  translation: impossibile avviare il multiprinter
+- id: errors.source.hash_verification_failed
+  translation: verifica hash fallita %s
+- id: errors.source.unsupported_hash_length
+  translation: lunghezza hash non supportata %d
+- id: errors.source.unsupported_source_type
+  translation: tipo di sorgente non supportato
+- id: errors.validation.distribution_empty
+  translation: la distribuzione non può essere vuota
+- id: errors.validation.insufficient_args
+  translation: richiesto almeno un argomento
+- id: errors.validation.insufficient_args_detailed
+  translation: "richiesti almeno %d argomenti, ne sono stati forniti solo %d
+    Utilizzo: %s
+    Per ulteriori informazioni, usa: %s --help"
+- id: errors.validation.invalid_path
+  translation: percorso non valido '%s'
+- id: errors.validation.no_project_files
+  translation: "né yap.json né PKGBUILD trovati in %s
+    Assicurati che la directory del progetto contenga uno di questi file:
+    - yap.json (consigliato per progetti multi-pacchetto)
+    - PKGBUILD (per progetti singolo-pacchetto)"
+- id: errors.validation.path_not_exist
+  translation: il percorso non esiste
+- id: errors.validation.project_file_not_found
+  translation: file di progetto non trovato
+- id: errors.validation.project_path_empty
+  translation: il percorso del progetto non può essere vuoto
+- id: errors.validation.unsupported_distribution
+  translation: "distribuzione non supportata '%s'
+    Distribuzioni supportate:
+    %s
+    Usa 'yap list-distros' per visualizzare tutte le opzioni disponibili"
+- id: flags.build.cleanbuild
+  translation: 🧹 rimuovi directory $srcdir/ prima del build (garantisce build pulito)
+- id: flags.build.from
+  translation:
+    ▶️  inizia a costruire dal pacchetto specificato (consapevole delle
+    dipendenze)
+- id: flags.build.nobuild
+  translation: 📥 scarica ed estrai solo file sorgente (nessuna compilazione)
+- id: flags.build.nomakedeps
+  translation: ⏭️  salta tutte le installazioni e controlli make dependency (makedeps)
+- id: flags.build.pkgrel
+  translation: 🔢 sovrascrivi numero di rilascio pacchetto (pkgrel) per tutti i pacchetti
+- id: flags.build.pkgver
+  translation:
+    🏷️  sovrascrivi versione pacchetto (pkgver) per tutti i pacchetti nel
+    progetto
+- id: flags.build.skip_sync
+  translation: 🚫 salta sincronizzazione gestore pacchetti con remote
+- id: flags.build.ssh_password
+  translation: 🔐 password SSH per accedere a repository privati
+- id: flags.build.to
+  translation: ⏹️  ferma costruzione al pacchetto specificato (consapevole delle dipendenze)
+- id: flags.build.zap
+  translation: 💥 rimuovi intera directory di staging prima del build (pulizia profonda)
+- id: flags.graph.format
+  translation: "formato output: svg, png"
+- id: flags.graph.output
+  translation: "percorso file output (default: dependencies.svg)"
+- id: flags.graph.show_external
+  translation: includi dipendenze esterne nel grafico
+- id: flags.graph.theme
+  translation: "tema visuale: modern, classic, dark"
+- id: flags.no_color
+  translation: disabilita output colorato
+- id: flags.prepare.golang
+  translation: 🐹 installa inoltre runtime Go e strumenti di sviluppo
+- id: flags.prepare.skip_sync
+  translation:
+    ⚡ salta sincronizzazione gestore pacchetti (più veloce ma può perdere
+    aggiornamenti)
+- id: flags.verbose
+  translation: abilita output verboso con logging dettagliato
+- id: flags.zap.from
+  translation: ▶️  inizia pulizia dal pacchetto specificato (consapevole delle dipendenze)
+- id: flags.zap.to
+  translation: ⏹️  ferma pulizia al pacchetto specificato (consapevole delle dipendenze)
+- id: footer.documentation
+  translation: "📖 Documentazione:"
+- id: footer.more_info
+  translation: Usa "yap [comando] --help" per maggiori informazioni su un comando.
+- id: footer.report_issues
+  translation: "🐛 Segnala problemi:"
+- id: groups.additional
+  translation: Comandi Aggiuntivi
+- id: groups.build
+  translation: Comandi di Build
+- id: groups.environment
+  translation: Comandi di Ambiente
+- id: groups.utility
+  translation: Comandi Utility
+- id: logger.analyzing_package_dependencies
+  translation: analisi dipendenze pacchetto
+- id: logger.batch_build_strategy
+  translation: strategia di build in batch
+- id: logger.build.build_completed
+  translation: Tutti i pacchetti costruiti con successo
+- id: logger.build.build_failed
+  translation: Build fallito
+- id: logger.build.building_for_distribution
+  translation: Costruzione per distribuzione
+- id: logger.build.building_packages
+  translation: Costruzione pacchetti...
+- id: logger.build.initializing_project
+  translation: Inizializzazione progetto...
+- id: logger.build.no_distribution_specified
+  translation: Nessuna distribuzione specificata, uso quella rilevata
+- id: logger.build.project_init_failed
+  translation: Inizializzazione progetto fallita
+- id: logger.build.project_init_success
+  translation: Progetto inizializzato con successo
+- id: logger.build.project_path
+  translation: Percorso progetto
+- id: logger.build.starting_verbose
+  translation: Avvio processo di build con logging verboso abilitato
+- id: logger.build_batch_determined
+  translation: analisi dipendenze completata
+- id: logger.build_order_determined
+  translation: ordine di compilazione determinato
+- id: logger.building
+  translation: compilazione
+- id: logger.building_resulting_package
+  translation: costruzione pacchetto risultante
+- id: logger.building_runtime_dependency_batch
+  translation: compilazione batch dipendenze runtime
+- id: logger.buildpackage.info.package_artifact_created
+  translation: artefatto del pacchetto creato
+- id: logger.buildpackage.info.package_artifact_created_1
+  translation: artefatto del pacchetto creato
+- id: logger.buildpackage.warn.failed_to_remove_temporary
+  translation: impossibile rimuovere la directory temporanea
+- id: logger.buildpackage.warn.failed_to_remove_temporary_1
+  translation: impossibile rimuovere la directory temporanea
+- id: logger.calculatedatahash.warn.failed_to_close_file
+  translation: impossibile chiudere il file durante il calcolo dell'hash
+- id: logger.calculatedatahash.warn.failed_to_close_file_1
+  translation: impossibile chiudere il file durante il calcolo dell'hash
+- id: logger.calculatesha256.warn.failed_to_close_file
+  translation: impossibile chiudere il file durante il calcolo SHA256
+- id: logger.calculatesha256.warn.failed_to_close_file_1
+  translation: impossibile chiudere il file durante il calcolo SHA256
+- id: logger.calculatesha256.warn.failed_to_close_file_2
+  translation: impossibile chiudere il file
+- id: logger.calculatesha256.warn.failed_to_close_file_3
+  translation: impossibile chiudere il file
+- id: logger.calculatesha256.warn.failed_to_close_file_4
+  translation: impossibile chiudere il file durante il calcolo SHA256
+- id: logger.calculatesha256.warn.failed_to_close_file_5
+  translation: impossibile chiudere il file durante il calcolo SHA256
+- id: logger.checkgo.info.go_is_already_installed
+  translation: go è già installato
+- id: logger.checkgo.info.go_is_already_installed_1
+  translation: go è già installato
+- id: logger.chmod.error.failed_to_chmod
+  translation: impossibile modificare i permessi (chmod)
+- id: logger.chmod.error.failed_to_chmod_1
+  translation: impossibile modificare i permessi (chmod)
+- id: logger.chownrecursivetooriginaluser.warn.failed_to_chown_file
+  translation: impossibile cambiare il proprietario del file
+- id: logger.chownrecursivetooriginaluser.warn.failed_to_chown_file_1
+  translation: impossibile cambiare il proprietario del file
+- id: logger.chowntooriginaluser.debug.changed_ownership_to_original
+  translation: proprietà cambiata all'utente originale
+- id: logger.chowntooriginaluser.debug.changed_ownership_to_original_1
+  translation: proprietà cambiata all'utente originale
+- id: logger.circular_dependency_detected
+  translation: dipendenza circolare rilevata
+- id: logger.clone.error.failed_to_load_ssh
+  translation: impossibile caricare la chiave SSH
+- id: logger.clone.error.failed_to_load_ssh_1
+  translation: impossibile caricare la chiave SSH
+- id: logger.clone.warn.try_to_use_an
+  translation: prova a usare una password SSH con l'opzione -p
+- id: logger.clone.warn.try_to_use_an_1
+  translation: prova a usare una password SSH con l'opzione -p
+- id: logger.concurrently.warn.failed_to_shutdown_download
+  translation: impossibile arrestare il gestore di download
+- id: logger.concurrently.warn.failed_to_shutdown_download_1
+  translation: impossibile arrestare il gestore di download
+- id: logger.configureresumeifpossible.info.resuming_download
+  translation: ripresa del download
+- id: logger.configureresumeifpossible.info.resuming_download_1
+  translation: ripresa del download
+- id: logger.create.error.failed_to_create_path
+  translation: impossibile creare il percorso
+- id: logger.create.error.failed_to_create_path_1
+  translation: impossibile creare il percorso
+- id: logger.createdeb.warn.failed_to_close_debian
+  translation: impossibile chiudere il file del pacchetto Debian
+- id: logger.createdeb.warn.failed_to_close_debian_1
+  translation: impossibile chiudere il file del pacchetto Debian
+- id: logger.createmtreegzip.warn.failed_to_close_gzip
+  translation: impossibile chiudere lo stream gzip
+- id: logger.createmtreegzip.warn.failed_to_close_gzip_1
+  translation: impossibile chiudere lo stream gzip
+- id: logger.createmtreegzip.warn.failed_to_close_output
+  translation: impossibile chiudere il file di output
+- id: logger.createmtreegzip.warn.failed_to_close_output_1
+  translation: impossibile chiudere il file di output
+- id: logger.createspec.warn.failed_to_close_pkgbuild
+  translation: impossibile chiudere il file PKGBUILD
+- id: logger.createspec.warn.failed_to_close_pkgbuild_1
+  translation: impossibile chiudere il file PKGBUILD
+- id: logger.createtargz.warn.failed_to_close_output
+  translation: impossibile chiudere il file di output
+- id: logger.createtargz.warn.failed_to_close_output_1
+  translation: impossibile chiudere il file di output
+- id: logger.createtarzst.warn.failed_to_close_output
+  translation: impossibile chiudere il file di output
+- id: logger.createtarzst.warn.failed_to_close_output_1
+  translation: impossibile chiudere il file di output
+- id: logger.createwrite.error.failed_to_write_to
+  translation: impossibile scrivere sul file
+- id: logger.createwrite.error.failed_to_write_to_1
+  translation: impossibile scrivere sul file
+- id: logger.createwrite.warn.failed_to_close_file
+  translation: impossibile chiudere il file
+- id: logger.createwrite.warn.failed_to_close_file_1
+  translation: impossibile chiudere il file
+- id: logger.creating_package
+  translation: creazione pacchetto
+- id: logger.dependency_analysis_complete
+  translation: analisi dipendenze completata
+- id: logger.dependency_analysis_starting
+  translation: avvio analisi dipendenze
+- id: logger.dependency_aware_build_process_starting
+  translation: avvio processo di compilazione con consapevolezza delle dipendenze
+- id: logger.dependency_category
+  translation: categoria dipendenza
+- id: logger.dependency_popularity
+  translation: popolarità delle dipendenze
+- id: logger.dependency_popularity_analysis
+  translation: popolarità dipendenze
+- id: logger.download.info.response_status
+  translation: "stato della risposta: "
+- id: logger.execwithcontext.debug.command_execution_completed
+  translation: esecuzione comando completata
+- id: logger.execwithcontext.debug.command_execution_completed_1
+  translation: esecuzione comando completata
+- id: logger.execwithcontext.debug.executing_command
+  translation: esecuzione comando
+- id: logger.execwithcontext.debug.executing_command_1
+  translation: esecuzione comando
+- id: logger.execwithcontext.error.command_execution_failed
+  translation: esecuzione comando fallita
+- id: logger.execwithcontext.error.command_execution_failed_1
+  translation: esecuzione comando fallita
+- id: logger.execwithsudocontext.debug.executing_command
+  translation: esecuzione comando
+- id: logger.execwithsudocontext.debug.executing_command_1
+  translation: esecuzione comando
+- id: logger.execwithsudocontext.debug.executing_command_with_sudo
+  translation: esecuzione comando con sudo
+- id: logger.execwithsudocontext.debug.executing_command_with_sudo_1
+  translation: esecuzione comando con sudo
+- id: logger.external_dependency
+  translation: dipendenza esterna
+- id: logger.external_runtime_dependencies_collected
+  translation: dipendenze runtime esterne raccolte
+- id: logger.extract.warn.failed_to_close_source
+  translation: impossibile chiudere il file sorgente
+- id: logger.extract.warn.failed_to_close_source_1
+  translation: impossibile chiudere il file sorgente
+- id: logger.failed_to_close_project_file
+  translation: impossibile chiudere file progetto
+- id: logger.failed_to_preserve_ownership
+  translation: impossibile preservare la proprietà per SourceDir
+- id: logger.failed_to_remove_package_directory
+  translation: impossibile rimuovere directory pacchetto
+- id: logger.fatal_error
+  translation: errore fatale
+- id: logger.finish.info.download_completed
+  translation: download completato
+- id: logger.finish.info.download_completed_1
+  translation: download completato
+- id: logger.generatepnggraph.info.svg_graph_generated_for
+  translation: grafico SVG generato per la conversione in PNG
+- id: logger.generatepnggraph.info.svg_graph_generated_for_1
+  translation: grafico SVG generato per la conversione in PNG
+- id: logger.generatepnggraph.warn.png_conversion_requires_external
+  translation: la conversione in PNG richiede strumenti esterni
+- id: logger.generatepnggraph.warn.png_conversion_requires_external_1
+  translation: la conversione in PNG richiede strumenti esterni
+- id: logger.generatesvggraph.error.failed_to_close_file
+  translation: impossibile chiudere il file
+- id: logger.generatesvggraph.error.failed_to_close_file_1
+  translation: impossibile chiudere il file
+- id: logger.generatesvggraph.info.svg_graph_generated_successfully
+  translation: grafico SVG generato con successo
+- id: logger.generatesvggraph.info.svg_graph_generated_successfully_1
+  translation: grafico SVG generato con successo
+- id: logger.generating_package
+  translation: generazione pacchetto
+- id: logger.getarchitecture.warn.unknown_architecture_falling_back
+  translation: architettura sconosciuta, uso GOARCH come fallback
+- id: logger.getarchitecture.warn.unknown_architecture_falling_back_1
+  translation: architettura sconosciuta, uso GOARCH come fallback
+- id: logger.getfiletype.debug.failed_to_get_file
+  translation: impossibile ottenere informazioni sul file
+- id: logger.getfiletype.debug.failed_to_get_file_1
+  translation: impossibile ottenere informazioni sul file
+- id: logger.getfiletype.debug.failed_to_open_file
+  translation: impossibile aprire il file per il rilevamento del tipo
+- id: logger.getfiletype.debug.failed_to_open_file_1
+  translation: impossibile aprire il file per il rilevamento del tipo
+- id: logger.getfiletype.warn.failed_to_close_file
+  translation: impossibile chiudere il file
+- id: logger.getfiletype.warn.failed_to_close_file_1
+  translation: impossibile chiudere il file
+- id: logger.getoriginaluser.warn.failed_to_lookup_sudo
+  translation: impossibile recuperare le informazioni utente sudo
+- id: logger.getoriginaluser.warn.failed_to_lookup_sudo_1
+  translation: impossibile recuperare le informazioni utente sudo
+- id: logger.gosetup.info.go_successfully_installed
+  translation: go installato correttamente
+- id: logger.gosetup.info.go_successfully_installed_1
+  translation: go installato correttamente
+- id: logger.installing_external_runtime_dependencies
+  translation: installazione dipendenze runtime esterne
+- id: logger.installing_package
+  translation: installazione pacchetto
+- id: logger.installing_runtime_dependency
+  translation: installazione dipendenza runtime
+- id: logger.installpackage.info.installing_package
+  translation: installazione pacchetto
+- id: logger.installpackage.info.installing_package_1
+  translation: installazione pacchetto
+- id: logger.installpackage.info.package_installed_successfully
+  translation: pacchetto installato con successo
+- id: logger.installpackage.info.package_installed_successfully_1
+  translation: pacchetto installato con successo
+- id: logger.integrity_check_for
+  translation: controllo integrità per
+- id: logger.internal_dependency
+  translation: dipendenza interna
+- id: logger.invalid_package_order
+  translation: ordine pacchetti non valido
+- id: logger.isstaticlibrary.warn.failed_to_close_file
+  translation: impossibile chiudere il file
+- id: logger.isstaticlibrary.warn.failed_to_close_file_1
+  translation: impossibile chiudere il file
+- id: logger.logdownloadstart.info.response_status
+  translation: "stato della risposta: "
+- id: logger.logdownloadstart.info.server_supports_resume
+  translation: il server supporta la ripresa del download
+- id: logger.logdownloadstart.info.server_supports_resume_1
+  translation: il server supporta la ripresa del download
+- id: logger.logpackagecreated.info.package_artifact_created
+  translation: artefatto del pacchetto creato
+- id: logger.logpackagecreated.info.package_artifact_created_1
+  translation: artefatto del pacchetto creato
+- id: logger.logpackagecreated.info.package_artifact_created_2
+  translation: artefatto del pacchetto creato
+- id: logger.logpackagecreated.info.package_artifact_created_3
+  translation: artefatto del pacchetto creato
+- id: logger.monitordownload.info.download_completed
+  translation: download completato
+- id: logger.monitordownload.info.download_completed_1
+  translation: download completato
+- id: logger.multi_project_file_found
+  translation: file multi-progetto trovato
+- id: logger.open.error.failed_to_open_file
+  translation: impossibile aprire il file
+- id: logger.open.error.failed_to_open_file_1
+  translation: impossibile aprire il file
+- id: logger.operation_completed
+  translation: operazione completata
+- id: logger.operation_failed
+  translation: operazione fallita
+- id: logger.operation_started
+  translation: operazione avviata
+- id: logger.package_declares_dependencies
+  translation: pacchetto dichiara dipendenze
+- id: logger.package_dependencies_found
+  translation: dipendenze pacchetto trovate
+- id: logger.package_information
+  translation: informazioni pacchetto
+- id: logger.package_installation_planned
+  translation: installazione del pacchetto pianificata
+- id: logger.package_installed
+  translation: pacchetto installato
+- id: logger.package_not_found
+  translation: pacchetto non trovato
+- id: logger.parsefile.error.failed_to_get_root
+  translation: impossibile ottenere la directory radice
+- id: logger.parsefile.error.failed_to_get_root_1
+  translation: impossibile ottenere la directory radice
+- id: logger.parseosrelease.warn.failed_to_close_osrelease
+  translation: impossibile chiudere il file os-release
+- id: logger.parseosrelease.warn.failed_to_close_osrelease_1
+  translation: impossibile chiudere il file os-release
+- id: logger.performing_topological_sort_for_build_order
+  translation: ordinamento topologico per ordine di compilazione
+- id: logger.preparing_sources
+  translation: preparazione sorgenti
+- id: logger.preserveownership.info.preserving_ownership_for_original
+  translation: preservazione della proprietà per l'utente originale
+- id: logger.preserveownership.info.preserving_ownership_for_original_1
+  translation: preservazione della proprietà per l'utente originale
+- id: logger.preserveownership.warn.failed_to_get_original
+  translation: impossibile ottenere informazioni sull'utente originale
+- id: logger.preserveownership.warn.failed_to_get_original_1
+  translation: impossibile ottenere informazioni sull'utente originale
+- id: logger.preserveownershiprecursive.info.preserving_ownership_recursively_for
+  translation: preservazione ricorsiva della proprietà per l'utente originale
+- id: logger.preserveownershiprecursive.info.preserving_ownership_recursively_for_1
+  translation: preservazione ricorsiva della proprietà per l'utente originale
+- id: logger.preserveownershiprecursive.warn.failed_to_get_original
+  translation: impossibile ottenere informazioni sull'utente originale
+- id: logger.preserveownershiprecursive.warn.failed_to_get_original_1
+  translation: impossibile ottenere informazioni sull'utente originale
+- id: logger.processing_build_batch
+  translation: elaborazione batch di compilazione
+- id: logger.project.batch_build_completed
+  translation: build in batch completato
+- id: logger.project.build_cache_stats
+  translation: statistiche cache di build
+- id: logger.project.build_order_determined
+  translation: ordine di build determinato
+- id: logger.project.builder_completed_for_package
+  translation: build completata per il pacchetto
+- id: logger.project.building_dependency_graph
+  translation: costruzione grafo delle dipendenze
+- id: logger.project.building_regular_packages
+  translation: costruzione pacchetti regolari
+- id: logger.project.building_runtime_dependency_batch
+  translation: costruzione batch dipendenze runtime
+- id: logger.project.found_from_package
+  translation: pacchetto iniziale trovato per il filtro --from
+- id: logger.project.found_to_package
+  translation: pacchetto finale trovato per il filtro --to
+- id: logger.project.installing_package
+  translation: installazione pacchetto
+- id: logger.project.installing_runtime_dependency
+  translation: installazione dipendenza runtime
+- id: logger.project.make_dependency_found
+  translation: dipendenza di build trovata
+- id: logger.project.package_build_finished
+  translation: build del pacchetto terminato
+- id: logger.project.package_build_skipped
+  translation: build del pacchetto saltato
+- id: logger.project.package_build_started
+  translation: build del pacchetto avviato
+- id: logger.project.package_installation_failed
+  translation: installazione del pacchetto fallita
+- id: logger.project.package_installed
+  translation: pacchetto installato
+- id: logger.shell.debug.exec_cmd
+  translation: esecuzione comando
+- id: logger.shell.debug.exec_sudo
+  translation: esecuzione comando con sudo
+- id: logger.shell.debug.exec_sudo_cmd
+  translation: esecuzione comando sudo
+- id: logger.project.parallel_build_workers
+  translation: worker di build paralleli
+- id: logger.project.runtime_dependencies_batching_complete
+  translation: raggruppamento dipendenze runtime completato
+- id: logger.project.runtime_dependencies_build_optimization
+  translation: ottimizzazione build dipendenze runtime
+- id: logger.project.runtime_dependency_batch_analysis
+  translation: analisi batch dipendenze runtime
+- id: logger.project.runtime_dependency_detected
+  translation: dipendenza runtime rilevata
+- id: logger.project.runtime_dependency_found
+  translation: dipendenza runtime trovata
+- id: logger.project.runtime_dependency_installation_failed
+  translation: installazione dipendenza runtime fallita
+- id: logger.project.runtime_dependency_installed
+  translation: dipendenza runtime installata
+- id: logger.project.runtime_dependency_map
+  translation: mappa dipendenze runtime
+- id: logger.project.skipping_batch_filtered_out
+  translation: batch saltato (filtrato)
+- id: logger.project.starting_dependencyaware_build_process
+  translation: avvio processo di build con consapevolezza delle dipendenze
+- id: logger.project.stopping_build_at_target_package
+  translation: interruzione build al pacchetto target
+- id: logger.pull.failed_to_pull
+  translation: impossibile scaricare immagine
+- id: logger.pull.specify_codename
+  translation:
+    tranne per alpine e arch, specifica anche il codename (es. rocky-9,
+    ubuntu-jammy)
+- id: logger.retrieving_sources
+  translation: recupero sorgenti
+- id: logger.rungraphcommand.info.generating_dependency_graph
+  translation: generazione grafo delle dipendenze
+- id: logger.rungraphcommand.info.generating_dependency_graph_1
+  translation: generazione grafo delle dipendenze
+- id: logger.runinstall.info.detected_package_type
+  translation: tipo di pacchetto rilevato
+- id: logger.runinstall.info.detected_package_type_1
+  translation: tipo di pacchetto rilevato
+- id: logger.runscriptwithpackage.debug.starting_script_execution
+  translation: avvio esecuzione script
+- id: logger.runscriptwithpackage.debug.starting_script_execution_1
+  translation: avvio esecuzione script
+- id: logger.runscriptwithpackage.error.script_execution_failed
+  translation: esecuzione script fallita
+- id: logger.runscriptwithpackage.error.script_execution_failed_1
+  translation: esecuzione script fallita
+- id: logger.runscriptwithpackage.error.script_execution_failed_2
+  translation: esecuzione script fallita
+- id: logger.runscriptwithpackage.error.script_execution_failed_3
+  translation: esecuzione script fallita
+- id: logger.runscriptwithpackage.info.executing_shell_script
+  translation: esecuzione script shell
+- id: logger.runscriptwithpackage.info.executing_shell_script_1
+  translation: esecuzione script shell
+- id: logger.runscriptwithpackage.info.executing_shell_script_2
+  translation: esecuzione script shell
+- id: logger.runscriptwithpackage.info.executing_shell_script_3
+  translation: esecuzione script shell
+- id: logger.runtime_dependency_batch_analysis
+  translation: analisi batch dipendenze runtime
+- id: logger.runtime_dependency_detected
+  translation: dipendenza runtime rilevata
+- id: logger.runtime_dependency_installation_failed
+  translation: installazione dipendenza runtime fallita
+- id: logger.runtime_dependency_installed
+  translation: dipendenza runtime installata
+- id: logger.runtime_dependency_map
+  translation: mappa dipendenze runtime
+- id: logger.setupccache.info.ccache_enabled_for_build_1
+  translation: ccache abilitato per build
+- id: logger.setupccache.info.ccache_not_found_skipping_1
+  translation: ccache non trovato, salto configurazione ccache per pacchetto
+- id: logger.setupccache.warn.ccache_setup_failed_1
+  translation: configurazione ccache fallita
+- id: logger.shell.info.exec_script
+  translation: "Esecuzione dello script per il pacchetto"
+- id: logger.setupccache.warn.failed_to_create_ccache_dir_1
+  translation: impossibile creare directory ccache
+- id: logger.setupenvironmentdependencies.info.go_detected_version_check
+  translation: "go rilevato: controllo versione disabilitato"
+- id: logger.setupenvironmentdependencies.info.go_detected_version_check_1
+  translation: "go rilevato: controllo versione disabilitato"
+- id: logger.setupenvironmentdependencies.warn.failed_to_setup_go
+  translation: impossibile configurare l'ambiente Go
+- id: logger.setupenvironmentdependencies.warn.failed_to_setup_go_1
+  translation: impossibile configurare l'ambiente Go
+- id: logger.single_project_file_found
+  translation: file singolo-progetto trovato
+- id: logger.skip_integrity_check_for
+  translation: salto controllo integrità per
+- id: logger.skipping_batch_filtered_out
+  translation: saltando batch (filtrato)
+- id: logger.starting_dependency_aware_build_process
+  translation: avvio processo di compilazione con consapevolezza delle dipendenze
+- id: logger.stopping_build_at_target_package
+  translation: fermando compilazione al pacchetto target
+- id: logger.stringifyarray.error.unable_to_parse_array
+  translation: impossibile analizzare l'elemento dell'array
+- id: logger.stringifyarray.error.unable_to_parse_array_1
+  translation: impossibile analizzare l'elemento dell'array
+- id: logger.stringifyfuncdecl.error.unable_to_parse_function
+  translation: impossibile analizzare la funzione
+- id: logger.stringifyfuncdecl.error.unable_to_parse_function_1
+  translation: impossibile analizzare la funzione
+- id: logger.strip.info.stripping_binaries
+  translation: rimozione simboli dai binari
+- id: logger.strip.info.stripping_binaries_1
+  translation: rimozione simboli dai binari
+- id: logger.tips.use_help
+  translation: 💡 Usa '%s --help' per vedere le opzioni disponibili
+- id: logger.tips.use_verbose
+  translation: 💡 Usa --verbose per vedere la lista completa
+- id: logger.tryhardlink.warn.failed_to_copy_file
+  translation: impossibile copiare i permessi del file
+- id: logger.tryhardlink.warn.failed_to_copy_file_1
+  translation: impossibile copiare i permessi del file
+- id: logger.unknown.debug.command_execution_completed
+  translation: esecuzione comando completata
+- id: logger.unknown.debug.command_execution_completed_1
+  translation: esecuzione comando completata
+- id: logger.unknown.debug.skipping_extraction_file_exists
+  translation: estrazione saltata, file esistente con stessa dimensione
+- id: logger.unknown.debug.skipping_extraction_file_exists_1
+  translation: estrazione saltata, file esistente con stessa dimensione
+- id: logger.unknown.error.command_execution_failed
+  translation: esecuzione comando fallita
+- id: logger.unknown.error.command_execution_failed_1
+  translation: esecuzione comando fallita
+- id: logger.unknown.info.basic_build_environment_successfully
+  translation: ambiente di build base preparato con successo
+- id: logger.unknown.info.basic_build_environment_successfully_1
+  translation: ambiente di build base preparato con successo
+- id: logger.unknown.info.go_successfully_installed
+  translation: go installato con successo
+- id: logger.unknown.info.go_successfully_installed_1
+  translation: go installato con successo
+- id: logger.unknown.info.package_artifact_created
+  translation: artefatto del pacchetto creato
+- id: logger.unknown.info.package_artifact_created_1
+  translation: artefatto del pacchetto creato
+- id: logger.unknown.info.package_artifact_created_2
+  translation: artefatto del pacchetto creato
+- id: logger.unknown.info.package_artifact_created_3
+  translation: artefatto del pacchetto creato
+- id: logger.unknown.info.shell_script_execution_completed
+  translation: esecuzione script shell completata con successo
+- id: logger.unknown.info.shell_script_execution_completed_1
+  translation: esecuzione script shell completata con successo
+- id: logger.unknown.info.shell_script_execution_completed_2
+  translation: esecuzione script shell completata con successo
+- id: logger.unknown.info.shell_script_execution_completed_3
+  translation: esecuzione script shell completata con successo
+- id: logger.unknown.warn.failed_to_close_archive
+  translation: impossibile chiudere il file archivio
+- id: logger.unknown.warn.failed_to_close_archive_1
+  translation: impossibile chiudere il file archivio
+- id: logger.unknown.warn.failed_to_close_new
+  translation: impossibile chiudere il nuovo file
+- id: logger.unknown.warn.failed_to_close_new_1
+  translation: impossibile chiudere il nuovo file
+- id: logger.unknown.warn.failed_to_close_rpm
+  translation: impossibile chiudere il file RPM
+- id: logger.unknown.warn.failed_to_close_rpm_1
+  translation: impossibile chiudere il file RPM
+- id: logger.validategeneral.error.invalid_spdx_license_identifier
+  translation: identificatore licenza SPDX non valido
+- id: logger.validategeneral.error.invalid_spdx_license_identifier_1
+  translation: identificatore licenza SPDX non valido
+- id: logger.validategeneral.error.missing_package_function
+  translation: funzione package() mancante
+- id: logger.validategeneral.error.missing_package_function_1
+  translation: funzione package() mancante
+- id: logger.validategeneral.error.number_of_sources_and
+  translation: numero di sorgenti e checksum non corrispondente
+- id: logger.validategeneral.error.number_of_sources_and_1
+  translation: numero di sorgenti e checksum non corrispondente
+- id: logger.validategeneral.info.you_can_find_valid
+  translation: puoi trovare identificatori SPDX validi qui
+- id: logger.validategeneral.info.you_can_find_valid_1
+  translation: puoi trovare identificatori SPDX validi qui
+- id: logger.withresume.info.retrying_download
+  translation: nuovo tentativo di download
+- id: logger.withresume.info.retrying_download_1
+  translation: nuovo tentativo di download
+- id: logger.withresumecontext.info.retrying_download
+  translation: nuovo tentativo di download
+- id: logger.withresumecontext.info.retrying_download_1
+  translation: nuovo tentativo di download
+- id: logger.zap.cleaning_for_distribution
+  translation: Pulizia per distribuzione
+- id: logger.zap.done
+  translation: zap completato.
+- id: logger.zap.fatal_error
+  translation: errore fatale
+- id: logger.zap.no_distribution_specified
+  translation: Nessuna distribuzione specificata, uso quella rilevata
+- id: logger.zap.project_path
+  translation: Percorso progetto
+- id: messages.verbose_mode_enabled
+  translation: modalità verbosa abilitata
+- id: root.examples
+  translation:
+    "# Costruisci tutti i pacchetti nella directory corrente per la tua
+    distro
+
+    yap build .
+
+
+    # Costruisci per distribuzione e rilascio specifici
+
+    yap build ubuntu-jammy /percorso/al/progetto
+
+
+    # Genera visualizzazione grafico delle dipendenze
+
+    yap graph --output docs/dependencies.svg .
+
+
+    # Installa un artefatto di pacchetto
+
+    yap install /percorso/al/pacchetto.deb
+
+
+    # Prepara ambiente di build per Rocky Linux 9
+
+    yap prepare rocky-9
+
+
+    # Pulisci artefatti di build
+
+    yap zap ubuntu-jammy /percorso/al/progetto
+
+
+    # Elenca tutte le distribuzioni supportate
+
+    yap list-distros
+
+    "
+- id: root.short
+  translation: 🚀 Yet Another Packager - Costruttore di pacchetti multi-distribuzione

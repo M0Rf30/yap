@@ -1,0 +1,305 @@
+pkgname="main-application"
+pkgver="1.5.0"
+pkgrel="1"
+pkgdesc="Main web application combining web framework, database client, and foundation libraries"
+arch=('x86_64')
+license=('MIT')
+maintainer="YAP Team <maintainer@yap.dev>"
+url="https://github.com/example/main-application"
+
+# Runtime dependencies on web-framework, database-client, and foundation-lib
+depends=('web-framework' 'database-client' 'foundation-lib')
+
+build() {
+  # Create local headers for build-time (since we can't access installed headers)
+  cat > foundation.h << 'EOF'
+#ifndef FOUNDATION_H
+#define FOUNDATION_H
+#include <stddef.h>
+#define FOUNDATION_VERSION "1.0.0"
+void foundation_init();
+void foundation_log(const char* level, const char* message);
+void* foundation_malloc(size_t size);
+void foundation_free(void* ptr);
+int foundation_string_compare(const char* str1, const char* str2);
+#endif
+EOF
+
+  cat > webframework.h << 'EOF'
+#ifndef WEBFRAMEWORK_H
+#define WEBFRAMEWORK_H
+#define WEBFRAMEWORK_VERSION "3.1.0"
+typedef struct http_request_t http_request_t;
+typedef struct http_response_t http_response_t;
+void webframework_init();
+http_request_t* webframework_parse_request(const char* raw_request);
+http_response_t* webframework_create_response(int status_code, const char* content_type, const char* body);
+int webframework_start_server(int port);
+void webframework_free_request(http_request_t* request);
+void webframework_free_response(http_response_t* response);
+#endif
+EOF
+
+  cat > database.h << 'EOF'
+#ifndef DATABASE_H
+#define DATABASE_H
+#define DATABASE_VERSION "2.0.0"
+typedef struct db_connection_t db_connection_t;
+void database_init();
+db_connection_t* database_connect(const char* host, int port, const char* database);
+int database_execute_query(db_connection_t* conn, const char* query);
+void database_disconnect(db_connection_t* conn);
+#endif
+EOF
+
+  # Create main application
+  cat > main_application.c << 'EOF'
+#include "foundation.h"
+#include "webframework.h"
+#include "database.h"
+#include <stdio.h>
+#include <string.h>
+#include <signal.h>
+#include <unistd.h>
+
+// Application state
+static db_connection_t* db_conn = NULL;
+static int server_running = 0;
+
+// Signal handler for graceful shutdown
+void signal_handler(int sig) {
+    foundation_log("INFO", "Received shutdown signal");
+    server_running = 0;
+}
+
+// Initialize all application components
+int app_init() {
+    foundation_log("INFO", "Initializing main application v1.5.0");
+    
+    // Initialize foundation library
+    foundation_init();
+    
+    // Initialize web framework
+    webframework_init();
+    
+    // Initialize database client
+    database_init();
+    
+    // Connect to database
+    db_conn = database_connect("localhost", 5432, "application_db");
+    if (!db_conn) {
+        foundation_log("ERROR", "Failed to connect to database");
+        return -1;
+    }
+    
+    // Setup database schema
+    int result = database_execute_query(db_conn, 
+        "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(255), email VARCHAR(255))");
+    if (result < 0) {
+        foundation_log("WARN", "Failed to create database schema");
+    }
+    
+    foundation_log("INFO", "Application initialized successfully");
+    return 0;
+}
+
+// Handle web requests
+void handle_request(const char* method, const char* path) {
+    foundation_log("DEBUG", "Handling web request");
+    
+    if (foundation_string_compare(path, "/") == 0) {
+        foundation_log("INFO", "Serving homepage");
+    } else if (foundation_string_compare(path, "/users") == 0) {
+        foundation_log("INFO", "Serving users endpoint");
+        
+        if (db_conn) {
+            int user_count = database_execute_query(db_conn, "SELECT COUNT(*) FROM users");
+            if (user_count >= 0) {
+                foundation_log("INFO", "User count retrieved from database");
+            }
+        }
+    } else if (foundation_string_compare(path, "/health") == 0) {
+        foundation_log("INFO", "Health check endpoint");
+    } else {
+        foundation_log("WARN", "Unknown endpoint requested");
+    }
+}
+
+// Main application loop
+int main() {
+    // Initialize application
+    if (app_init() != 0) {
+        foundation_log("ERROR", "Application initialization failed");
+        return 1;
+    }
+    
+    // Setup signal handlers
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+    
+    // Start web server
+    foundation_log("INFO", "Starting main application server");
+    webframework_start_server(8080);
+    server_running = 1;
+    
+    // Simulate request handling
+    foundation_log("INFO", "Application is running - handling requests");
+    int request_count = 0;
+    
+    while (server_running && request_count < 5) {
+        // Simulate incoming requests
+        if (request_count == 0) {
+            handle_request("GET", "/");
+        } else if (request_count == 1) {
+            handle_request("GET", "/users");
+        } else if (request_count == 2) {
+            handle_request("POST", "/users");
+        } else if (request_count == 3) {
+            handle_request("GET", "/health");
+        } else {
+            handle_request("GET", "/unknown");
+        }
+        
+        request_count++;
+        sleep(1); // Simulate time between requests
+    }
+    
+    // Cleanup
+    foundation_log("INFO", "Shutting down application");
+    if (db_conn) {
+        database_disconnect(db_conn);
+    }
+    
+    foundation_log("INFO", "Application shutdown complete");
+    return 0;
+}
+EOF
+
+  # Create application configuration
+  cat > app_config.json << 'EOF'
+{
+  "application": {
+    "name": "main-application",
+    "version": "1.5.0",
+    "environment": "production"
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "workers": 4
+  },
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "application_db",
+    "pool_size": 10
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "/var/log/main-application.log"
+  }
+}
+EOF
+
+  # Compile the application
+  gcc -o main_application main_application.c
+}
+
+package() {
+  # Install main application binary
+  install -Dm755 main_application "$pkgdir/usr/bin/main-application"
+  
+  # Install configuration
+  install -Dm644 app_config.json "$pkgdir/etc/main-application/config.json"
+  
+  # Install systemd service
+  mkdir -p "$pkgdir/lib/systemd/system"
+  cat > "$pkgdir/lib/systemd/system/main-application.service" << 'EOF'
+[Unit]
+Description=Main Application Web Server
+After=network.target database.service
+Requires=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/main-application
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+User=app
+Group=app
+WorkingDirectory=/var/lib/main-application
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/main-application /var/log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Install log rotation configuration
+  mkdir -p "$pkgdir/etc/logrotate.d"
+  cat > "$pkgdir/etc/logrotate.d/main-application" << 'EOF'
+/var/log/main-application.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 0644 app app
+    postrotate
+        systemctl reload main-application >/dev/null 2>&1 || true
+    endscript
+}
+EOF
+
+  # Create application directories
+  mkdir -p "$pkgdir/var/lib/main-application"
+  mkdir -p "$pkgdir/var/log"
+  
+  # Install documentation
+  mkdir -p "$pkgdir/usr/share/doc/main-application"
+  cat > "$pkgdir/usr/share/doc/main-application/README.md" << 'EOF'
+# Main Application
+
+This is the main web application that demonstrates the integration of:
+
+- Foundation Library (core utilities)
+- Web Framework (HTTP server and routing)
+- Database Client (connection pooling and queries)
+
+## Usage
+
+Start the service:
+```bash
+sudo systemctl start main-application
+sudo systemctl enable main-application
+```
+
+Check status:
+```bash
+sudo systemctl status main-application
+```
+
+View logs:
+```bash
+journalctl -u main-application -f
+```
+
+## Configuration
+
+Edit `/etc/main-application/config.json` to customize settings.
+
+## Dependencies
+
+This application requires:
+- foundation-lib (core utilities)
+- web-framework (HTTP server)
+- database-client (database connectivity)
+EOF
+}

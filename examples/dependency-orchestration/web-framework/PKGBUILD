@@ -1,0 +1,212 @@
+pkgname="web-framework"
+pkgver="3.1.0"
+pkgrel="1"
+pkgdesc="Modern web framework providing HTTP server, routing, and template engine"
+arch=('x86_64')
+license=('BSD-3-Clause')
+maintainer="YAP Team <maintainer@yap.dev>"
+url="https://github.com/example/web-framework"
+
+# Runtime dependency on foundation library
+depends=('foundation-lib')
+
+# Build dependencies for compilation
+makedepends=('gcc' 'make')
+
+# Check dependencies for testing
+checkdepends=('valgrind' 'cppcheck')
+
+# Optional dependencies for enhanced features
+optdepends=('compression-lib: for gzip compression support'
+           'ssl-lib: for HTTPS support')
+
+build() {
+  # Create local foundation.h for build-time
+  cat > foundation.h << 'EOF'
+#ifndef FOUNDATION_H
+#define FOUNDATION_H
+#include <stddef.h>
+#define FOUNDATION_VERSION "1.0.0"
+void foundation_init();
+void foundation_log(const char* level, const char* message);
+void* foundation_malloc(size_t size);
+void foundation_free(void* ptr);
+int foundation_string_compare(const char* str1, const char* str2);
+#endif
+EOF
+
+  # Create web framework implementation
+  cat > webframework.c << 'EOF'
+#include "foundation.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+typedef struct {
+    char* method;
+    char* path;
+    char* body;
+} http_request_t;
+
+typedef struct {
+    int status_code;
+    char* content_type;
+    char* body;
+} http_response_t;
+
+// Web framework functions
+void webframework_init() {
+    foundation_init();
+    foundation_log("INFO", "Web framework initialized");
+}
+
+http_request_t* webframework_parse_request(const char* raw_request) {
+    foundation_log("DEBUG", "Parsing HTTP request");
+    
+    http_request_t* request = (http_request_t*)foundation_malloc(sizeof(http_request_t));
+    if (!request) {
+        foundation_log("ERROR", "Failed to allocate request");
+        return NULL;
+    }
+    
+    // Simplified request parsing
+    request->method = (char*)foundation_malloc(8);
+    strcpy(request->method, "GET");
+    request->path = (char*)foundation_malloc(256);
+    strcpy(request->path, "/");
+    request->body = NULL;
+    
+    foundation_log("DEBUG", "HTTP request parsed successfully");
+    return request;
+}
+
+http_response_t* webframework_create_response(int status_code, const char* content_type, const char* body) {
+    foundation_log("DEBUG", "Creating HTTP response");
+    
+    http_response_t* response = (http_response_t*)foundation_malloc(sizeof(http_response_t));
+    if (!response) {
+        foundation_log("ERROR", "Failed to allocate response");
+        return NULL;
+    }
+    
+    response->status_code = status_code;
+    response->content_type = (char*)foundation_malloc(strlen(content_type) + 1);
+    strcpy(response->content_type, content_type);
+    response->body = (char*)foundation_malloc(strlen(body) + 1);
+    strcpy(response->body, body);
+    
+    foundation_log("DEBUG", "HTTP response created successfully");
+    return response;
+}
+
+int webframework_start_server(int port) {
+    foundation_log("INFO", "Starting web server");
+    char port_str[16];
+    sprintf(port_str, "Port: %d", port);
+    foundation_log("INFO", port_str);
+    return 1; // Success
+}
+
+void webframework_free_request(http_request_t* request) {
+    if (request) {
+        if (request->method) foundation_free(request->method);
+        if (request->path) foundation_free(request->path);
+        if (request->body) foundation_free(request->body);
+        foundation_free(request);
+    }
+}
+
+void webframework_free_response(http_response_t* response) {
+    if (response) {
+        if (response->content_type) foundation_free(response->content_type);
+        if (response->body) foundation_free(response->body);
+        foundation_free(response);
+    }
+}
+EOF
+
+  # Create header file
+  cat > webframework.h << 'EOF'
+#ifndef WEBFRAMEWORK_H
+#define WEBFRAMEWORK_H
+
+// Web framework version
+#define WEBFRAMEWORK_VERSION "3.1.0"
+
+// Forward declarations
+typedef struct http_request_t http_request_t;
+typedef struct http_response_t http_response_t;
+
+// Function declarations
+void webframework_init();
+http_request_t* webframework_parse_request(const char* raw_request);
+http_response_t* webframework_create_response(int status_code, const char* content_type, const char* body);
+int webframework_start_server(int port);
+void webframework_free_request(http_request_t* request);
+void webframework_free_response(http_response_t* response);
+
+#endif // WEBFRAMEWORK_H
+EOF
+
+  # Compile as shared library
+  gcc -fPIC -shared -o libwebframework.so.3.1.0 webframework.c
+  
+  # Create symlinks
+  rm -f libwebframework.so.3 libwebframework.so
+  ln -s libwebframework.so.3.1.0 libwebframework.so.3
+  ln -s libwebframework.so.3 libwebframework.so
+}
+
+package() {
+  # Install shared library
+  install -Dm755 libwebframework.so.3.1.0 "$pkgdir/usr/lib/libwebframework.so.3.1.0"
+  ln -s libwebframework.so.3.1.0 "$pkgdir/usr/lib/libwebframework.so.3"
+  ln -s libwebframework.so.3 "$pkgdir/usr/lib/libwebframework.so"
+  
+  # Install header files
+  install -Dm644 webframework.h "$pkgdir/usr/include/webframework.h"
+  
+  # Install web templates and static files
+  mkdir -p "$pkgdir/usr/share/web-framework/templates"
+  cat > "$pkgdir/usr/share/web-framework/templates/index.html" << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Framework Example</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #333; }
+        .info { background: #f0f0f0; padding: 20px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Web Framework v3.1.0</h1>
+    <div class="info">
+        <p>This is a sample web application powered by the web-framework package.</p>
+        <p>The framework provides HTTP server capabilities, request routing, and template rendering.</p>
+    </div>
+</body>
+</html>
+EOF
+
+  # Install framework configuration
+  mkdir -p "$pkgdir/etc/web-framework"
+  cat > "$pkgdir/etc/web-framework/server.conf" << 'EOF'
+# Web Framework Configuration
+[server]
+host=0.0.0.0
+port=8080
+workers=4
+max_connections=1000
+
+[security]
+csrf_protection=true
+xss_protection=true
+content_security_policy=default-src 'self'
+
+[templates]
+directory=/usr/share/web-framework/templates
+cache_enabled=true
+auto_reload=false
+EOF
+}
