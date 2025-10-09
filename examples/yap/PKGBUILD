@@ -1,5 +1,5 @@
 pkgname=yap
-pkgver=1.46
+pkgver=2.0.0
 pkgrel=1
 pkgdesc="Package software with ease"
 pkgdesc__alpine="Package software with ease for Alpine"
@@ -38,9 +38,14 @@ build() {
     go build \
     -buildvcs=false \
     -ldflags "-w -s" \
-    cmd/yap/yap.go
+    -o "${pkgname}" \
+    ./cmd/yap
 
-  upx "${pkgname}"
+  upx \
+    --best \
+    --lzma \
+    --force-overwrite \
+    "${pkgname}"
 }
 
 package() {

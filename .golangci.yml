@@ -1,8 +1,42 @@
 version: "2"
+
+run:
+  timeout: 10m
+  issues-exit-code: 1
+  tests: true
+
 linters:
-  default: all
   enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosec
+    - errorlint
+    - nilerr
+    - asciicheck
+    - bodyclose
+    - copyloopvar
+    - durationcheck
+    - gochecknoinits
+    - misspell
+    - nakedret
+    - revive
+    - unconvert
+    - unparam
+    - wastedassign
+    - whitespace
+    - predeclared
+    - cyclop
+    - gocyclo
+    - goconst
+    - gocritic
+    - dupl
+    - nestif
+    - lll
     - wsl_v5
+
   disable:
     - depguard
     - exhaustruct
@@ -10,67 +44,192 @@ linters:
     - forcetypeassert
     - funlen
     - gochecknoglobals
-    - gochecknoinits
     - gomoddirectives
-    - ireturn
     - mnd
     - wrapcheck
-    - wsl
+
   settings:
     cyclop:
       max-complexity: 15
+
     dupl:
-      threshold: 100
-    funlen:
-      lines: -1
-      statements: 50
+      threshold: 80
+
     goconst:
-      min-len: 2
+      min-len: 3
       min-occurrences: 3
+
     gocritic:
-      disabled-checks:
-        - dupImport
-        - ifElseChain
-        - octalLiteral
-        - whyNoLint
-        - unnamedResult
       enabled-tags:
         - diagnostic
-        - experimental
-        - opinionated
         - performance
         - style
-    wsl_v5:
-      allow-first-in-block: true
-      allow-whole-block: false
-      branch-max-lines: 2
+      disabled-checks:
+        - paramTypeCombine
+        - whyNoLint
+
+    gocyclo:
+      min-complexity: 15
+
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        - G204
+        - G301
+        - G302
+
+    lll:
+      line-length: 100
+
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: exported
+        - name: increment-decrement
+        - name: var-naming
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+
+    staticcheck:
+      checks:
+        - all
+
   exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+    generated: strict
+
+    rules:
+      - path: "pkg/builders/common/"
+        text: "avoid meaningless package names"
+        linters:
+          - revive
+
+      - path: "(docs|dist|bin|examples)/"
+        linters:
+          - gosec
+          - govet
+          - staticcheck
+          - unused
+          - errcheck
+          - ineffassign
+          - revive
+          - gocritic
+          - dupl
+          - goconst
+          - cyclop
+          - gocyclo
+          - lll
+          - nestif
+          - asciicheck
+          - bodyclose
+          - copyloopvar
+          - durationcheck
+          - gochecknoinits
+          - misspell
+          - nakedret
+          - unconvert
+          - unparam
+          - wastedassign
+          - whitespace
+          - predeclared
+          - errorlint
+          - nilerr
+
+      - path: ".*\\.pb\\.go$"
+        linters:
+          - gosec
+          - govet
+          - staticcheck
+          - unused
+          - errcheck
+          - ineffassign
+          - revive
+          - gocritic
+          - dupl
+          - goconst
+          - cyclop
+          - gocyclo
+          - lll
+          - nestif
+          - asciicheck
+          - bodyclose
+          - copyloopvar
+          - durationcheck
+          - gochecknoinits
+          - misspell
+          - nakedret
+          - unconvert
+          - unparam
+          - wastedassign
+          - whitespace
+          - predeclared
+          - errorlint
+          - nilerr
+
+      - path: ".*_generated\\.go$"
+        linters:
+          - gosec
+          - govet
+          - staticcheck
+          - unused
+          - errcheck
+          - ineffassign
+          - revive
+          - gocritic
+          - dupl
+          - goconst
+          - cyclop
+          - gocyclo
+          - lll
+          - nestif
+          - asciicheck
+          - bodyclose
+          - copyloopvar
+          - durationcheck
+          - gochecknoinits
+          - misspell
+          - nakedret
+          - unconvert
+          - unparam
+          - wastedassign
+          - whitespace
+          - predeclared
+          - errorlint
+          - nilerr
+
+      - path: "_test\\.go"
+        linters:
+          - gosec
+          - dupl
+          - goconst
+          - lll
+          - cyclop
+          - gocyclo
+
+      - path: "_test\\.go"
+        text: "G30[12]:"
+        linters:
+          - gosec
+
 formatters:
   enable:
-    - gci
-    - gofmt
     - goimports
+
   settings:
-    gofmt:
-      rewrite-rules:
-        - pattern: interface{}
-          replacement: any
     goimports:
       local-prefixes:
-        - github.com/golangci/golangci-lint
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+        - github.com/M0Rf30/yap
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
