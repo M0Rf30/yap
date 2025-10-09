@@ -1,4 +1,15 @@
+// Package set provides generic set data structure implementation and string utilities.
 package set
+
+import (
+	"slices"
+	"strings"
+
+	"mvdan.cc/sh/v3/syntax"
+
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
+)
 
 var exists = struct{}{}
 
@@ -59,4 +70,82 @@ func (s *Set) Iter() <-chan string {
 // value: the value to be removed from the set.
 func (s *Set) Remove(value string) {
 	delete(s.m, value)
+}
+
+// Contains checks if a string is present in an array of strings.
+func Contains(array []string, str string) bool {
+	return slices.Contains(array, str)
+}
+
+// StringifyArray generates a string representation of an array in the given syntax.
+//
+// node: A pointer to the syntax.Assign node representing the array.
+// []string: An array of strings representing the stringified elements of the array.
+func StringifyArray(node *syntax.Assign) []string {
+	var fields []string
+
+	printer := syntax.NewPrinter(syntax.Indent(2))
+	out := &strings.Builder{}
+
+	if len(node.Array.Elems) == 0 {
+		logger.Fatal(i18n.T("errors.set.empty_array"),
+			"path", node.Name.Value)
+	}
+
+	for index := range node.Array.Elems {
+		err := printer.Print(out, node.Array.Elems[index].Value)
+		if err != nil {
+			logger.Error(i18n.T("logger.stringifyarray.error.unable_to_parse_array_1"),
+				"path", out.String())
+		}
+
+		out.WriteString(" ")
+		fields = append(fields, out.String())
+	}
+
+	return fields
+}
+
+// StringifyAssign returns a string representation of the given *syntax.Assign node.
+//
+// It takes a pointer to a *syntax.Assign node as its parameter.
+// It returns a string.
+func StringifyAssign(node *syntax.Assign) string {
+	out := &strings.Builder{}
+	printer := syntax.NewPrinter(syntax.Indent(2))
+
+	if node.Value == nil {
+		logger.Fatal(i18n.T("errors.set.empty_variable"),
+			"path", node.Name.Value)
+	}
+
+	err := printer.Print(out, node.Value)
+	if err != nil {
+		return ""
+	}
+
+	return strings.Trim(out.String(), "\"")
+}
+
+// StringifyFuncDecl converts a syntax.FuncDecl node to a string representation.
+//
+// It takes a pointer to a syntax.FuncDecl node as a parameter and returns a string.
+func StringifyFuncDecl(node *syntax.FuncDecl) string {
+	out := &strings.Builder{}
+	printer := syntax.NewPrinter(syntax.Indent(2))
+
+	err := printer.Print(out, node.Body)
+	if err != nil {
+		logger.Error(i18n.T("logger.stringifyfuncdecl.error.unable_to_parse_function_1"),
+			"path", out.String())
+	}
+
+	funcDecl := strings.Trim(out.String(), "{\n}")
+
+	if funcDecl == "" {
+		logger.Fatal(i18n.T("errors.set.empty_function"),
+			"path", node.Name.Value)
+	}
+
+	return funcDecl
 }

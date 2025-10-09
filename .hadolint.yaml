@@ -1,9 +1,0 @@
-# Following source doesn't work in most setups
-ignored:
-  - DL3007
-  - DL3008
-  - DL3018
-  - DL3033
-  - DL3036
-  - DL3037
-  - DL3041

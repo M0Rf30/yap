@@ -8,3 +8,9 @@ line_length: false
 spaces: false
 url: false
 whitespace: false
+
+# Disable problematic rules for existing content
+MD024: false  # no-duplicate-heading - Allow duplicate headings
+MD029: false  # ol-prefix - Allow flexible ordered list numbering  
+MD040: false  # fenced-code-language - Allow code blocks without language
+MD041: false  # first-line-heading - Don't require H1 as first line

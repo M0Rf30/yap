@@ -1,0 +1,24 @@
+# Maintainer: YAP Example <example@yap.org>
+pkgname=package-a
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Package A with circular dependency on Package B"
+arch=('x86_64')
+license=('MIT')
+depends=('package-b')
+source=('package-a.c')
+sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir"
+    gcc -fPIC -shared package-a.c -o libpackage-a.so.1.0.0
+    ln -sf libpackage-a.so.1.0.0 libpackage-a.so.1
+    ln -sf libpackage-a.so.1 libpackage-a.so
+}
+
+package() {
+    cd "$srcdir"
+    install -Dm755 libpackage-a.so.1.0.0 "$pkgdir/usr/lib/libpackage-a.so.1.0.0"
+    install -Dm755 libpackage-a.so.1 "$pkgdir/usr/lib/libpackage-a.so.1"
+    install -Dm755 libpackage-a.so "$pkgdir/usr/lib/libpackage-a.so"
+}

@@ -1,3 +1,4 @@
+// Package source provides source file download and management functionality.
 package source
 
 import (
@@ -9,21 +10,40 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
-	"github.com/M0Rf30/yap/pkg/constants"
-	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/pkg/errors"
+
+	"github.com/M0Rf30/yap/v2/pkg/archive"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/download"
+	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/git"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
+const (
+	fileProtocol = "file"
+)
+
+// Legacy global variables for backward compatibility - to be deprecated
 var (
+	// SSHPassword contains the SSH password for authentication.
 	SSHPassword string
+	// downloadMutexes tracks ongoing downloads to prevent duplicate downloads.
+	downloadMutexes  = make(map[string]*sync.Mutex)
+	downloadMapMutex = sync.Mutex{}
 )
 
 // Source defines all the fields accepted by a source item.
 type Source struct {
 	// Hash is the integrity hashsum for a source item
 	Hash string
+	// PkgName is the package name for component logging
+	PkgName string
 	// RefKey is the reference name for a VCS fragment (branch, tag) declared in the
 	// URI. i.e: "myfile::git+https://example.com/example.git#branch=example"
 	RefKey string
@@ -31,6 +51,7 @@ type Source struct {
 	// myfile::git+https://example.com/example.git#branch=refvalue
 	RefValue string
 	// SSHPassword is used to store the password for SSH authentication.
+	// SSHPassword contains the SSH password for authentication.
 	SSHPassword string
 	// SourceItemPath is the absolute path to a source item (folder or file)
 	SourceItemPath string
@@ -62,16 +83,33 @@ func (src *Source) Get() error {
 	switch sourceType {
 	case "http", "https", "ftp", constants.Git:
 		var err error
-		if !osutils.Exists(sourceFilePath) {
+
+		// Use mutex to prevent duplicate downloads of the same file
+		downloadMapMutex.Lock()
+
+		mutex, exists := downloadMutexes[sourceFilePath]
+		if !exists {
+			mutex = &sync.Mutex{}
+			downloadMutexes[sourceFilePath] = mutex
+		}
+
+		downloadMapMutex.Unlock()
+
+		// Lock this specific file's download
+		mutex.Lock()
+		defer mutex.Unlock()
+
+		// Check again after acquiring the lock (double-checked locking pattern)
+		if !files.Exists(sourceFilePath) {
 			err = src.getURL(sourceType, sourceFilePath, SSHPassword)
 		}
 
 		if err != nil {
 			return err
 		}
-	case "file":
+	case fileProtocol:
 	default:
-		return errors.Errorf("unsupported source type")
+		return errors.Errorf("%s", i18n.T("errors.source.unsupported_source_type"))
 	}
 
 	err := src.validateSource(sourceFilePath)
@@ -84,7 +122,7 @@ func (src *Source) Get() error {
 		return err
 	}
 
-	err = osutils.Unarchive(sourceFilePath, src.SrcDir)
+	err = archive.Extract(sourceFilePath, src.SrcDir)
 	if err != nil {
 		return err
 	}
@@ -110,7 +148,7 @@ func (src *Source) getReferenceType() plumbing.ReferenceName {
 // getProtocol returns the protocol of the source item URI.
 func (src *Source) getProtocol() string {
 	if !strings.Contains(src.SourceItemURI, "://") {
-		return "file"
+		return fileProtocol
 	}
 
 	switch {
@@ -138,9 +176,21 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 	case constants.Git:
 		referenceName := src.getReferenceType()
 
-		return osutils.GitClone(dloadFilePath, normalizedURI, sshPassword, referenceName)
+		return git.Clone(dloadFilePath, normalizedURI, sshPassword, referenceName)
 	default:
-		return osutils.Download(dloadFilePath, normalizedURI)
+		// Use enhanced download with resume capability and 3 retries, with context information
+		_, err := shell.MultiPrinter.Start()
+		if err != nil {
+			return err
+		}
+
+		return download.WithResumeContext(
+			dloadFilePath,
+			normalizedURI,
+			3,
+			src.PkgName,
+			src.SourceItemPath,
+			shell.MultiPrinter.Writer)
 	}
 }
 
@@ -150,7 +200,7 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 // No parameters.
 // No return types.
 func (src *Source) parseURI() {
-	src.SourceItemPath = osutils.Filename(src.SourceItemURI)
+	src.SourceItemPath = filepath.Base(src.SourceItemURI)
 
 	if strings.Contains(src.SourceItemURI, "::") {
 		split := strings.SplitN(src.SourceItemURI, "::", 2)
@@ -165,6 +215,11 @@ func (src *Source) parseURI() {
 		splitFragment := strings.SplitN(fragment, "=", 2)
 		src.RefKey = splitFragment[0]
 		src.RefValue = splitFragment[1]
+
+		// Update SourceItemPath to remove the fragment only if no custom name was used
+		if src.SourceItemPath == filepath.Base(split[0]+"#"+fragment) {
+			src.SourceItemPath = filepath.Base(src.SourceItemURI)
+		}
 	}
 }
 
@@ -173,11 +228,19 @@ func (src *Source) parseURI() {
 // It returns an error if the symlink creation fails.
 func (src *Source) symlinkSources(symlinkSource string) error {
 	symlinkTarget := filepath.Join(src.SrcDir, src.SourceItemPath)
-	if !osutils.Exists(symlinkTarget) {
-		return os.Symlink(symlinkSource, symlinkTarget)
+
+	// Check if target already exists and points to the correct source
+	if linkTarget, err := os.Readlink(symlinkTarget); err == nil {
+		if linkTarget == symlinkSource {
+			return nil // Already correctly linked
+		}
+		// Remove existing incorrect symlink
+		if err := os.Remove(symlinkTarget); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return os.Symlink(symlinkSource, symlinkTarget)
 }
 
 // validateSource checks the integrity of the source files.
@@ -186,11 +249,28 @@ func (src *Source) symlinkSources(symlinkSource string) error {
 func (src *Source) validateSource(sourceFilePath string) error {
 	info, err := os.Stat(sourceFilePath)
 	if err != nil {
-		return errors.Errorf("failed to open file for hash %s", sourceFilePath)
+		return errors.Errorf(i18n.T("errors.source.failed_to_open_file_for_hash"), sourceFilePath)
 	}
 
-	if src.Hash == "SKIP" || info.IsDir() {
-		osutils.Logger.Info("skip integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
+	// If it's a directory, handle based on protocol (like makepkg)
+	if info.IsDir() {
+		protocol := src.getProtocol()
+		// For VCS protocols (git), directories are expected (cloned repos)
+		if protocol == constants.Git {
+			logger.Info(i18n.T("logger.skip_integrity_check_for"),
+				"source", src.SourceItemURI)
+
+			return nil
+		}
+		// For non-VCS, non-file protocols, directories are not supported (like makepkg)
+		// The file protocol (local files) also shouldn't accept directories in source arrays
+
+		return errors.Errorf(i18n.T("errors.source.directory_not_supported"), sourceFilePath)
+	}
+
+	if src.Hash == "SKIP" {
+		logger.Info(i18n.T("logger.skip_integrity_check_for"),
+			"source", src.SourceItemURI)
 
 		return nil
 	}
@@ -203,28 +283,38 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	case 128:
 		hashSum = sha512.New()
 	default:
-		return errors.Errorf("unsupported hash length %d", len(src.Hash))
+		return errors.Errorf(i18n.T("errors.source.unsupported_hash_length"), len(src.Hash))
 	}
 
-	file, err := osutils.Open(filepath.Clean(sourceFilePath))
+	file, err := files.Open(filepath.Clean(sourceFilePath))
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			logger.Warn(
+				"failed to close source file",
+				"path", sourceFilePath,
+				"error", err)
+		}
+	}()
 
 	_, err = io.Copy(hashSum, file)
 	if err != nil {
-		return errors.Errorf("failed to copy file %s", sourceFilePath)
+		return errors.Errorf(i18n.T("errors.source.failed_to_copy_file"), sourceFilePath)
 	}
 
 	sum := hashSum.Sum(nil)
 	hexSum := hex.EncodeToString(sum)
 
 	if hexSum != src.Hash {
-		return errors.Errorf("hash verification failed %s", src.SourceItemPath)
+		return errors.Errorf(i18n.T("errors.source.hash_verification_failed"), src.SourceItemPath)
 	}
 
-	osutils.Logger.Info("integrity check for", osutils.Logger.Args("source", src.SourceItemURI))
+	logger.Info(i18n.T("logger.integrity_check_for"),
+		"source", src.SourceItemURI)
 
 	return nil
 }

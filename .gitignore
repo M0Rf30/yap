@@ -1,3 +1,26 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+/bin/
+/dist/
+/releases/
+artifacts/
+
+# Go build cache
+*.test
+*.out
+*.prof
+
+# Test coverage files
+coverage.out
+coverage.html
+
+# Package artifacts
 *.apk
 *.deb
 *.egg
@@ -6,20 +29,56 @@
 *.pyc
 *.rpm
 *.tar.*
+*.zip
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Documentation artifacts
+docs/api/
+
+# YAP specific
+/yap
+examples/yap/pkg
+examples/yap/src
+examples/yap/yap
+
+# OS generated files
 .DS_Store
 .DS_Store?
 .Spotlight-V100
 .Trashes
 ._*
-.trunk
-/yap
 Icon?
 Thumbs.db
-artifacts
-dist/
 ehthumbs.db
-examples/yap/pkg
-examples/yap/src
-examples/yap/yap
-.vscode
+
+# Editor directories and files
+.vscode/
 .idea/
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
+
+# Temporary files
+.tmp/
+temp/
+.temp/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Cache directories
+.cache/
+.trunk
+
+# Air live reload
+.air.toml
+tmp/
+.claude_consciousness.m8
