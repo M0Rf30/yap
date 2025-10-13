@@ -13,7 +13,7 @@ require (
 	github.com/google/rpmpack v0.7.1
 	github.com/klauspost/compress v1.18.0
 	github.com/klauspost/pgzip v1.2.6
-	github.com/mholt/archives v0.1.5-0.20251009160624-cca9224336fa
+	github.com/mholt/archives v0.1.5-0.20251009205813-e30ac6010726
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/otiai10/copy v1.14.1
 	github.com/pkg/errors v0.9.1
@@ -63,7 +63,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/mikelolasagasti/xz v1.0.1 // indirect
 	github.com/minio/minlz v1.0.1 // indirect
-	github.com/nwaples/rardecode/v2 v2.1.1 // indirect
+	github.com/nwaples/rardecode/v2 v2.2.1 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pjbgf/sha1cd v0.5.0 // indirect
