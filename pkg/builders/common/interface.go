@@ -26,19 +26,19 @@ const (
 // This unifies the behavior across different package formats (APK, DEB, RPM, Pacman).
 type Builder interface {
 	// BuildPackage creates the package file at the specified artifacts path
-	BuildPackage(artifactsPath string) error
+	BuildPackage(artifactsPath string, targetArch string) error
 
 	// PrepareFakeroot sets up the package metadata and prepares the build environment
-	PrepareFakeroot(artifactsPath string) error
+	PrepareFakeroot(artifactsPath string, targetArch string) error
 
 	// Install installs the built package (requires appropriate package manager)
 	Install(artifactsPath string) error
 
 	// Prepare installs build dependencies and prepares the build environment
-	Prepare(makeDepends []string) error
+	Prepare(makeDepends []string, targetArch string) error
 
 	// PrepareEnvironment sets up the build environment with necessary tools
-	PrepareEnvironment(golang bool) error
+	PrepareEnvironment(golang bool, targetArch string) error
 
 	// Update updates the package manager's package database
 	Update() error
@@ -288,18 +288,105 @@ func (bb *BaseBuilder) Install(artifactsPath string) error {
 
 // Prepare installs build dependencies using the appropriate package manager.
 // This consolidates duplicated Prepare methods across all builders.
-func (bb *BaseBuilder) Prepare(makeDepends []string) error {
+func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 	installArgs := constants.GetInstallArgs(bb.Format)
+
+	// Add cross-compilation dependencies if target architecture is different
+	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
+		logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
+			"target_arch", targetArch,
+			"build_arch", bb.PKGBUILD.ArchComputed)
+
+		crossDeps := bb.getCrossCompilerDependencies(targetArch)
+		if len(crossDeps) > 0 {
+			logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
+				"target_arch", targetArch,
+				"packages", strings.Join(crossDeps, ", "))
+		}
+
+		installArgs = append(installArgs, crossDeps...)
+	}
+
 	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, makeDepends)
 }
 
 // PrepareEnvironment sets up the build environment with necessary tools.
 // This consolidates duplicated PrepareEnvironment methods across all builders.
-func (bb *BaseBuilder) PrepareEnvironment(golang bool) error {
+func (bb *BaseBuilder) PrepareEnvironment(golang bool, targetArch string) error {
 	allArgs := bb.SetupEnvironmentDependencies(golang)
+
+	// Add cross-compilation dependencies if target architecture is different
+	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
+		logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
+			"target_arch", targetArch,
+			"build_arch", bb.PKGBUILD.ArchComputed)
+
+		crossDeps := bb.getCrossCompilerDependencies(targetArch)
+		if len(crossDeps) > 0 {
+			logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
+				"target_arch", targetArch,
+				"packages", strings.Join(crossDeps, ", "))
+		}
+
+		allArgs = append(allArgs, crossDeps...)
+	}
+
 	useSudo := bb.Format == constants.FormatAPK
 
-	return shell.ExecWithSudo(useSudo, "", getPackageManager(bb.Format), allArgs...)
+	// Install dependencies first
+	err := shell.ExecWithSudo(useSudo, "", getPackageManager(bb.Format), allArgs...)
+	if err != nil {
+		return err
+	}
+
+	// Set up cross-compilation environment after dependencies are installed
+	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
+		err = bb.SetupCrossCompilationEnvironment(targetArch)
+		if err != nil {
+			return fmt.Errorf("failed to setup cross-compilation environment: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// getCrossCompilerDependencies returns cross-compiler dependencies for target architecture
+func (bb *BaseBuilder) getCrossCompilerDependencies(targetArch string) []string {
+	// Map target architecture to appropriate cross-compiler package names
+	crossCompilerMap := map[string]map[string][]string{
+		"deb": {
+			"aarch64": {"gcc-aarch64-linux-gnu", "g++-aarch64-linux-gnu"},
+			"armv7":   {"gcc-arm-linux-gnueabihf", "g++-arm-linux-gnueabihf"},
+			"armv6":   {"gcc-arm-linux-gnueabihf", "g++-arm-linux-gnueabihf"},
+			"i386":    {"gcc-i686-linux-gnu", "g++-i686-linux-gnu"},
+			"ppc64le": {"gcc-powerpc64le-linux-gnu", "g++-powerpc64le-linux-gnu"},
+			"s390x":   {"gcc-s390x-linux-gnu", "g++-s390x-linux-gnu"},
+		},
+		"rpm": {
+			"aarch64": {"gcc-aarch64-linux-gnu", "gcc-c++-aarch64-linux-gnu"},
+			"armv7":   {"gcc-arm-linux-gnu", "gcc-c++-arm-linux-gnu"},
+			"i686":    {"gcc-i686-linux-gnu", "gcc-c++-i686-linux-gnu"},
+			"ppc64le": {"gcc-ppc64le-linux-gnu", "gcc-c++-ppc64le-linux-gnu"},
+			"s390x":   {"gcc-s390x-linux-gnu", "gcc-c++-s390x-linux-gnu"},
+		},
+		"apk": {
+			"aarch64": {"gcc-aarch64", "musl-aarch64", "musl-dev"},
+			"armv7":   {"gcc-armv7", "musl-armv7", "musl-dev"},
+			"armv6":   {"gcc-armhf", "musl-armhf", "musl-dev"},
+		},
+		"pacman": {
+			"aarch64": {"aarch64-linux-gnu-gcc", "aarch64-linux-gnu-binutils"},
+			"armv7":   {"arm-none-eabi-gcc", "arm-none-eabi-binutils"},
+		},
+	}
+
+	if archDeps, exists := crossCompilerMap[bb.Format]; exists {
+		if deps, exists := archDeps[targetArch]; exists {
+			return deps
+		}
+	}
+
+	return []string{}
 }
 
 // Update updates the package manager's package database.
@@ -349,4 +436,180 @@ func (bb *BaseBuilder) SetupCcache() error {
 	_ = os.Setenv("CCACHE_DIR", ccacheDir)
 
 	return nil
+}
+
+// SetupCrossCompilationEnvironment configures environment variables for cross-compilation.
+// This function sets up environment variables for C/C++, Rust, and Go cross-compilation.
+//
+//nolint:gocyclo,cyclop
+//nolint:cyclop
+//nolint:gocyclo
+func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error {
+	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
+		// No cross-compilation needed
+		return nil
+	}
+
+	logger.Info(i18n.T("logger.cross_compilation.setting_up_cross_compilation_environment"),
+		"target_arch", targetArch,
+		"build_arch", bb.PKGBUILD.ArchComputed)
+
+	// Get the appropriate cross-compiler toolchain for the target architecture
+	toolchain, exists := CrossToolchainMap[targetArch]
+	if !exists {
+		return fmt.Errorf("no cross-compilation toolchain available for architecture: %s", targetArch)
+	}
+
+	// Determine the distribution-specific toolchain packages
+	var distro string
+
+	switch bb.Format {
+	case constants.FormatDEB:
+		distro = "debian"
+	case constants.FormatRPM:
+		distro = "fedora"
+	case constants.FormatAPK:
+		distro = "alpine"
+	case constants.FormatPacman:
+		distro = "arch"
+	default:
+		distro = "debian" // fallback
+	}
+
+	toolchainPackages, exists := toolchain[distro]
+	if !exists {
+		// Try to find a toolchain for any distribution
+		for _, distroToolchain := range toolchain {
+			toolchainPackages = distroToolchain
+			break
+		}
+
+		if toolchainPackages.GCCPackage == "" {
+			return fmt.Errorf("no cross-compilation toolchain available for %s on %s", targetArch, distro)
+		}
+	}
+
+	// Set up C/C++ cross-compilation environment variables
+	_ = os.Setenv("CC", toolchainPackages.GCCPackage)
+	_ = os.Setenv("CXX", toolchainPackages.GPlusPlusPackage)
+	_ = os.Setenv("AR", toolchainPackages.BinutilsPackage)
+	_ = os.Setenv("STRIP", toolchainPackages.BinutilsPackage)
+	_ = os.Setenv("RANLIB", toolchainPackages.BinutilsPackage)
+	_ = os.Setenv("OBJDUMP", toolchainPackages.BinutilsPackage)
+	_ = os.Setenv("OBJCOPY", toolchainPackages.BinutilsPackage)
+	_ = os.Setenv("LD", toolchainPackages.BinutilsPackage)
+	_ = os.Setenv("NM", toolchainPackages.BinutilsPackage)
+
+	// Calculate CROSS_COMPILE prefix
+	ccPrefix := ""
+
+	if strings.Contains(toolchainPackages.GCCPackage, "-gcc") {
+		// Extract prefix before -gcc
+		parts := strings.Split(toolchainPackages.GCCPackage, "-gcc")
+		if len(parts) > 0 {
+			ccPrefix = parts[0] + "-"
+		}
+	} else if strings.Contains(toolchainPackages.GCCPackage, "gcc") {
+		// Extract prefix before gcc
+		parts := strings.Split(toolchainPackages.GCCPackage, "gcc")
+		if len(parts) > 0 {
+			ccPrefix = parts[0] + "-"
+		}
+	}
+
+	// Set up Rust cross-compilation environment variables
+	rustTarget := bb.getRustTargetArchitecture(targetArch)
+	if rustTarget != "" {
+		_ = os.Setenv("CARGO_BUILD_TARGET", rustTarget)
+		_ = os.Setenv("RUSTC_TARGET", rustTarget)
+		rustTargetUpper := strings.ToUpper(strings.ReplaceAll(rustTarget, "-", "_"))
+		_ = os.Setenv("CARGO_TARGET_"+rustTargetUpper+"_LINKER",
+			toolchainPackages.BinutilsPackage+"-ld")
+
+		// Set CC and CXX for Rust's build script integration
+		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CC",
+			toolchainPackages.GCCPackage+"-gcc")
+		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CXX",
+			toolchainPackages.GPlusPlusPackage+"-g++")
+
+		logger.Info(i18n.T("logger.cross_compilation.rust_cross_compilation_configured"),
+			"rust_target", rustTarget,
+			"target_arch", targetArch)
+	}
+
+	// Set up Go cross-compilation environment variables
+	goArch := bb.getGoTargetArchitecture(targetArch)
+
+	goOS := "linux" // Default to Linux for cross-compilation
+	if goArch != "" {
+		_ = os.Setenv("GOOS", goOS)
+		_ = os.Setenv("GOARCH", goArch)
+
+		// Set up CGO for cross-compilation
+		_ = os.Setenv("CGO_ENABLED", "1")
+		_ = os.Setenv("CC_FOR_TARGET", toolchainPackages.GCCPackage+"-gcc")
+		_ = os.Setenv("CXX_FOR_TARGET", toolchainPackages.GPlusPlusPackage+"-g++")
+
+		logger.Info(i18n.T("logger.cross_compilation.go_cross_compilation_configured"),
+			"goos", goOS,
+			"goarch", goArch,
+			"target_arch", targetArch)
+	}
+
+	// Set common cross-compilation variables
+	_ = os.Setenv("CROSS_COMPILE", ccPrefix+"-")
+	_ = os.Setenv("TARGET_ARCH", targetArch)
+	_ = os.Setenv("HOST_ARCH", bb.PKGBUILD.ArchComputed)
+	_ = os.Setenv("BUILD_ARCH", bb.PKGBUILD.ArchComputed)
+
+	// Configure pkg-config for cross-compilation
+	pkgConfigPath := "/usr/lib/" + ccPrefix + "/pkgconfig:/usr/local/lib/" +
+		ccPrefix + "/pkgconfig"
+	_ = os.Setenv("PKG_CONFIG_PATH", pkgConfigPath)
+	_ = os.Setenv("PKG_CONFIG_LIBDIR", "/usr/lib/"+ccPrefix+"/pkgconfig")
+
+	logger.Info(i18n.T("logger.cross_compilation.cross_compilation_environment_configured"),
+		"target_arch", targetArch,
+		"cc", os.Getenv("CC"),
+		"cxx", os.Getenv("CXX"))
+
+	return nil
+}
+
+// getRustTargetArchitecture maps YAP architecture names to Rust target triples
+func (bb *BaseBuilder) getRustTargetArchitecture(arch string) string {
+	rustTargets := map[string]string{
+		"aarch64": "aarch64-unknown-linux-gnu",
+		"armv7":   "armv7-unknown-linux-gnueabihf",
+		"armv6":   "arm-unknown-linux-gnueabihf",
+		"i686":    "i686-unknown-linux-gnu",
+		"x86_64":  "x86_64-unknown-linux-gnu",
+		"ppc64le": "powerpc64le-unknown-linux-gnu",
+		"s390x":   "s390x-unknown-linux-gnu",
+	}
+
+	if target, exists := rustTargets[arch]; exists {
+		return target
+	}
+
+	return ""
+}
+
+// getGoTargetArchitecture maps YAP architecture names to Go GOARCH values
+func (bb *BaseBuilder) getGoTargetArchitecture(arch string) string {
+	goArchs := map[string]string{
+		"aarch64": "arm64",
+		"armv7":   "arm",
+		"armv6":   "arm",
+		"i686":    "386",
+		"x86_64":  "amd64",
+		"ppc64le": "ppc64le",
+		"s390x":   "s390x",
+	}
+
+	if goArch, exists := goArchs[arch]; exists {
+		return goArch
+	}
+
+	return ""
 }

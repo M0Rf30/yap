@@ -45,7 +45,11 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Pkg {
 //
 // The method calls the internal pacmanBuild function to perform the actual build process.
 // It returns an error if the build process encounters any issues.
-func (m *Pkg) BuildPackage(artifactsPath string) error {
+func (m *Pkg) BuildPackage(artifactsPath string, targetArch string) error {
+	// If target architecture is specified for cross-compilation, use it
+	if targetArch != "" {
+		m.PKGBUILD.ArchComputed = targetArch
+	}
 	// Translate architecture for Pacman format
 	m.TranslateArchitecture()
 
@@ -80,8 +84,11 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 // The method initializes the pacmanDir, resolves the package destination, and creates
 // the PKGBUILD and post-installation script files if necessary. It returns an error
 // if any stem fails.
-func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
+func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 	m.pacmanDir = m.PKGBUILD.StartDir
+	// Note: Don't override ArchComputed here - it should remain the native architecture
+	// The targetArch is used for package naming in BuildPackage method
+
 	m.PKGBUILD.InstalledSize, _ = files.GetDirSize(m.PKGBUILD.PackageDir)
 	m.PKGBUILD.BuildDate = time.Now().Unix()
 	m.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)

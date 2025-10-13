@@ -1,3 +1,22 @@
+<!-- OPENSPEC:START -->
+# OpenSpec Instructions
+
+These instructions are for AI assistants working in this project.
+
+Always open `@/openspec/AGENTS.md` when the request:
+- Mentions planning or proposals (words like proposal, spec, change, plan)
+- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
+- Sounds ambiguous and you need the authoritative spec before coding
+
+Use `@/openspec/AGENTS.md` to learn:
+- How to create and apply change proposals
+- Spec format and conventions
+- Project structure and guidelines
+
+Keep this managed block so 'openspec update' can refresh the instructions.
+
+<!-- OPENSPEC:END -->
+
 # YAP Agent Guidelines
 
 ## Project Overview
@@ -54,7 +73,7 @@ yap zap <project-path>                         # Clean build environment
 yap list-distros                               # List supported distributions
 yap graph <project-path>                       # Show dependency graph
 
-# Package operations  
+# Package operations
 yap build --skip-sync <project-path>           # Skip dependency sync (faster)
 yap build --cleanbuild <project-path>          # Clean source before build
 ```
@@ -86,7 +105,7 @@ go test -timeout 30s ./pkg/download/...
 ## Code Style
 
 ### Module and Imports
-- **Module**: `github.com/M0Rf30/yap/v2` 
+- **Module**: `github.com/M0Rf30/yap/v2`
 - **Import grouping**: Standard → Third-party → Local (with goimports)
 - **Local prefix**: `github.com/M0Rf30/yap/v2`
 
@@ -270,7 +289,7 @@ go run tar_format.go                           # Generate test packages
 ../scripts/test_apk_format.sh yap-auto.apk     # Quick format check
 ../scripts/compare_apk.sh official.apk yap.apk # Detailed comparison
 
-# DEB Format Testing  
+# DEB Format Testing
 dpkg-deb --info package.deb                    # Validate metadata
 dpkg-deb --contents package.deb                # Check file structure
 
@@ -322,7 +341,7 @@ The APK builder (`pkg/builders/apk/`) is under active development for full Alpin
    - Alpine APK uses concatenated gzip streams: `.SIGN` + `.CONTROL` + `data.tar.gz`
    - Current YAP: Single-stream gzip
    - Required for `apk add` compatibility
-   
+
 2. **Package Signing** (High Priority)
    - RSA signature support (`.SIGN.RSA.*` entries)
    - Integration with Alpine signing keys
@@ -336,7 +355,7 @@ The APK builder (`pkg/builders/apk/`) is under active development for full Alpin
 4. **Extended Metadata** (Low Priority)
    - `origin`: Source package name
    - `commit`: Git commit hash
-   - `builddate`: Build timestamp  
+   - `builddate`: Build timestamp
    - `datahash`: Additional integrity check
 
 #### Investigation Tools & Scripts
@@ -356,7 +375,7 @@ The APK builder (`pkg/builders/apk/`) is under active development for full Alpin
 wget http://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/busybox-1.37.0-r19.apk
 
 # Build YAP APK package
-yap build alpine examples/yap
+yap build alpine examples/yap -sdvc
 
 # Compare tar formats
 gunzip -c package.apk | dd bs=1 skip=257 count=8 2>/dev/null | od -A n -t x1z
@@ -389,7 +408,7 @@ make clean deps fmt lint lint-md test doc build-all
 # Create release artifacts
 ls releases/
 # yap-linux-amd64.tar.gz
-# yap-linux-arm64.tar.gz  
+# yap-linux-arm64.tar.gz
 # yap-darwin-amd64.tar.gz
 # yap-darwin-arm64.tar.gz
 # yap-windows-amd64.zip
@@ -404,10 +423,10 @@ ls releases/
 Before release, test on multiple distributions:
 ```bash
 # Test major distribution families
-yap build ubuntu examples/yap         # Debian family
-yap build fedora examples/yap         # Red Hat family  
-yap build alpine examples/yap         # Alpine
-yap build arch examples/yap           # Arch Linux
+yap build ubuntu examples/yap -sdvc         # Debian family
+yap build fedora examples/yap -sdvc         # Red Hat family
+yap build alpine examples/yap -sdvc         # Alpine
+yap build arch examples/yap -sdvc           # Arch Linux
 ```
 
 ## Troubleshooting
