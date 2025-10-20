@@ -13,7 +13,7 @@ require (
 	github.com/google/rpmpack v0.7.1
 	github.com/klauspost/compress v1.18.0
 	github.com/klauspost/pgzip v1.2.6
-	github.com/mholt/archives v0.1.5-0.20251009205813-e30ac6010726
+	github.com/mholt/archives v0.1.5
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/otiai10/copy v1.14.1
 	github.com/pkg/errors v0.9.1
