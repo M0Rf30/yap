@@ -61,7 +61,7 @@ jobs:
           sarif_file: gosec.sarif
 
       - name: 📤 Upload Gosec results as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: gosec-results
           path: gosec.sarif
@@ -134,7 +134,7 @@ jobs:
           fi
 
       - name: 📤 Upload vulnerability scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: vulnerability-scan-results
           path: |
@@ -229,7 +229,7 @@ jobs:
           go-licenses report ./... >> licenses/report.md 2>/dev/null || echo "Unable to generate detailed license report" >> licenses/report.md
 
       - name: 📤 Upload license compliance results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: license-compliance-results
           path: licenses/
