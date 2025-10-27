@@ -192,7 +192,7 @@ jobs:
           echo "✅ Binary execution test passed"
 
       - name: 📦 Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: build-artifacts
           path: dist/
@@ -274,7 +274,7 @@ jobs:
           make doc-generate
 
       - name: 📤 Upload documentation artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: documentation
           path: docs/api/
