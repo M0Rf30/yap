@@ -208,7 +208,7 @@ jobs:
           fetch-depth: 0
 
       - name: 📥 Download coverage reports
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: coverage-reports
 
@@ -281,7 +281,7 @@ jobs:
 
     steps:
       - name: 📥 Download coverage reports
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: coverage-reports
 
