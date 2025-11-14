@@ -33,6 +33,7 @@ type PKGBUILD struct {
 	ArchComputed   string
 	Backup         []string
 	Build          string
+	BuildArch      string // Build architecture for cross-compilation (where compilation happens)
 	BuildDate      int64
 	Checksum       string
 	Codename       string
@@ -50,6 +51,7 @@ type PKGBUILD struct {
 	Group          string
 	HashSums       []string
 	Home           string
+	HostArch       string // Host architecture for cross-compilation (where package will run)
 	Install        string
 	InstalledSize  int64
 	License        []string
@@ -82,6 +84,7 @@ type PKGBUILD struct {
 	SourceDir      string
 	SourceURI      []string
 	StartDir       string
+	TargetArch     string // Target architecture for cross-compilation (what we're building for)
 	URL            string
 	StaticEnabled  bool
 	StripEnabled   bool
@@ -450,6 +453,12 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 		pkgBuild.DebConfig = data.(string)
 	case "install":
 		pkgBuild.Install = data.(string)
+	case "target_arch":
+		pkgBuild.TargetArch = data.(string)
+	case "build_arch":
+		pkgBuild.BuildArch = data.(string)
+	case "host_arch":
+		pkgBuild.HostArch = data.(string)
 	}
 
 	if err != nil {
@@ -639,4 +648,21 @@ func (pkgBuild *PKGBUILD) isValidArchitecture(arch string) bool {
 	}
 
 	return set.Contains(validArchitectures, arch)
+}
+
+// IsCrossCompilation checks if cross-compilation is enabled for this PKGBUILD.
+// Returns true if any of the cross-compilation architecture variables are set.
+func (pkgBuild *PKGBUILD) IsCrossCompilation() bool {
+	return pkgBuild.TargetArch != "" || pkgBuild.BuildArch != "" || pkgBuild.HostArch != ""
+}
+
+// GetTargetArchitecture returns the target architecture for cross-compilation.
+// If a target architecture is explicitly set in the PKGBUILD, it returns that.
+// Otherwise, it returns the computed architecture from the standard architecture processing.
+func (pkgBuild *PKGBUILD) GetTargetArchitecture() string {
+	if pkgBuild.TargetArch != "" {
+		return pkgBuild.TargetArch
+	}
+
+	return pkgBuild.ArchComputed
 }

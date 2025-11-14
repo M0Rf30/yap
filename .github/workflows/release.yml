@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GO_VERSION: "1.24.5"
+  GO_VERSION: "1.25.4"
   REGISTRY: ghcr.io
 
 jobs:
@@ -259,7 +259,7 @@ jobs:
             echo "- **Package Publishing:** ${{ needs.packages.result }}"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
-          
+
           if [[ "${{ steps.status.outputs.status }}" == "success" ]]; then
             {
               echo "✅ Release completed successfully!"

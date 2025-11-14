@@ -1020,3 +1020,29 @@
     "
 - id: root.short
   translation: 🚀 Yet Another Packager - Costruttore di pacchetti multi-distribuzione
+
+- id: flags.build.target_arch
+  translation: 🏗️  architettura di destinazione per la compilazione incrociata (es., aarch64, armv7, i686)
+
+- id: logger.cross_compilation.detected_target_architecture
+  translation: rilevata architettura di destinazione per la compilazione incrociata
+- id: logger.cross_compilation.installing_cross_compiler_packages
+  translation: installazione dei pacchetti del compilatore incrociato per l'architettura di destinazione
+- id: logger.cross_compilation.cross_compiler_package_installed
+  translation: pacchetto del compilatore incrociato installato con successo
+- id: logger.cross_compilation.failed_to_install_cross_compiler_package
+  translation: impossibile installare il pacchetto del compilatore incrociato
+- id: logger.cross_compilation.configuring_cross_compilation_environment
+  translation: configurazione delle variabili d'ambiente per la compilazione incrociata
+- id: logger.cross_compilation.cross_compilation_environment_configured
+  translation: ambiente di compilazione incrociata configurato con successo
+- id: logger.cross_compilation.starting_cross_compilation_build
+  translation: avvio della compilazione incrociata per l'architettura di destinazione
+- id: logger.cross_compilation.setting_up_cross_compilation_environment
+  translation: configurazione ambiente di compilazione incrociata per l'architettura di destinazione
+- id: logger.cross_compilation.rust_cross_compilation_configured
+  translation: compilazione incrociata Rust configurata per il target
+- id: logger.cross_compilation.go_cross_compilation_configured
+  translation: compilazione incrociata Go configurata per il target
+- id: logger.cross_compilation.cross_compilation_environment_setup_failed
+  translation: impossibile configurare l'ambiente di compilazione incrociata

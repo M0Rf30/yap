@@ -20,7 +20,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  GO_VERSION: "1.24.5"
+  GO_VERSION: "1.25.4"
 
 jobs:
   docker:
@@ -88,6 +88,7 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.os }}
+            ${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}
           labels: |
             maintainer=M0Rf30
             org.opencontainers.image.authors=M0Rf30

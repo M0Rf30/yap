@@ -45,6 +45,7 @@ type Config struct {
 	Zap          bool   // Controls whether to use zap functionality
 	FromPkgName  string // Specifies the source package name for transformation
 	ToPkgName    string // Specifies the target package name for transformation
+	TargetArch   string // Specifies the target architecture for cross-compilation
 
 	// Internal state
 	singleProject  bool          //nolint:unused // Reserved for future migration
@@ -71,6 +72,8 @@ var (
 	FromPkgName string
 	// ToPkgName specifies the target package name for transformation.
 	ToPkgName string
+	// TargetArch specifies the target architecture for cross-compilation
+	TargetArch string
 
 	// Global state variables
 	singleProject  bool
@@ -265,7 +268,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	if !NoMakeDeps {
 		mpc.getMakeDeps()
 
-		err := packageManager.Prepare(makeDepends)
+		err := packageManager.Prepare(makeDepends, TargetArch)
 		if err != nil {
 			return err
 		}
@@ -279,7 +282,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 			logger.Debug(i18n.T("logger.installing_external_runtime_dependencies"),
 				"count", len(runtimeDepends))
 
-			err := packageManager.Prepare(runtimeDepends)
+			err := packageManager.Prepare(runtimeDepends, TargetArch)
 			if err != nil {
 				return err
 			}
@@ -489,7 +492,7 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		return err
 	}
 
-	err = proj.PackageManager.PrepareFakeroot(mpc.Output)
+	err = proj.PackageManager.PrepareFakeroot(mpc.Output, TargetArch)
 	if err != nil {
 		return err
 	}
@@ -499,7 +502,7 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		"version", proj.Builder.PKGBUILD.PkgVer,
 		"release", proj.Builder.PKGBUILD.PkgRel)
 
-	err = proj.PackageManager.BuildPackage(mpc.Output)
+	err = proj.PackageManager.BuildPackage(mpc.Output, TargetArch)
 	if err != nil {
 		return err
 	}
@@ -592,7 +595,15 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
-		pkgbuildFile.ComputeArchitecture()
+		// Set target architecture for cross-compilation if specified
+		if TargetArch != "" {
+			// Keep the native architecture for ArchComputed, set TargetArch for cross-compilation
+			pkgbuildFile.ComputeArchitecture() // This sets the native architecture
+			pkgbuildFile.TargetArch = TargetArch
+		} else {
+			pkgbuildFile.ComputeArchitecture()
+		}
+
 		pkgbuildFile.ValidateMandatoryItems()
 		pkgbuildFile.ValidateGeneral()
 
