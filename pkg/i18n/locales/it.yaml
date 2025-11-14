@@ -281,6 +281,8 @@
   translation: "Impostazione della variabile srcdir fallita"
 - id: errors.pkgbuild.failed_to_set_variable_startdir
   translation: "Impostazione della variabile startdir fallita"
+- id: errors.pkgbuild.failed_to_set_environment_variables
+  translation: "Impostazione delle variabili d'ambiente per l'esecuzione del pacchetto fallita"
 - id: errors.pkgbuild.invalid_directive_use
   translation: "Uso di direttiva non valido"
 - id: errors.pkgbuild.unsupported_architecture

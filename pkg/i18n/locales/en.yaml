@@ -280,6 +280,8 @@
   translation: "Failed to set srcdir variable"
 - id: errors.pkgbuild.failed_to_set_variable_startdir
   translation: "Failed to set startdir variable"
+- id: errors.pkgbuild.failed_to_set_environment_variables
+  translation: "Failed to set environment variables for package execution"
 - id: errors.pkgbuild.invalid_directive_use
   translation: "Invalid directive usage"
 - id: errors.pkgbuild.unsupported_architecture

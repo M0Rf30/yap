@@ -83,6 +83,18 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	pkgVer := builder.PKGBUILD.PkgVer
 	pkgRel := builder.PKGBUILD.PkgRel
 
+	// Set environment variables for this package before executing any function
+	// This ensures each package uses its own pkgdir, srcdir, and startdir
+	err := builder.PKGBUILD.SetEnvironmentVariables()
+	if err != nil {
+		errMsg := i18n.T("errors.pkgbuild.failed_to_set_environment_variables")
+
+		return errors.Wrap(err, errors.ErrTypeBuild, errMsg).
+			WithContext("package", pkgName).
+			WithContext("stage", stage).
+			WithOperation("SetEnvironmentVariables")
+	}
+
 	// Use logger for consistent formatting
 	logger.Info(i18n.T(message), "pkgver", pkgVer, "pkgrel", pkgRel)
 
@@ -96,7 +108,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 			Format:   format,
 		}
 
-		err := tempBuilder.SetupCcache()
+		err = tempBuilder.SetupCcache()
 		if err != nil {
 			logger.Warn(i18n.T("logger.setupccache.warn.ccache_setup_failed_1"),
 				"package", pkgName, "error", err)
@@ -106,7 +118,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 		// Check if cross-compilation is needed
 		if builder.PKGBUILD.TargetArch != "" &&
 			builder.PKGBUILD.TargetArch != builder.PKGBUILD.ArchComputed {
-			err := tempBuilder.SetupCrossCompilationEnvironment(builder.PKGBUILD.TargetArch)
+			err = tempBuilder.SetupCrossCompilationEnvironment(builder.PKGBUILD.TargetArch)
 			if err != nil {
 				logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
 					"package", pkgName, "target_arch", builder.PKGBUILD.TargetArch, "error", err)
@@ -115,7 +127,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	}
 
 	// Execute script with package decoration
-	err := shell.RunScriptWithPackage("  set -e\n"+pkgbuildFunction, pkgName)
+	err = shell.RunScriptWithPackage("  set -e\n"+pkgbuildFunction, pkgName)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).
