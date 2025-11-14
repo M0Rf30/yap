@@ -29,6 +29,7 @@ coverage.html
 *.pyc
 *.rpm
 *.tar.*
+*.tar
 *.zip
 
 # Go workspace file
@@ -81,4 +82,11 @@ temp/
 # Air live reload
 .air.toml
 tmp/
+
+# AI releated
 .claude_consciousness.m8
+.codanna*
+.fastembed_cache
+.opencode/
+openspec/
+

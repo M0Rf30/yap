@@ -83,7 +83,7 @@ func TestBuildPackage(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = rpm.BuildPackage(artifactsDir)
+	err = rpm.BuildPackage(artifactsDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestBuildPackageWithoutEpoch(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = rpm.BuildPackage(artifactsDir)
+	err = rpm.BuildPackage(artifactsDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestPrepareFakeroot(t *testing.T) {
 
 	rpm.PKGBUILD.PackageDir = packageDir
 
-	err = rpm.PrepareFakeroot(tempDir)
+	err = rpm.PrepareFakeroot(tempDir, "")
 	if err != nil {
 		t.Errorf("PrepareFakeroot failed: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestPrepare(t *testing.T) {
 	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	makeDepends := []string{"make", "gcc"}
-	err := rpm.Prepare(makeDepends)
+	err := rpm.Prepare(makeDepends, "")
 	// This will likely fail since dnf isn't available, but we test the method call
 	if err == nil {
 		t.Log("Prepare succeeded (unexpected in test environment)")
@@ -213,7 +213,7 @@ func TestPrepareEnvironment(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
-	err := rpm.PrepareEnvironment(false)
+	err := rpm.PrepareEnvironment(false, "")
 	// This will likely fail since dnf isn't available, but we test the method call
 	if err == nil {
 		t.Log("PrepareEnvironment succeeded (unexpected in test environment)")
@@ -229,7 +229,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
-	err := rpm.PrepareEnvironment(true)
+	err := rpm.PrepareEnvironment(true, "")
 	// This will likely fail since dnf isn't available, but we test the method call
 	if err == nil {
 		t.Log("PrepareEnvironment with golang succeeded (unexpected in test environment)")
