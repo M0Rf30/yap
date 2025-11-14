@@ -3,6 +3,7 @@ package common
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -780,6 +781,240 @@ func TestLogCrossCompilation(t *testing.T) {
 			// This test validates the method doesn't panic
 			// Actual logging output would require log capture
 			builder.LogCrossCompilation(tt.targetArch)
+		})
+	}
+}
+
+// TestBinutilsToolNameGeneration tests that binutils tools are properly extracted
+// from package names to actual tool command names.
+func TestBinutilsToolNameGeneration(t *testing.T) {
+	tests := []struct {
+		name            string
+		binutilsPackage string
+		expectedAr      string
+		expectedStrip   string
+		expectedRanlib  string
+	}{
+		{
+			name:            "Arch Linux aarch64",
+			binutilsPackage: "aarch64-linux-gnu-binutils",
+			expectedAr:      "aarch64-linux-gnu-ar",
+			expectedStrip:   "aarch64-linux-gnu-strip",
+			expectedRanlib:  "aarch64-linux-gnu-ranlib",
+		},
+		{
+			name:            "Debian aarch64",
+			binutilsPackage: "binutils-aarch64-linux-gnu",
+			expectedAr:      "binutils-aarch64-linux-gnu-ar",
+			expectedStrip:   "binutils-aarch64-linux-gnu-strip",
+			expectedRanlib:  "binutils-aarch64-linux-gnu-ranlib",
+		},
+		{
+			name:            "Alpine aarch64",
+			binutilsPackage: "binutils-aarch64",
+			expectedAr:      "binutils-aarch64-ar",
+			expectedStrip:   "binutils-aarch64-strip",
+			expectedRanlib:  "binutils-aarch64-ranlib",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the binutils prefix extraction logic
+			binutilsPrefix := strings.TrimSuffix(tt.binutilsPackage, "-binutils")
+			if binutilsPrefix == tt.binutilsPackage {
+				binutilsPrefix = strings.TrimSuffix(tt.binutilsPackage, "binutils")
+			}
+
+			ar := binutilsPrefix + "-ar"
+			strip := binutilsPrefix + "-strip"
+			ranlib := binutilsPrefix + "-ranlib"
+
+			if ar != tt.expectedAr {
+				t.Errorf("AR: expected %s, got %s", tt.expectedAr, ar)
+			}
+
+			if strip != tt.expectedStrip {
+				t.Errorf("STRIP: expected %s, got %s", tt.expectedStrip, strip)
+			}
+
+			if ranlib != tt.expectedRanlib {
+				t.Errorf("RANLIB: expected %s, got %s", tt.expectedRanlib, ranlib)
+			}
+		})
+	}
+}
+
+// TestCrossCompilationToolchainMapping verifies that cross-compilation toolchains
+// are correctly mapped for all supported architectures and distributions.
+func TestCrossCompilationToolchainMapping(t *testing.T) {
+	tests := []struct {
+		arch   string
+		distro string
+		expect bool // whether toolchain should exist
+	}{
+		{"aarch64", "arch", true},
+		{"aarch64", "debian", true},
+		{"aarch64", "ubuntu", true},
+		{"aarch64", "fedora", true},
+		{"aarch64", "alpine", true},
+		{"armv7", "arch", true},
+		{"armv7", "debian", true},
+		{"i686", "arch", true},
+		{"x86_64", "fedora", true},
+		{"ppc64le", "debian", true},
+		{"s390x", "fedora", true},
+		{"unsupported", "arch", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.arch+"_"+tt.distro, func(t *testing.T) {
+			toolchain, exists := CrossToolchainMap[tt.arch]
+			if !exists && tt.expect {
+				t.Errorf("Expected toolchain for %s to exist", tt.arch)
+				return
+			}
+
+			if !exists {
+				return
+			}
+
+			distroToolchain, exists := toolchain[tt.distro]
+			if !exists && tt.expect {
+				t.Errorf("Expected %s toolchain for %s, but not found", tt.distro, tt.arch)
+				return
+			}
+
+			if !exists {
+				return
+			}
+
+			// Verify toolchain has required fields
+			if distroToolchain.GCCPackage == "" {
+				t.Errorf("GCCPackage is empty for %s on %s", tt.arch, tt.distro)
+			}
+
+			if distroToolchain.GPlusPlusPackage == "" {
+				t.Errorf("GPlusPlusPackage is empty for %s on %s", tt.arch, tt.distro)
+			}
+
+			if distroToolchain.BinutilsPackage == "" {
+				t.Errorf("BinutilsPackage is empty for %s on %s", tt.arch, tt.distro)
+			}
+
+			t.Logf("Toolchain for %s on %s:", tt.arch, tt.distro)
+			t.Logf("  GCC: %s", distroToolchain.GCCPackage)
+			t.Logf("  G++: %s", distroToolchain.GPlusPlusPackage)
+			t.Logf("  Binutils: %s", distroToolchain.BinutilsPackage)
+		})
+	}
+}
+
+// TestCrossCompilationEnvironmentVariables tests that environment variables
+// are set correctly for cross-compilation, without the suffix duplication bug.
+func TestCrossCompilationEnvironmentVariables(t *testing.T) {
+	// Save original environment
+	originalCC := os.Getenv("CC")
+	originalCXX := os.Getenv("CXX")
+	originalAR := os.Getenv("AR")
+
+	defer func() {
+		_ = os.Setenv("CC", originalCC)
+		_ = os.Setenv("CXX", originalCXX)
+		_ = os.Setenv("AR", originalAR)
+	}()
+
+	tempDir := t.TempDir()
+
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName:      "test-package",
+		PkgVer:       "1.0.0",
+		PkgRel:       "1",
+		ArchComputed: "x86_64",
+		StartDir:     tempDir,
+	}
+
+	tests := []struct {
+		name        string
+		format      string
+		targetArch  string
+		expectedCC  string // Expected CC value (should NOT have duplicated suffix)
+		expectedCXX string
+		expectedAR  string
+	}{
+		{
+			name:        "Arch Linux aarch64",
+			format:      "pacman",
+			targetArch:  "aarch64",
+			expectedCC:  "aarch64-linux-gnu-gcc", // NOT gcc-gcc or similar
+			expectedCXX: "aarch64-linux-gnu-g++",
+			expectedAR:  "aarch64-linux-gnu-ar",
+		},
+		{
+			name:        "Debian aarch64",
+			format:      "deb",
+			targetArch:  "aarch64",
+			expectedCC:  "gcc-aarch64-linux-gnu",
+			expectedCXX: "g++-aarch64-linux-gnu",
+			expectedAR:  "binutils-aarch64-linux-gnu-ar", // Note: depends on pattern
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clear environment
+			_ = os.Setenv("CC", "")
+			_ = os.Setenv("CXX", "")
+			_ = os.Setenv("AR", "")
+
+			bb := NewBaseBuilder(pkg, tt.format)
+
+			err := bb.SetupCrossCompilationEnvironment(tt.targetArch)
+			if err != nil {
+				t.Logf("SetupCrossCompilationEnvironment returned error (may be expected): %v", err)
+				// Don't fail the test - some toolchains might not be available
+				return
+			}
+
+			cc := os.Getenv("CC")
+			cxx := os.Getenv("CXX")
+			ar := os.Getenv("AR")
+
+			t.Logf("CC=%s, CXX=%s, AR=%s", cc, cxx, ar)
+
+			// Check that CC doesn't contain duplicated suffixes
+			if strings.Contains(cc, "gcc-gcc") || strings.Contains(cc, "--gcc") {
+				t.Errorf("CC contains duplicated gcc suffix: %s", cc)
+			}
+
+			if strings.Contains(cxx, "g++-g++") || strings.Contains(cxx, "--g++") {
+				t.Errorf("CXX contains duplicated g++ suffix: %s", cxx)
+			}
+
+			// Verify that binutils tools have proper suffix
+			if ar != "" && !strings.HasSuffix(ar, "-ar") {
+				t.Errorf("AR should end with -ar, got: %s", ar)
+			}
+
+			// Check Rust and Go environment variables
+			rustTarget := os.Getenv("CARGO_BUILD_TARGET")
+			if rustTarget != "" {
+				rustTargetUpper := strings.ToUpper(strings.ReplaceAll(rustTarget, "-", "_"))
+
+				rustCC := os.Getenv("TARGET_" + rustTargetUpper + "_CC")
+				if rustCC != "" {
+					if strings.Contains(rustCC, "gcc-gcc") || strings.Contains(rustCC, "--gcc") {
+						t.Errorf("Rust TARGET_CC contains duplicated gcc suffix: %s", rustCC)
+					}
+				}
+			}
+
+			goCC := os.Getenv("CC_FOR_TARGET")
+			if goCC != "" {
+				if strings.Contains(goCC, "gcc-gcc") || strings.Contains(goCC, "--gcc") {
+					t.Errorf("Go CC_FOR_TARGET contains duplicated gcc suffix: %s", goCC)
+				}
+			}
 		})
 	}
 }

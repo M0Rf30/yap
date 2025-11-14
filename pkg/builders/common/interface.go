@@ -514,13 +514,22 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	// Set up C/C++ cross-compilation environment variables
 	_ = os.Setenv("CC", toolchainPackages.GCCPackage)
 	_ = os.Setenv("CXX", toolchainPackages.GPlusPlusPackage)
-	_ = os.Setenv("AR", toolchainPackages.BinutilsPackage)
-	_ = os.Setenv("STRIP", toolchainPackages.BinutilsPackage)
-	_ = os.Setenv("RANLIB", toolchainPackages.BinutilsPackage)
-	_ = os.Setenv("OBJDUMP", toolchainPackages.BinutilsPackage)
-	_ = os.Setenv("OBJCOPY", toolchainPackages.BinutilsPackage)
-	_ = os.Setenv("LD", toolchainPackages.BinutilsPackage)
-	_ = os.Setenv("NM", toolchainPackages.BinutilsPackage)
+
+	// Extract binutils prefix for tool names
+	// BinutilsPackage is like "aarch64-linux-gnu-binutils", we need "aarch64-linux-gnu-ar", etc.
+	binutilsPrefix := strings.TrimSuffix(toolchainPackages.BinutilsPackage, "-binutils")
+	if binutilsPrefix == toolchainPackages.BinutilsPackage {
+		// If no -binutils suffix, try without suffix (for special cases)
+		binutilsPrefix = strings.TrimSuffix(toolchainPackages.BinutilsPackage, "binutils")
+	}
+
+	_ = os.Setenv("AR", binutilsPrefix+"-ar")
+	_ = os.Setenv("STRIP", binutilsPrefix+"-strip")
+	_ = os.Setenv("RANLIB", binutilsPrefix+"-ranlib")
+	_ = os.Setenv("OBJDUMP", binutilsPrefix+"-objdump")
+	_ = os.Setenv("OBJCOPY", binutilsPrefix+"-objcopy")
+	_ = os.Setenv("LD", binutilsPrefix+"-ld")
+	_ = os.Setenv("NM", binutilsPrefix+"-nm")
 
 	// Calculate CROSS_COMPILE prefix
 	ccPrefix := ""
@@ -546,13 +555,14 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 		_ = os.Setenv("RUSTC_TARGET", rustTarget)
 		rustTargetUpper := strings.ToUpper(strings.ReplaceAll(rustTarget, "-", "_"))
 		_ = os.Setenv("CARGO_TARGET_"+rustTargetUpper+"_LINKER",
-			toolchainPackages.BinutilsPackage+"-ld")
+			binutilsPrefix+"-ld")
 
 		// Set CC and CXX for Rust's build script integration
+		// Note: GCCPackage and GPlusPlusPackage already contain the full command name
 		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CC",
-			toolchainPackages.GCCPackage+"-gcc")
+			toolchainPackages.GCCPackage)
 		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CXX",
-			toolchainPackages.GPlusPlusPackage+"-g++")
+			toolchainPackages.GPlusPlusPackage)
 
 		logger.Info(i18n.T("logger.cross_compilation.rust_cross_compilation_configured"),
 			"rust_target", rustTarget,
@@ -568,9 +578,10 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 		_ = os.Setenv("GOARCH", goArch)
 
 		// Set up CGO for cross-compilation
+		// Note: GCCPackage and GPlusPlusPackage already contain the full command name
 		_ = os.Setenv("CGO_ENABLED", "1")
-		_ = os.Setenv("CC_FOR_TARGET", toolchainPackages.GCCPackage+"-gcc")
-		_ = os.Setenv("CXX_FOR_TARGET", toolchainPackages.GPlusPlusPackage+"-g++")
+		_ = os.Setenv("CC_FOR_TARGET", toolchainPackages.GCCPackage)
+		_ = os.Setenv("CXX_FOR_TARGET", toolchainPackages.GPlusPlusPackage)
 
 		logger.Info(i18n.T("logger.cross_compilation.go_cross_compilation_configured"),
 			"goos", goOS,

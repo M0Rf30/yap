@@ -2,6 +2,7 @@
 package builder
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
@@ -102,7 +103,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	if stage == "build" {
 		// Create a temporary BaseBuilder to access the SetupCcache and
 		// SetupCrossCompilationEnvironment methods
-		format := determineFormatFromContext()
+		format := determineFormatFromContext(builder.PKGBUILD.Distro)
 		tempBuilder := &common.BaseBuilder{
 			PKGBUILD: builder.PKGBUILD,
 			Format:   format,
@@ -140,15 +141,33 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	return nil
 }
 
-// determineFormatFromContext determines the package format based on context
-func determineFormatFromContext() string {
-	// The format information should ideally be passed through the call chain
-	// from the packer where it's known, but as a fallback we can try to infer it
-	// This is a temporary workaround - the proper solution is to pass format information
+// determineFormatFromContext determines the package format based on the distribution.
+// This maps distribution names to their corresponding package formats.
+func determineFormatFromContext(distro string) string {
+	// Map common distribution names to package formats
+	distroFormatMap := map[string]string{
+		"arch":     "pacman",
+		"alpine":   "apk",
+		"debian":   "deb",
+		"ubuntu":   "deb",
+		"fedora":   "rpm",
+		"rhel":     "rpm",
+		"centos":   "rpm",
+		"rocky":    "rpm",
+		"alma":     "rpm",
+		"opensuse": "rpm",
+		"suse":     "rpm",
+	}
 
-	// Since we can't determine the format easily, return empty
-	// and let the SetupCrossCompilationEnvironment handle the fallback logic
-	return "" // Let the cross-compilation logic handle fallbacks
+	// Normalize distro name to lowercase for case-insensitive matching
+	distroLower := strings.ToLower(distro)
+
+	if format, exists := distroFormatMap[distroLower]; exists {
+		return format
+	}
+
+	// Fallback to empty string - SetupCrossCompilationEnvironment will use "debian" as fallback
+	return ""
 }
 
 // getSources detects sources provided by a single project source array and
