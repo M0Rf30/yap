@@ -363,6 +363,110 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 	return nil
 }
 
+// buildAndInstallProjectsParallel builds projects in parallel with immediate installation.
+// This implements Arch Linux-style dependency handling: each package is installed
+// immediately after building, making it available for other packages building in parallel.
+// This ensures that packages with runtime dependencies (depends) can access those
+// dependencies during their build phase, even if they're in the same batch.
+func (mpc *MultipleProject) buildAndInstallProjectsParallel(projects []*Project, maxWorkers int,
+	shouldInstall bool) error {
+	projectChan := make(chan *Project, len(projects))
+	errorChan := make(chan error, len(projects))
+
+	var waitGroup sync.WaitGroup
+
+	// Start workers
+	for workerNum := range maxWorkers {
+		waitGroup.Add(1)
+
+		go func(workerID int) {
+			defer waitGroup.Done()
+
+			workerIDStr := fmt.Sprintf("worker-%d", workerID)
+
+			for proj := range projectChan {
+				pkgName := proj.Builder.PKGBUILD.PkgName
+
+				logger.Debug(i18n.T("logger.creating_package"),
+					"package", pkgName,
+					"version", proj.Builder.PKGBUILD.PkgVer,
+					"release", proj.Builder.PKGBUILD.PkgRel,
+					"worker_id", workerIDStr)
+
+				// Step 1: Build the package
+				err := proj.Builder.Compile(NoBuild)
+				if err != nil {
+					errorChan <- err
+
+					return
+				}
+
+				if !NoBuild {
+					// Step 2: Create the package file
+					err := mpc.createPackage(proj)
+					if err != nil {
+						errorChan <- err
+
+						return
+					}
+
+					// Step 3: Install immediately (Arch Linux style)
+					// This makes the package available for other packages building in parallel
+					if shouldInstall {
+						logger.Info(i18n.T("logger.installing_package"),
+							"package", pkgName,
+							"worker_id", workerIDStr)
+
+						err := proj.PackageManager.Install(mpc.Output)
+						if err != nil {
+							logger.Error(
+								i18n.T("logger.project.package_installation_failed"),
+								"package", pkgName,
+								"error", err)
+
+							errorChan <- err
+
+							return
+						}
+
+						logger.Info(i18n.T("logger.package_installed"),
+							"package", pkgName,
+							"worker_id", workerIDStr)
+					}
+				}
+
+				if ToPkgName != "" && pkgName == ToPkgName {
+					return
+				}
+			}
+		}(workerNum)
+	}
+
+	// Send projects to workers
+	go func() {
+		defer close(projectChan)
+
+		for _, proj := range projects {
+			projectChan <- proj
+		}
+	}()
+
+	// Wait for completion
+	go func() {
+		waitGroup.Wait()
+		close(errorChan)
+	}()
+
+	// Check for errors
+	for err := range errorChan {
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // checkPkgsRange checks the range of packages from `fromPkgName` to `toPkgName`.
 //
 // It takes two parameters:
@@ -1025,9 +1129,11 @@ func (mpc *MultipleProject) calculateDependencyPopularity() map[string]int {
 	return popularity
 }
 
-// buildBatchWithDependencyInstall builds a batch of projects with immediate installation
-// of runtime dependencies.
-// Runtime dependencies are built in parallel when they don't depend on each other.
+// buildBatchWithDependencyInstall builds a batch of projects with Arch Linux-style
+// dependency handling: packages are installed immediately after building, making them
+// available for subsequent packages in the same batch.
+// This ensures that runtime dependencies (depends) are available during the build phase,
+// matching the behavior of Arch Linux's makepkg.
 func (mpc *MultipleProject) buildBatchWithDependencyInstall(projects []*Project, maxWorkers int,
 	runtimeDependencyMap map[string]bool, batchNumber int,
 ) error {
@@ -1049,12 +1155,14 @@ func (mpc *MultipleProject) buildBatchWithDependencyInstall(projects []*Project,
 		"batch_number", batchNumber)
 
 	// Phase 1: Build and install runtime dependencies first
+	// Install immediately after building to make them available for dependent packages
 	err := mpc.buildAndInstallRuntimeDeps(runtimeDeps, maxWorkers)
 	if err != nil {
 		return err
 	}
 
 	// Phase 2: Build and install regular packages
+	// Regular packages may depend on runtime deps from this batch
 	return mpc.buildAndInstallRegularPackages(regularPackages, maxWorkers)
 }
 
@@ -1074,6 +1182,7 @@ func (mpc *MultipleProject) buildAndInstallRuntimeDeps(
 }
 
 // buildAndInstallRegularPackages handles the building and installation of regular packages.
+// Uses the standard parallel build without immediate installation for non-dependency packages.
 func (mpc *MultipleProject) buildAndInstallRegularPackages(
 	regularPackages []*Project, maxWorkers int) error {
 	if len(regularPackages) == 0 {
@@ -1084,6 +1193,7 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 		i18n.T("logger.project.building_regular_packages"),
 		"count", len(regularPackages))
 
+	// Build packages in parallel
 	err := mpc.buildProjectsParallel(regularPackages, maxWorkers)
 	if err != nil {
 		return err
@@ -1213,6 +1323,7 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 }
 
 // buildAndInstallRuntimeBatches builds and installs runtime dependency batches.
+// Uses immediate installation after each package build (Arch Linux style).
 func (mpc *MultipleProject) buildAndInstallRuntimeBatches(
 	runtimeBatches [][]*Project, maxWorkers int) error {
 	// Build and install each batch of runtime dependencies
@@ -1229,47 +1340,12 @@ func (mpc *MultipleProject) buildAndInstallRuntimeBatches(
 			"parallel_packages", batchSize,
 			"packages", batchPackages)
 
-		// Build this batch in parallel
-		err := mpc.buildProjectsParallel(batch, min(maxWorkers, batchSize))
+		// Build and install this batch in parallel with immediate installation
+		// This ensures packages are installed as soon as they're built,
+		// making them available for other packages building in parallel
+		err := mpc.buildAndInstallProjectsParallel(batch, min(maxWorkers, batchSize), true)
 		if err != nil {
 			return err
-		}
-
-		// Install all packages in this batch immediately after building
-		err = mpc.installRuntimeBatch(batch)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// installRuntimeBatch installs all projects in a runtime dependency batch.
-func (mpc *MultipleProject) installRuntimeBatch(batch []*Project) error {
-	for _, proj := range batch {
-		pkgName := proj.Builder.PKGBUILD.PkgName
-
-		if !NoBuild {
-			logger.Info(i18n.T("logger.project.installing_runtime_dependency"),
-				"package", pkgName)
-
-			err := proj.PackageManager.Install(mpc.Output)
-			if err != nil {
-				logger.Error(i18n.T("logger.project.runtime_dependency_installation_failed"),
-					"package", pkgName,
-					"error", err)
-
-				return err
-			}
-
-			logger.Info(i18n.T("logger.project.runtime_dependency_installed"),
-				"package", pkgName)
-		}
-
-		if ToPkgName != "" && pkgName == ToPkgName {
-			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
-				"target_package", ToPkgName)
 		}
 	}
 
