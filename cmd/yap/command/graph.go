@@ -53,7 +53,7 @@ func init() {
 		"")
 	graphCmd.Flags().StringVarP(&graphFormat, "format", "f", "svg",
 		"")
-	graphCmd.Flags().StringVar(&graphTheme, "theme", "modern",
+	graphCmd.Flags().StringVar(&graphTheme, "theme", "gradient",
 		"")
 	graphCmd.Flags().BoolVar(&showExternal, "show-external", false,
 		"")

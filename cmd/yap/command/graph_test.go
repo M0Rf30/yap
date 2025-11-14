@@ -42,7 +42,7 @@ func TestGraphCommand(t *testing.T) {
 			Edges: []graph.Edge{
 				{From: "pkg2", To: "pkg1", Type: "runtime"},
 			},
-			Theme: theme.GetTheme("modern"),
+			Theme: theme.GetTheme("gradient"),
 		}
 
 		err := render.GenerateSVGGraph(graphData, outputPath, false)
@@ -58,8 +58,12 @@ func TestGraphCommand(t *testing.T) {
 	})
 
 	t.Run("Theme selection", func(t *testing.T) {
+		gradientTheme := theme.GetTheme("gradient")
+		assert.Equal(t, "#00C851", gradientTheme.NodeInternal)
+
+		// Test backward compatibility alias
 		modernTheme := theme.GetTheme("modern")
-		assert.Equal(t, "#00C851", modernTheme.NodeInternal)
+		assert.Equal(t, gradientTheme, modernTheme)
 
 		darkTheme := theme.GetTheme("dark")
 		assert.Equal(t, "#1a1a1a", darkTheme.Background)
@@ -73,13 +77,13 @@ func TestGraphCommandFlags(t *testing.T) {
 	// Reset global variables
 	graphOutput = ""
 	graphFormat = "svg"
-	graphTheme = "modern"
+	graphTheme = "gradient"
 	showExternal = false
 
 	t.Run("Default values", func(t *testing.T) {
 		assert.Equal(t, "", graphOutput)
 		assert.Equal(t, "svg", graphFormat)
-		assert.Equal(t, "modern", graphTheme)
+		assert.Equal(t, "gradient", graphTheme)
 		assert.False(t, showExternal)
 	})
 }
