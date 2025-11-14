@@ -9,6 +9,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/project"
 )
 
@@ -21,17 +22,27 @@ var (
 
 	// prepareCmd represents the prepare command.
 	prepareCmd = &cobra.Command{
-		Use:     "prepare <distro>",
+		Use:     "prepare [distro]",
 		GroupID: "environment",
 		Aliases: []string{"prep", "setup"},
 		Short:   "🛠️  Prepare build environment with development packages", // Will be set in init()
 		Long:    "",                                                        // Will be set in init()
 		Example: "",                                                        // Will be set in init()
-		Args:    createValidateDistroArgs(1),
+		Args:    cobra.RangeArgs(0, 1),
 		PreRun:  PreRunValidation,
 		Run: func(_ *cobra.Command, args []string) {
-			split := strings.Split(args[0], "-")
-			distro := split[0]
+			var distro string
+
+			// Use the default distro if none is provided
+			if len(args) == 0 {
+				osRelease, _ := platform.ParseOSRelease()
+				distro = osRelease.ID
+				logger.Warn(i18n.T("logger.prepare.no_distribution_specified"),
+					"distro", distro)
+			} else {
+				split := strings.Split(args[0], "-")
+				distro = split[0]
+			}
 
 			packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
 			if !project.SkipSyncDeps {
