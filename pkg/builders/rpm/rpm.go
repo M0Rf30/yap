@@ -35,13 +35,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *RPM {
 
 // BuildPackage creates an RPM package based on the provided PKGBUILD information.
 func (r *RPM) BuildPackage(artifactsPath string, targetArch string) error {
-	// Log cross-compilation build initiation
-	if targetArch != "" && targetArch != r.PKGBUILD.ArchComputed {
-		logger.Info(i18n.T("logger.cross_compilation.starting_cross_compilation_build"),
-			"package", r.PKGBUILD.PkgName,
-			"target_arch", targetArch,
-			"build_arch", r.PKGBUILD.ArchComputed)
-	}
+	r.LogCrossCompilation(targetArch)
 
 	// Use target architecture for cross-compilation if specified
 	arch := r.PKGBUILD.ArchComputed
@@ -129,14 +123,7 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) error {
 func (r *RPM) PrepareFakeroot(_ string, targetArch string) error {
 	r.getGroup()
 	r.getRelease()
-
-	// Use centralized architecture mapping from common package
-	// If target architecture is specified for cross-compilation, use it
-	if targetArch != "" {
-		r.PKGBUILD.ArchComputed = targetArch
-	}
-
-	r.TranslateArchitecture()
+	r.SetTargetArchitecture(targetArch)
 
 	if r.PKGBUILD.StripEnabled {
 		return options.Strip(r.PKGBUILD.PackageDir)

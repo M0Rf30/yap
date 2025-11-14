@@ -442,6 +442,37 @@ yap build arch examples/yap           # Arch Linux
 - ✅ Created comprehensive APK testing infrastructure
 - ✅ Integrated custom archives library for APK support
 - ✅ Documented APK format requirements and gaps
+- ✅ **Consolidated architecture handling and cross-compilation logging (2025-11-14)**
+
+### Architectural Decisions
+
+#### Why Certain Methods Remain Format-Specific
+
+The following methods **cannot** be consolidated into BaseBuilder:
+
+**DEB-specific:**
+- `getRelease()` - Debian uses codename directly (e.g., "bullseye")
+- `addScriptlets()` - DEB maintainer scripts format
+- `createConfFiles()` - Debian conffiles mechanism
+- `createDebconfFile()` - Debian interactive configuration
+
+**RPM-specific:**
+- `getRelease()` - RPM uses distro mapping (e.g., ".fc39" for Fedora 39)
+- `getGroup()` - RPM has specific group categories
+- `addScriptlets()` - RPM supports pretrans/posttrans not in DEB
+- `processDepends()` - Converts to rpmpack.Relations type
+
+**APK-specific:**
+- `createAPKPackage()` - Two-stream gzip format (control + data)
+- `createPkgInfo()` - Alpine .PKGINFO format with datahash
+- `isControlFile()` - APK control file detection logic
+- `writeFileWithChecksum()` - PAX format with APK-TOOLS.checksum.SHA1
+
+**Pacman-specific:**
+- `renderMtree()` - Arch Linux mtree metadata format
+- `createMTREEGzip()` - Mtree-specific compression
+
+These differences reflect **genuine format requirements**, not duplication.
 
 ### Known Limitations
 - **APK Packages**: Not yet installable with `apk add` (3-stream format required)
