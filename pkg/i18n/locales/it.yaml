@@ -400,6 +400,10 @@
 - id: logger.build.starting_verbose
   translation: "Avvio della compilazione in modalità dettagliata"
 
+# Messaggi logger - Prepare
+- id: logger.prepare.no_distribution_specified
+  translation: "Nessuna distribuzione specificata, uso il default del sistema"
+
 # Messaggi logger - Archive
 - id: logger.archive.debug.skip_exists
   translation: "Saltato, il file esiste già"
