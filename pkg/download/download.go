@@ -315,13 +315,18 @@ func formatBytes(size int64) string {
 		return fmt.Sprintf("%d B", size)
 	}
 
+	units := []string{"B", "KB", "MB", "GB", "TB", "PB", "EB"}
 	div, exp := int64(unit), 0
-	for n := size / unit; n >= unit; n /= unit {
+
+	for n := size / unit; n >= unit && exp < len(units)-2; n /= unit {
 		div *= unit
 		exp++
 	}
 
-	units := []string{"B", "KB", "MB", "GB", "TB"}
+	// Bounds check to prevent index out of range
+	if exp+1 >= len(units) {
+		exp = len(units) - 2
+	}
 
 	return fmt.Sprintf("%.1f %s", float64(size)/float64(div), units[exp+1])
 }
