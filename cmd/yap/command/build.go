@@ -137,6 +137,7 @@ func InitializeBuildDescriptions() {
 	buildCmd.Flag("ssh-password").Usage = i18n.T("flags.build.ssh_password")
 	buildCmd.Flag("from").Usage = i18n.T("flags.build.from")
 	buildCmd.Flag("to").Usage = i18n.T("flags.build.to")
+	buildCmd.Flag("target-arch").Usage = i18n.T("flags.build.target_arch")
 }
 
 //nolint:gochecknoinits // Required for cobra command registration
@@ -195,4 +196,8 @@ func init() {
 		"from", "", "", "")
 	buildCmd.Flags().StringVarP(&project.ToPkgName,
 		"to", "", "", "")
+
+	// CROSS-COMPILATION FLAGS
+	buildCmd.Flags().StringVarP(&project.TargetArch,
+		"target-arch", "t", "", "Target architecture for cross-compilation (e.g., arm64, armv7, x86_64)")
 }

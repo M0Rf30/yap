@@ -63,7 +63,7 @@ func TestBuildPackage(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	err = builder.BuildPackage(tempDir)
+	err = builder.BuildPackage(tempDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestPrepareFakeroot(t *testing.T) {
 
 	builder.PKGBUILD.PackageDir = pkgDir
 
-	err = builder.PrepareFakeroot(tempDir)
+	err = builder.PrepareFakeroot(tempDir, "")
 	if err != nil {
 		t.Errorf("PrepareFakeroot failed: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestPrepareFakerootWithScripts(t *testing.T) {
 
 	builder.PKGBUILD.PackageDir = pkgDir
 
-	err = builder.PrepareFakeroot(tempDir)
+	err = builder.PrepareFakeroot(tempDir, "")
 	if err != nil {
 		t.Errorf("PrepareFakeroot with scripts failed: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestPrepare(t *testing.T) {
 	builder := NewBuilder(pkgBuild)
 
 	makeDepends := []string{"make", "gcc"}
-	err := builder.Prepare(makeDepends)
+	err := builder.Prepare(makeDepends, "")
 	// This will likely fail since apk isn't installed, but we test the method call
 	if err == nil {
 		t.Log("Prepare succeeded (unexpected in test environment)")
@@ -199,7 +199,7 @@ func TestPrepareEnvironment(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	builder := NewBuilder(pkgBuild)
 
-	err := builder.PrepareEnvironment(false)
+	err := builder.PrepareEnvironment(false, "")
 	// This will likely fail since apk isn't installed, but we test the method call
 	if err == nil {
 		t.Log("PrepareEnvironment succeeded (unexpected in test environment)")
@@ -215,7 +215,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	builder := NewBuilder(pkgBuild)
 
-	err := builder.PrepareEnvironment(true)
+	err := builder.PrepareEnvironment(true, "")
 	// This will likely fail since apk isn't installed, but we test the method call
 	if err == nil {
 		t.Log("PrepareEnvironment with golang succeeded (unexpected in test environment)")

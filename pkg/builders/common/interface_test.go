@@ -490,3 +490,199 @@ func TestGetUpdateCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestSetupCrossCompilationEnvironment(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "yap-cross-comp-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
+
+	// Create a test PKGBUILD
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName:      "test-package",
+		PkgVer:       "1.0.0",
+		PkgRel:       "1",
+		ArchComputed: "x86_64",
+		StartDir:     tempDir,
+	}
+
+	// Test cases for different target architectures
+	testCases := []struct {
+		name       string
+		targetArch string
+		format     string
+		expectEnv  map[string]string // Expected environment variables (partial check)
+	}{
+		{
+			name:       "aarch64 cross-compilation",
+			targetArch: "aarch64",
+			format:     "deb",
+			expectEnv: map[string]string{
+				"CARGO_BUILD_TARGET": "aarch64-unknown-linux-gnu",
+				"GOOS":               "linux",
+				"GOARCH":             "arm64",
+				"TARGET_ARCH":        "aarch64",
+			},
+		},
+		{
+			name:       "armv7 cross-compilation",
+			targetArch: "armv7",
+			format:     "rpm",
+			expectEnv: map[string]string{
+				"CARGO_BUILD_TARGET": "armv7-unknown-linux-gnueabihf",
+				"GOOS":               "linux",
+				"GOARCH":             "arm",
+				"TARGET_ARCH":        "armv7",
+			},
+		},
+		{
+			name:       "x86_64 no cross-compilation",
+			targetArch: "x86_64",
+			format:     "deb",
+			expectEnv:  map[string]string{
+				// Should not set cross-compilation env vars when target == build
+			},
+		},
+		{
+			name:       "empty target arch",
+			targetArch: "",
+			format:     "deb",
+			expectEnv:  map[string]string{
+				// Should not set cross-compilation env vars when target is empty
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create base builder
+			bb := NewBaseBuilder(pkg, tc.format)
+
+			// Setup cross-compilation environment
+			err := bb.SetupCrossCompilationEnvironment(tc.targetArch)
+
+			// For valid cross-compilation scenarios, we expect success
+			if tc.targetArch != "" && tc.targetArch != pkg.ArchComputed {
+				if err != nil {
+					t.Logf("SetupCrossCompilationEnvironment error (expected for some toolchains): %v", err)
+					// Some toolchains might not be available in test environment, that's ok
+					return
+				}
+			} else {
+				// For no-cross-compilation scenarios, should return nil
+				if err != nil {
+					t.Errorf("Expected no error for no cross-compilation, got: %v", err)
+					return
+				}
+			}
+
+			// Check expected environment variables
+			for key, expectedValue := range tc.expectEnv {
+				actualValue := os.Getenv(key)
+				if expectedValue != "" && actualValue != expectedValue {
+					t.Errorf("Expected %s=%s, got %s", key, expectedValue, actualValue)
+				}
+			}
+
+			// Clean up environment variables for next test
+			for key := range tc.expectEnv {
+				_ = os.Unsetenv(key)
+			}
+
+			_ = os.Unsetenv("CC")
+			_ = os.Unsetenv("CXX")
+			_ = os.Unsetenv("CROSS_COMPILE")
+			_ = os.Unsetenv("HOST_ARCH")
+			_ = os.Unsetenv("BUILD_ARCH")
+		})
+	}
+}
+
+func TestGetRustTargetArchitecture(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "yap-rust-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
+
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName:      "test-package",
+		ArchComputed: "x86_64",
+		StartDir:     tempDir,
+	}
+
+	bb := NewBaseBuilder(pkg, "deb")
+
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"aarch64", "aarch64-unknown-linux-gnu"},
+		{"armv7", "armv7-unknown-linux-gnueabihf"},
+		{"armv6", "arm-unknown-linux-gnueabihf"},
+		{"i686", "i686-unknown-linux-gnu"},
+		{"x86_64", "x86_64-unknown-linux-gnu"},
+		{"ppc64le", "powerpc64le-unknown-linux-gnu"},
+		{"s390x", "s390x-unknown-linux-gnu"},
+		{"unknown", ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			result := bb.getRustTargetArchitecture(tc.input)
+			if result != tc.expected {
+				t.Errorf("Expected %s, got %s", tc.expected, result)
+			}
+		})
+	}
+}
+
+func TestGetGoTargetArchitecture(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "yap-go-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
+
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName:      "test-package",
+		ArchComputed: "x86_64",
+		StartDir:     tempDir,
+	}
+
+	bb := NewBaseBuilder(pkg, "deb")
+
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"aarch64", "arm64"},
+		{"armv7", "arm"},
+		{"armv6", "arm"},
+		{"i686", "386"},
+		{"x86_64", "amd64"},
+		{"ppc64le", "ppc64le"},
+		{"s390x", "s390x"},
+		{"unknown", ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			result := bb.getGoTargetArchitecture(tc.input)
+			if result != tc.expected {
+				t.Errorf("Expected %s, got %s", tc.expected, result)
+			}
+		})
+	}
+}

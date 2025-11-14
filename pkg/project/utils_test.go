@@ -126,6 +126,7 @@ func TestProcessDependencies(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var processed []string
+
 			processDependencies(tt.deps, packageMap, func(depName string) {
 				processed = append(processed, depName)
 			})

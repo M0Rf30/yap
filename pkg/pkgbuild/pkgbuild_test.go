@@ -1707,3 +1707,94 @@ func TestPKGBUILD_ChecksumSupport_SKIPValues(t *testing.T) {
 		t.Errorf("Expected 3 checksums, got %d", len(pb.HashSums))
 	}
 }
+
+func TestPKGBUILD_CrossCompilationVariables(t *testing.T) {
+	pb := &PKGBUILD{}
+
+	// Test that cross-compilation variables are initially empty
+	if pb.TargetArch != "" {
+		t.Errorf("Expected TargetArch to be empty, got %s", pb.TargetArch)
+	}
+
+	if pb.BuildArch != "" {
+		t.Errorf("Expected BuildArch to be empty, got %s", pb.BuildArch)
+	}
+
+	if pb.HostArch != "" {
+		t.Errorf("Expected HostArch to be empty, got %s", pb.HostArch)
+	}
+
+	// Test IsCrossCompilation method with no variables set
+	if pb.IsCrossCompilation() {
+		t.Error("Expected IsCrossCompilation to return false when no variables are set")
+	}
+
+	// Set a target architecture
+	pb.TargetArch = "aarch64"
+
+	// Test IsCrossCompilation method with target_arch set
+	if !pb.IsCrossCompilation() {
+		t.Error("Expected IsCrossCompilation to return true when target_arch is set")
+	}
+
+	// Test GetTargetArchitecture method
+	if pb.GetTargetArchitecture() != "aarch64" {
+		t.Errorf("Expected GetTargetArchitecture to return aarch64, got %s", pb.GetTargetArchitecture())
+	}
+
+	// Test with empty target arch but computed arch
+	pb.TargetArch = ""
+	pb.ArchComputed = "x86_64"
+
+	if pb.GetTargetArchitecture() != "x86_64" {
+		t.Errorf("Expected GetTargetArchitecture to return x86_64, got %s", pb.GetTargetArchitecture())
+	}
+
+	// Test with both target arch and computed arch
+	pb.TargetArch = "armv7"
+	pb.ArchComputed = "x86_64"
+
+	if pb.GetTargetArchitecture() != "armv7" {
+		t.Errorf("Expected GetTargetArchitecture to return armv7, got %s", pb.GetTargetArchitecture())
+	}
+}
+
+func TestPKGBUILD_AddItemWithCrossCompilationVariables(t *testing.T) {
+	pb := &PKGBUILD{}
+	pb.Init() // Initialize the PKGBUILD to set up the priorities map
+
+	// Test adding target_arch variable
+	err := pb.AddItem("target_arch", "aarch64")
+	if err != nil {
+		t.Errorf("Failed to add target_arch variable: %v", err)
+	}
+
+	if pb.TargetArch != "aarch64" {
+		t.Errorf("Expected TargetArch to be aarch64, got %s", pb.TargetArch)
+	}
+
+	// Test adding build_arch variable
+	err = pb.AddItem("build_arch", "x86_64")
+	if err != nil {
+		t.Errorf("Failed to add build_arch variable: %v", err)
+	}
+
+	if pb.BuildArch != "x86_64" {
+		t.Errorf("Expected BuildArch to be x86_64, got %s", pb.BuildArch)
+	}
+
+	// Test adding host_arch variable
+	err = pb.AddItem("host_arch", "armv7")
+	if err != nil {
+		t.Errorf("Failed to add host_arch variable: %v", err)
+	}
+
+	if pb.HostArch != "armv7" {
+		t.Errorf("Expected HostArch to be armv7, got %s", pb.HostArch)
+	}
+
+	// Test IsCrossCompilation method
+	if !pb.IsCrossCompilation() {
+		t.Error("Expected IsCrossCompilation to return true when variables are set")
+	}
+}
