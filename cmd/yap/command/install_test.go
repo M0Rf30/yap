@@ -179,7 +179,7 @@ func TestInstallCommandDefinition(t *testing.T) {
 	// Test that the install command is properly defined
 	assert.NotNil(t, installCmd)
 	assert.Equal(t, "install <artifact-file>", installCmd.Use)
-	assert.Contains(t, installCmd.Short, "Install a package artifact")
+	assert.Contains(t, installCmd.Short, "Install built packages on the local system")
 	assert.Equal(t, "utility", installCmd.GroupID)
 	assert.NotEmpty(t, installCmd.Long)
 	assert.NotNil(t, installCmd.RunE)

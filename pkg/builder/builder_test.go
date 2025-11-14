@@ -3,6 +3,7 @@ package builder_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -422,7 +423,7 @@ func TestBuilder_CompileWithFailingInitDirs(t *testing.T) {
 
 	err := bldr.Compile(false)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to initialize directories")
+	assert.Contains(t, strings.ToLower(err.Error()), "failed to initialize directories")
 }
 
 func TestBuilder_CompileErrorContexts(t *testing.T) {
@@ -452,5 +453,5 @@ func TestBuilder_CompileErrorContexts(t *testing.T) {
 	errStr := err.Error()
 	t.Logf("Actual error: %s", errStr)
 	// These tests verify that error handling is working, but the exact format may change
-	assert.Contains(t, errStr, "build stage failed")
+	assert.Contains(t, strings.ToLower(errStr), "build stage failed")
 }

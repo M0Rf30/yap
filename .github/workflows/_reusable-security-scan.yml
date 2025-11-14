@@ -1,0 +1,96 @@
+---
+name: Reusable Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: "Go version to use"
+        required: false
+        type: string
+        default: "1.25.4"
+      upload-sarif:
+        description: "Upload SARIF to GitHub Security"
+        required: false
+        type: boolean
+        default: true
+      run-gosec:
+        description: "Run Gosec security scanner"
+        required: false
+        type: boolean
+        default: true
+      run-vulncheck:
+        description: "Run govulncheck vulnerability scanner"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ inputs.go-version }}
+          cache: true
+
+      - name: 📥 Download dependencies
+        run: go mod download
+
+      - name: 🔒 Install Gosec
+        if: ${{ inputs.run-gosec }}
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: 🔒 Run Gosec Security Scanner
+        if: ${{ inputs.run-gosec }}
+        run: |
+          gosec -fmt sarif -out gosec.sarif -exclude-dir=docs -exclude-dir=dist ./...
+
+      - name: 📋 Upload Gosec SARIF
+        if: ${{ inputs.run-gosec && inputs.upload-sarif }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: gosec.sarif
+
+      - name: 📤 Upload Gosec artifact
+        if: ${{ inputs.run-gosec }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: gosec-results
+          path: gosec.sarif
+          retention-days: 30
+
+      - name: 🛡️ Install govulncheck
+        if: ${{ inputs.run-vulncheck }}
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: 🔍 Run vulnerability check
+        if: ${{ inputs.run-vulncheck }}
+        id: vulncheck
+        run: |
+          echo "🔍 Running vulnerability scan..."
+          
+          if govulncheck -json ./... > vulncheck.json 2>&1; then
+            echo "result=success" >> "$GITHUB_OUTPUT"
+            echo "✅ No vulnerabilities found"
+          else
+            echo "result=vulnerabilities_found" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Vulnerabilities detected"
+          fi
+
+      - name: 📤 Upload vulnerability scan results
+        if: ${{ inputs.run-vulncheck }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: vulnerability-scan-results
+          path: vulncheck.json
+          retention-days: 30
