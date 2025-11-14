@@ -1,24 +1,822 @@
+# YAP English Localization
+# This file contains all English translations for the YAP package builder
+
+# Root command
+- id: root.short
+  translation: "Yet Another Packager - Build native packages for multiple Linux distributions"
+- id: root.examples
+  translation: |
+    # Build packages for all distributions
+    yap build /path/to/project
+
+    # Build for a specific distribution
+    yap build ubuntu /path/to/project
+    yap build alpine /path/to/project
+
+    # Build with verbose output
+    yap -v build /path/to/project
+
+# Command groups
+- id: groups.build
+  translation: "Build Commands"
+- id: groups.environment
+  translation: "Environment Commands"
+- id: groups.utility
+  translation: "Utility Commands"
+
+# Build command
+- id: commands.build.short
+  translation: "Build packages from yap.json project definition"
+- id: commands.build.long
+  translation: |
+    Build native packages for one or more Linux distributions from a yap.json
+    project definition file. Supports multiple package formats including DEB,
+    RPM, APK, and Pacman.
+- id: commands.build.examples
+  translation: |
+    # Build for all distributions
+    yap build /path/to/project
+
+    # Build for specific distribution
+    yap build ubuntu /path/to/project
+    yap build fedora /path/to/project
+
+    # Build with options
+    yap build --skip-sync /path/to/project
+    yap build --cleanbuild /path/to/project
+
+# Completion command
+- id: commands.completion.short
+  translation: "Generate shell completion scripts"
+
+# Graph command
+- id: commands.graph.short
+  translation: "Generate beautiful dependency graphs"
+- id: commands.graph.long
+  translation: |
+    Generate visual dependency graphs showing relationships between packages
+    in your project. Supports multiple output formats (SVG, PNG) and themes.
+- id: commands.graph.examples
+  translation: |
+    # Generate SVG graph
+    yap graph /path/to/project
+
+    # Generate PNG graph with custom output
+    yap graph -f png -o deps.png /path/to/project
+
+    # Use different theme
+    yap graph --theme dark /path/to/project
+
+# Install command
+- id: commands.install.short
+  translation: "Install built packages on the local system"
+- id: commands.install.long
+  translation: |
+    Install packages that were built by YAP onto the local system using
+    the appropriate package manager for your distribution.
+- id: commands.install.examples
+  translation: |
+    # Install built package
+    yap install /path/to/package.deb
+    yap install /path/to/package.rpm
+
+# List distros command
+- id: commands.list_distros.short
+  translation: "List all supported distributions and releases"
+- id: commands.list_distros.long
+  translation: |
+    Display a complete list of all Linux distributions and release versions
+    supported by YAP for package building.
+- id: commands.list_distros.examples
+  translation: |
+    # List all supported distributions
+    yap list-distros
+
+# Prepare command
+- id: commands.prepare.short
+  translation: "Prepare build environment"
+- id: commands.prepare.long
+  translation: |
+    Prepare the build environment by setting up required dependencies,
+    compilers, and build tools for the target distribution.
+- id: commands.prepare.examples
+  translation: |
+    # Prepare environment for current distribution
+    yap prepare /path/to/project
+
+    # Prepare with Go installation
+    yap prepare --golang /path/to/project
+
+# Pull command
+- id: commands.pull.short
+  translation: "Pull container images for distributions"
+
+# Status command
+- id: commands.status.short
+  translation: "Show build status and environment information"
+
+# Version command
+- id: commands.version.short
+  translation: "Show YAP version information"
+
+# Zap command
+- id: commands.zap.short
+  translation: "Clean build artifacts and temporary files"
+- id: commands.zap.long
+  translation: |
+    Remove build artifacts, temporary files, and cached data for a project.
+    Can clean for specific distributions or all distributions.
+- id: commands.zap.examples
+  translation: |
+    # Clean all build artifacts
+    yap zap /path/to/project
+
+    # Clean specific distribution
+    yap zap --from ubuntu /path/to/project
+
+    # Clean range of distributions
+    yap zap --from ubuntu --to fedora /path/to/project
+
+# Build flags
+- id: flags.build.cleanbuild
+  translation: "Remove source directory before building"
+- id: flags.build.from
+  translation: "Start building from this distribution"
+- id: flags.build.nobuild
+  translation: "Skip building packages (prepare only)"
+- id: flags.build.nomakedeps
+  translation: "Skip make dependencies installation"
+- id: flags.build.pkgrel
+  translation: "Override package release number"
+- id: flags.build.pkgver
+  translation: "Override package version"
+- id: flags.build.skip_sync
+  translation: "Skip syncing dependencies (faster builds)"
+- id: flags.build.ssh_password
+  translation: "SSH password for Git repositories"
 - id: flags.build.target_arch
-  translation: 🏗️  target architecture for cross-compilation (e.g., aarch64, armv7, i686)
-- id: logger.cross_compilation.detected_target_architecture
-  translation: detected target architecture for cross-compilation
-- id: logger.cross_compilation.installing_cross_compiler_packages
-  translation: installing cross-compiler packages for target architecture
-- id: logger.cross_compilation.cross_compiler_package_installed
-  translation: cross-compiler package installed successfully
-- id: logger.cross_compilation.failed_to_install_cross_compiler_package
-  translation: failed to install cross-compiler package
-- id: logger.cross_compilation.configuring_cross_compilation_environment
-  translation: configuring cross-compilation environment variables
+  translation: "Target architecture for cross-compilation"
+- id: flags.build.to
+  translation: "Stop building at this distribution"
+- id: flags.build.zap
+  translation: "Clean artifacts before building"
+
+# Graph flags
+- id: flags.graph.format
+  translation: "Output format (svg, png)"
+- id: flags.graph.output
+  translation: "Output file path"
+- id: flags.graph.show_external
+  translation: "Show external dependencies"
+- id: flags.graph.theme
+  translation: "Graph theme (modern, dark, light)"
+
+# Global flags
+- id: flags.no_color
+  translation: "Disable colored output"
+- id: flags.verbose
+  translation: "Enable verbose output"
+
+# Prepare flags
+- id: flags.prepare.golang
+  translation: "Install Go compiler"
+- id: flags.prepare.skip_sync
+  translation: "Skip syncing dependencies"
+- id: flags.prepare.target_arch
+  translation: "Target architecture"
+
+# Zap flags
+- id: flags.zap.from
+  translation: "Start cleaning from this distribution"
+- id: flags.zap.to
+  translation: "Stop cleaning at this distribution"
+
+# Footer messages
+- id: footer.documentation
+  translation: "Documentation: https://opencode.ai/docs"
+- id: footer.more_info
+  translation: "For more information, visit:"
+- id: footer.report_issues
+  translation: "Report issues: https://github.com/M0Rf30/yap/issues"
+
+# General messages
+- id: messages.verbose_mode_enabled
+  translation: "Verbose mode enabled"
+
+# Build errors
+- id: errors.build.build_stage_failed
+  translation: "Build stage failed"
+- id: errors.build.failed_to_initialize_directories
+  translation: "Failed to initialize directories"
+- id: errors.build.failed_to_retrieve_source
+  translation: "Failed to retrieve source"
+- id: errors.build.failed_to_retrieve_sources
+  translation: "Failed to retrieve sources"
+
+# Completion errors
+- id: errors.completion.failed_to_generate_bash_completion
+  translation: "Failed to generate Bash completion"
+- id: errors.completion.failed_to_generate_fish_completion
+  translation: "Failed to generate Fish completion"
+- id: errors.completion.failed_to_generate_zsh_completion
+  translation: "Failed to generate Zsh completion"
+
+# Download errors
+- id: errors.download.download_failed
+  translation: "Download failed"
+- id: errors.download.download_failed_after_attempts
+  translation: "Download failed after all retry attempts"
+- id: errors.download.download_failed_no_response
+  translation: "Download failed: no response from server"
+
+# File errors
+- id: errors.files.failed_to_access_directory
+  translation: "Failed to access directory"
+- id: errors.files.failed_to_change_permissions
+  translation: "Failed to change permissions"
+- id: errors.files.failed_to_create_directory
+  translation: "Failed to create directory"
+- id: errors.files.failed_to_stat_file
+  translation: "Failed to stat file"
+- id: errors.files.file_not_writable
+  translation: "File is not writable"
+
+# Git errors
+- id: errors.git.empty_download_path
+  translation: "Download path cannot be empty"
+- id: errors.git.remote_branch_not_found
+  translation: "Remote branch not found"
+
+# Graph errors
+- id: errors.graph.failed_to_load_project
+  translation: "Failed to load project"
+- id: errors.graph.failed_to_resolve_project_path
+  translation: "Failed to resolve project path"
+
+# Install errors
+- id: errors.install.artifact_not_found
+  translation: "Package artifact not found"
+- id: errors.install.failed_to_resolve_path
+  translation: "Failed to resolve path"
+- id: errors.install.installation_failed
+  translation: "Installation failed"
+- id: errors.install.unsupported_package_format
+  translation: "Unsupported package format"
+- id: errors.install.unsupported_package_type
+  translation: "Unsupported package type"
+
+# Packer errors
+- id: errors.packer.unsupported_linux_distro
+  translation: "Unsupported Linux distribution"
+- id: errors.packer.unsupported_package_manager
+  translation: "Unsupported package manager"
+
+# PKGBUILD errors
+- id: errors.pkgbuild.failed_to_set_variable
+  translation: "Failed to set variable"
+- id: errors.pkgbuild.failed_to_set_variable_pkgdir
+  translation: "Failed to set pkgdir variable"
+- id: errors.pkgbuild.failed_to_set_variable_srcdir
+  translation: "Failed to set srcdir variable"
+- id: errors.pkgbuild.failed_to_set_variable_startdir
+  translation: "Failed to set startdir variable"
+- id: errors.pkgbuild.invalid_directive_use
+  translation: "Invalid directive usage"
+- id: errors.pkgbuild.unsupported_architecture
+  translation: "Unsupported architecture"
+
+# Platform errors
+- id: errors.platform.chown_failed
+  translation: "Failed to change ownership"
+- id: errors.platform.chown_root_directory_failed
+  translation: "Failed to change ownership of root directory"
+- id: errors.platform.create_gofmt_symlink_failed
+  translation: "Failed to create gofmt symlink"
+- id: errors.platform.create_go_symlink_failed
+  translation: "Failed to create go symlink"
+- id: errors.platform.download_go_archive_failed
+  translation: "Failed to download Go archive"
+- id: errors.platform.extract_go_archive_failed
+  translation: "Failed to extract Go archive"
+- id: errors.platform.no_container_app_found
+  translation: "No container application found (Docker or Podman required)"
+- id: errors.platform.open_os_release_failed
+  translation: "Failed to open /etc/os-release"
+- id: errors.platform.parse_sudo_gid_failed
+  translation: "Failed to parse SUDO_GID"
+- id: errors.platform.parse_sudo_uid_failed
+  translation: "Failed to parse SUDO_UID"
+- id: errors.platform.remove_go_archive_failed
+  translation: "Failed to remove Go archive"
+- id: errors.platform.scan_os_release_failed
+  translation: "Failed to scan /etc/os-release"
+- id: errors.platform.start_multiprinter_failed
+  translation: "Failed to start multiprinter"
+
+# Project errors
+- id: errors.project.circular_dependency_detected
+  translation: "Circular dependency detected"
+- id: errors.project.circular_runtime_dependency_detected
+  translation: "Circular runtime dependency detected"
+
+# RPM errors
+- id: errors.rpm.modification_time_out_of_range
+  translation: "File modification time out of range for RPM format"
+
+# Set errors
+- id: errors.set.empty_array
+  translation: "Empty array"
+- id: errors.set.empty_function
+  translation: "Empty function"
+- id: errors.set.empty_variable
+  translation: "Empty variable"
+
+# Shell errors
+- id: errors.shell.command_not_allowed_for_sudo
+  translation: "Command not allowed for sudo execution"
+- id: errors.shell.failed_to_create_script_runner
+  translation: "Failed to create script runner"
+- id: errors.shell.failed_to_parse_script
+  translation: "Failed to parse script"
+- id: errors.shell.failed_to_start_multiprinter
+  translation: "Failed to start multiprinter"
+- id: errors.shell.script_execution_failed
+  translation: "Script execution failed"
+
+# Source errors
+- id: errors.source.directory_not_supported
+  translation: "Directory sources are not supported"
+- id: errors.source.failed_to_copy_file
+  translation: "Failed to copy file"
+- id: errors.source.failed_to_open_file_for_hash
+  translation: "Failed to open file for hash calculation"
+- id: errors.source.hash_verification_failed
+  translation: "Hash verification failed"
+- id: errors.source.unsupported_hash_length
+  translation: "Unsupported hash length"
+- id: errors.source.unsupported_source_type
+  translation: "Unsupported source type"
+
+# Validation errors
+- id: errors.validation.distribution_empty
+  translation: "Distribution cannot be empty"
+- id: errors.validation.insufficient_args
+  translation: "Insufficient arguments"
+- id: errors.validation.insufficient_args_detailed
+  translation: "Insufficient arguments provided"
+- id: errors.validation.invalid_path
+  translation: "Invalid path"
+- id: errors.validation.no_project_files
+  translation: "No project files found"
+- id: errors.validation.path_not_exist
+  translation: "Path does not exist"
+- id: errors.validation.project_file_not_found
+  translation: "Project file not found"
+- id: errors.validation.project_path_empty
+  translation: "Project path cannot be empty"
+- id: errors.validation.unsupported_distribution
+  translation: "Unsupported distribution"
+
+# Logger messages - Build
+- id: logger.build.build_completed
+  translation: "Build completed successfully"
+- id: logger.build.build_failed
+  translation: "Build failed"
+- id: logger.build.building_for_distribution
+  translation: "Building for distribution"
+- id: logger.build.building_packages
+  translation: "Building packages"
+- id: logger.build.initializing_project
+  translation: "Initializing project"
+- id: logger.build.no_distribution_specified
+  translation: "No distribution specified, using system default"
+- id: logger.build.project_init_failed
+  translation: "Project initialization failed"
+- id: logger.build.project_init_success
+  translation: "Project initialized successfully"
+- id: logger.build.project_path
+  translation: "Project path"
+- id: logger.build.starting_verbose
+  translation: "Starting build in verbose mode"
+
+# Logger messages - Archive
+- id: logger.archive.debug.skip_exists
+  translation: "Skipping, file already exists"
+- id: logger.archive.warn.close_failed
+  translation: "Failed to close archive"
+
+# Logger messages - Build package
+- id: logger.buildpackage.warn.failed_to_remove_temporary_1
+  translation: "Failed to remove temporary directory"
+
+# Logger messages - Calculate data hash
+- id: logger.calculatedatahash.warn.failed_to_close_file_1
+  translation: "Failed to close file after hash calculation"
+
+# Logger messages - Calculate SHA256
+- id: logger.calculatesha256.warn.failed_to_close_file_5
+  translation: "Failed to close file after SHA256 calculation"
+
+# Logger messages - Check Go
+- id: logger.checkgo.info.go_is_already_installed_1
+  translation: "Go is already installed"
+
+# Logger messages - Chmod
+- id: logger.chmod.error.failed_to_chmod_1
+  translation: "Failed to change file permissions"
+
+# Logger messages - Chown
+- id: logger.chownrecursivetooriginaluser.warn.failed_to_chown_file_1
+  translation: "Failed to change ownership of file"
+- id: logger.chowntooriginaluser.debug.changed_ownership_to_original_1
+  translation: "Changed ownership to original user"
+
+# Logger messages - Clone
+- id: logger.clone.error.failed_to_load_ssh_1
+  translation: "Failed to load SSH key"
+- id: logger.clone.warn.try_to_use_an_1
+  translation: "Try to use an SSH key or provide credentials"
+
+# Logger messages - Configure resume
+- id: logger.configureresumeifpossible.info.resuming_download_1
+  translation: "Resuming download from previous position"
+
+# Logger messages - Create DEB
+- id: logger.createdeb.warn.failed_to_close_debian_1
+  translation: "Failed to close Debian archive"
+
+# Logger messages - Create
+- id: logger.create.error.failed_to_create_path_1
+  translation: "Failed to create path"
+
+# Logger messages - Create mtree gzip
+- id: logger.createmtreegzip.warn.failed_to_close_gzip_1
+  translation: "Failed to close gzip stream"
+- id: logger.createmtreegzip.warn.failed_to_close_output_1
+  translation: "Failed to close output file"
+
+# Logger messages - Create spec
+- id: logger.createspec.warn.failed_to_close_pkgbuild_1
+  translation: "Failed to close PKGBUILD file"
+
+# Logger messages - Create tar.gz
+- id: logger.createtargz.warn.failed_to_close_output_1
+  translation: "Failed to close tar.gz output"
+
+# Logger messages - Create tar.zst
+- id: logger.createtarzst.warn.failed_to_close_output_1
+  translation: "Failed to close tar.zst output"
+
+# Logger messages - Create write
+- id: logger.createwrite.error.failed_to_write_to_1
+  translation: "Failed to write to file"
+
+# Logger messages - Creating package
+- id: logger.creating_package
+  translation: "Creating package"
+- id: logger.building_resulting_package
+  translation: "Building resulting package"
+
+# Logger messages - Cross compilation
 - id: logger.cross_compilation.cross_compilation_environment_configured
-  translation: cross-compilation environment configured successfully
-- id: logger.cross_compilation.starting_cross_compilation_build
-  translation: starting cross-compilation build for target architecture
-- id: logger.cross_compilation.setting_up_cross_compilation_environment
-  translation: setting up cross-compilation environment for target architecture
-- id: logger.cross_compilation.rust_cross_compilation_configured
-  translation: Rust cross-compilation configured for target
-- id: logger.cross_compilation.go_cross_compilation_configured
-  translation: Go cross-compilation configured for target
+  translation: "Cross-compilation environment configured"
 - id: logger.cross_compilation.cross_compilation_environment_setup_failed
-  translation: failed to setup cross-compilation environment
+  translation: "Cross-compilation environment setup failed"
+- id: logger.cross_compilation.detected_target_architecture
+  translation: "Detected target architecture"
+- id: logger.cross_compilation.go_cross_compilation_configured
+  translation: "Go cross-compilation configured"
+- id: logger.cross_compilation.installing_cross_compiler_packages
+  translation: "Installing cross-compiler packages"
+- id: logger.cross_compilation.rust_cross_compilation_configured
+  translation: "Rust cross-compilation configured"
+- id: logger.cross_compilation.setting_up_cross_compilation_environment
+  translation: "Setting up cross-compilation environment"
+- id: logger.cross_compilation.starting_cross_compilation_build
+  translation: "Starting cross-compilation build"
+
+# Logger messages - Dependencies
+- id: logger.analyzing_package_dependencies
+  translation: "Analyzing package dependencies"
+- id: logger.dependency_analysis_complete
+  translation: "Dependency analysis complete"
+- id: logger.dependency_analysis_starting
+  translation: "Starting dependency analysis"
+- id: logger.dependency_aware_build_process_starting
+  translation: "Starting dependency-aware build process"
+- id: logger.dependency_category
+  translation: "Dependency category"
+- id: logger.dependency_popularity
+  translation: "Dependency popularity"
+- id: logger.dependency_popularity_analysis
+  translation: "Analyzing dependency popularity"
+- id: logger.external_dependency
+  translation: "External dependency"
+- id: logger.external_runtime_dependencies_collected
+  translation: "External runtime dependencies collected"
+- id: logger.internal_dependency
+  translation: "Internal dependency"
+- id: logger.package_dependencies_found
+  translation: "Package dependencies found"
+
+# Logger messages - Build batch
+- id: logger.batch_build_strategy
+  translation: "Batch build strategy"
+- id: logger.build_batch_determined
+  translation: "Build batch determined"
+- id: logger.build_order_determined
+  translation: "Build order determined"
+- id: logger.processing_build_batch
+  translation: "Processing build batch"
+
+# Logger messages - Circular dependency
+- id: logger.circular_dependency_detected
+  translation: "Circular dependency detected"
+
+# Logger messages - Download
+- id: logger.download.info.response_status
+  translation: "Response status"
+
+# Logger messages - Exec with context
+- id: logger.execwithcontext.debug.command_execution_completed_1
+  translation: "Command execution completed"
+- id: logger.execwithcontext.error.command_execution_failed_1
+  translation: "Command execution failed"
+
+# Logger messages - Fatal error
+- id: logger.fatal_error
+  translation: "Fatal error"
+
+# Logger messages - Files
+- id: logger.files.warn.close_write
+  translation: "Failed to close file writer"
+- id: logger.failed_to_close_project_file
+  translation: "Failed to close project file"
+- id: logger.failed_to_preserve_ownership
+  translation: "Failed to preserve file ownership"
+- id: logger.failed_to_remove_package_directory
+  translation: "Failed to remove package directory"
+
+# Logger messages - Finish
+- id: logger.finish.info.download_completed_1
+  translation: "Download completed"
+
+# Logger messages - Generate PNG graph
+- id: logger.generatepnggraph.info.svg_graph_generated_for_1
+  translation: "SVG graph generated for conversion"
+- id: logger.generatepnggraph.warn.png_conversion_requires_external_1
+  translation: "PNG conversion requires external tool (inkscape or imagemagick)"
+
+# Logger messages - Generate SVG graph
+- id: logger.generatesvggraph.error.failed_to_close_file_1
+  translation: "Failed to close SVG file"
+- id: logger.generatesvggraph.info.svg_graph_generated_successfully_1
+  translation: "SVG graph generated successfully"
+
+# Logger messages - Go setup
+- id: logger.gosetup.info.go_successfully_installed_1
+  translation: "Go successfully installed"
+
+# Logger messages - Installing
+- id: logger.installing_external_runtime_dependencies
+  translation: "Installing external runtime dependencies"
+- id: logger.installing_package
+  translation: "Installing package"
+- id: logger.installpackage.info.installing_package_1
+  translation: "Installing package"
+- id: logger.installpackage.info.package_installed_successfully_1
+  translation: "Package installed successfully"
+
+# Logger messages - Integrity check
+- id: logger.integrity_check_for
+  translation: "Integrity check for"
+- id: logger.skip_integrity_check_for
+  translation: "Skipping integrity check for"
+
+# Logger messages - Invalid package order
+- id: logger.invalid_package_order
+  translation: "Invalid package order"
+
+# Logger messages - Log download start
+- id: logger.logdownloadstart.info.response_status
+  translation: "Response status"
+- id: logger.logdownloadstart.info.server_supports_resume_1
+  translation: "Server supports resume capability"
+
+# Logger messages - Log package created
+- id: logger.logpackagecreated.info.package_artifact_created_3
+  translation: "Package artifact created"
+
+# Logger messages - Monitor download
+- id: logger.monitordownload.info.download_completed_1
+  translation: "Download completed"
+
+# Logger messages - Multi project file
+- id: logger.multi_project_file_found
+  translation: "Multiple project files found"
+- id: logger.single_project_file_found
+  translation: "Single project file found"
+
+# Logger messages - Open
+- id: logger.open.error.failed_to_open_file_1
+  translation: "Failed to open file"
+
+# Logger messages - Package
+- id: logger.package_information
+  translation: "Package information"
+- id: logger.package_installation_planned
+  translation: "Package installation planned"
+- id: logger.package_installed
+  translation: "Package installed"
+- id: logger.package_not_found
+  translation: "Package not found"
+
+# Logger messages - Parse file
+- id: logger.parsefile.error.failed_to_get_root_1
+  translation: "Failed to get root element"
+
+# Logger messages - Parse OS release
+- id: logger.parseosrelease.warn.failed_to_close_osrelease_1
+  translation: "Failed to close /etc/os-release"
+
+# Logger messages - Performing topological sort
+- id: logger.performing_topological_sort_for_build_order
+  translation: "Performing topological sort for build order"
+
+# Logger messages - Platform
+- id: logger.platform.info.preserve_recursive
+  translation: "Preserving ownership recursively"
+- id: logger.platform.warn.arch_fallback
+  translation: "Architecture detection fallback"
+- id: logger.platform.warn.get_user
+  translation: "Failed to get user information"
+- id: logger.platform.warn.sudo_lookup
+  translation: "Failed to lookup sudo user"
+
+# Logger messages - Preserve ownership
+- id: logger.preserveownership.info.preserving_ownership_for_original_1
+  translation: "Preserving ownership for original user"
+- id: logger.preserveownership.warn.failed_to_get_original_1
+  translation: "Failed to get original ownership"
+
+# Logger messages - Project
+- id: logger.project.building_dependency_graph
+  translation: "Building dependency graph"
+- id: logger.project.building_regular_packages
+  translation: "Building regular packages"
+- id: logger.project.building_runtime_dependency_batch
+  translation: "Building runtime dependency batch"
+- id: logger.project.found_from_package
+  translation: "Found starting package"
+- id: logger.project.found_to_package
+  translation: "Found target package"
+- id: logger.project.installing_runtime_dependency
+  translation: "Installing runtime dependency"
+- id: logger.project.make_dependency_found
+  translation: "Make dependency found"
+- id: logger.project.package_installation_failed
+  translation: "Package installation failed"
+- id: logger.project.runtime_dependencies_batching_complete
+  translation: "Runtime dependencies batching complete"
+- id: logger.project.runtime_dependencies_build_optimization
+  translation: "Optimizing runtime dependencies build order"
+- id: logger.project.runtime_dependency_batch_analysis
+  translation: "Analyzing runtime dependency batch"
+- id: logger.project.runtime_dependency_detected
+  translation: "Runtime dependency detected"
+- id: logger.project.runtime_dependency_found
+  translation: "Runtime dependency found"
+- id: logger.project.runtime_dependency_installation_failed
+  translation: "Runtime dependency installation failed"
+- id: logger.project.runtime_dependency_installed
+  translation: "Runtime dependency installed"
+- id: logger.project.runtime_dependency_map
+  translation: "Runtime dependency map"
+- id: logger.project.skipping_batch_filtered_out
+  translation: "Skipping batch (filtered out)"
+- id: logger.project.starting_dependencyaware_build_process
+  translation: "Starting dependency-aware build process"
+
+# Logger messages - Pull
+- id: logger.pull.failed_to_pull
+  translation: "Failed to pull container image"
+- id: logger.pull.specify_codename
+  translation: "Please specify a distribution codename"
+
+# Logger messages - Retrieving sources
+- id: logger.retrieving_sources
+  translation: "Retrieving sources"
+
+# Logger messages - Run graph command
+- id: logger.rungraphcommand.info.generating_dependency_graph_1
+  translation: "Generating dependency graph"
+
+# Logger messages - Run install
+- id: logger.runinstall.info.detected_package_type_1
+  translation: "Detected package type"
+
+# Logger messages - Run script with package
+- id: logger.runscriptwithpackage.debug.starting_script_execution_1
+  translation: "Starting script execution"
+- id: logger.runscriptwithpackage.error.script_execution_failed_1
+  translation: "Script execution failed"
+- id: logger.runscriptwithpackage.error.script_execution_failed_3
+  translation: "Script execution failed with error"
+- id: logger.runscriptwithpackage.info.executing_shell_script_3
+  translation: "Executing shell script"
+
+# Logger messages - Setup ccache
+- id: logger.setupccache.info.ccache_enabled_for_build_1
+  translation: "ccache enabled for build"
+- id: logger.setupccache.info.ccache_not_found_skipping_1
+  translation: "ccache not found, skipping"
+- id: logger.setupccache.warn.ccache_setup_failed_1
+  translation: "ccache setup failed"
+- id: logger.setupccache.warn.failed_to_create_ccache_dir_1
+  translation: "Failed to create ccache directory"
+
+# Logger messages - Setup environment dependencies
+- id: logger.setupenvironmentdependencies.info.go_detected_version_check_1
+  translation: "Go detected, checking version"
+- id: logger.setupenvironmentdependencies.warn.failed_to_setup_go_1
+  translation: "Failed to setup Go"
+
+# Logger messages - Shell
+- id: logger.shell.debug.exec_cmd
+  translation: "Executing command"
+- id: logger.shell.debug.exec_sudo
+  translation: "Executing with sudo"
+- id: logger.shell.debug.exec_sudo_cmd
+  translation: "Executing command with sudo"
+- id: logger.shell.info.exec_script
+  translation: "Executing script"
+
+# Logger messages - Stopping build
+- id: logger.stopping_build_at_target_package
+  translation: "Stopping build at target package"
+
+# Logger messages - Stringify array
+- id: logger.stringifyarray.error.unable_to_parse_array_1
+  translation: "Unable to parse array"
+
+# Logger messages - Stringify func decl
+- id: logger.stringifyfuncdecl.error.unable_to_parse_function_1
+  translation: "Unable to parse function"
+
+# Logger messages - Strip
+- id: logger.strip.info.stripping_binaries_1
+  translation: "Stripping binaries"
+
+# Logger messages - Tips
+- id: logger.tips.use_help
+  translation: "Use '%s --help' for more information"
+- id: logger.tips.use_verbose
+  translation: "Use --verbose flag for detailed output"
+
+# Logger messages - Unknown/Generic
+- id: logger.unknown.debug.command_execution_completed_1
+  translation: "Command execution completed"
+- id: logger.unknown.error.command_execution_failed_1
+  translation: "Command execution failed"
+- id: logger.unknown.info.basic_build_environment_successfully_1
+  translation: "Build environment setup completed successfully"
+- id: logger.unknown.info.go_successfully_installed_1
+  translation: "Go successfully installed"
+- id: logger.unknown.info.shell_script_execution_completed_1
+  translation: "Shell script execution completed"
+- id: logger.unknown.info.shell_script_execution_completed_3
+  translation: "Shell script execution completed successfully"
+- id: logger.unknown.warn.failed_to_close_archive_1
+  translation: "Failed to close archive"
+- id: logger.unknown.warn.failed_to_close_new_1
+  translation: "Failed to close new file"
+- id: logger.unknown.warn.failed_to_close_rpm_1
+  translation: "Failed to close RPM file"
+
+# Logger messages - Validate general
+- id: logger.validategeneral.error.invalid_spdx_license_identifier_1
+  translation: "Invalid SPDX license identifier"
+- id: logger.validategeneral.error.missing_package_function_1
+  translation: "Missing package() function in PKGBUILD"
+- id: logger.validategeneral.error.number_of_sources_and_1
+  translation: "Number of sources and checksums do not match"
+- id: logger.validategeneral.info.you_can_find_valid_1
+  translation: "You can find valid SPDX license identifiers at https://spdx.org/licenses/"
+
+# Logger messages - With resume
+- id: logger.withresumecontext.info.retrying_download_1
+  translation: "Retrying download with resume support"
+- id: logger.withresume.info.retrying_download_1
+  translation: "Retrying download"
+
+# Logger messages - Zap
+- id: logger.zap.cleaning_for_distribution
+  translation: "Cleaning build artifacts for distribution"
+- id: logger.zap.done
+  translation: "Cleanup completed"
+- id: logger.zap.fatal_error
+  translation: "Fatal error during cleanup"
+- id: logger.zap.no_distribution_specified
+  translation: "No distribution specified, cleaning all"
+- id: logger.zap.project_path
+  translation: "Project path"

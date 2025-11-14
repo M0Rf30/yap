@@ -5,7 +5,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
-	"crypto/sha1" //nolint:gosec // SHA1 required by APK format for checksum headers
+	"crypto/sha1" // #nosec G505 -- SHA1 required by APK format for checksum headers
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -334,7 +334,7 @@ func (a *Apk) writeFileWithChecksum(
 			_ = f.Close()
 		}()
 
-		// nolint:gosec
+		// #nosec G401 -- SHA1 required by APK format for checksum headers
 		hasher := sha1.New()
 
 		content, err := io.ReadAll(f)

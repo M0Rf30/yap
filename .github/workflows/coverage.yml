@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24.6"
+  GO_VERSION: "1.25.4"
 
 jobs:
   # ===================================
@@ -72,7 +72,7 @@ jobs:
 
           echo "COVERAGE_PERCENT=$COVERAGE" >> "$GITHUB_ENV"
           echo "📊 Coverage: ${COVERAGE}%"
-          
+
           # Save coverage percentage to file for other jobs
           echo "$COVERAGE" > coverage-percentage.txt
 
@@ -215,7 +215,7 @@ jobs:
       - name: 📈 Analyze coverage trends
         run: |
           echo "📈 Analyzing coverage trends..."
-          
+
           # Read coverage percentage from file
           if [[ -f coverage-percentage.txt ]]; then
             COVERAGE_PERCENT=$(cat coverage-percentage.txt)
@@ -288,7 +288,7 @@ jobs:
       - name: 🚪 Check coverage quality gate
         run: |
           echo "🚪 Checking coverage quality gate..."
-          
+
           # Read coverage percentage from file
           if [[ -f coverage-percentage.txt ]]; then
             COVERAGE_PERCENT=$(cat coverage-percentage.txt)
@@ -305,7 +305,7 @@ jobs:
 
           # Convert coverage to integer for comparison
           COVERAGE_INT=$(echo "$COVERAGE_PERCENT" | cut -d'.' -f1)
-          
+
           if [[ "$COVERAGE_INT" -ge "$MINIMUM_COVERAGE" ]]; then
             echo "✅ Coverage quality gate PASSED"
             echo "QUALITY_GATE=passed" >> "$GITHUB_ENV"

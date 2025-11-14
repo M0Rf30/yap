@@ -1,50 +1,44 @@
 ---
-name: 🐳 Docker Build & Push
+name: Reusable Docker Build
 
 on:
-  push:
-    branches: ["main"]
-    tags: ["v*.*.*"]
-  pull_request:
-    branches: ["main"]
-
-permissions:
-  contents: read
-  packages: write
-  security-events: write
-  actions: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  REGISTRY: ghcr.io
-  GO_VERSION: "1.25.4"
+  workflow_call:
+    inputs:
+      os:
+        description: "Operating system to build for"
+        required: true
+        type: string
+      registry:
+        description: "Container registry"
+        required: false
+        type: string
+        default: "ghcr.io"
+      go-version:
+        description: "Go version to use"
+        required: false
+        type: string
+        default: "1.25.4"
+      push:
+        description: "Push image to registry"
+        required: false
+        type: boolean
+        default: false
+      platforms:
+        description: "Target platforms"
+        required: false
+        type: string
+        default: "linux/amd64,linux/arm64"
+    secrets:
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
 
 jobs:
-  # Generate matrix for all OS builds
-  matrix-prep:
-    name: 📋 Prepare Build Matrix
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: 📋 Set matrix
-        id: set-matrix
-        run: |
-          echo 'matrix=["alpine","rocky-8","rocky-9","rocky-10","ubuntu-focal","ubuntu-jammy","ubuntu-noble"]' >> "$GITHUB_OUTPUT"
-
-  # Build each OS image
-  docker-build:
-    name: 🐳 ${{ matrix.os }}
-    needs: matrix-prep
+  build:
+    name: Build ${{ inputs.os }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJson(needs.matrix-prep.outputs.matrix) }}
 
     steps:
       - name: 📂 Checkout code
@@ -55,9 +49,9 @@ jobs:
       - name: 🔍 Lint Dockerfile
         uses: hadolint/hadolint-action@v3.3.0
         with:
-          dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
+          dockerfile: build/deploy/${{ inputs.os }}/Dockerfile
           config: .hadolint.yml
-          output-file: hadolint-${{ matrix.os }}.sarif
+          output-file: hadolint-${{ inputs.os }}.sarif
           format: sarif
 
       - name: 📋 Upload Hadolint results
@@ -65,23 +59,23 @@ jobs:
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: hadolint-${{ matrix.os }}.sarif
+          sarif_file: hadolint-${{ inputs.os }}.sarif
           wait-for-processing: true
-          category: hadolint-${{ matrix.os }}
+          category: hadolint-${{ inputs.os }}
 
       - name: 🐳 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: 🔐 Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
+        if: ${{ inputs.push }}
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ${{ inputs.registry }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🔐 Log in to Docker Hub
-        if: github.event_name != 'pull_request'
+        if: ${{ inputs.push }}
         continue-on-error: true
         uses: docker/login-action@v3
         with:
@@ -93,17 +87,18 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.os }}
-            ${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}
+            ${{ inputs.registry }}/${{ github.repository }}-${{ inputs.os }}
+            ${{ secrets.DOCKER_USERNAME }}/yap-${{ inputs.os }}
           labels: |
             maintainer=M0Rf30
             org.opencontainers.image.authors=M0Rf30
-            org.opencontainers.image.title=yap-${{ matrix.os }}
-            org.opencontainers.image.description=YAP - Yet Another Packager for ${{ matrix.os }}
+            org.opencontainers.image.title=yap-${{ inputs.os }}
+            org.opencontainers.image.description=YAP - Yet Another Packager for ${{ inputs.os }}
             org.opencontainers.image.vendor=M0Rf30
           tags: |
             type=ref,event=branch
             type=ref,event=pr
+            type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -113,15 +108,15 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: build/deploy/${{ matrix.os }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          file: build/deploy/${{ inputs.os }}/Dockerfile
+          platforms: ${{ inputs.platforms }}
+          push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            GO_VERSION=${{ env.GO_VERSION }}
+            GO_VERSION=${{ inputs.go-version }}
             VERSION=${{ github.ref_name }}
             BUILD_TIME=${{ github.run_id }}
             COMMIT=${{ github.sha }}
