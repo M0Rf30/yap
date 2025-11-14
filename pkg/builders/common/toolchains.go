@@ -127,6 +127,10 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 			"alpine":  {"musl-dev"},
 			"default": {"libc6-dev-s390x-cross"},
 		},
+		"riscv64": {
+			"alpine":  {"musl-dev"},
+			"default": {"libc6-dev-riscv64-cross"},
+		},
 	}
 
 	// Define architecture-specific patterns that need special handling
@@ -138,12 +142,16 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 		"x86_64":  "x86-64-linux-gnu",
 		"ppc64le": "powerpc64le-linux-gnu",
 		"s390x":   "s390x-linux-gnu",
+		"riscv64": "riscv64-linux-gnu",
 	}
 
 	result := make(map[string]map[string]CrossToolchain)
 
 	// Architectures to process
-	architectures := []string{"aarch64", "armv7", "armv6", "i686", "x86_64", "ppc64le", "s390x"}
+	architectures := []string{
+		"aarch64", "armv7", "armv6", "i686",
+		"x86_64", "ppc64le", "s390x", "riscv64",
+	}
 	distributions := []string{"debian", "ubuntu", "fedora", "alpine", "arch"}
 
 	for _, arch := range architectures {

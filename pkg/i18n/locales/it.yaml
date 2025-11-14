@@ -491,6 +491,8 @@
   translation: "Configurazione dell'ambiente di cross-compile fallita"
 - id: logger.cross_compilation.detected_target_architecture
   translation: "Rilevata architettura di destinazione"
+- id: logger.cross_compilation.autoconf_cross_compilation_configured
+  translation: "Cross-compile Autoconf configurato"
 - id: logger.cross_compilation.go_cross_compilation_configured
   translation: "Cross-compile Go configurato"
 - id: logger.cross_compilation.installing_cross_compiler_packages
