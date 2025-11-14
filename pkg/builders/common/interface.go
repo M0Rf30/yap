@@ -426,7 +426,7 @@ func (bb *BaseBuilder) SetupCcache() error {
 	// Create ccache directory if it doesn't exist
 	ccacheDir := filepath.Join(bb.PKGBUILD.StartDir, ".ccache")
 	if _, err := os.Stat(ccacheDir); os.IsNotExist(err) {
-		err = os.MkdirAll(ccacheDir, 0o755)
+		err = os.MkdirAll(ccacheDir, 0o750)
 		if err != nil {
 			logger.Warn(i18n.T("logger.setupccache.warn.failed_to_create_ccache_dir_1"),
 				"dir", ccacheDir, "error", err)

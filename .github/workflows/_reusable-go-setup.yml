@@ -1,0 +1,52 @@
+---
+name: Reusable Go Setup
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: "Go version to use"
+        required: false
+        type: string
+        default: "1.25.4"
+      download-deps:
+        description: "Download dependencies"
+        required: false
+        type: boolean
+        default: true
+      verify-deps:
+        description: "Verify dependencies"
+        required: false
+        type: boolean
+        default: false
+      cache:
+        description: "Enable Go cache"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  setup:
+    name: Setup Go Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ inputs.go-version }}
+          cache: ${{ inputs.cache }}
+
+      - name: 📥 Download dependencies
+        if: ${{ inputs.download-deps }}
+        run: go mod download
+
+      - name: ✅ Verify dependencies
+        if: ${{ inputs.verify-deps }}
+        run: go mod verify

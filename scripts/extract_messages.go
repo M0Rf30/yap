@@ -46,7 +46,7 @@ func main() {
 	mergedMessages := mergeMessages(messages, existingMessages)
 
 	// Write to English locale file
-	if err := writeMessagesToFile(mergedMessages, "en.yaml"); err != nil {
+	if err := writeMessagesToFile(mergedMessages, "pkg/i18n/locales/en.yaml"); err != nil {
 		fmt.Printf("Error writing messages: %v\n", err)
 		os.Exit(1)
 	}

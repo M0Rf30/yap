@@ -29,136 +29,24 @@ jobs:
   # ===================================
   sast:
     name: 🔍 Static Analysis
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: 📂 Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: 🐹 Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: 📥 Download dependencies
-        run: go mod download
-
-      - name: 🔒 Install Gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
-
-      - name: 🔒 Run Gosec Security Scanner
-        run: |
-          gosec -fmt sarif -out gosec.sarif -exclude-dir=docs -exclude-dir=dist ./...
-
-      - name: 📋 Upload Gosec results to GitHub Security
-        if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: gosec.sarif
-
-      - name: 📤 Upload Gosec results as artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: gosec-results
-          path: gosec.sarif
-          retention-days: 30
+    uses: ./.github/workflows/_reusable-security-scan.yml
+    with:
+      go-version: "1.25.4"
+      upload-sarif: true
+      run-gosec: true
+      run-vulncheck: false
 
   # ===================================
   # Vulnerability Scanning
   # ===================================
   vulnerability-scan:
     name: 🛡️ Vulnerability Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: 📂 Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: 🐹 Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: 📥 Download dependencies
-        run: go mod download
-
-      - name: 🛡️ Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-
-      - name: 🔍 Run vulnerability check
-        id: vulncheck
-        run: |
-          echo "🔍 Running vulnerability scan..."
-
-          # Run govulncheck and capture output
-          if govulncheck -json ./... > vulncheck.json 2>&1; then
-            echo "result=success" >> "$GITHUB_OUTPUT"
-            echo "✅ No vulnerabilities found"
-          else
-            echo "result=vulnerabilities_found" >> "$GITHUB_OUTPUT"
-            echo "⚠️ Vulnerabilities detected"
-          fi
-
-          # Generate human-readable report
-          {
-            echo "## 🛡️ Vulnerability Scan Report"
-            echo ""
-            echo "**Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-            echo "**Scanner:** govulncheck"
-            echo ""
-          } > vulncheck-report.md
-
-          if [[ -f vulncheck.json ]]; then
-            if jq -e '.vulnerabilities | length > 0' vulncheck.json >/dev/null 2>&1; then
-              {
-                echo "### ⚠️ Vulnerabilities Found"
-                echo ""
-                # Extract vulnerability details using jq
-                jq -r '.vulnerabilities[] | "- **\(.osv.id)**: \(.osv.summary // "No summary available")"' vulncheck.json 2>/dev/null || echo "- See vulncheck.json for details"
-              } >> vulncheck-report.md
-            else
-              {
-                echo "### ✅ No Vulnerabilities Found"
-                echo ""
-                echo "All dependencies are secure according to the Go vulnerability database."
-              } >> vulncheck-report.md
-            fi
-          fi
-
-      - name: 📤 Upload vulnerability scan results
-        uses: actions/upload-artifact@v5
-        with:
-          name: vulnerability-scan-results
-          path: |
-            vulncheck.json
-            vulncheck-report.md
-          retention-days: 30
-
-      - name: 💬 Comment vulnerability results on PR
-        if: github.event_name == 'pull_request' && steps.vulncheck.outputs.result == 'vulnerabilities_found'
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const fs = require('fs');
-
-            if (fs.existsSync('vulncheck-report.md')) {
-              const report = fs.readFileSync('vulncheck-report.md', 'utf8');
-
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `🛡️ **Security Vulnerability Scan Results**\n\n${report}`
-              });
-            }
+    uses: ./.github/workflows/_reusable-security-scan.yml
+    with:
+      go-version: "1.25.4"
+      upload-sarif: false
+      run-gosec: false
+      run-vulncheck: true
 
   # ===================================
   # License Compliance Check

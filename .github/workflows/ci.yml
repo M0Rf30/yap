@@ -72,34 +72,12 @@ jobs:
   # ===================================
   security:
     name: 🔒 Security Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: 📂 Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: 🐹 Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: 🔒 Install Gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
-
-      - name: 🔒 Run Gosec Security Scanner
-        run: |
-          gosec -fmt sarif -out gosec.sarif ./...
-
-      - name: 📋 Upload SARIF file
-        if: always()
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: gosec.sarif
+    uses: ./.github/workflows/_reusable-security-scan.yml
+    with:
+      go-version: "1.25.4"
+      upload-sarif: true
+      run-gosec: true
+      run-vulncheck: false
 
   # ===================================
   # Build & Test Matrix
@@ -138,16 +116,7 @@ jobs:
         run: CGO_ENABLED=0 go build -v ./...
 
       - name: 🧪 Run tests
-        run: go test -v -coverprofile=coverage.out ./...
-
-      - name: 📊 Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25.4'
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage.out
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+        run: go test -v ./...
 
   # ===================================
   # Build Validation
