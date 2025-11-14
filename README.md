@@ -564,7 +564,7 @@ yap graph --show-external --output complete-graph.svg .
 
 **Graph Features:**
 - **Interactive SVG**: Hover effects and tooltips with package information
-- **Modern Themes**: Choose from modern, classic, or dark themes
+- **Multiple Themes**: Choose from gradient, classic, or dark themes
 - **Hierarchical Layout**: Packages arranged by dependency levels and build order
 - **Color Coding**: Different colors for internal packages, external dependencies, and popular packages
 - **Multiple Formats**: SVG (native) and PNG (via external conversion)

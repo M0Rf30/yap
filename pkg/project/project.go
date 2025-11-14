@@ -54,7 +54,7 @@ type Config struct {
 	runtimeDepends []string      //nolint:unused // Reserved for dependency tracking
 }
 
-// Legacy global variables for backward compatibility - to be deprecated
+// Global variables for build configuration
 var (
 	// Verbose enables verbose output for debugging.
 	Verbose bool

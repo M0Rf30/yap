@@ -51,7 +51,7 @@ func TestGetTheme_Classic(t *testing.T) {
 }
 
 func TestGetTheme_Default(t *testing.T) {
-	// Test default theme (should be "modern")
+	// Test default theme (should be "gradient")
 	theme := GetTheme("")
 
 	expected := graph.Theme{
@@ -73,13 +73,13 @@ func TestGetTheme_Default(t *testing.T) {
 	}
 }
 
-func TestGetTheme_Modern(t *testing.T) {
-	// Test that "modern" theme is the same as default
-	defaultTheme := GetTheme("")
+func TestGetTheme_ModernAlias(t *testing.T) {
+	// Test that "modern" theme alias works and returns gradient theme
+	gradientTheme := GetTheme("gradient")
 	modernTheme := GetTheme("modern")
 
-	if defaultTheme != modernTheme {
-		t.Errorf("Expected modern theme to be same as default, got %+v vs %+v", defaultTheme, modernTheme)
+	if gradientTheme != modernTheme {
+		t.Errorf("Expected modern alias to match gradient theme, got %+v vs %+v", gradientTheme, modernTheme)
 	}
 }
 
@@ -105,7 +105,7 @@ func TestGetTheme_UnknownTheme(t *testing.T) {
 
 func TestGetTheme_ThemeValues(t *testing.T) {
 	// Test all themes to ensure they have appropriate values
-	themes := []string{"dark", "classic", "modern", "unknown"}
+	themes := []string{"dark", "classic", "gradient", "modern", "unknown"}
 
 	for _, themeName := range themes {
 		theme := GetTheme(themeName)

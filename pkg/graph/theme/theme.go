@@ -34,7 +34,9 @@ func GetTheme(themeName string) graph.Theme {
 			BorderColor:  "#BDBDBD",
 			GridColor:    "#EEEEEE",
 		}
-	default: // modern
+	case "modern": // Backward compatibility alias
+		return GetTheme("gradient")
+	default: // gradient (default theme)
 		return graph.Theme{
 			Background:   "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
 			NodeInternal: "#00C851",

@@ -31,7 +31,7 @@ func createTestPKGBUILD() *pkgbuild.PKGBUILD {
 		Depends:      []string{"dependency1>=1.0", "dependency2<2.0"},
 		MakeDepends:  []string{"make", "gcc"},
 		OptDepends:   []string{"optional>=1.0"},
-		Replaces:     []string{"old-package"},
+		Replaces:     []string{"legacy-rpm-package"},
 		Provides:     []string{"virtual-package"},
 		Conflicts:    []string{"conflicting-package"},
 		Backup:       []string{"etc/config.conf", "/etc/other.conf"},

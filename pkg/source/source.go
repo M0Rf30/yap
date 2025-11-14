@@ -29,7 +29,7 @@ const (
 	fileProtocol = "file"
 )
 
-// Legacy global variables for backward compatibility - to be deprecated
+// Global variables for source handling
 var (
 	// SSHPassword contains the SSH password for authentication.
 	SSHPassword string

@@ -808,17 +808,17 @@ func TestPKGBUILD_mapArrays_EdgeCases(t *testing.T) {
 	}
 
 	// Test conflicts
-	pb.mapArrays("conflicts", []string{"old-package"})
+	pb.mapArrays("conflicts", []string{"conflicting-package"})
 
-	if len(pb.Conflicts) != 1 || pb.Conflicts[0] != "old-package" {
-		t.Errorf("Expected Conflicts ['old-package'], got %v", pb.Conflicts)
+	if len(pb.Conflicts) != 1 || pb.Conflicts[0] != "conflicting-package" {
+		t.Errorf("Expected Conflicts ['conflicting-package'], got %v", pb.Conflicts)
 	}
 
 	// Test replaces
-	pb.mapArrays("replaces", []string{"obsolete-package"})
+	pb.mapArrays("replaces", []string{"replaced-package"})
 
-	if len(pb.Replaces) != 1 || pb.Replaces[0] != "obsolete-package" {
-		t.Errorf("Expected Replaces ['obsolete-package'], got %v", pb.Replaces)
+	if len(pb.Replaces) != 1 || pb.Replaces[0] != "replaced-package" {
+		t.Errorf("Expected Replaces ['replaced-package'], got %v", pb.Replaces)
 	}
 }
 
