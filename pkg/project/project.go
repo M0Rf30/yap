@@ -146,10 +146,6 @@ type MultipleProject struct {
 	Output      string     `json:"output"      validate:"required"`
 	Projects    []*Project `json:"projects"    validate:"required,dive,required"`
 	Config      *Config    // Configuration for this project build
-
-	// Internal state for --from --to filtering across batches
-	startProcessing bool // tracks if we should start processing (found FromPkgName)
-	stopProcessing  bool // tracks if we should stop processing (found ToPkgName)
 }
 
 // Project represents a single project.
@@ -185,14 +181,18 @@ func (mpc *MultipleProject) BuildAll() error {
 	// Show verbose dependency information automatically via debug logging
 	mpc.displayVerboseDependencyInfo()
 
+	// Filter projects based on --from and --to flags before building dependency graph
+	projectsToProcess := mpc.getProjectsInRange()
+
 	// Build dependency graph and get topologically sorted build order
-	buildOrder, err := mpc.resolveDependencies()
+	// Only consider dependencies within the filtered project set
+	buildOrder, err := mpc.resolveDependencies(projectsToProcess)
 	if err != nil {
 		return err
 	}
 
 	// Performance optimization: determine optimal parallelism
-	maxWorkers := min(runtime.NumCPU(), len(mpc.Projects))
+	maxWorkers := min(runtime.NumCPU(), len(projectsToProcess))
 
 	// Process packages in dependency-aware parallel batches
 	return mpc.buildProjectsInOrder(buildOrder, maxWorkers)
@@ -915,9 +915,62 @@ func (mpc *MultipleProject) displayDependencies(
 	}
 }
 
+// getProjectsInRange returns the subset of projects based on --from and --to flags.
+// Returns all projects if no flags are set, or only projects in the specified range.
+func (mpc *MultipleProject) getProjectsInRange() []*Project {
+	// If no filtering is specified, return all projects
+	if FromPkgName == "" && ToPkgName == "" {
+		return mpc.Projects
+	}
+
+	var filtered []*Project
+
+	startProcessing := (FromPkgName == "")
+
+	for _, proj := range mpc.Projects {
+		pkgName := proj.Builder.PKGBUILD.PkgName
+
+		// Check if this is the FromPkgName - start processing from here
+		if FromPkgName != "" && !startProcessing && pkgName == FromPkgName {
+			startProcessing = true
+
+			logger.Debug(i18n.T("logger.project.found_from_package"),
+				"package", FromPkgName)
+		}
+
+		// If we should be processing, include this package
+		if startProcessing {
+			filtered = append(filtered, proj)
+
+			// Check if this is the ToPkgName - stop after this package
+			if ToPkgName != "" && pkgName == ToPkgName {
+				logger.Debug(i18n.T("logger.project.found_to_package"),
+					"package", ToPkgName)
+
+				break
+			}
+		}
+	}
+
+	if len(filtered) > 0 {
+		var pkgNames []string
+		for _, proj := range filtered {
+			pkgNames = append(pkgNames, proj.Builder.PKGBUILD.PkgName)
+		}
+
+		logger.Info(i18n.T("logger.project.filtering_projects"),
+			"total", len(mpc.Projects),
+			"filtered", len(filtered),
+			"packages", pkgNames)
+	}
+
+	return filtered
+}
+
 // resolveDependencies builds a dependency graph and returns projects in topologically sorted order.
 // Returns slices of project batches that can be built in parallel within each batch.
-func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
+// Only considers dependencies that exist within the provided project set.
+func (mpc *MultipleProject) resolveDependencies(projects []*Project) ([][]*Project, error) {
 	logger.Info(i18n.T("logger.analyzing_package_dependencies"))
 
 	// Build dependency graph
@@ -925,8 +978,8 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 	dependsOn := make(map[string][]string)
 	dependedBy := make(map[string][]string)
 
-	// Index projects by package name
-	for _, proj := range mpc.Projects {
+	// Index projects by package name - only for projects in range
+	for _, proj := range projects {
 		pkgName := proj.Builder.PKGBUILD.PkgName
 		projectMap[pkgName] = proj
 		dependsOn[pkgName] = nil
@@ -937,10 +990,10 @@ func (mpc *MultipleProject) resolveDependencies() ([][]*Project, error) {
 		i18n.T("logger.project.building_dependency_graph"),
 		"total_packages", len(projectMap))
 
-	// Build dependency relationships
+	// Build dependency relationships - only within filtered projects
 	totalDeps := 0
 
-	for _, proj := range mpc.Projects {
+	for _, proj := range projects {
 		pkgName := proj.Builder.PKGBUILD.PkgName
 
 		var packageDeps []string
@@ -1501,48 +1554,26 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 		"total_packages", totalPackages,
 		"max_parallel_workers", maxWorkers)
 
-	// Initialize filtering state based on --from flag
-	// If no --from is specified, start processing immediately
-	mpc.startProcessing = (FromPkgName == "")
-	mpc.stopProcessing = false
-
 	processedPackages := 0
 
 	for batchIndex, batch := range buildOrder {
-		// Check if we should stop processing (found ToPkgName in previous batch)
-		if mpc.stopProcessing {
-			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
-				"target_package", ToPkgName)
-
-			break
-		}
-
-		// Filter batch based on FromPkgName and ToPkgName with global state
-		filteredBatch := mpc.filterBatch(batch)
-		if len(filteredBatch) == 0 {
-			logger.Debug(i18n.T("logger.project.skipping_batch_filtered_out"),
-				"batch_number", batchIndex+1)
-
-			continue
-		}
-
-		batchWorkers := min(maxWorkers, len(filteredBatch))
+		batchWorkers := min(maxWorkers, len(batch))
 
 		var batchPackages []string
-		for _, proj := range filteredBatch {
+		for _, proj := range batch {
 			batchPackages = append(batchPackages, proj.Builder.PKGBUILD.PkgName)
 		}
 
 		logger.Debug(i18n.T("logger.processing_build_batch"),
 			"batch_number", batchIndex+1,
-			"batch_size", len(filteredBatch),
+			"batch_size", len(batch),
 			"packages", batchPackages,
 			"parallel_workers", batchWorkers,
 			"progress", fmt.Sprintf("%d/%d packages", processedPackages, totalPackages))
 
 		// Build current batch in parallel - but handle runtime dependencies specially
 		err := mpc.buildBatchWithDependencyInstall(
-			filteredBatch,
+			batch,
 			batchWorkers,
 			runtimeDependencyMap,
 			batchIndex+1)
@@ -1552,37 +1583,4 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 	}
 
 	return nil
-}
-
-// filterBatch filters a batch of projects based on FromPkgName and ToPkgName criteria
-// with global state tracking across batches.
-func (mpc *MultipleProject) filterBatch(batch []*Project) []*Project {
-	var filtered []*Project
-
-	for _, proj := range batch {
-		pkgName := proj.Builder.PKGBUILD.PkgName
-
-		// Check if this is the FromPkgName - start processing from here
-		if FromPkgName != "" && !mpc.startProcessing && pkgName == FromPkgName {
-			mpc.startProcessing = true
-
-			logger.Debug(i18n.T("logger.project.found_from_package"),
-				"package", FromPkgName)
-		}
-
-		// If we should be processing, include this package
-		if mpc.startProcessing && !mpc.stopProcessing {
-			filtered = append(filtered, proj)
-
-			// Check if this is the ToPkgName - mark to stop after this batch
-			if ToPkgName != "" && pkgName == ToPkgName {
-				mpc.stopProcessing = true
-
-				logger.Debug(i18n.T("logger.project.found_to_package"),
-					"package", ToPkgName)
-			}
-		}
-	}
-
-	return filtered
 }
