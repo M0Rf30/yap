@@ -512,8 +512,17 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	}
 
 	// Set up C/C++ cross-compilation environment variables
-	_ = os.Setenv("CC", toolchainPackages.GCCPackage)
-	_ = os.Setenv("CXX", toolchainPackages.GPlusPlusPackage)
+	// Check if ccache is available and wrap the cross-compiler commands with it
+	_, ccacheErr := exec.LookPath("ccache")
+	ccacheAvailable := ccacheErr == nil
+
+	if ccacheAvailable {
+		_ = os.Setenv("CC", "ccache "+toolchainPackages.GCCPackage)
+		_ = os.Setenv("CXX", "ccache "+toolchainPackages.GPlusPlusPackage)
+	} else {
+		_ = os.Setenv("CC", toolchainPackages.GCCPackage)
+		_ = os.Setenv("CXX", toolchainPackages.GPlusPlusPackage)
+	}
 
 	// Extract binutils prefix for tool names
 	// BinutilsPackage is like "aarch64-linux-gnu-binutils", we need "aarch64-linux-gnu-ar", etc.
@@ -559,10 +568,17 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 
 		// Set CC and CXX for Rust's build script integration
 		// Note: GCCPackage and GPlusPlusPackage already contain the full command name
-		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CC",
-			toolchainPackages.GCCPackage)
-		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CXX",
-			toolchainPackages.GPlusPlusPackage)
+		// Wrap with ccache if available
+		rustCC := toolchainPackages.GCCPackage
+		rustCXX := toolchainPackages.GPlusPlusPackage
+
+		if ccacheAvailable {
+			rustCC = "ccache " + rustCC
+			rustCXX = "ccache " + rustCXX
+		}
+
+		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CC", rustCC)
+		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CXX", rustCXX)
 
 		logger.Info(i18n.T("logger.cross_compilation.rust_cross_compilation_configured"),
 			"rust_target", rustTarget,
@@ -579,9 +595,15 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 
 		// Set up CGO for cross-compilation
 		// Note: GCCPackage and GPlusPlusPackage already contain the full command name
+		// Wrap with ccache if available
 		_ = os.Setenv("CGO_ENABLED", "1")
-		_ = os.Setenv("CC_FOR_TARGET", toolchainPackages.GCCPackage)
-		_ = os.Setenv("CXX_FOR_TARGET", toolchainPackages.GPlusPlusPackage)
+		if ccacheAvailable {
+			_ = os.Setenv("CC_FOR_TARGET", "ccache "+toolchainPackages.GCCPackage)
+			_ = os.Setenv("CXX_FOR_TARGET", "ccache "+toolchainPackages.GPlusPlusPackage)
+		} else {
+			_ = os.Setenv("CC_FOR_TARGET", toolchainPackages.GCCPackage)
+			_ = os.Setenv("CXX_FOR_TARGET", toolchainPackages.GPlusPlusPackage)
+		}
 
 		logger.Info(i18n.T("logger.cross_compilation.go_cross_compilation_configured"),
 			"goos", goOS,
