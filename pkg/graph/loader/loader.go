@@ -12,6 +12,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/graph"
 	"github.com/M0Rf30/yap/v2/pkg/graph/theme"
+	"github.com/M0Rf30/yap/v2/pkg/parser"
 )
 
 // LoadProjectForGraph loads project configuration and creates graph data.
@@ -101,6 +102,7 @@ func createMultiPackageGraph(projects []struct {
 
 	// Create nodes from project names and parse PKGBUILD files
 	for i, proj := range projects {
+		// Use YAP's proper parser for graph generation
 		pkgName, version, release := parsePKGBUILD(filepath.Join(projectPath, proj.Name))
 
 		// Use parsed pkgname if available, otherwise fall back to project name
@@ -136,42 +138,22 @@ func createMultiPackageGraph(projects []struct {
 	return graphData
 }
 
-// parsePKGBUILD parses a PKGBUILD file from a project directory and extracts
-// pkgname, version, and release.
+// parsePKGBUILD parses a PKGBUILD file from a project directory using the proper
+// YAP parser to extract pkgname, version, and release. This ensures consistency
+// with the build system and properly handles renovate comments and other edge cases.
 func parsePKGBUILD(projectDir string) (pkgName, version, release string) {
-	pkgbuildPath := filepath.Join(projectDir, "PKGBUILD")
-
-	// Check if PKGBUILD exists in current directory context
-	content, err := os.ReadFile(filepath.Clean(pkgbuildPath))
+	// Use YAP's parser with dummy distro/release for graph generation
+	// This properly handles all PKGBUILD syntax including renovate comments
+	pkgBuild, err := parser.ParseFile("", "", projectDir, projectDir)
 	if err != nil {
-		// Return empty strings if we can't read the file
+		// Return defaults if we can't parse the file
 		return "", "1.0.0", "1"
 	}
 
-	lines := strings.SplitSeq(string(content), "\n")
-	for line := range lines {
-		line = strings.TrimSpace(line)
-
-		// Skip comments and empty lines
-		if strings.HasPrefix(line, "#") || line == "" {
-			continue
-		}
-
-		// Parse pkgname
-		if strings.HasPrefix(line, "pkgname=") {
-			pkgName = extractQuotedValue(line, "pkgname=")
-		}
-
-		// Parse pkgver
-		if strings.HasPrefix(line, "pkgver=") {
-			version = extractQuotedValue(line, "pkgver=")
-		}
-
-		// Parse pkgrel
-		if strings.HasPrefix(line, "pkgrel=") {
-			release = extractQuotedValue(line, "pkgrel=")
-		}
-	}
+	// Extract the values from the parsed PKGBUILD
+	pkgName = pkgBuild.PkgName
+	version = pkgBuild.PkgVer
+	release = pkgBuild.PkgRel
 
 	// Set defaults if not found
 	if version == "" {
@@ -183,20 +165,6 @@ func parsePKGBUILD(projectDir string) (pkgName, version, release string) {
 	}
 
 	return pkgName, version, release
-}
-
-// extractQuotedValue extracts the value from a KEY=value or KEY="value" line.
-func extractQuotedValue(line, prefix string) string {
-	value := strings.TrimPrefix(line, prefix)
-	value = strings.TrimSpace(value)
-
-	// Remove surrounding quotes if present
-	if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
-		(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
-		value = value[1 : len(value)-1]
-	}
-
-	return value
 }
 
 // addDependenciesFromPKGBUILD parses actual dependencies from PKGBUILD files.
