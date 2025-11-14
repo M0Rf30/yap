@@ -160,6 +160,57 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	return tmpl.Execute(file, pkgBuild)
 }
 
+// filterInstalledPackages checks which packages are not installed and returns only those.
+// It uses the appropriate package manager query command based on the package manager name.
+func filterInstalledPackages(packageManager string, packages []string) []string {
+	if len(packages) == 0 {
+		return nil
+	}
+
+	var (
+		queryCmd  string
+		queryArgs []string
+	)
+
+	// Determine the query command based on package manager
+
+	switch packageManager {
+	case "pacman":
+		queryCmd = "pacman"
+		queryArgs = []string{"-Q"}
+	case "dpkg":
+		queryCmd = "dpkg"
+		queryArgs = []string{"-s"}
+	case "rpm":
+		queryCmd = "rpm"
+		queryArgs = []string{"-q"}
+	case "apk":
+		queryCmd = "apk"
+		queryArgs = []string{"info", "-e"}
+	default:
+		// Unknown package manager, return all packages
+		return packages
+	}
+
+	missingPackages := make([]string, 0, len(packages))
+
+	// Check each package individually
+	for _, pkg := range packages {
+		// Create a new slice with the query args and package name
+		args := make([]string, len(queryArgs)+1)
+		copy(args, queryArgs)
+		args[len(queryArgs)] = pkg
+
+		err := shell.Exec(true, "", queryCmd, args...)
+		if err != nil {
+			// Package not installed or query failed, add to missing list
+			missingPackages = append(missingPackages, pkg)
+		}
+	}
+
+	return missingPackages
+}
+
 // GetDepends reads the package manager name, its arguments and all the
 // dependencies required to build the package. It returns any error if
 // encountered.
@@ -168,7 +219,25 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 		return nil
 	}
 
-	args = append(args, makeDepends...)
+	// Filter out already-installed packages to avoid sudo prompts
+	missingPackages := filterInstalledPackages(packageManager, makeDepends)
+
+	// If all packages are already installed, nothing to do
+	if len(missingPackages) == 0 {
+		logger.Info(i18n.T("logger.pkgbuild.info.all_packages_installed"),
+			"count", len(makeDepends))
+
+		return nil
+	}
+
+	// Log which packages need installation
+	if len(missingPackages) < len(makeDepends) {
+		logger.Info(i18n.T("logger.pkgbuild.info.packages_already_installed"),
+			"installed", len(makeDepends)-len(missingPackages),
+			"missing", len(missingPackages))
+	}
+
+	args = append(args, missingPackages...)
 
 	return shell.ExecWithSudo(false, "", packageManager, args...)
 }
