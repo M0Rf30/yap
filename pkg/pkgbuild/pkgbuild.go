@@ -237,21 +237,30 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, folderName)
 	}
+}
 
+// SetEnvironmentVariables sets the environment variables for the PKGBUILD execution context.
+// This should be called just before executing build/package functions to ensure
+// each package uses its own directories, even when building multiple packages.
+//
+// It returns an error if setting any environment variable fails.
+func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
 	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
 	if err != nil {
-		logger.Fatal(i18n.T("errors.pkgbuild.failed_to_set_variable_pkgdir"))
+		return err
 	}
 
 	err = os.Setenv("srcdir", pkgBuild.SourceDir)
 	if err != nil {
-		logger.Fatal(i18n.T("errors.pkgbuild.failed_to_set_variable_srcdir"))
+		return err
 	}
 
 	err = os.Setenv("startdir", pkgBuild.StartDir)
 	if err != nil {
-		logger.Fatal(i18n.T("errors.pkgbuild.failed_to_set_variable_startdir"))
+		return err
 	}
+
+	return nil
 }
 
 // ValidateGeneral checks that mandatory items are correctly provided by the PKGBUILD

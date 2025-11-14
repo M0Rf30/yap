@@ -112,6 +112,12 @@ func TestPKGBUILD_SetMainFolders(t *testing.T) {
 
 	pb.SetMainFolders()
 
+	// Set environment variables (now a separate step)
+	err := pb.SetEnvironmentVariables()
+	if err != nil {
+		t.Fatalf("Failed to set environment variables: %v", err)
+	}
+
 	// Check environment variables were set
 	if os.Getenv("pkgdir") == "" {
 		t.Error("pkgdir environment variable not set")
@@ -1452,6 +1458,12 @@ func TestPKGBUILD_SetMainFolders_Alpine(t *testing.T) {
 	expectedPackageDir := filepath.Join(filepath.FromSlash("/tmp/test"), "apk", "pkg", "test-pkg")
 	if pb.PackageDir != expectedPackageDir {
 		t.Errorf("Expected PackageDir '%s', got '%s'", expectedPackageDir, pb.PackageDir)
+	}
+
+	// Set environment variables (now a separate step)
+	err := pb.SetEnvironmentVariables()
+	if err != nil {
+		t.Fatalf("Failed to set environment variables: %v", err)
 	}
 
 	// Check environment variables are set
