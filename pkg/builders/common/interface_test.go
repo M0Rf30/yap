@@ -686,3 +686,100 @@ func TestGetGoTargetArchitecture(t *testing.T) {
 		})
 	}
 }
+
+func TestSetTargetArchitecture(t *testing.T) {
+	tests := []struct {
+		name           string
+		initialArch    string
+		targetArch     string
+		format         string
+		expectedResult string
+	}{
+		{
+			name:           "set target architecture for cross-compilation",
+			initialArch:    "amd64",
+			targetArch:     "arm64",
+			format:         "deb",
+			expectedResult: "arm64",
+		},
+		{
+			name:           "empty target keeps original architecture",
+			initialArch:    "amd64",
+			targetArch:     "",
+			format:         "deb",
+			expectedResult: "amd64",
+		},
+		{
+			name:           "apk architecture translation",
+			initialArch:    "amd64",
+			targetArch:     "x86_64",
+			format:         "apk",
+			expectedResult: "x86_64",
+		},
+		{
+			name:           "rpm architecture translation",
+			initialArch:    "amd64",
+			targetArch:     "x86_64",
+			format:         "rpm",
+			expectedResult: "x86_64",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pkg := &pkgbuild.PKGBUILD{
+				ArchComputed: tt.initialArch,
+			}
+			builder := NewBaseBuilder(pkg, tt.format)
+
+			builder.SetTargetArchitecture(tt.targetArch)
+
+			if builder.PKGBUILD.ArchComputed != tt.expectedResult {
+				t.Errorf("SetTargetArchitecture() = %v, want %v",
+					builder.PKGBUILD.ArchComputed, tt.expectedResult)
+			}
+		})
+	}
+}
+
+func TestLogCrossCompilation(t *testing.T) {
+	tests := []struct {
+		name        string
+		buildArch   string
+		targetArch  string
+		description string
+	}{
+		{
+			name:        "logs when architectures differ",
+			buildArch:   "amd64",
+			targetArch:  "arm64",
+			description: "should log cross-compilation message",
+		},
+		{
+			name:        "no log when architectures match",
+			buildArch:   "amd64",
+			targetArch:  "amd64",
+			description: "should not log when architectures are the same",
+		},
+		{
+			name:        "no log when target is empty",
+			buildArch:   "amd64",
+			targetArch:  "",
+			description: "should not log when target architecture is not specified",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pkg := &pkgbuild.PKGBUILD{
+				PkgName:      "test-package",
+				ArchComputed: tt.buildArch,
+			}
+			builder := NewBaseBuilder(pkg, "deb")
+
+			// This test validates the method doesn't panic
+			// Actual logging output would require log capture
+			builder.LogCrossCompilation(tt.targetArch)
+		})
+	}
+}

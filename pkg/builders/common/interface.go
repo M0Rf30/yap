@@ -117,6 +117,28 @@ func (bb *BaseBuilder) TranslateArchitecture() {
 	bb.PKGBUILD.ArchComputed = archMapping.TranslateArch(bb.Format, bb.PKGBUILD.ArchComputed)
 }
 
+// SetTargetArchitecture sets the target architecture for cross-compilation and translates it.
+// If targetArch is empty, it uses the current ArchComputed value.
+// This consolidates the duplicated architecture handling pattern across all builders.
+func (bb *BaseBuilder) SetTargetArchitecture(targetArch string) {
+	if targetArch != "" {
+		bb.PKGBUILD.ArchComputed = targetArch
+	}
+
+	bb.TranslateArchitecture()
+}
+
+// LogCrossCompilation logs cross-compilation build initiation if target architecture differs.
+// This consolidates duplicated cross-compilation logging across builders.
+func (bb *BaseBuilder) LogCrossCompilation(targetArch string) {
+	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
+		logger.Info(i18n.T("logger.cross_compilation.starting_cross_compilation_build"),
+			"package", bb.PKGBUILD.PkgName,
+			"target_arch", targetArch,
+			"build_arch", bb.PKGBUILD.ArchComputed)
+	}
+}
+
 // SetupEnvironmentDependencies gets the build environment dependencies for the format.
 func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
 	buildDeps := constants.GetBuildDeps()

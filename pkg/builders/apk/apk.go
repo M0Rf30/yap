@@ -44,12 +44,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Apk {
 // The package is created as a gzip-compressed tar archive containing the package
 // files and metadata (.PKGINFO and optional .install script).
 func (a *Apk) BuildPackage(artifactsPath string, targetArch string) error {
-	// If target architecture is specified for cross-compilation, use it
-	if targetArch != "" {
-		a.PKGBUILD.ArchComputed = targetArch
-	}
-
-	a.TranslateArchitecture()
+	a.SetTargetArchitecture(targetArch)
 
 	pkgName := a.BuildPackageName(".apk")
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
@@ -67,12 +62,7 @@ func (a *Apk) BuildPackage(artifactsPath string, targetArch string) error {
 // PrepareFakeroot sets up the APK package metadata.
 // It generates the .PKGINFO file and optional install scripts for lifecycle hooks.
 func (a *Apk) PrepareFakeroot(artifactsPath string, targetArch string) error {
-	// If target architecture is specified for cross-compilation, use it
-	if targetArch != "" {
-		a.PKGBUILD.ArchComputed = targetArch
-	}
-
-	a.TranslateArchitecture()
+	a.SetTargetArchitecture(targetArch)
 
 	a.PKGBUILD.InstalledSize, _ = files.GetDirSize(a.PKGBUILD.PackageDir)
 	a.PKGBUILD.BuildDate = time.Now().Unix()

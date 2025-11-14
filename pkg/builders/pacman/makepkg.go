@@ -46,12 +46,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Pkg {
 // The method calls the internal pacmanBuild function to perform the actual build process.
 // It returns an error if the build process encounters any issues.
 func (m *Pkg) BuildPackage(artifactsPath string, targetArch string) error {
-	// If target architecture is specified for cross-compilation, use it
-	if targetArch != "" {
-		m.PKGBUILD.ArchComputed = targetArch
-	}
-	// Translate architecture for Pacman format
-	m.TranslateArchitecture()
+	m.SetTargetArchitecture(targetArch)
 
 	completeVersion := m.PKGBUILD.PkgVer
 

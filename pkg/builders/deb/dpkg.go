@@ -41,13 +41,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Package {
 // The method calls dpkgDeb to create the package and removes the
 // package directory, returning an error if any step fails.
 func (d *Package) BuildPackage(artifactsPath string, targetArch string) error {
-	// Log cross-compilation build initiation
-	if targetArch != "" && targetArch != d.PKGBUILD.ArchComputed {
-		logger.Info(i18n.T("logger.cross_compilation.starting_cross_compilation_build"),
-			"package", d.PKGBUILD.PkgName,
-			"target_arch", targetArch,
-			"build_arch", d.PKGBUILD.ArchComputed)
-	}
+	d.LogCrossCompilation(targetArch)
 
 	debTemp, err := os.MkdirTemp(d.PKGBUILD.SourceDir, "tmp")
 	if err != nil {
@@ -100,14 +94,7 @@ func (d *Package) BuildPackage(artifactsPath string, targetArch string) error {
 // resources, and strips binaries. The method returns an error if any step fails.
 func (d *Package) PrepareFakeroot(_ string, targetArch string) error {
 	d.getRelease()
-
-	// Use centralized architecture mapping from BaseBuilder
-	// If target architecture is specified for cross-compilation, use it
-	if targetArch != "" {
-		d.PKGBUILD.ArchComputed = targetArch
-	}
-
-	d.TranslateArchitecture()
+	d.SetTargetArchitecture(targetArch)
 
 	err := os.RemoveAll(d.debDir)
 	if err != nil {
