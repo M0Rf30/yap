@@ -123,7 +123,7 @@ func TestGetInstallArgs(t *testing.T) {
 		{"APK install args", FormatAPK, []string{"add", "--allow-untrusted"}},
 		{"DEB install args", FormatDEB, []string{"--allow-downgrades", "--assume-yes", "install"}},
 		{"RPM install args", FormatRPM, []string{"-y", "install"}},
-		{"Pacman install args", FormatPacman, []string{"-S", "--noconfirm"}},
+		{"Pacman install args", FormatPacman, []string{"-S", "--noconfirm", "--needed"}},
 		{"Unknown format", "unknown", []string{}},
 	}
 
