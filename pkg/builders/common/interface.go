@@ -601,6 +601,44 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	_ = os.Setenv("PKG_CONFIG_PATH", pkgConfigPath)
 	_ = os.Setenv("PKG_CONFIG_LIBDIR", "/usr/lib/"+ccPrefix+"/pkgconfig")
 
+	// Set up autoconf cross-compilation configuration
+	// Get the GNU triplets for the build and host architectures
+	hostTriplet := bb.getGNUTriplet(targetArch)
+	buildTriplet := bb.getGNUTriplet(bb.PKGBUILD.ArchComputed)
+
+	if hostTriplet != "" && buildTriplet != "" {
+		// Configure autoconf for cross-compilation
+		// These environment variables inform autoconf that we're cross-compiling
+		_ = os.Setenv("ac_cv_host", hostTriplet)
+		_ = os.Setenv("ac_cv_build", buildTriplet)
+
+		// Create configure wrapper function that can be used in PKGBUILDs
+		// This is a bash function that automatically adds --host and --build flags
+		configureWrapper := fmt.Sprintf(`
+# YAP cross-compilation configure wrapper
+configure_cross() {
+  if [ -x ./configure ]; then
+    ./configure --host=%s --build=%s "$@"
+  elif [ -x configure ]; then
+    configure --host=%s --build=%s "$@"
+  else
+    echo "Warning: configure script not found" >&2
+    return 1
+  fi
+}
+
+# Export the function so it's available in build scripts
+export -f configure_cross 2>/dev/null || true
+`, hostTriplet, buildTriplet, hostTriplet, buildTriplet)
+
+		// Set the wrapper in the environment (will be available to the build script)
+		_ = os.Setenv("YAP_CONFIGURE_WRAPPER", configureWrapper)
+
+		logger.Info(i18n.T("logger.cross_compilation.autoconf_cross_compilation_configured"),
+			"host_triplet", hostTriplet,
+			"build_triplet", buildTriplet)
+	}
+
 	logger.Info(i18n.T("logger.cross_compilation.cross_compilation_environment_configured"),
 		"target_arch", targetArch,
 		"cc", os.Getenv("CC"),
@@ -619,6 +657,7 @@ func (bb *BaseBuilder) getRustTargetArchitecture(arch string) string {
 		"x86_64":  "x86_64-unknown-linux-gnu",
 		"ppc64le": "powerpc64le-unknown-linux-gnu",
 		"s390x":   "s390x-unknown-linux-gnu",
+		"riscv64": "riscv64gc-unknown-linux-gnu",
 	}
 
 	if target, exists := rustTargets[arch]; exists {
@@ -638,10 +677,33 @@ func (bb *BaseBuilder) getGoTargetArchitecture(arch string) string {
 		"x86_64":  "amd64",
 		"ppc64le": "ppc64le",
 		"s390x":   "s390x",
+		"riscv64": "riscv64",
 	}
 
 	if goArch, exists := goArchs[arch]; exists {
 		return goArch
+	}
+
+	return ""
+}
+
+// getGNUTriplet maps YAP architecture names to GNU system triplets for autoconf.
+// These triplets follow the format: cpu-vendor-os, e.g., aarch64-linux-gnu.
+// This is used for autoconf's --host and --build flags during cross-compilation.
+func (bb *BaseBuilder) getGNUTriplet(arch string) string {
+	gnuTriplets := map[string]string{
+		"aarch64": "aarch64-linux-gnu",
+		"armv7":   "arm-linux-gnueabihf",
+		"armv6":   "arm-linux-gnueabihf",
+		"i686":    "i686-linux-gnu",
+		"x86_64":  "x86_64-linux-gnu",
+		"ppc64le": "powerpc64le-linux-gnu",
+		"s390x":   "s390x-linux-gnu",
+		"riscv64": "riscv64-linux-gnu",
+	}
+
+	if triplet, exists := gnuTriplets[arch]; exists {
+		return triplet
 	}
 
 	return ""

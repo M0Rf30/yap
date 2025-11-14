@@ -490,6 +490,8 @@
   translation: "Cross-compilation environment setup failed"
 - id: logger.cross_compilation.detected_target_architecture
   translation: "Detected target architecture"
+- id: logger.cross_compilation.autoconf_cross_compilation_configured
+  translation: "Autoconf cross-compilation configured"
 - id: logger.cross_compilation.go_cross_compilation_configured
   translation: "Go cross-compilation configured"
 - id: logger.cross_compilation.installing_cross_compiler_packages

@@ -864,6 +864,9 @@ func TestCrossCompilationToolchainMapping(t *testing.T) {
 		{"x86_64", "fedora", true},
 		{"ppc64le", "debian", true},
 		{"s390x", "fedora", true},
+		{"riscv64", "arch", true},
+		{"riscv64", "debian", true},
+		{"riscv64", "ubuntu", true},
 		{"unsupported", "arch", false},
 	}
 
