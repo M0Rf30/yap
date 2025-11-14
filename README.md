@@ -35,6 +35,7 @@ YAP eliminates the need to learn multiple packaging formats and build systems by
 - **Component Logging**: Clear, tagged logging for complex build processes
 - **Enhanced PKGBUILD Support**: Extended syntax with custom variables and arrays
 - **Cross-Distribution Variables**: Distribution-specific configurations in single file
+- **Cross-Compilation Support**: Build packages for different architectures than your build environment
 
 ### 🎯 **Developer Experience**
 - **Simple Configuration**: JSON project files with minimal setup
@@ -578,6 +579,26 @@ yap graph --show-external --output complete-graph.svg .
 ```
 
 ## 🔧 Advanced Usage
+
+### Cross-Compilation
+
+Build packages for target architectures different from your build environment:
+
+```bash
+# Build ARM64 package on x86_64 system
+yap build --target-arch=aarch64 ubuntu-jammy .
+
+# Build ARMv7 package on x86_64 system
+yap build --target-arch=armv7 fedora-38 .
+
+# Build 32-bit Intel package on x86_64 system
+yap build --target-arch=i686 alpine .
+
+# Build PowerPC package on x86_64 system
+yap build --target-arch=ppc64le arch .
+```
+
+YAP automatically installs the required cross-compilation toolchains and configures the build environment for the target architecture.
 
 ### Multi-Package Projects
 

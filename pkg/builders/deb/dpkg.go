@@ -40,7 +40,15 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Package {
 // It takes artifactsPath to specify where to store the package.
 // The method calls dpkgDeb to create the package and removes the
 // package directory, returning an error if any step fails.
-func (d *Package) BuildPackage(artifactsPath string) error {
+func (d *Package) BuildPackage(artifactsPath string, targetArch string) error {
+	// Log cross-compilation build initiation
+	if targetArch != "" && targetArch != d.PKGBUILD.ArchComputed {
+		logger.Info(i18n.T("logger.cross_compilation.starting_cross_compilation_build"),
+			"package", d.PKGBUILD.PkgName,
+			"target_arch", targetArch,
+			"build_arch", d.PKGBUILD.ArchComputed)
+	}
+
 	debTemp, err := os.MkdirTemp(d.PKGBUILD.SourceDir, "tmp")
 	if err != nil {
 		return err
@@ -90,10 +98,15 @@ func (d *Package) BuildPackage(artifactsPath string) error {
 // PrepareFakeroot sets up the environment for building a Debian package in a fakeroot context.
 // It retrieves architecture and release information, cleans up the debDir, creates necessary
 // resources, and strips binaries. The method returns an error if any step fails.
-func (d *Package) PrepareFakeroot(_ string) error {
+func (d *Package) PrepareFakeroot(_ string, targetArch string) error {
 	d.getRelease()
 
 	// Use centralized architecture mapping from BaseBuilder
+	// If target architecture is specified for cross-compilation, use it
+	if targetArch != "" {
+		d.PKGBUILD.ArchComputed = targetArch
+	}
+
 	d.TranslateArchitecture()
 
 	err := os.RemoveAll(d.debDir)

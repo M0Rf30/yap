@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG GO_VERSION=1.24.5
+ARG GO_VERSION=1.25.4
 
 # Build stage
 FROM golang:${GO_VERSION}-alpine AS builder
@@ -32,9 +32,9 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
 
 # Generate bash completion (do this in build stage where we can execute the binary)
 RUN if [ "${TARGETARCH}" = "$(go env GOARCH)" ]; then \
-        /usr/bin/yap completion bash > /tmp/yap-completion.bash; \
+    /usr/bin/yap completion bash > /tmp/yap-completion.bash; \
     else \
-        echo "# Cross-compilation: bash completion will be generated at runtime" > /tmp/yap-completion.bash; \
+    echo "# Cross-compilation: bash completion will be generated at runtime" > /tmp/yap-completion.bash; \
     fi
 
 # Runtime stage
@@ -43,7 +43,7 @@ FROM opensuse/leap:latest
 # Build arguments for runtime stage
 ARG VERSION=dev
 ARG TARGETARCH=amd64
-ARG GO_VERSION=1.24.5
+ARG GO_VERSION=1.25.4
 
 # Metadata labels
 LABEL org.opencontainers.image.title="yap-opensuse-tubleweed"
@@ -56,9 +56,9 @@ LABEL org.opencontainers.image.version="${VERSION}"
 
 # Install minimal runtime dependencies
 RUN zypper -n update && zypper -n install \
-        bash-completion \
-        ca-certificates \
-        sudo && \
+    bash-completion \
+    ca-certificates \
+    sudo && \
     zypper clean -a
 
 # Create non-root user

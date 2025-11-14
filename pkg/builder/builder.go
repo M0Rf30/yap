@@ -88,17 +88,29 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 
 	// Set up ccache for the build stage if ccache is available
 	if stage == "build" {
-		// Create a temporary BaseBuilder to access the SetupCcache method
-		// We don't know the exact format, so we'll use a generic one and just call the ccache setup
+		// Create a temporary BaseBuilder to access the SetupCcache and
+		// SetupCrossCompilationEnvironment methods
+		format := determineFormatFromContext()
 		tempBuilder := &common.BaseBuilder{
 			PKGBUILD: builder.PKGBUILD,
-			Format:   "", // Format is not used in SetupCcache, so we can leave it empty
+			Format:   format,
 		}
 
 		err := tempBuilder.SetupCcache()
 		if err != nil {
 			logger.Warn(i18n.T("logger.setupccache.warn.ccache_setup_failed_1"),
 				"package", pkgName, "error", err)
+		}
+
+		// Set up cross-compilation environment if target architecture is specified
+		// Check if cross-compilation is needed
+		if builder.PKGBUILD.TargetArch != "" &&
+			builder.PKGBUILD.TargetArch != builder.PKGBUILD.ArchComputed {
+			err := tempBuilder.SetupCrossCompilationEnvironment(builder.PKGBUILD.TargetArch)
+			if err != nil {
+				logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
+					"package", pkgName, "target_arch", builder.PKGBUILD.TargetArch, "error", err)
+			}
 		}
 	}
 
@@ -114,6 +126,17 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	}
 
 	return nil
+}
+
+// determineFormatFromContext determines the package format based on context
+func determineFormatFromContext() string {
+	// The format information should ideally be passed through the call chain
+	// from the packer where it's known, but as a fallback we can try to infer it
+	// This is a temporary workaround - the proper solution is to pass format information
+
+	// Since we can't determine the format easily, return empty
+	// and let the SetupCrossCompilationEnvironment handle the fallback logic
+	return "" // Let the cross-compilation logic handle fallbacks
 }
 
 // getSources detects sources provided by a single project source array and

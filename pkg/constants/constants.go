@@ -19,7 +19,7 @@ const (
 	// Git defines the git command name.
 	Git = "git"
 	// GoArchiveURL defines the URL for the Go programming language archive.
-	GoArchiveURL = "https://go.dev/dl/go1.24.5.linux-amd64.tar.gz"
+	GoArchiveURL = "https://go.dev/dl/go1.25.4.linux-amd64.tar.gz"
 	// YAPVersion defines the current version of YAP.
 	YAPVersion = "v2.0.0"
 )

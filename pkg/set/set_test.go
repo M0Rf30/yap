@@ -280,6 +280,7 @@ func TestStringifyArrayWithMockData(t *testing.T) {
 
 	// Find the array assignment
 	var arrayAssign *syntax.Assign
+
 	syntax.Walk(file, func(node syntax.Node) bool {
 		if assign, ok := node.(*syntax.Assign); ok && assign.Array != nil {
 			arrayAssign = assign
@@ -325,6 +326,7 @@ func TestStringifyAssignWithMockData(t *testing.T) {
 
 	// Find the variable assignment
 	var varAssign *syntax.Assign
+
 	syntax.Walk(file, func(node syntax.Node) bool {
 		if assign, ok := node.(*syntax.Assign); ok && assign.Value != nil {
 			varAssign = assign
@@ -371,6 +373,7 @@ func TestStringifyFuncDeclWithMockData(t *testing.T) {
 
 	// Find the function declaration
 	var funcDecl *syntax.FuncDecl
+
 	syntax.Walk(file, func(node syntax.Node) bool {
 		if fn, ok := node.(*syntax.FuncDecl); ok {
 			funcDecl = fn

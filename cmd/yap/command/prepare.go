@@ -16,6 +16,9 @@ var (
 	// GoLang indicates whether to prepare Go language environment.
 	GoLang bool
 
+	// TargetArch specifies the target architecture for cross-compilation.
+	TargetArch string
+
 	// prepareCmd represents the prepare command.
 	prepareCmd = &cobra.Command{
 		Use:     "prepare <distro>",
@@ -39,7 +42,7 @@ var (
 				}
 			}
 
-			err := packageManager.PrepareEnvironment(GoLang)
+			err := packageManager.PrepareEnvironment(GoLang, TargetArch)
 			if err != nil {
 				logger.Error(err.Error())
 			}
@@ -63,6 +66,7 @@ func InitializePrepareDescriptions() {
 	// Update flag descriptions with localized text
 	prepareCmd.Flag("skip-sync").Usage = i18n.T("flags.prepare.skip_sync")
 	prepareCmd.Flag("golang").Usage = i18n.T("flags.prepare.golang")
+	prepareCmd.Flag("target-arch").Usage = i18n.T("flags.prepare.target_arch")
 }
 
 //nolint:gochecknoinits // Required for cobra command registration
@@ -76,4 +80,6 @@ func init() {
 		"skip-sync", "s", false, "")
 	prepareCmd.Flags().BoolVarP(&GoLang,
 		"golang", "g", false, "")
+	prepareCmd.Flags().StringVarP(&TargetArch,
+		"target-arch", "t", "", "Target architecture for cross-compilation (e.g., arm64, armv7, x86_64)")
 }

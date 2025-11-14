@@ -34,12 +34,26 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *RPM {
 }
 
 // BuildPackage creates an RPM package based on the provided PKGBUILD information.
-func (r *RPM) BuildPackage(artifactsPath string) error {
+func (r *RPM) BuildPackage(artifactsPath string, targetArch string) error {
+	// Log cross-compilation build initiation
+	if targetArch != "" && targetArch != r.PKGBUILD.ArchComputed {
+		logger.Info(i18n.T("logger.cross_compilation.starting_cross_compilation_build"),
+			"package", r.PKGBUILD.PkgName,
+			"target_arch", targetArch,
+			"build_arch", r.PKGBUILD.ArchComputed)
+	}
+
+	// Use target architecture for cross-compilation if specified
+	arch := r.PKGBUILD.ArchComputed
+	if targetArch != "" {
+		arch = targetArch
+	}
+
 	pkgName := fmt.Sprintf("%s-%s-%s.%s.rpm",
 		r.PKGBUILD.PkgName,
 		r.PKGBUILD.PkgVer,
 		r.PKGBUILD.PkgRel,
-		r.PKGBUILD.ArchComputed)
+		arch)
 
 	epoch, _ := strconv.ParseUint(r.PKGBUILD.Epoch, 10, 32)
 	if epoch == 0 {
@@ -58,7 +72,7 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		Epoch:       uint32(epoch),
 		Version:     r.PKGBUILD.PkgVer,
 		Release:     r.PKGBUILD.PkgRel,
-		Arch:        r.PKGBUILD.ArchComputed,
+		Arch:        arch,
 		Vendor:      copyright,
 		URL:         r.PKGBUILD.URL,
 		Packager:    r.PKGBUILD.Maintainer,
@@ -112,11 +126,16 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 // cleans up the RPM directory, creates necessary directories, and gathers files.
 // It also processes package dependencies and creates the RPM spec file, returning
 // an error if any step fails.
-func (r *RPM) PrepareFakeroot(_ string) error {
+func (r *RPM) PrepareFakeroot(_ string, targetArch string) error {
 	r.getGroup()
 	r.getRelease()
 
 	// Use centralized architecture mapping from common package
+	// If target architecture is specified for cross-compilation, use it
+	if targetArch != "" {
+		r.PKGBUILD.ArchComputed = targetArch
+	}
+
 	r.TranslateArchitecture()
 
 	if r.PKGBUILD.StripEnabled {
