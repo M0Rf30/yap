@@ -175,7 +175,7 @@ pkgrel="2"
 	}
 
 	// Test loading multi-package project
-	graphData, err := LoadProjectForGraph(tempDir, "modern")
+	graphData, err := LoadProjectForGraph(tempDir, "gradient")
 	if err != nil {
 		t.Fatalf("Failed to load project: %v", err)
 	}
