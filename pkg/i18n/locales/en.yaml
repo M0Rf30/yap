@@ -828,3 +828,9 @@
   translation: "No distribution specified, cleaning all"
 - id: logger.zap.project_path
   translation: "Project path"
+
+# Logger messages - Package installation
+- id: logger.pkgbuild.info.all_packages_installed
+  translation: "All required packages are already installed"
+- id: logger.pkgbuild.info.packages_already_installed
+  translation: "Some packages are already installed"
