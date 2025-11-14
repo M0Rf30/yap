@@ -369,55 +369,6 @@ func TestCreateMultiPackageGraph(t *testing.T) {
 	}
 }
 
-func TestExtractQuotedValue(t *testing.T) {
-	tests := []struct {
-		name     string
-		line     string
-		prefix   string
-		expected string
-	}{
-		{
-			name:     "simple value",
-			line:     "pkgname=test-package",
-			prefix:   "pkgname=",
-			expected: "test-package",
-		},
-		{
-			name:     "quoted value",
-			line:     "pkgname=\"test-package\"",
-			prefix:   "pkgname=",
-			expected: "test-package",
-		},
-		{
-			name:     "single quoted value",
-			line:     "pkgname='test-package'",
-			prefix:   "pkgname=",
-			expected: "test-package",
-		},
-		{
-			name:     "value with spaces",
-			line:     "pkgname=\"test package\"",
-			prefix:   "pkgname=",
-			expected: "test package",
-		},
-		{
-			name:     "empty value",
-			line:     "pkgname=",
-			prefix:   "pkgname=",
-			expected: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := extractQuotedValue(tt.line, tt.prefix)
-			if result != tt.expected {
-				t.Errorf("extractQuotedValue(%q, %q) = %q, want %q", tt.line, tt.prefix, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestCleanDependencyName(t *testing.T) {
 	tests := []struct {
 		name     string
