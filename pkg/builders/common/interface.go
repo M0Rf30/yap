@@ -20,6 +20,9 @@ import (
 
 const (
 	updateCommand = "update"
+	formatDeb     = "deb"
+	formatPacman  = "pacman"
+	formatApk     = "apk"
 )
 
 // Builder defines the common interface that all package builders must implement.
@@ -73,7 +76,7 @@ func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
 			version := result[1]
 
 			switch bb.Format {
-			case "deb":
+			case formatDeb:
 				processed[index] = fmt.Sprintf("%s (%s %s)", name, operator, version)
 			case "rpm":
 				processed[index] = fmt.Sprintf("%s %s %s", name, operator, version)
@@ -187,10 +190,10 @@ func (bb *BaseBuilder) CreateFileWalker() *files.Walker {
 
 	// Configure format-specific options
 	switch bb.Format {
-	case "pacman":
+	case formatPacman:
 		// Pacman skips dot files
 		options.SkipDotFiles = true
-	case "apk":
+	case formatApk:
 		// APK skips control files starting with '.'
 		options.SkipPatterns = []string{".*"}
 	}
@@ -217,7 +220,7 @@ func (bb *BaseBuilder) FormatRelease(distroSuffixMap map[string]string) {
 	}
 
 	switch bb.Format {
-	case "deb":
+	case formatDeb:
 		bb.PKGBUILD.PkgRel += bb.PKGBUILD.Codename
 	case "rpm":
 		if suffix, exists := distroSuffixMap[bb.PKGBUILD.Distro]; exists {
@@ -516,20 +519,25 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	_, ccacheErr := exec.LookPath("ccache")
 	ccacheAvailable := ccacheErr == nil
 
+	// Convert package names to executable names
+	gccExecutable := toolchainPackages.GetExecutableName(toolchainPackages.GCCPackage)
+	gppExecutable := toolchainPackages.GetExecutableName(toolchainPackages.GPlusPlusPackage)
+
 	if ccacheAvailable {
-		_ = os.Setenv("CC", "ccache "+toolchainPackages.GCCPackage)
-		_ = os.Setenv("CXX", "ccache "+toolchainPackages.GPlusPlusPackage)
+		_ = os.Setenv("CC", "ccache "+gccExecutable)
+		_ = os.Setenv("CXX", "ccache "+gppExecutable)
 	} else {
-		_ = os.Setenv("CC", toolchainPackages.GCCPackage)
-		_ = os.Setenv("CXX", toolchainPackages.GPlusPlusPackage)
+		_ = os.Setenv("CC", gccExecutable)
+		_ = os.Setenv("CXX", gppExecutable)
 	}
 
 	// Extract binutils prefix for tool names
-	// BinutilsPackage is like "aarch64-linux-gnu-binutils", we need "aarch64-linux-gnu-ar", etc.
-	binutilsPrefix := strings.TrimSuffix(toolchainPackages.BinutilsPackage, "-binutils")
+	// BinutilsPackage is like "binutils-aarch64-linux-gnu", we need "aarch64-linux-gnu-ar", etc.
+	binutilsPrefix := strings.TrimPrefix(toolchainPackages.BinutilsPackage, "binutils-")
 	if binutilsPrefix == toolchainPackages.BinutilsPackage {
-		// If no -binutils suffix, try without suffix (for special cases)
-		binutilsPrefix = strings.TrimSuffix(toolchainPackages.BinutilsPackage, "binutils")
+		// If no binutils- prefix, try the package conversion logic
+		// For packages like "aarch64-linux-gnu-binutils", extract the prefix
+		binutilsPrefix = strings.TrimSuffix(toolchainPackages.BinutilsPackage, "-binutils")
 	}
 
 	_ = os.Setenv("AR", binutilsPrefix+"-ar")
@@ -540,20 +548,20 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	_ = os.Setenv("LD", binutilsPrefix+"-ld")
 	_ = os.Setenv("NM", binutilsPrefix+"-nm")
 
-	// Calculate CROSS_COMPILE prefix
+	// Calculate CROSS_COMPILE prefix from the executable name
 	ccPrefix := ""
 
-	if strings.Contains(toolchainPackages.GCCPackage, "-gcc") {
-		// Extract prefix before -gcc
-		parts := strings.Split(toolchainPackages.GCCPackage, "-gcc")
+	if strings.Contains(gccExecutable, "-gcc") {
+		// Extract prefix before -gcc (e.g., "aarch64-linux-gnu-gcc" -> "aarch64-linux-gnu")
+		parts := strings.Split(gccExecutable, "-gcc")
 		if len(parts) > 0 {
-			ccPrefix = parts[0] + "-"
+			ccPrefix = parts[0]
 		}
-	} else if strings.Contains(toolchainPackages.GCCPackage, "gcc") {
+	} else if strings.Contains(gccExecutable, "gcc") {
 		// Extract prefix before gcc
-		parts := strings.Split(toolchainPackages.GCCPackage, "gcc")
+		parts := strings.Split(gccExecutable, "gcc")
 		if len(parts) > 0 {
-			ccPrefix = parts[0] + "-"
+			ccPrefix = strings.TrimSuffix(parts[0], "-")
 		}
 	}
 
@@ -567,10 +575,9 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 			binutilsPrefix+"-ld")
 
 		// Set CC and CXX for Rust's build script integration
-		// Note: GCCPackage and GPlusPlusPackage already contain the full command name
-		// Wrap with ccache if available
-		rustCC := toolchainPackages.GCCPackage
-		rustCXX := toolchainPackages.GPlusPlusPackage
+		// Use the executable names (already converted above)
+		rustCC := gccExecutable
+		rustCXX := gppExecutable
 
 		if ccacheAvailable {
 			rustCC = "ccache " + rustCC
@@ -593,16 +600,14 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 		_ = os.Setenv("GOOS", goOS)
 		_ = os.Setenv("GOARCH", goArch)
 
-		// Set up CGO for cross-compilation
-		// Note: GCCPackage and GPlusPlusPackage already contain the full command name
-		// Wrap with ccache if available
+		// Set up CGO for cross-compilation using executable names
 		_ = os.Setenv("CGO_ENABLED", "1")
 		if ccacheAvailable {
-			_ = os.Setenv("CC_FOR_TARGET", "ccache "+toolchainPackages.GCCPackage)
-			_ = os.Setenv("CXX_FOR_TARGET", "ccache "+toolchainPackages.GPlusPlusPackage)
+			_ = os.Setenv("CC_FOR_TARGET", "ccache "+gccExecutable)
+			_ = os.Setenv("CXX_FOR_TARGET", "ccache "+gppExecutable)
 		} else {
-			_ = os.Setenv("CC_FOR_TARGET", toolchainPackages.GCCPackage)
-			_ = os.Setenv("CXX_FOR_TARGET", toolchainPackages.GPlusPlusPackage)
+			_ = os.Setenv("CC_FOR_TARGET", gccExecutable)
+			_ = os.Setenv("CXX_FOR_TARGET", gppExecutable)
 		}
 
 		logger.Info(i18n.T("logger.cross_compilation.go_cross_compilation_configured"),

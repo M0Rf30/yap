@@ -941,7 +941,7 @@ func TestCrossCompilationEnvironmentVariables(t *testing.T) {
 		name        string
 		format      string
 		targetArch  string
-		expectedCC  string // Expected CC value (should NOT have duplicated suffix)
+		expectedCC  string // Expected CC value (should be executable name)
 		expectedCXX string
 		expectedAR  string
 	}{
@@ -949,7 +949,7 @@ func TestCrossCompilationEnvironmentVariables(t *testing.T) {
 			name:        "Arch Linux aarch64",
 			format:      "pacman",
 			targetArch:  "aarch64",
-			expectedCC:  "aarch64-linux-gnu-gcc", // NOT gcc-gcc or similar
+			expectedCC:  "aarch64-linux-gnu-gcc", // Already correct format
 			expectedCXX: "aarch64-linux-gnu-g++",
 			expectedAR:  "aarch64-linux-gnu-ar",
 		},
@@ -957,9 +957,9 @@ func TestCrossCompilationEnvironmentVariables(t *testing.T) {
 			name:        "Debian aarch64",
 			format:      "deb",
 			targetArch:  "aarch64",
-			expectedCC:  "gcc-aarch64-linux-gnu",
-			expectedCXX: "g++-aarch64-linux-gnu",
-			expectedAR:  "binutils-aarch64-linux-gnu-ar", // Note: depends on pattern
+			expectedCC:  "aarch64-linux-gnu-gcc", // Converted from package name gcc-aarch64-linux-gnu
+			expectedCXX: "aarch64-linux-gnu-g++", // Converted from package name g++-aarch64-linux-gnu
+			expectedAR:  "aarch64-linux-gnu-ar",  // From binutils prefix
 		},
 	}
 

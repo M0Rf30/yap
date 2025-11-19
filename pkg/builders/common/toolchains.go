@@ -1,7 +1,10 @@
 // Package common provides shared functionality for cross-compilation toolchains.
 package common
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // CrossToolchain represents a cross-compilation toolchain for a specific target architecture.
 type CrossToolchain struct {
@@ -214,3 +217,39 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 
 	return result
 }()
+
+// GetExecutableName converts a package name to its executable name.
+// Different distributions use different naming conventions:
+//   - Debian/Ubuntu/Fedora: gcc-aarch64-linux-gnu -> aarch64-linux-gnu-gcc
+//   - Arch Linux: aarch64-linux-gnu-gcc -> aarch64-linux-gnu-gcc (already correct)
+//   - Alpine: gcc-aarch64 -> aarch64-alpine-linux-musl-gcc (needs special handling)
+func (ct CrossToolchain) GetExecutableName(packageName string) string {
+	// Handle Fedora's gcc-c++ pattern (G++)
+	if strings.HasPrefix(packageName, "gcc-c++-") {
+		suffix := strings.TrimPrefix(packageName, "gcc-c++-")
+		// Fedora: gcc-c++-aarch64-linux-gnu -> aarch64-linux-gnu-g++
+		return suffix + "-g++"
+	}
+
+	// Handle g++ pattern
+	if strings.HasPrefix(packageName, "g++-") {
+		suffix := strings.TrimPrefix(packageName, "g++-")
+		// Debian/Ubuntu: g++-aarch64-linux-gnu -> aarch64-linux-gnu-g++
+		return suffix + "-g++"
+	}
+
+	// Handle gcc pattern
+	if strings.HasPrefix(packageName, "gcc-") {
+		suffix := strings.TrimPrefix(packageName, "gcc-")
+
+		// Alpine special case: gcc-aarch64 needs to become aarch64-alpine-linux-musl-gcc
+		// However, we can't reliably determine this without knowing the distribution
+		// So we'll just do the basic transformation and let Alpine handle it
+		// Alpine: gcc-aarch64 -> aarch64-gcc (which may need further handling at runtime)
+		return suffix + "-gcc"
+	}
+
+	// Otherwise, return as-is (already in correct format for Arch, etc.)
+	// Arch: aarch64-linux-gnu-gcc -> aarch64-linux-gnu-gcc
+	return packageName
+}
