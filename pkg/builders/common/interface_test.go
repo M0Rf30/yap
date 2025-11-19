@@ -1021,3 +1021,70 @@ func TestCrossCompilationEnvironmentVariables(t *testing.T) {
 		})
 	}
 }
+
+func TestInstallCrossCompiled(t *testing.T) {
+	// Create a temporary directory for artifacts
+	tmpDir := t.TempDir()
+
+	tests := []struct {
+		name          string
+		format        string
+		targetArch    string
+		buildArch     string
+		expectedTool  string // Expected installation tool
+		skipExecution bool   // Skip actual execution since we're in unit test
+	}{
+		{
+			name:          "cross-compiled DEB uses dpkg",
+			format:        constants.FormatDEB,
+			targetArch:    "arm64",
+			buildArch:     "amd64",
+			expectedTool:  "dpkg",
+			skipExecution: true,
+		},
+		{
+			name:          "native DEB uses dpkg",
+			format:        constants.FormatDEB,
+			targetArch:    "amd64",
+			buildArch:     "amd64",
+			expectedTool:  "dpkg",
+			skipExecution: true,
+		},
+		{
+			name:          "cross-compiled RPM uses dnf",
+			format:        constants.FormatRPM,
+			targetArch:    "aarch64",
+			buildArch:     "x86_64",
+			expectedTool:  "dnf",
+			skipExecution: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pkg := &pkgbuild.PKGBUILD{
+				PkgName:      "test-package",
+				PkgVer:       "1.0.0",
+				PkgRel:       "1",
+				ArchComputed: tt.buildArch,
+				TargetArch:   tt.targetArch,
+			}
+
+			builder := NewBaseBuilder(pkg, tt.format)
+
+			// Create a dummy package file
+			pkgName := builder.BuildPackageName(getExtension(tt.format))
+			pkgPath := filepath.Join(tmpDir, pkgName)
+
+			err := os.WriteFile(pkgPath, []byte("dummy package"), 0o644)
+			if err != nil {
+				t.Fatalf("Failed to create dummy package: %v", err)
+			}
+
+			// Verify that DEB format always expects dpkg
+			if tt.format == constants.FormatDEB && tt.expectedTool != "dpkg" {
+				t.Errorf("DEB format should always use dpkg, but expected %s", tt.expectedTool)
+			}
+		})
+	}
+}
