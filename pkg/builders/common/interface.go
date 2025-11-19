@@ -304,6 +304,11 @@ func (bb *BaseBuilder) Install(artifactsPath string) error {
 		return shell.Exec(false, "", "pacman", "-U", "--noconfirm", pkgPath)
 	}
 
+	// For DEB packages, always use dpkg -i to avoid dependency resolution issues
+	if bb.Format == constants.FormatDEB {
+		return shell.ExecWithSudo(false, "", "dpkg", "-i", pkgPath)
+	}
+
 	installArgs := constants.GetInstallArgs(bb.Format)
 	installArgs = append(installArgs, pkgPath)
 	useSudo := bb.Format == constants.FormatAPK
