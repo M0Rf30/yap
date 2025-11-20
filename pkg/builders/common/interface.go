@@ -78,7 +78,7 @@ func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
 			switch bb.Format {
 			case formatDeb:
 				processed[index] = fmt.Sprintf("%s (%s %s)", name, operator, version)
-			case "rpm":
+			case constants.FormatRPM:
 				processed[index] = fmt.Sprintf("%s %s %s", name, operator, version)
 			default:
 				processed[index] = depend
@@ -222,7 +222,7 @@ func (bb *BaseBuilder) FormatRelease(distroSuffixMap map[string]string) {
 	switch bb.Format {
 	case formatDeb:
 		bb.PKGBUILD.PkgRel += bb.PKGBUILD.Codename
-	case "rpm":
+	case constants.FormatRPM:
 		if suffix, exists := distroSuffixMap[bb.PKGBUILD.Distro]; exists {
 			bb.PKGBUILD.PkgRel += suffix + bb.PKGBUILD.Codename
 		}
@@ -253,9 +253,9 @@ func getPackageManager(format string) string {
 	case constants.FormatRPM:
 		return "dnf"
 	case constants.FormatPacman:
-		return "pacman"
+		return formatPacman
 	case constants.FormatAPK:
-		return "apk"
+		return formatApk
 	default:
 		return ""
 	}
@@ -299,16 +299,30 @@ func (bb *BaseBuilder) Install(artifactsPath string) error {
 	pkgName := bb.BuildPackageName(getExtension(bb.Format))
 	pkgPath := filepath.Join(artifactsPath, pkgName)
 
+	// Use format-specific direct installation tools to avoid dependency resolution issues
+	// with foreign architectures during cross-compilation
+
 	if bb.Format == constants.FormatPacman {
-		// Pacman uses special install args for local files
+		// Pacman uses -U flag for local files
 		return shell.Exec(false, "", "pacman", "-U", "--noconfirm", pkgPath)
 	}
 
-	// For DEB packages, always use dpkg -i to avoid dependency resolution issues
 	if bb.Format == constants.FormatDEB {
+		// Use dpkg instead of apt-get to avoid dependency resolution issues
 		return shell.ExecWithSudo(false, "", "dpkg", "-i", pkgPath)
 	}
 
+	if bb.Format == constants.FormatRPM {
+		// Use rpm instead of yum/dnf to avoid dependency resolution issues
+		return shell.ExecWithSudo(false, "", "rpm", "-i", pkgPath)
+	}
+
+	if bb.Format == constants.FormatAPK {
+		// Use --no-network flag to prevent dependency resolution from repos
+		return shell.ExecWithSudo(true, "", "apk", "add", "--allow-untrusted", "--no-network", pkgPath)
+	}
+
+	// Fallback to generic installation (should not be reached for supported formats)
 	installArgs := constants.GetInstallArgs(bb.Format)
 	installArgs = append(installArgs, pkgPath)
 	useSudo := bb.Format == constants.FormatAPK
@@ -392,19 +406,19 @@ func (bb *BaseBuilder) getCrossCompilerDependencies(targetArch string) []string 
 			"ppc64le": {"gcc-powerpc64le-linux-gnu", "g++-powerpc64le-linux-gnu"},
 			"s390x":   {"gcc-s390x-linux-gnu", "g++-s390x-linux-gnu"},
 		},
-		"rpm": {
+		constants.FormatRPM: {
 			"aarch64": {"gcc-aarch64-linux-gnu", "gcc-c++-aarch64-linux-gnu"},
 			"armv7":   {"gcc-arm-linux-gnu", "gcc-c++-arm-linux-gnu"},
 			"i686":    {"gcc-i686-linux-gnu", "gcc-c++-i686-linux-gnu"},
 			"ppc64le": {"gcc-ppc64le-linux-gnu", "gcc-c++-ppc64le-linux-gnu"},
 			"s390x":   {"gcc-s390x-linux-gnu", "gcc-c++-s390x-linux-gnu"},
 		},
-		"apk": {
+		constants.FormatAPK: {
 			"aarch64": {"gcc-aarch64", "musl-aarch64", "musl-dev"},
 			"armv7":   {"gcc-armv7", "musl-armv7", "musl-dev"},
 			"armv6":   {"gcc-armhf", "musl-armhf", "musl-dev"},
 		},
-		"pacman": {
+		constants.FormatPacman: {
 			"aarch64": {"aarch64-linux-gnu-gcc", "aarch64-linux-gnu-binutils"},
 			"armv7":   {"arm-none-eabi-gcc", "arm-none-eabi-binutils"},
 		},
