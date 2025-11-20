@@ -226,13 +226,17 @@ func (d *Deb) createConfFiles() error {
 
 	data := ""
 
+	var confFilesBuilder strings.Builder
+
 	for _, name := range d.PKGBUILD.Backup {
 		if !strings.HasPrefix(name, "/") {
 			name = "/" + name
 		}
 
-		data += name + "\n"
+		confFilesBuilder.WriteString(name + "\n")
 	}
+
+	data += confFilesBuilder.String()
 
 	return osutils.CreateWrite(path, data)
 }
