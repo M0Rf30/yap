@@ -60,6 +60,9 @@ Conflicts: {{join .}}
 {{- with .Replaces}}
 Replaces: {{join .}}
 {{- end }}
+{{- with .OptDepends}}
+Recommends: {{join .}}
+{{- end }}
 {{- if .URL}}
 Homepage: {{.URL}}
 {{- end }}

@@ -63,7 +63,6 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		Requires:    processDepends(r.PKGBUILD.Depends),
 		Conflicts:   processDepends(r.PKGBUILD.Conflicts),
 		Recommends:  processDepends(r.PKGBUILD.OptDepends),
-		Suggests:    processDepends(r.PKGBUILD.OptDepends),
 		BuildTime:   time.Now(),
 	})
 
