@@ -226,27 +226,27 @@
 - id: errors.download.download_failed
   translation: "Download fallito"
 - id: errors.download.download_failed_after_attempts
-  translation: "Download fallito dopo tutti i tentativi di riprovare"
+  translation: "Download fallito dopo %d tentativi (errore: %v)"
 - id: errors.download.download_failed_no_response
   translation: "Download fallito: nessuna risposta dal server"
 
 # Errori file
 - id: errors.files.failed_to_access_directory
-  translation: "Accesso alla directory fallito"
+  translation: "Accesso alla directory fallito: %s"
 - id: errors.files.failed_to_change_permissions
   translation: "Modifica dei permessi fallita"
 - id: errors.files.failed_to_create_directory
-  translation: "Creazione della directory fallita"
+  translation: "Creazione della directory fallita: %s"
 - id: errors.files.failed_to_stat_file
   translation: "Operazione stat sul file fallita"
 - id: errors.files.file_not_writable
-  translation: "Il file non è scrivibile"
+  translation: "Il file non è scrivibile: %s"
 
 # Errori git
 - id: errors.git.empty_download_path
   translation: "Il percorso di download non può essere vuoto"
 - id: errors.git.remote_branch_not_found
-  translation: "Branch remoto non trovato"
+  translation: "Branch remoto non trovato: %s (errore: %v)"
 
 # Errori graph
 - id: errors.graph.failed_to_load_project
@@ -256,15 +256,15 @@
 
 # Errori install
 - id: errors.install.artifact_not_found
-  translation: "Artefatto del pacchetto non trovato"
+  translation: "Pacchetto non trovato: %s"
 - id: errors.install.failed_to_resolve_path
   translation: "Risoluzione del percorso fallita"
 - id: errors.install.installation_failed
   translation: "Installazione fallita"
 - id: errors.install.unsupported_package_format
-  translation: "Formato pacchetto non supportato"
+  translation: "Formato pacchetto non supportato: %s"
 - id: errors.install.unsupported_package_type
-  translation: "Tipo pacchetto non supportato"
+  translation: "Tipo pacchetto non supportato: %s"
 
 # Errori packer
 - id: errors.packer.unsupported_linux_distro
@@ -284,7 +284,7 @@
 - id: errors.pkgbuild.failed_to_set_environment_variables
   translation: "Impostazione delle variabili d'ambiente per l'esecuzione del pacchetto fallita"
 - id: errors.pkgbuild.invalid_directive_use
-  translation: "Uso di direttiva non valido"
+  translation: "Uso di direttiva non valido: %s"
 - id: errors.pkgbuild.unsupported_architecture
   translation: "Architettura non supportata"
 
@@ -336,7 +336,7 @@
 
 # Errori shell
 - id: errors.shell.command_not_allowed_for_sudo
-  translation: "Comando non consentito per l'esecuzione con sudo"
+  translation: "Comando non consentito per l'esecuzione con sudo: %s"
 - id: errors.shell.failed_to_create_script_runner
   translation: "Creazione dello script runner fallita"
 - id: errors.shell.failed_to_parse_script
@@ -348,15 +348,15 @@
 
 # Errori source
 - id: errors.source.directory_not_supported
-  translation: "Le directory come sorgenti non sono supportate"
+  translation: "Le directory come sorgenti non sono supportate: %s"
 - id: errors.source.failed_to_copy_file
-  translation: "Copia del file fallita"
+  translation: "Copia del file fallita: %s"
 - id: errors.source.failed_to_open_file_for_hash
-  translation: "Apertura del file per il calcolo dell'hash fallita"
+  translation: "Apertura del file per il calcolo dell'hash fallita: %s"
 - id: errors.source.hash_verification_failed
-  translation: "Verifica dell'hash fallita"
+  translation: "Verifica dell'hash fallita per %s"
 - id: errors.source.unsupported_hash_length
-  translation: "Lunghezza hash non supportata"
+  translation: "Lunghezza hash non supportata: %d"
 - id: errors.source.unsupported_source_type
   translation: "Tipo sorgente non supportato"
 
@@ -545,6 +545,22 @@
 # Messaggi logger - Download
 - id: logger.download.info.response_status
   translation: "Stato della risposta"
+
+# Messaggi logger - Extract
+- id: logger.extract.extracting_package
+  translation: "Estrazione del pacchetto nella directory di staging"
+- id: logger.extract.package_extracted
+  translation: "Pacchetto estratto con successo nella directory di staging"
+- id: logger.extract.cross_compilation_detected
+  translation: "Cross-compilation rilevata - estrazione del pacchetto invece dell'installazione"
+- id: logger.extract.staging_cleaned
+  translation: "Directory di staging pulita"
+- id: logger.extract.staging_directory_created
+  translation: "Directory di staging creata per la cross-compilation"
+- id: logger.extract.staging_directory_reused
+  translation: "Riutilizzo della directory di staging esistente"
+- id: logger.extract.extraction_stats
+  translation: "Estrazione completata"
 
 # Messaggi logger - Exec with context
 - id: logger.execwithcontext.debug.command_execution_completed_1

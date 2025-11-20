@@ -363,6 +363,48 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 	return nil
 }
 
+// installPackageForWorker handles package installation or extraction for a worker.
+// It uses InstallOrExtract to handle both native builds (install) and cross-compilation (extract).
+func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, workerID string) error {
+	logger.Info(i18n.T("logger.installing_package"),
+		"package", pkgName,
+		"worker_id", workerID)
+
+	// Type assert to access BaseBuilder methods
+	type installOrExtractor interface {
+		InstallOrExtract(artifactsPath, buildDir, targetArch string) error
+	}
+
+	if installer, ok := proj.PackageManager.(installOrExtractor); ok {
+		err := installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
+		if err != nil {
+			logger.Error(
+				i18n.T("logger.project.package_installation_failed"),
+				"package", pkgName,
+				"error", err)
+
+			return err
+		}
+	} else {
+		// Fallback to regular Install if InstallOrExtract not available
+		err := proj.PackageManager.Install(mpc.Output)
+		if err != nil {
+			logger.Error(
+				i18n.T("logger.project.package_installation_failed"),
+				"package", pkgName,
+				"error", err)
+
+			return err
+		}
+	}
+
+	logger.Info(i18n.T("logger.package_installed"),
+		"package", pkgName,
+		"worker_id", workerID)
+
+	return nil
+}
+
 // buildAndInstallProjectsParallel builds projects in parallel with immediate installation.
 // This implements Arch Linux-style dependency handling: each package is installed
 // immediately after building, making it available for other packages building in parallel.
@@ -410,28 +452,13 @@ func (mpc *MultipleProject) buildAndInstallProjectsParallel(projects []*Project,
 						return
 					}
 
-					// Step 3: Install immediately (Arch Linux style)
-					// This makes the package available for other packages building in parallel
+					// Step 3: Install immediately (Arch Linux style) or extract for cross-compilation
 					if shouldInstall {
-						logger.Info(i18n.T("logger.installing_package"),
-							"package", pkgName,
-							"worker_id", workerIDStr)
-
-						err := proj.PackageManager.Install(mpc.Output)
-						if err != nil {
-							logger.Error(
-								i18n.T("logger.project.package_installation_failed"),
-								"package", pkgName,
-								"error", err)
-
+						if err := mpc.installPackageForWorker(proj, pkgName, workerIDStr); err != nil {
 							errorChan <- err
 
 							return
 						}
-
-						logger.Info(i18n.T("logger.package_installed"),
-							"package", pkgName,
-							"worker_id", workerIDStr)
 					}
 				}
 
@@ -1273,19 +1300,37 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 	return nil
 }
 
-// installPackage installs a single package.
+// installPackage installs a single package or extracts it for cross-compilation.
 func (mpc *MultipleProject) installPackage(proj *Project) error {
 	pkgName := proj.Builder.PKGBUILD.PkgName
 	logger.Info(i18n.T("logger.installing_package"), "package", pkgName)
 
-	err := proj.PackageManager.Install(mpc.Output)
-	if err != nil {
-		logger.Error(
-			i18n.T("logger.project.package_installation_failed"),
-			"package", pkgName,
-			"error", err)
+	// Use InstallOrExtract to handle both native and cross-compilation builds
+	type installOrExtractor interface {
+		InstallOrExtract(artifactsPath, buildDir, targetArch string) error
+	}
 
-		return err
+	if installer, ok := proj.PackageManager.(installOrExtractor); ok {
+		err := installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
+		if err != nil {
+			logger.Error(
+				i18n.T("logger.project.package_installation_failed"),
+				"package", pkgName,
+				"error", err)
+
+			return err
+		}
+	} else {
+		// Fallback to regular Install if InstallOrExtract not available
+		err := proj.PackageManager.Install(mpc.Output)
+		if err != nil {
+			logger.Error(
+				i18n.T("logger.project.package_installation_failed"),
+				"package", pkgName,
+				"error", err)
+
+			return err
+		}
 	}
 
 	logger.Info(i18n.T("logger.package_installed"), "package", pkgName)
