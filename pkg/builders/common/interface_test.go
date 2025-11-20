@@ -1051,11 +1051,51 @@ func TestInstallCrossCompiled(t *testing.T) {
 			skipExecution: true,
 		},
 		{
-			name:          "cross-compiled RPM uses dnf",
+			name:          "cross-compiled RPM uses rpm",
 			format:        constants.FormatRPM,
 			targetArch:    "aarch64",
 			buildArch:     "x86_64",
-			expectedTool:  "dnf",
+			expectedTool:  "rpm",
+			skipExecution: true,
+		},
+		{
+			name:          "native RPM uses rpm",
+			format:        constants.FormatRPM,
+			targetArch:    "x86_64",
+			buildArch:     "x86_64",
+			expectedTool:  "rpm",
+			skipExecution: true,
+		},
+		{
+			name:          "cross-compiled APK uses apk with --no-network",
+			format:        constants.FormatAPK,
+			targetArch:    "aarch64",
+			buildArch:     "x86_64",
+			expectedTool:  "apk",
+			skipExecution: true,
+		},
+		{
+			name:          "native APK uses apk with --no-network",
+			format:        constants.FormatAPK,
+			targetArch:    "x86_64",
+			buildArch:     "x86_64",
+			expectedTool:  "apk",
+			skipExecution: true,
+		},
+		{
+			name:          "cross-compiled Pacman uses pacman -U",
+			format:        constants.FormatPacman,
+			targetArch:    "aarch64",
+			buildArch:     "x86_64",
+			expectedTool:  "pacman",
+			skipExecution: true,
+		},
+		{
+			name:          "native Pacman uses pacman -U",
+			format:        constants.FormatPacman,
+			targetArch:    "x86_64",
+			buildArch:     "x86_64",
+			expectedTool:  "pacman",
 			skipExecution: true,
 		},
 	}
@@ -1081,9 +1121,24 @@ func TestInstallCrossCompiled(t *testing.T) {
 				t.Fatalf("Failed to create dummy package: %v", err)
 			}
 
-			// Verify that DEB format always expects dpkg
-			if tt.format == constants.FormatDEB && tt.expectedTool != "dpkg" {
-				t.Errorf("DEB format should always use dpkg, but expected %s", tt.expectedTool)
+			// Verify that each format uses the expected direct installation tool
+			switch tt.format {
+			case constants.FormatDEB:
+				if tt.expectedTool != "dpkg" {
+					t.Errorf("DEB format should always use dpkg, but expected %s", tt.expectedTool)
+				}
+			case constants.FormatRPM:
+				if tt.expectedTool != "rpm" {
+					t.Errorf("RPM format should always use rpm, but expected %s", tt.expectedTool)
+				}
+			case constants.FormatAPK:
+				if tt.expectedTool != "apk" {
+					t.Errorf("APK format should always use apk, but expected %s", tt.expectedTool)
+				}
+			case constants.FormatPacman:
+				if tt.expectedTool != "pacman" {
+					t.Errorf("Pacman format should always use pacman, but expected %s", tt.expectedTool)
+				}
 			}
 		})
 	}
