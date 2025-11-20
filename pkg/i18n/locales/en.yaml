@@ -225,27 +225,27 @@
 - id: errors.download.download_failed
   translation: "Download failed"
 - id: errors.download.download_failed_after_attempts
-  translation: "Download failed after all retry attempts"
+  translation: "Download failed after %d retry attempts (error: %v)"
 - id: errors.download.download_failed_no_response
   translation: "Download failed: no response from server"
 
 # File errors
 - id: errors.files.failed_to_access_directory
-  translation: "Failed to access directory"
+  translation: "Failed to access directory: %s"
 - id: errors.files.failed_to_change_permissions
   translation: "Failed to change permissions"
 - id: errors.files.failed_to_create_directory
-  translation: "Failed to create directory"
+  translation: "Failed to create directory: %s"
 - id: errors.files.failed_to_stat_file
   translation: "Failed to stat file"
 - id: errors.files.file_not_writable
-  translation: "File is not writable"
+  translation: "File is not writable: %s"
 
 # Git errors
 - id: errors.git.empty_download_path
   translation: "Download path cannot be empty"
 - id: errors.git.remote_branch_not_found
-  translation: "Remote branch not found"
+  translation: "Remote branch not found: %s (error: %v)"
 
 # Graph errors
 - id: errors.graph.failed_to_load_project
@@ -255,15 +255,15 @@
 
 # Install errors
 - id: errors.install.artifact_not_found
-  translation: "Package artifact not found"
+  translation: "Package artifact not found: %s"
 - id: errors.install.failed_to_resolve_path
   translation: "Failed to resolve path"
 - id: errors.install.installation_failed
   translation: "Installation failed"
 - id: errors.install.unsupported_package_format
-  translation: "Unsupported package format"
+  translation: "Unsupported package format: %s"
 - id: errors.install.unsupported_package_type
-  translation: "Unsupported package type"
+  translation: "Unsupported package type: %s"
 
 # Packer errors
 - id: errors.packer.unsupported_linux_distro
@@ -283,7 +283,7 @@
 - id: errors.pkgbuild.failed_to_set_environment_variables
   translation: "Failed to set environment variables for package execution"
 - id: errors.pkgbuild.invalid_directive_use
-  translation: "Invalid directive usage"
+  translation: "Invalid directive usage: %s"
 - id: errors.pkgbuild.unsupported_architecture
   translation: "Unsupported architecture"
 
@@ -335,7 +335,7 @@
 
 # Shell errors
 - id: errors.shell.command_not_allowed_for_sudo
-  translation: "Command not allowed for sudo execution"
+  translation: "Command not allowed for sudo execution: %s"
 - id: errors.shell.failed_to_create_script_runner
   translation: "Failed to create script runner"
 - id: errors.shell.failed_to_parse_script
@@ -347,15 +347,15 @@
 
 # Source errors
 - id: errors.source.directory_not_supported
-  translation: "Directory sources are not supported"
+  translation: "Directory sources are not supported: %s"
 - id: errors.source.failed_to_copy_file
-  translation: "Failed to copy file"
+  translation: "Failed to copy file: %s"
 - id: errors.source.failed_to_open_file_for_hash
-  translation: "Failed to open file for hash calculation"
+  translation: "Failed to open file for hash calculation: %s"
 - id: errors.source.hash_verification_failed
-  translation: "Hash verification failed"
+  translation: "Hash verification failed for %s"
 - id: errors.source.unsupported_hash_length
-  translation: "Unsupported hash length"
+  translation: "Unsupported hash length: %d"
 - id: errors.source.unsupported_source_type
   translation: "Unsupported source type"
 
@@ -834,3 +834,19 @@
   translation: "All required packages are already installed"
 - id: logger.pkgbuild.info.packages_already_installed
   translation: "Some packages are already installed"
+
+# Logger messages - Package extraction (cross-compilation)
+- id: logger.extract.extracting_package
+  translation: "Extracting package to staging directory"
+- id: logger.extract.package_extracted
+  translation: "Package extracted successfully to staging"
+- id: logger.extract.cross_compilation_detected
+  translation: "Cross-compilation detected - extracting package instead of installing"
+- id: logger.extract.staging_cleaned
+  translation: "Staging directory cleaned up"
+- id: logger.extract.staging_directory_created
+  translation: "Created staging directory for cross-compilation"
+- id: logger.extract.staging_directory_reused
+  translation: "Reusing existing staging directory"
+- id: logger.extract.extraction_stats
+  translation: "Extraction complete"

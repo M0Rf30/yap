@@ -312,6 +312,9 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 // This should be called just before executing build/package functions to ensure
 // each package uses its own directories, even when building multiple packages.
 //
+// For cross-compilation builds, it also sets up paths to the staging directory where
+// extracted cross-compiled dependencies are available.
+//
 // It returns an error if setting any environment variable fails.
 func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
 	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
@@ -329,7 +332,104 @@ func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
 		return err
 	}
 
+	// If cross-compiling, prepend staging directory paths to search paths
+	if pkgBuild.TargetArch != "" && pkgBuild.TargetArch != pkgBuild.ArchComputed {
+		return pkgBuild.setupCrossCompilationPaths()
+	}
+
 	return nil
+}
+
+// setupCrossCompilationPaths configures environment paths for cross-compilation builds.
+// It prepends staging directory paths to PKG_CONFIG_PATH, CFLAGS, LDFLAGS, and LD_LIBRARY_PATH
+// so that build systems can find headers, libraries, and pkg-config files from extracted packages.
+func (pkgBuild *PKGBUILD) setupCrossCompilationPaths() error {
+	stagingRoot := filepath.Join(filepath.Dir(pkgBuild.StartDir), "yap-cross-staging")
+
+	// Add staging paths to PKG_CONFIG_PATH
+	if err := pkgBuild.prependPkgConfigPaths(stagingRoot); err != nil {
+		return err
+	}
+
+	// Add staging paths to CFLAGS and CPPFLAGS for header files
+	if err := pkgBuild.prependIncludePaths(stagingRoot); err != nil {
+		return err
+	}
+
+	// Add staging paths to LDFLAGS and LD_LIBRARY_PATH for libraries
+	return pkgBuild.prependLibraryPaths(stagingRoot)
+}
+
+// prependPkgConfigPaths adds staging directory pkg-config paths to PKG_CONFIG_PATH.
+func (pkgBuild *PKGBUILD) prependPkgConfigPaths(stagingRoot string) error {
+	pkgConfigPath := os.Getenv("PKG_CONFIG_PATH")
+	stagingPaths := []string{
+		filepath.Join(stagingRoot, "usr", "lib", "pkgconfig"),
+		filepath.Join(stagingRoot, "usr", "share", "pkgconfig"),
+		filepath.Join(stagingRoot, "usr", "local", "lib", "pkgconfig"),
+		filepath.Join(stagingRoot, "opt", "zextras", "common", "lib", "pkgconfig"),
+	}
+
+	for _, path := range stagingPaths {
+		if pkgConfigPath == "" {
+			pkgConfigPath = path
+		} else {
+			pkgConfigPath = path + ":" + pkgConfigPath
+		}
+	}
+
+	return os.Setenv("PKG_CONFIG_PATH", pkgConfigPath)
+}
+
+// prependIncludePaths adds staging directory include paths to CFLAGS and CPPFLAGS.
+func (pkgBuild *PKGBUILD) prependIncludePaths(stagingRoot string) error {
+	cflags := os.Getenv("CFLAGS")
+	stagingPaths := []string{
+		filepath.Join(stagingRoot, "usr", "include"),
+		filepath.Join(stagingRoot, "usr", "local", "include"),
+		filepath.Join(stagingRoot, "opt", "zextras", "common", "include"),
+	}
+
+	for _, path := range stagingPaths {
+		cflags = "-I" + path + " " + cflags
+	}
+
+	if err := os.Setenv("CFLAGS", cflags); err != nil {
+		return err
+	}
+
+	return os.Setenv("CPPFLAGS", cflags)
+}
+
+// prependLibraryPaths adds staging directory library paths to LDFLAGS and LD_LIBRARY_PATH.
+func (pkgBuild *PKGBUILD) prependLibraryPaths(stagingRoot string) error {
+	ldflags := os.Getenv("LDFLAGS")
+	stagingPaths := []string{
+		filepath.Join(stagingRoot, "usr", "lib"),
+		filepath.Join(stagingRoot, "usr", "local", "lib"),
+		filepath.Join(stagingRoot, "opt", "zextras", "common", "lib"),
+	}
+
+	for _, path := range stagingPaths {
+		ldflags = "-L" + path + " " + ldflags
+	}
+
+	if err := os.Setenv("LDFLAGS", ldflags); err != nil {
+		return err
+	}
+
+	// Add to LD_LIBRARY_PATH
+	ldLibraryPath := os.Getenv("LD_LIBRARY_PATH")
+
+	for _, path := range stagingPaths {
+		if ldLibraryPath == "" {
+			ldLibraryPath = path
+		} else {
+			ldLibraryPath = path + ":" + ldLibraryPath
+		}
+	}
+
+	return os.Setenv("LD_LIBRARY_PATH", ldLibraryPath)
 }
 
 // ValidateGeneral checks that mandatory items are correctly provided by the PKGBUILD
