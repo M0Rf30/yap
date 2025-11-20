@@ -460,7 +460,7 @@ maintainer="John Doe <john@example.com>"
 YAP supports building packages for the following distributions:
 
 | Distribution ID | Package Format | Container Base | Package Manager |
-|----------------|----------------|----------------|-----------------|
+| --------------- | -------------- | -------------- | --------------- |
 | `almalinux` | `.rpm` | rockylinux/rockylinux:* | yum |
 | `alpine` | `.apk` | alpine:latest | apk |
 | `amzn` | `.rpm` | amazonlinux:1/2 | yum |
