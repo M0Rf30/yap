@@ -288,8 +288,8 @@ func normalizeScriptContent(script string) string {
 			continue
 		}
 
-		if strings.HasSuffix(trimmed, "\\") {
-			commandPart := strings.TrimSuffix(trimmed, "\\")
+		if before, ok := strings.CutSuffix(trimmed, "\\"); ok {
+			commandPart := before
 			commandPart = strings.TrimRight(commandPart, " ")
 
 			if currentCommand.Len() > 0 {

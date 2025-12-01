@@ -319,9 +319,9 @@ func handleArrayContinuation(
 	currentDeps []string,
 	dependencies map[string][]string,
 ) (newArray string, newDeps []string, newInArray bool) {
-	if strings.HasSuffix(line, ")") {
+	if before, ok := strings.CutSuffix(line, ")"); ok {
 		// End of array
-		line = strings.TrimSuffix(line, ")")
+		line = before
 		if line != "" {
 			moreDeps := parseDependencyLine(line)
 			currentDeps = append(currentDeps, moreDeps...)

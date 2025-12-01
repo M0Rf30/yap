@@ -225,22 +225,22 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 //   - Alpine: gcc-aarch64 -> aarch64-alpine-linux-musl-gcc (needs special handling)
 func (ct CrossToolchain) GetExecutableName(packageName string) string {
 	// Handle Fedora's gcc-c++ pattern (G++)
-	if strings.HasPrefix(packageName, "gcc-c++-") {
-		suffix := strings.TrimPrefix(packageName, "gcc-c++-")
+	if after, ok := strings.CutPrefix(packageName, "gcc-c++-"); ok {
+		suffix := after
 		// Fedora: gcc-c++-aarch64-linux-gnu -> aarch64-linux-gnu-g++
 		return suffix + "-g++"
 	}
 
 	// Handle g++ pattern
-	if strings.HasPrefix(packageName, "g++-") {
-		suffix := strings.TrimPrefix(packageName, "g++-")
+	if after, ok := strings.CutPrefix(packageName, "g++-"); ok {
+		suffix := after
 		// Debian/Ubuntu: g++-aarch64-linux-gnu -> aarch64-linux-gnu-g++
 		return suffix + "-g++"
 	}
 
 	// Handle gcc pattern
-	if strings.HasPrefix(packageName, "gcc-") {
-		suffix := strings.TrimPrefix(packageName, "gcc-")
+	if after, ok := strings.CutPrefix(packageName, "gcc-"); ok {
+		suffix := after
 
 		// Alpine special case: gcc-aarch64 needs to become aarch64-alpine-linux-musl-gcc
 		// However, we can't reliably determine this without knowing the distribution

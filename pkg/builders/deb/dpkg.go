@@ -183,17 +183,17 @@ func (d *Package) createConfFiles() error {
 
 	path := filepath.Join(d.debDir, "conffiles")
 
-	data := ""
+	var data strings.Builder
 
 	for _, name := range d.PKGBUILD.Backup {
 		if !strings.HasPrefix(name, "/") {
 			name = "/" + name
 		}
 
-		data += name + "\n"
+		data.WriteString(name + "\n")
 	}
 
-	return files.CreateWrite(path, data)
+	return files.CreateWrite(path, data.String())
 }
 
 // createCopyrightFile generates a copyright file for the Debian package.
