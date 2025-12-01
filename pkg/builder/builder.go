@@ -196,11 +196,7 @@ func (builder *Builder) getSources() error {
 
 	// Start workers for source processing (including enhanced downloads)
 	for range maxWorkers {
-		waitGroup.Add(1)
-
-		go func() {
-			defer waitGroup.Done()
-
+		waitGroup.Go(func() {
 			for task := range sourceChan {
 				err := task.source.Get()
 				if err != nil {
@@ -217,7 +213,7 @@ func (builder *Builder) getSources() error {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	// Send tasks to workers

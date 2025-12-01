@@ -7,34 +7,35 @@ run:
 
 linters:
   enable:
-    - errcheck
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    - gosec
-    - errorlint
-    - nilerr
     - asciicheck
     - bodyclose
     - copyloopvar
-    - durationcheck
-    - gochecknoinits
-    - misspell
-    - nakedret
-    - revive
-    - unconvert
-    - unparam
-    - wastedassign
-    - whitespace
-    - predeclared
     - cyclop
-    - gocyclo
+    - dupl
+    - durationcheck
+    - errcheck
+    - errorlint
+    - gochecknoinits
     - goconst
     - gocritic
-    - dupl
-    - nestif
+    - gocyclo
+    - gosec
+    - govet
+    - ineffassign
     - lll
+    - misspell
+    - modernize
+    - nakedret
+    - nestif
+    - nilerr
+    - predeclared
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - wastedassign
+    - whitespace
     - wsl_v5
 
   disable:
@@ -87,18 +88,18 @@ linters:
         - name: blank-imports
         - name: context-as-argument
         - name: dot-imports
+        - name: empty-block
         - name: error-return
         - name: error-strings
+        - name: errorf
         - name: exported
         - name: increment-decrement
-        - name: var-naming
+        - name: indent-error-flow
         - name: package-comments
         - name: range
         - name: receiver-naming
-        - name: indent-error-flow
-        - name: errorf
-        - name: empty-block
         - name: superfluous-else
+        - name: var-naming
 
     staticcheck:
       checks:
@@ -115,105 +116,105 @@ linters:
 
       - path: "(docs|dist|bin|examples)/"
         linters:
-          - gosec
-          - govet
-          - staticcheck
-          - unused
-          - errcheck
-          - ineffassign
-          - revive
-          - gocritic
-          - dupl
-          - goconst
-          - cyclop
-          - gocyclo
-          - lll
-          - nestif
           - asciicheck
           - bodyclose
           - copyloopvar
+          - cyclop
+          - dupl
           - durationcheck
+          - errcheck
+          - errorlint
           - gochecknoinits
+          - goconst
+          - gocritic
+          - gocyclo
+          - gosec
+          - govet
+          - ineffassign
+          - lll
           - misspell
           - nakedret
+          - nestif
+          - nilerr
+          - predeclared
+          - revive
+          - staticcheck
           - unconvert
           - unparam
+          - unused
           - wastedassign
           - whitespace
-          - predeclared
-          - errorlint
-          - nilerr
 
       - path: ".*\\.pb\\.go$"
         linters:
-          - gosec
-          - govet
-          - staticcheck
-          - unused
-          - errcheck
-          - ineffassign
-          - revive
-          - gocritic
-          - dupl
-          - goconst
-          - cyclop
-          - gocyclo
-          - lll
-          - nestif
           - asciicheck
           - bodyclose
           - copyloopvar
+          - cyclop
+          - dupl
           - durationcheck
+          - errcheck
+          - errorlint
           - gochecknoinits
+          - goconst
+          - gocritic
+          - gocyclo
+          - gosec
+          - govet
+          - ineffassign
+          - lll
           - misspell
           - nakedret
+          - nestif
+          - nilerr
+          - predeclared
+          - revive
+          - staticcheck
           - unconvert
           - unparam
+          - unused
           - wastedassign
           - whitespace
-          - predeclared
-          - errorlint
-          - nilerr
 
       - path: ".*_generated\\.go$"
         linters:
-          - gosec
-          - govet
-          - staticcheck
-          - unused
-          - errcheck
-          - ineffassign
-          - revive
-          - gocritic
-          - dupl
-          - goconst
-          - cyclop
-          - gocyclo
-          - lll
-          - nestif
           - asciicheck
           - bodyclose
           - copyloopvar
+          - cyclop
+          - dupl
           - durationcheck
+          - errcheck
+          - errorlint
           - gochecknoinits
+          - goconst
+          - gocritic
+          - gocyclo
+          - gosec
+          - govet
+          - ineffassign
+          - lll
           - misspell
           - nakedret
+          - nestif
+          - nilerr
+          - predeclared
+          - revive
+          - staticcheck
           - unconvert
           - unparam
+          - unused
           - wastedassign
           - whitespace
-          - predeclared
-          - errorlint
-          - nilerr
 
       - path: "_test\\.go"
         linters:
-          - gosec
+          - cyclop
           - dupl
           - goconst
-          - lll
-          - cyclop
           - gocyclo
+          - gosec
+          - lll
 
       - path: "_test\\.go"
         text: "G30[12]:"

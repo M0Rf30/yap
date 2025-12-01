@@ -11,9 +11,9 @@ require (
 	github.com/go-git/go-git/v5 v5.16.4
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/google/rpmpack v0.7.1
-	github.com/klauspost/compress v1.18.1
+	github.com/klauspost/compress v1.18.2
 	github.com/klauspost/pgzip v1.2.6
-	github.com/mholt/archives v0.1.5
+	github.com/mholt/archives v0.1.6-0.20251107150748-4a3da7803a6f
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/otiai10/copy v1.14.1
 	github.com/pkg/errors v0.9.1
@@ -43,7 +43,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/containerd/console v1.0.5 // indirect
-	github.com/cyphar/filepath-securejoin v0.6.0 // indirect
+	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
@@ -77,7 +77,7 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
