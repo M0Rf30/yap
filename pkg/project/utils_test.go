@@ -144,3 +144,167 @@ func TestProcessDependencies(t *testing.T) {
 		})
 	}
 }
+
+func TestGetMakeDepsDeduplication(t *testing.T) {
+	// Create test projects with duplicate make dependencies
+	mpc := &MultipleProject{
+		Projects: []*Project{
+			{
+				Builder: &builder.Builder{
+					PKGBUILD: &pkgbuild.PKGBUILD{
+						PkgName:     "pkg-a",
+						MakeDepends: []string{"gcc", "make", "perl"},
+					},
+				},
+			},
+			{
+				Builder: &builder.Builder{
+					PKGBUILD: &pkgbuild.PKGBUILD{
+						PkgName:     "pkg-b",
+						MakeDepends: []string{"perl", "gcc", "autoconf"},
+					},
+				},
+			},
+			{
+				Builder: &builder.Builder{
+					PKGBUILD: &pkgbuild.PKGBUILD{
+						PkgName:     "pkg-c",
+						MakeDepends: []string{"make", "perl", "automake"},
+					},
+				},
+			},
+		},
+	}
+
+	// Reset global makeDepends before test
+	makeDepends = []string{}
+
+	// Call getMakeDeps
+	mpc.getMakeDeps()
+
+	// Check that dependencies are deduplicated
+	depCount := make(map[string]int)
+
+	for _, dep := range makeDepends {
+		depName := extractPackageName(dep)
+		depCount[depName]++
+	}
+
+	// Each dependency should appear only once
+	for depName, count := range depCount {
+		if count > 1 {
+			t.Errorf("Dependency %q appears %d times, expected 1", depName, count)
+		}
+	}
+
+	// Check expected dependencies are present
+	expectedDeps := map[string]bool{
+		"gcc":      true,
+		"make":     true,
+		"perl":     true,
+		"autoconf": true,
+		"automake": true,
+	}
+
+	for expectedDep := range expectedDeps {
+		found := false
+
+		for _, dep := range makeDepends {
+			if extractPackageName(dep) == expectedDep {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("Expected dependency %q not found in makeDepends", expectedDep)
+		}
+	}
+}
+
+func TestGetRuntimeDepsDeduplication(t *testing.T) {
+	// Create test projects with duplicate runtime dependencies
+	mpc := &MultipleProject{
+		Projects: []*Project{
+			{
+				Builder: &builder.Builder{
+					PKGBUILD: &pkgbuild.PKGBUILD{
+						PkgName: "pkg-a",
+						Depends: []string{"libc", "perl", "zlib"},
+					},
+				},
+			},
+			{
+				Builder: &builder.Builder{
+					PKGBUILD: &pkgbuild.PKGBUILD{
+						PkgName: "pkg-b",
+						Depends: []string{"perl", "libc", "openssl"},
+					},
+				},
+			},
+			{
+				Builder: &builder.Builder{
+					PKGBUILD: &pkgbuild.PKGBUILD{
+						PkgName: "pkg-c",
+						Depends: []string{"zlib", "perl", "libxml2"},
+					},
+				},
+			},
+		},
+	}
+
+	// Reset global runtimeDepends before test
+	runtimeDepends = []string{}
+
+	// Call getRuntimeDeps
+	mpc.getRuntimeDeps()
+
+	// Check that dependencies are deduplicated
+	depCount := make(map[string]int)
+
+	for _, dep := range runtimeDepends {
+		depName := extractPackageName(dep)
+		depCount[depName]++
+	}
+
+	// Each dependency should appear only once
+	for depName, count := range depCount {
+		if count > 1 {
+			t.Errorf("Dependency %q appears %d times, expected 1", depName, count)
+		}
+	}
+
+	// Check expected external dependencies are present (internal packages should be filtered)
+	expectedDeps := map[string]bool{
+		"libc":    true,
+		"perl":    true,
+		"zlib":    true,
+		"openssl": true,
+		"libxml2": true,
+	}
+
+	for expectedDep := range expectedDeps {
+		found := false
+
+		for _, dep := range runtimeDepends {
+			if extractPackageName(dep) == expectedDep {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("Expected dependency %q not found in runtimeDepends", expectedDep)
+		}
+	}
+
+	// Check that internal dependencies are NOT present
+	internalDeps := []string{"pkg-a", "pkg-b", "pkg-c"}
+	for _, internalDep := range internalDeps {
+		for _, dep := range runtimeDepends {
+			if extractPackageName(dep) == internalDep {
+				t.Errorf("Internal dependency %q should not be in runtimeDepends", internalDep)
+			}
+		}
+	}
+}
