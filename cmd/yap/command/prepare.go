@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
@@ -32,6 +33,9 @@ var (
 		PreRun:  PreRunValidation,
 		Run: func(_ *cobra.Command, args []string) {
 			var distro string
+
+			// Set the skip toolchain validation flag
+			common.SkipToolchainValidation = project.SkipToolchainValidation
 
 			// Use the default distro if none is provided
 			if len(args) == 0 {
@@ -69,6 +73,8 @@ var (
 
 // InitializePrepareDescriptions sets the localized descriptions for the prepare command.
 // This must be called after i18n is initialized.
+//
+//nolint:dupl // Similar pattern across all command initializations
 func InitializePrepareDescriptions() {
 	prepareCmd.Short = i18n.T("commands.prepare.short")
 	prepareCmd.Long = i18n.T("commands.prepare.long")
@@ -76,6 +82,7 @@ func InitializePrepareDescriptions() {
 
 	// Update flag descriptions with localized text
 	prepareCmd.Flag("skip-sync").Usage = i18n.T("flags.prepare.skip_sync")
+	prepareCmd.Flag("skip-toolchain-validation").Usage = i18n.T("flags.prepare.skip_toolchain_validation")
 	prepareCmd.Flag("golang").Usage = i18n.T("flags.prepare.golang")
 	prepareCmd.Flag("target-arch").Usage = i18n.T("flags.prepare.target_arch")
 }
@@ -89,6 +96,8 @@ func init() {
 
 	prepareCmd.Flags().BoolVarP(&project.SkipSyncDeps,
 		"skip-sync", "s", false, "")
+	prepareCmd.Flags().BoolVarP(&project.SkipToolchainValidation,
+		"skip-toolchain-validation", "", false, "")
 	prepareCmd.Flags().BoolVarP(&GoLang,
 		"golang", "g", false, "")
 	prepareCmd.Flags().StringVarP(&TargetArch,

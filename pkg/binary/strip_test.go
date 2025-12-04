@@ -1,9 +1,11 @@
-package binary
+package binary_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/M0Rf30/yap/v2/pkg/binary"
 )
 
 func TestStripFile(t *testing.T) {
@@ -18,7 +20,7 @@ func TestStripFile(t *testing.T) {
 	}
 
 	// Test StripFile - this will likely fail on a non-binary file but tests the function call
-	_ = StripFile(testFile)
+	_ = binary.StripFile(testFile)
 	// We don't fail the test if strip command fails because we're testing with dummy content
 	// The important thing is that the function executes without panicking
 }
@@ -35,7 +37,7 @@ func TestStripLTO(t *testing.T) {
 	}
 
 	// Test StripLTO - this will likely fail on a non-binary file but tests the function call
-	_ = StripLTO(testFile)
+	_ = binary.StripLTO(testFile)
 	// We don't fail the test if strip command fails because we're testing with dummy content
 	// The important thing is that the function executes without panicking
 }
@@ -52,7 +54,7 @@ func TestStripFileWithArgs(t *testing.T) {
 	}
 
 	// Test StripFile with additional args
-	_ = StripFile(testFile, "--version")
+	_ = binary.StripFile(testFile, "--version")
 	// We don't fail the test if strip command fails because we're testing with dummy content
 }
 
@@ -68,13 +70,13 @@ func TestStripLTOWithArgs(t *testing.T) {
 	}
 
 	// Test StripLTO with additional args
-	_ = StripLTO(testFile, "--version")
+	_ = binary.StripLTO(testFile, "--version")
 	// We don't fail the test if strip command fails because we're testing with dummy content
 }
 
 func TestStripNonExistentFile(t *testing.T) {
 	// Test with non-existent file
-	err := StripFile("/non/existent/file")
+	err := binary.StripFile("/non/existent/file")
 	if err == nil {
 		t.Fatal("Expected error for non-existent file, got nil")
 	}
@@ -82,7 +84,7 @@ func TestStripNonExistentFile(t *testing.T) {
 
 func TestStripLTONonExistentFile(t *testing.T) {
 	// Test with non-existent file
-	err := StripLTO("/non/existent/file")
+	err := binary.StripLTO("/non/existent/file")
 	if err == nil {
 		t.Fatal("Expected error for non-existent file, got nil")
 	}
@@ -115,9 +117,9 @@ func TestStripWithCrossCompilation(t *testing.T) {
 
 	// This will fail because aarch64-linux-gnu-strip may not exist,
 	// but we're testing that it attempts to use the right command
-	_ = StripFile(testFile)
+	_ = binary.StripFile(testFile)
 
 	// Test with STRIP unset (should use default "strip")
 	_ = os.Unsetenv("STRIP")
-	_ = StripFile(testFile)
+	_ = binary.StripFile(testFile)
 }

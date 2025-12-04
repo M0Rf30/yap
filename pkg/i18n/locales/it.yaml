@@ -153,6 +153,8 @@
   translation: "Sovrascrive la versione del pacchetto"
 - id: flags.build.skip_sync
   translation: "Salta la sincronizzazione delle dipendenze (compilazione più veloce)"
+- id: flags.build.skip_toolchain_validation
+  translation: "Salta la validazione del toolchain di cross-compilazione"
 - id: flags.build.ssh_password
   translation: "Password SSH per i repository Git"
 - id: flags.build.target_arch
@@ -183,6 +185,8 @@
   translation: "Installa il compilatore Go"
 - id: flags.prepare.skip_sync
   translation: "Salta la sincronizzazione delle dipendenze"
+- id: flags.prepare.skip_toolchain_validation
+  translation: "Salta la validazione del toolchain di cross-compilazione"
 - id: flags.prepare.target_arch
   translation: "Architettura di destinazione"
 
@@ -379,6 +383,30 @@
   translation: "Il percorso del progetto non può essere vuoto"
 - id: errors.validation.unsupported_distribution
   translation: "Distribuzione non supportata"
+
+# Errori cross-compilation
+- id: errors.cross_compilation.toolchain_validation_failed
+  translation: "Validazione toolchain di cross-compilazione fallita per"
+- id: errors.cross_compilation.missing_executables
+  translation: "Eseguibili mancanti"
+- id: errors.cross_compilation.required_packages
+  translation: "Pacchetti richiesti"
+- id: errors.cross_compilation.installation_command
+  translation: "Per installare la toolchain richiesta, eseguire"
+- id: errors.cross_compilation.path_note
+  translation: "Dopo aver installato i pacchetti, assicurarsi che gli eseguibili siano nel PATH."
+- id: errors.cross_compilation.alpine_note
+  translation: "Alpine Linux utilizza toolchain basate su musl con convenzioni di denominazione semplificate."
+- id: errors.cross_compilation.arch_multilib_note
+  translation: "Arch Linux utilizza pacchetti multilib per la cross-compilazione i686."
+- id: errors.cross_compilation.arch_prefix_note
+  translation: "I pacchetti cross-compiler di Arch Linux utilizzano la convenzione di denominazione con prefisso."
+- id: errors.cross_compilation.unsupported_format
+  translation: "Formato pacchetto non supportato:"
+- id: errors.cross_compilation.failed_to_get_toolchain
+  translation: "Impossibile ottenere la toolchain per"
+- id: errors.cross_compilation.skip_validation_tip
+  translation: "Per saltare la validazione della toolchain e tentare comunque la compilazione, usare: --skip-toolchain-validation"
 
 # Messaggi logger - Build
 - id: logger.build.build_completed

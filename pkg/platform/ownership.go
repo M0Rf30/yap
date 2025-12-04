@@ -23,12 +23,15 @@ type OriginalUser struct {
 }
 
 // GetOriginalUser detects if yap is running under sudo and returns original user info.
+// Returns (nil, nil) if not running under sudo - this is not an error condition.
+//
+//nolint:nilnil // Returning (nil, nil) is intentional when not under sudo
 func GetOriginalUser() (*OriginalUser, error) {
 	sudoUser := os.Getenv("SUDO_USER")
 	sudoUID := os.Getenv("SUDO_UID")
 	sudoGID := os.Getenv("SUDO_GID")
 
-	// If not running under sudo, return nil
+	// If not running under sudo, return nil - this is not an error
 	if sudoUser == "" || sudoUID == "" || sudoGID == "" {
 		return nil, nil
 	}

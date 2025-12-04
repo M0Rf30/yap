@@ -1,14 +1,15 @@
-package buffers
+package buffers_test
 
 import (
 	"testing"
 
+	"github.com/M0Rf30/yap/v2/pkg/buffers"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 )
 
 func TestBufferPools(t *testing.T) {
 	t.Run("DefaultBufferPool", func(t *testing.T) {
-		buf := DefaultBufferPool.Get()
+		buf := buffers.DefaultBufferPool.Get()
 		if buf == nil {
 			t.Fatal("DefaultBufferPool.Get() returned nil")
 		}
@@ -23,11 +24,11 @@ func TestBufferPools(t *testing.T) {
 		}
 
 		// Put it back to verify the pool works
-		DefaultBufferPool.Put(byteSlice) //nolint:staticcheck // SA6002: sync.Pool expects value, not pointer
+		buffers.DefaultBufferPool.Put(byteSlice) //nolint:staticcheck // SA6002: sync.Pool expects value, not pointer
 	})
 
 	t.Run("SmallBufferPool", func(t *testing.T) {
-		buf := SmallBufferPool.Get()
+		buf := buffers.SmallBufferPool.Get()
 		if buf == nil {
 			t.Fatal("SmallBufferPool.Get() returned nil")
 		}
@@ -42,13 +43,13 @@ func TestBufferPools(t *testing.T) {
 		}
 
 		// Put it back to verify the pool works
-		SmallBufferPool.Put(byteSlice) //nolint:staticcheck // SA6002: sync.Pool expects value, not pointer
+		buffers.SmallBufferPool.Put(byteSlice) //nolint:staticcheck // SA6002: sync.Pool expects value, not pointer
 	})
 }
 
 func TestGetAndPutSmallBuffer(t *testing.T) {
 	// Get a buffer from the small buffer pool
-	buf := GetSmallBuffer()
+	buf := buffers.GetSmallBuffer()
 
 	// Verify the buffer has the correct size
 	if len(buf) != constants.SmallBufferSize {
@@ -56,38 +57,38 @@ func TestGetAndPutSmallBuffer(t *testing.T) {
 	}
 
 	// Put the buffer back
-	PutSmallBuffer(buf)
+	buffers.PutSmallBuffer(buf)
 
 	// Verify that a buffer with wrong size is not put back
 	wrongSizedBuf := make([]byte, constants.SmallBufferSize+1)
-	PutSmallBuffer(wrongSizedBuf) // This should not put the buffer back
+	buffers.PutSmallBuffer(wrongSizedBuf) // This should not put the buffer back
 
 	// Get another buffer to make sure the pool still works
-	anotherBuf := GetSmallBuffer()
+	anotherBuf := buffers.GetSmallBuffer()
 	if len(anotherBuf) != constants.SmallBufferSize {
 		t.Errorf("Expected buffer size %d after put with wrong size, got %d", constants.SmallBufferSize, len(anotherBuf))
 	}
 
 	// Put it back
-	PutSmallBuffer(anotherBuf)
+	buffers.PutSmallBuffer(anotherBuf)
 }
 
 func TestBufferPoolReuse(t *testing.T) {
 	// Get a buffer
-	buf1 := GetSmallBuffer()
+	buf1 := buffers.GetSmallBuffer()
 	if len(buf1) != constants.SmallBufferSize {
 		t.Fatalf("Expected buffer size %d, got %d", constants.SmallBufferSize, len(buf1))
 	}
 
 	// Put it back
-	PutSmallBuffer(buf1)
+	buffers.PutSmallBuffer(buf1)
 
 	// Get another buffer - it might be the same one from the pool
-	buf2 := GetSmallBuffer()
+	buf2 := buffers.GetSmallBuffer()
 	if len(buf2) != constants.SmallBufferSize {
 		t.Fatalf("Expected buffer size %d, got %d", constants.SmallBufferSize, len(buf2))
 	}
 
 	// Put it back
-	PutSmallBuffer(buf2)
+	buffers.PutSmallBuffer(buf2)
 }

@@ -1,4 +1,4 @@
-// Package command provides the CLI commands for the YAP package builder.
+// Package command implements the YAP CLI commands including build, install, graph, and utility operations.
 package command
 
 import (
@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -28,6 +29,9 @@ var buildCmd = &cobra.Command{
 	Args:    cobra.RangeArgs(1, 2),                               // Allow 1-2 arguments
 	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
+		// Set the skip toolchain validation flag
+		common.SkipToolchainValidation = project.SkipToolchainValidation
+
 		// Set verbose flag from global flag
 		project.Verbose = verbose
 		shell.SetVerbose(verbose)
@@ -132,6 +136,7 @@ func InitializeBuildDescriptions() {
 	buildCmd.Flag("zap").Usage = i18n.T("flags.build.zap")
 	buildCmd.Flag("nomakedeps").Usage = i18n.T("flags.build.nomakedeps")
 	buildCmd.Flag("skip-sync").Usage = i18n.T("flags.build.skip_sync")
+	buildCmd.Flag("skip-toolchain-validation").Usage = i18n.T("flags.build.skip_toolchain_validation")
 	buildCmd.Flag("pkgver").Usage = i18n.T("flags.build.pkgver")
 	buildCmd.Flag("pkgrel").Usage = i18n.T("flags.build.pkgrel")
 	buildCmd.Flag("ssh-password").Usage = i18n.T("flags.build.ssh_password")
@@ -180,6 +185,8 @@ func init() {
 		"nomakedeps", "d", false, "")
 	buildCmd.Flags().BoolVarP(&project.SkipSyncDeps,
 		"skip-sync", "s", false, "")
+	buildCmd.Flags().BoolVarP(&project.SkipToolchainValidation,
+		"skip-toolchain-validation", "", false, "")
 
 	// VERSION CONTROL FLAGS
 	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgVer,
