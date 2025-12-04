@@ -1,4 +1,6 @@
 // Package errors provides custom error types and error handling utilities for YAP.
+//
+//nolint:revive // Intentional wrapper around stdlib errors with structured error handling
 package errors
 
 import (

@@ -152,6 +152,8 @@
   translation: "Override package version"
 - id: flags.build.skip_sync
   translation: "Skip syncing dependencies (faster builds)"
+- id: flags.build.skip_toolchain_validation
+  translation: "Skip cross-compilation toolchain validation"
 - id: flags.build.ssh_password
   translation: "SSH password for Git repositories"
 - id: flags.build.target_arch
@@ -182,6 +184,8 @@
   translation: "Install Go compiler"
 - id: flags.prepare.skip_sync
   translation: "Skip syncing dependencies"
+- id: flags.prepare.skip_toolchain_validation
+  translation: "Skip cross-compilation toolchain validation"
 - id: flags.prepare.target_arch
   translation: "Target architecture"
 
@@ -378,6 +382,30 @@
   translation: "Project path cannot be empty"
 - id: errors.validation.unsupported_distribution
   translation: "Unsupported distribution"
+
+# Cross-compilation errors
+- id: errors.cross_compilation.toolchain_validation_failed
+  translation: "Cross-compilation toolchain validation failed for"
+- id: errors.cross_compilation.missing_executables
+  translation: "Missing executables"
+- id: errors.cross_compilation.required_packages
+  translation: "Required packages"
+- id: errors.cross_compilation.installation_command
+  translation: "To install the required toolchain, run"
+- id: errors.cross_compilation.path_note
+  translation: "After installing the packages, ensure the executables are in your PATH."
+- id: errors.cross_compilation.alpine_note
+  translation: "Alpine Linux uses musl-based toolchains with simplified naming conventions."
+- id: errors.cross_compilation.arch_multilib_note
+  translation: "Arch Linux uses multilib packages for i686 cross-compilation."
+- id: errors.cross_compilation.arch_prefix_note
+  translation: "Arch Linux cross-compiler packages use the prefix naming convention."
+- id: errors.cross_compilation.unsupported_format
+  translation: "Unsupported package format:"
+- id: errors.cross_compilation.failed_to_get_toolchain
+  translation: "Failed to get toolchain for"
+- id: errors.cross_compilation.skip_validation_tip
+  translation: "To skip toolchain validation and attempt the build anyway, use: --skip-toolchain-validation"
 
 # Logger messages - Build
 - id: logger.build.build_completed

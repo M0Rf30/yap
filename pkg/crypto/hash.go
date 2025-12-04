@@ -1,4 +1,6 @@
 // Package crypto provides cryptographic operations for package building.
+//
+//nolint:revive // Intentional wrapper around stdlib crypto for package-specific hashing
 package crypto
 
 import (

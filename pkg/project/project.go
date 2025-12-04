@@ -37,15 +37,16 @@ var (
 // Config encapsulates all build configuration and state variables.
 type Config struct {
 	// Build configuration flags
-	Verbose      bool   // Enables verbose output for debugging
-	CleanBuild   bool   // Enables clean build mode
-	NoBuild      bool   // Disables the build process
-	NoMakeDeps   bool   // Disables make dependencies installation
-	SkipSyncDeps bool   // Controls whether to skip dependency synchronization
-	Zap          bool   // Controls whether to use zap functionality
-	FromPkgName  string // Specifies the source package name for transformation
-	ToPkgName    string // Specifies the target package name for transformation
-	TargetArch   string // Specifies the target architecture for cross-compilation
+	Verbose                 bool   // Enables verbose output for debugging
+	CleanBuild              bool   // Enables clean build mode
+	NoBuild                 bool   // Disables the build process
+	NoMakeDeps              bool   // Disables make dependencies installation
+	SkipSyncDeps            bool   // Controls whether to skip dependency synchronization
+	SkipToolchainValidation bool   // Controls whether to skip cross-compilation toolchain validation
+	Zap                     bool   // Controls whether to use zap functionality
+	FromPkgName             string // Specifies the source package name for transformation
+	ToPkgName               string // Specifies the target package name for transformation
+	TargetArch              string // Specifies the target architecture for cross-compilation
 
 	// Internal state
 	singleProject  bool          //nolint:unused // Reserved for future migration
@@ -66,6 +67,8 @@ var (
 	NoMakeDeps bool
 	// SkipSyncDeps controls whether to skip dependency synchronization.
 	SkipSyncDeps bool
+	// SkipToolchainValidation controls whether to skip cross-compilation toolchain validation.
+	SkipToolchainValidation bool
 	// Zap controls whether to use zap functionality.
 	Zap bool
 	// FromPkgName specifies the source package name for transformation.

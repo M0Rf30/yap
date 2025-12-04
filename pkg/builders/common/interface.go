@@ -23,7 +23,18 @@ const (
 	formatDeb     = "deb"
 	formatPacman  = "pacman"
 	formatApk     = "apk"
+
+	// Distribution identifiers
+	distroDebian = "debian"
+	distroFedora = "fedora"
+	distroAlpine = "alpine"
+	distroArch   = "arch"
+	distroUbuntu = "ubuntu"
 )
+
+// SkipToolchainValidation controls whether cross-compilation toolchain validation is performed.
+// This is set by command-line flags and used by PrepareEnvironment.
+var SkipToolchainValidation bool
 
 // Builder defines the common interface that all package builders must implement.
 // This unifies the behavior across different package formats (APK, DEB, RPM, Pacman).
@@ -356,23 +367,21 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 
 // PrepareEnvironment sets up the build environment with necessary tools.
 // This consolidates duplicated PrepareEnvironment methods across all builders.
+// Uses the package-level SkipToolchainValidation variable to control validation.
 func (bb *BaseBuilder) PrepareEnvironment(golang bool, targetArch string) error {
+	return bb.PrepareEnvironmentWithValidation(golang, targetArch, SkipToolchainValidation)
+}
+
+// PrepareEnvironmentWithValidation sets up the build environment with optional toolchain validation.
+// This version allows callers to skip toolchain validation if needed.
+func (bb *BaseBuilder) PrepareEnvironmentWithValidation(golang bool, targetArch string, skipValidation bool) error {
 	allArgs := bb.SetupEnvironmentDependencies(golang)
 
 	// Add cross-compilation dependencies if target architecture is different
 	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
-		logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
-			"target_arch", targetArch,
-			"build_arch", bb.PKGBUILD.ArchComputed)
-
-		crossDeps := bb.getCrossCompilerDependencies(targetArch)
-		if len(crossDeps) > 0 {
-			logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
-				"target_arch", targetArch,
-				"packages", strings.Join(crossDeps, ", "))
+		if err := bb.handleCrossCompilation(targetArch, skipValidation, &allArgs); err != nil {
+			return err
 		}
-
-		allArgs = append(allArgs, crossDeps...)
 	}
 
 	useSudo := bb.Format == constants.FormatAPK
@@ -394,43 +403,80 @@ func (bb *BaseBuilder) PrepareEnvironment(golang bool, targetArch string) error 
 	return nil
 }
 
-// getCrossCompilerDependencies returns cross-compiler dependencies for target architecture
+// getCrossCompilerDependencies returns cross-compiler dependencies for target architecture.
+// This function uses the centralized CrossToolchainMap to get toolchain packages for the
+// specified target architecture based on the builder's package format.
 func (bb *BaseBuilder) getCrossCompilerDependencies(targetArch string) []string {
-	// Map target architecture to appropriate cross-compiler package names
-	crossCompilerMap := map[string]map[string][]string{
-		"deb": {
-			"aarch64": {"gcc-aarch64-linux-gnu", "g++-aarch64-linux-gnu"},
-			"armv7":   {"gcc-arm-linux-gnueabihf", "g++-arm-linux-gnueabihf"},
-			"armv6":   {"gcc-arm-linux-gnueabihf", "g++-arm-linux-gnueabihf"},
-			"i386":    {"gcc-i686-linux-gnu", "g++-i686-linux-gnu"},
-			"ppc64le": {"gcc-powerpc64le-linux-gnu", "g++-powerpc64le-linux-gnu"},
-			"s390x":   {"gcc-s390x-linux-gnu", "g++-s390x-linux-gnu"},
-		},
-		constants.FormatRPM: {
-			"aarch64": {"gcc-aarch64-linux-gnu", "gcc-c++-aarch64-linux-gnu"},
-			"armv7":   {"gcc-arm-linux-gnu", "gcc-c++-arm-linux-gnu"},
-			"i686":    {"gcc-i686-linux-gnu", "gcc-c++-i686-linux-gnu"},
-			"ppc64le": {"gcc-ppc64le-linux-gnu", "gcc-c++-ppc64le-linux-gnu"},
-			"s390x":   {"gcc-s390x-linux-gnu", "gcc-c++-s390x-linux-gnu"},
-		},
-		constants.FormatAPK: {
-			"aarch64": {"gcc-aarch64", "musl-aarch64", "musl-dev"},
-			"armv7":   {"gcc-armv7", "musl-armv7", "musl-dev"},
-			"armv6":   {"gcc-armhf", "musl-armhf", "musl-dev"},
-		},
-		constants.FormatPacman: {
-			"aarch64": {"aarch64-linux-gnu-gcc", "aarch64-linux-gnu-binutils"},
-			"armv7":   {"arm-none-eabi-gcc", "arm-none-eabi-binutils"},
-		},
+	// Map package format to distribution key in CrossToolchainMap
+	formatToDistro := map[string]string{
+		constants.FormatDEB:    "ubuntu", // DEB format uses Ubuntu/Debian toolchains
+		constants.FormatRPM:    "fedora", // RPM format uses Fedora toolchains
+		constants.FormatAPK:    "alpine", // APK format uses Alpine toolchains
+		constants.FormatPacman: "arch",   // Pacman format uses Arch toolchains
 	}
 
-	if archDeps, exists := crossCompilerMap[bb.Format]; exists {
-		if deps, exists := archDeps[targetArch]; exists {
-			return deps
+	// Get the distribution key for this format
+	distro, exists := formatToDistro[bb.Format]
+	if !exists {
+		return []string{}
+	}
+
+	// Get the toolchain for this architecture and distribution
+	toolchain, err := GetCrossToolchain(targetArch, distro)
+	if err != nil {
+		// Architecture not supported for this distribution
+		return []string{}
+	}
+
+	// Return all packages needed for this toolchain
+	return (&toolchain).GetAllPackages()
+}
+
+// handleCrossCompilation handles cross-compilation setup including validation and dependency collection.
+// This helper reduces nesting complexity in PrepareEnvironmentWithValidation.
+func (bb *BaseBuilder) handleCrossCompilation(targetArch string, skipValidation bool, allArgs *[]string) error {
+	logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
+		"target_arch", targetArch,
+		"build_arch", bb.PKGBUILD.ArchComputed)
+
+	// Validate toolchain availability before attempting installation
+	if !skipValidation {
+		if err := bb.validateCrossToolchain(targetArch); err != nil {
+			return err
 		}
+	} else {
+		logger.Info("Skipping toolchain validation", "target_arch", targetArch)
 	}
 
-	return []string{}
+	// Add cross-compilation dependencies
+	crossDeps := bb.getCrossCompilerDependencies(targetArch)
+	if len(crossDeps) > 0 {
+		logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
+			"target_arch", targetArch,
+			"packages", strings.Join(crossDeps, ", "))
+	}
+
+	*allArgs = append(*allArgs, crossDeps...)
+
+	return nil
+}
+
+// validateCrossToolchain validates that the cross-compilation toolchain is available.
+func (bb *BaseBuilder) validateCrossToolchain(targetArch string) error {
+	logger.Debug("Validating cross-compilation toolchain availability",
+		"target_arch", targetArch,
+		"format", bb.Format)
+
+	if err := ValidateToolchain(targetArch, bb.Format); err != nil {
+		// Return detailed validation error with installation instructions
+		return fmt.Errorf("%w", err)
+	}
+
+	logger.Debug("Cross-compilation toolchain validation passed",
+		"target_arch", targetArch,
+		"format", bb.Format)
+
+	return nil
 }
 
 // Update updates the package manager's package database.
@@ -509,15 +555,15 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 
 	switch bb.Format {
 	case constants.FormatDEB:
-		distro = "debian"
+		distro = distroDebian
 	case constants.FormatRPM:
-		distro = "fedora"
+		distro = distroFedora
 	case constants.FormatAPK:
-		distro = "alpine"
+		distro = distroAlpine
 	case constants.FormatPacman:
-		distro = "arch"
+		distro = distroArch
 	default:
-		distro = "debian" // fallback
+		distro = distroDebian // fallback
 	}
 
 	toolchainPackages, exists := toolchain[distro]

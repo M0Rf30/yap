@@ -1,9 +1,11 @@
-package archive
+package archive_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/M0Rf30/yap/v2/pkg/archive"
 )
 
 func TestCreateTarZst(t *testing.T) {
@@ -26,7 +28,7 @@ func TestCreateTarZst(t *testing.T) {
 	}
 
 	// Test creating tar.zst archive
-	err = CreateTarZst(sourceDir, outputFile, false)
+	err = archive.CreateTarZst(sourceDir, outputFile, false)
 	if err != nil {
 		t.Fatalf("CreateTarZst failed: %v", err)
 	}
@@ -59,7 +61,7 @@ func TestCreateTarZstWithDirectories(t *testing.T) {
 	}
 
 	// Test creating tar.zst archive with directories
-	err = CreateTarZst(sourceDir, outputFile, true)
+	err = archive.CreateTarZst(sourceDir, outputFile, true)
 	if err != nil {
 		t.Fatalf("CreateTarZst failed: %v", err)
 	}
@@ -75,7 +77,7 @@ func TestCreateTarZstInvalidSourceDir(t *testing.T) {
 	outputFile := filepath.Join(tempDir, "test.tar.zst")
 	invalidSourceDir := "/non/existent/directory"
 
-	err := CreateTarZst(invalidSourceDir, outputFile, false)
+	err := archive.CreateTarZst(invalidSourceDir, outputFile, false)
 	if err == nil {
 		t.Fatal("Expected error for invalid source directory, got nil")
 	}
@@ -102,7 +104,7 @@ func TestExtract(t *testing.T) {
 	}
 
 	// Create archive
-	err = CreateTarZst(sourceDir, archiveFile, false)
+	err = archive.CreateTarZst(sourceDir, archiveFile, false)
 	if err != nil {
 		t.Fatalf("Failed to create archive: %v", err)
 	}
@@ -114,7 +116,7 @@ func TestExtract(t *testing.T) {
 	}
 
 	// Test extraction
-	err = Extract(archiveFile, extractDir)
+	err = archive.Extract(archiveFile, extractDir)
 	if err != nil {
 		t.Fatalf("Extract failed: %v", err)
 	}
@@ -146,7 +148,7 @@ func TestExtractInvalidArchive(t *testing.T) {
 		t.Fatalf("Failed to create extract directory: %v", err)
 	}
 
-	err = Extract(invalidArchive, extractDir)
+	err = archive.Extract(invalidArchive, extractDir)
 	if err == nil {
 		t.Fatal("Expected error for invalid archive file, got nil")
 	}

@@ -28,9 +28,13 @@ linters:
     - nakedret
     - nestif
     - nilerr
+    - nilnil
+    - noctx
     - predeclared
     - revive
     - staticcheck
+    - testpackage
+    - thelper
     - unconvert
     - unparam
     - unused
@@ -76,12 +80,12 @@ linters:
       severity: medium
       confidence: medium
       excludes:
-        - G204
-        - G301
-        - G302
+        - G204 # Subprocess with variable
+        - G301 # Poor file permissions
+        - G302 # Poor file permissions
 
     lll:
-      line-length: 100
+      line-length: 120
 
     revive:
       rules:
@@ -109,11 +113,25 @@ linters:
     generated: strict
 
     rules:
+      # Project-specific: Allow generic package names in builders/common
       - path: "pkg/builders/common/"
         text: "avoid meaningless package names"
         linters:
           - revive
 
+      # Allow custom errors package name (conflicts with stdlib but is intentional)
+      - path: "pkg/errors/"
+        text: "avoid package names that conflict with Go standard library"
+        linters:
+          - revive
+
+      # Allow custom crypto package name (conflicts with stdlib but is intentional)
+      - path: "pkg/crypto/"
+        text: "avoid package names that conflict with Go standard library"
+        linters:
+          - revive
+
+      # Skip all linting for documentation and distribution directories
       - path: "(docs|dist|bin|examples)/"
         linters:
           - asciicheck
@@ -136,15 +154,20 @@ linters:
           - nakedret
           - nestif
           - nilerr
+          - nilnil
+          - noctx
           - predeclared
           - revive
           - staticcheck
+          - testpackage
+          - thelper
           - unconvert
           - unparam
           - unused
           - wastedassign
           - whitespace
 
+      # Skip all linting for protobuf generated files
       - path: ".*\\.pb\\.go$"
         linters:
           - asciicheck
@@ -167,15 +190,20 @@ linters:
           - nakedret
           - nestif
           - nilerr
+          - nilnil
+          - noctx
           - predeclared
           - revive
           - staticcheck
+          - testpackage
+          - thelper
           - unconvert
           - unparam
           - unused
           - wastedassign
           - whitespace
 
+      # Skip all linting for other generated files
       - path: ".*_generated\\.go$"
         linters:
           - asciicheck
@@ -198,15 +226,20 @@ linters:
           - nakedret
           - nestif
           - nilerr
+          - nilnil
+          - noctx
           - predeclared
           - revive
           - staticcheck
+          - testpackage
+          - thelper
           - unconvert
           - unparam
           - unused
           - wastedassign
           - whitespace
 
+      # Relax certain rules for test files
       - path: "_test\\.go"
         linters:
           - cyclop
@@ -216,10 +249,18 @@ linters:
           - gosec
           - lll
 
+      # Allow poor file permissions in tests
       - path: "_test\\.go"
         text: "G30[12]:"
         linters:
           - gosec
+
+      # Allow internal test packages for testing unexported functions
+      # Many tests need to test internal implementation details and require package-level access
+      - path: "(cmd/yap/command|pkg/(builders|constants|core|crypto|download|files|git|graph|logger|packer|pkgbuild|platform|project|set|shell))/.*_test\\.go"
+        text: "package should be `.*_test` instead of"
+        linters:
+          - testpackage
 
 formatters:
   enable:

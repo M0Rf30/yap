@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,7 +57,7 @@ Description: Test package for extraction
 
 	// Build DEB package
 	debPath := filepath.Join(tmpDir, "test-package_1.0.0_amd64.deb")
-	cmd := exec.Command("dpkg-deb", "--build", pkgDir, debPath)
+	cmd := exec.CommandContext(context.Background(), "dpkg-deb", "--build", pkgDir, debPath)
 
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("Failed to build DEB: %v\nOutput: %s", err, output)

@@ -113,6 +113,7 @@ func TestProcessFile(t *testing.T) {
 		{
 			name: "Valid regular file",
 			setup: func(t *testing.T) (string, fs.DirEntry) {
+				t.Helper()
 				tempDir := t.TempDir()
 				filePath := filepath.Join(tempDir, "test.txt")
 				err := os.WriteFile(filePath, []byte("test content"), 0o644)

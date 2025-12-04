@@ -3,7 +3,10 @@ package common
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
+
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
 // CrossToolchain represents a cross-compilation toolchain for a specific target architecture.
@@ -16,6 +19,94 @@ type CrossToolchain struct {
 	BinutilsPackage string
 	// AdditionalPackages are any additional packages needed for the toolchain
 	AdditionalPackages []string
+	// Triple is the GNU triplet for the target architecture
+	Triple string
+	// InstallCommands provides distribution-specific installation commands
+	InstallCommands map[string]string
+}
+
+// Validate checks if the required toolchain executables are available in PATH.
+func (ct *CrossToolchain) Validate() ([]string, error) {
+	var missing []string
+
+	// Check GCC
+	if ct.GCCPackage != "" {
+		if _, err := exec.LookPath(ct.GCCPackage); err != nil {
+			missing = append(missing, ct.GCCPackage)
+		}
+	}
+
+	// Check G++
+	if ct.GPlusPlusPackage != "" {
+		if _, err := exec.LookPath(ct.GPlusPlusPackage); err != nil {
+			missing = append(missing, ct.GPlusPlusPackage)
+		}
+	}
+
+	// Check Binutils
+	if ct.BinutilsPackage != "" {
+		if _, err := exec.LookPath(ct.BinutilsPackage); err != nil {
+			missing = append(missing, ct.BinutilsPackage)
+		}
+	}
+
+	// Check for common binutils tools
+	binutilsTools := []string{"ar", "ld", "strip", "objdump", "nm"}
+	for _, tool := range binutilsTools {
+		if _, err := exec.LookPath(tool); err != nil {
+			missing = append(missing, tool)
+		}
+	}
+
+	if len(missing) > 0 {
+		return missing, fmt.Errorf("missing required toolchain executables: %v", missing)
+	}
+
+	return nil, nil
+}
+
+// GetAllPackages returns all packages needed for this toolchain.
+func (ct *CrossToolchain) GetAllPackages() []string {
+	var packages []string
+
+	if ct.GCCPackage != "" {
+		packages = append(packages, ct.GCCPackage)
+	}
+
+	if ct.GPlusPlusPackage != "" {
+		packages = append(packages, ct.GPlusPlusPackage)
+	}
+
+	if ct.BinutilsPackage != "" {
+		packages = append(packages, ct.BinutilsPackage)
+	}
+
+	packages = append(packages, ct.AdditionalPackages...)
+
+	return packages
+}
+
+// GetPackagesByType returns packages categorized by type.
+func (ct *CrossToolchain) GetPackagesByType() map[string][]string {
+	result := make(map[string][]string)
+
+	if ct.GCCPackage != "" {
+		result["compiler"] = append(result["compiler"], ct.GCCPackage)
+	}
+
+	if ct.GPlusPlusPackage != "" {
+		result["compiler"] = append(result["compiler"], ct.GPlusPlusPackage)
+	}
+
+	if ct.BinutilsPackage != "" {
+		result["binutils"] = append(result["binutils"], ct.BinutilsPackage)
+	}
+
+	if len(ct.AdditionalPackages) > 0 {
+		result["libraries"] = ct.AdditionalPackages
+	}
+
+	return result
 }
 
 // CrossToolchainMap maps target architectures to toolchain packages for each distribution.
@@ -23,21 +114,21 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 	// Define base patterns for each distribution
 	basePatterns := map[string]map[string]string{
 		"debian": {
-			"gcc":        "gcc-%s-linux-gnu",
-			"g++":        "g++-%s-linux-gnu",
-			"binutils":   "binutils-%s-linux-gnu",
+			"gcc":        "gcc-%s",
+			"g++":        "g++-%s",
+			"binutils":   "binutils-%s",
 			"additional": "libc6-dev-%s-cross",
 		},
 		"ubuntu": {
-			"gcc":        "gcc-%s-linux-gnu",
-			"g++":        "g++-%s-linux-gnu",
-			"binutils":   "binutils-%s-linux-gnu",
+			"gcc":        "gcc-%s",
+			"g++":        "g++-%s",
+			"binutils":   "binutils-%s",
 			"additional": "libc6-dev-%s-cross",
 		},
 		"fedora": {
-			"gcc":        "gcc-%s-linux-gnu",
-			"g++":        "gcc-c++-%s-linux-gnu",
-			"binutils":   "binutils-%s-linux-gnu",
+			"gcc":        "gcc-%s",
+			"g++":        "gcc-c++-%s",
+			"binutils":   "binutils-%s",
 			"additional": "",
 		},
 		"alpine": {
@@ -116,6 +207,7 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 		},
 		"i686": {
 			"alpine":  {"musl-dev"},
+			"arch":    {"lib32-gcc-libs"}, // Arch multilib needs lib32 libraries
 			"default": {"libc6-dev-i386-cross"},
 		},
 		"x86_64": {
@@ -167,10 +259,15 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 				continue
 			}
 
-			// For Arch Linux, use the specialized archPatterns
-			// For other distributions, use the simple architecture name
+			// Determine which pattern to use for this architecture
+			// For Alpine, use simple arch name (armv7, aarch64, etc.)
+			// For Debian/Ubuntu/Fedora/Arch, use GNU triplet from archPatterns
 			archPattern := arch
-			if distro == "arch" {
+			if distro == "alpine" {
+				// Alpine uses simplified names
+				archPattern = arch
+			} else {
+				// Debian, Ubuntu, Fedora, Arch use GNU triplet patterns
 				if pattern, exists := archPatterns[arch]; exists {
 					archPattern = pattern
 				}
@@ -206,11 +303,29 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 				}
 			}
 
+			// Get the GNU triplet for this architecture
+			triple := archPatterns[arch]
+
+			// Build install commands for each distribution
+			installCommands := make(map[string]string)
+			switch distro {
+			case distroDebian, distroUbuntu:
+				installCommands[distro] = fmt.Sprintf("sudo apt-get install %s %s", gcc, gpp)
+			case distroFedora:
+				installCommands[distro] = fmt.Sprintf("sudo dnf install %s %s", gcc, gpp)
+			case distroArch:
+				installCommands[distro] = fmt.Sprintf("sudo pacman -S %s %s", gcc, gpp)
+			case distroAlpine:
+				installCommands[distro] = fmt.Sprintf("sudo apk add %s %s", gcc, gpp)
+			}
+
 			result[arch][distro] = CrossToolchain{
 				GCCPackage:         gcc,
 				GPlusPlusPackage:   gpp,
 				BinutilsPackage:    binutils,
 				AdditionalPackages: additional,
+				Triple:             triple,
+				InstallCommands:    installCommands,
 			}
 		}
 	}
@@ -223,7 +338,7 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 //   - Debian/Ubuntu/Fedora: gcc-aarch64-linux-gnu -> aarch64-linux-gnu-gcc
 //   - Arch Linux: aarch64-linux-gnu-gcc -> aarch64-linux-gnu-gcc (already correct)
 //   - Alpine: gcc-aarch64 -> aarch64-alpine-linux-musl-gcc (needs special handling)
-func (ct CrossToolchain) GetExecutableName(packageName string) string {
+func (ct *CrossToolchain) GetExecutableName(packageName string) string {
 	// Handle Fedora's gcc-c++ pattern (G++)
 	if after, ok := strings.CutPrefix(packageName, "gcc-c++-"); ok {
 		suffix := after
@@ -252,4 +367,122 @@ func (ct CrossToolchain) GetExecutableName(packageName string) string {
 	// Otherwise, return as-is (already in correct format for Arch, etc.)
 	// Arch: aarch64-linux-gnu-gcc -> aarch64-linux-gnu-gcc
 	return packageName
+}
+
+// GetCrossToolchain retrieves the toolchain for a given architecture and distribution.
+func GetCrossToolchain(arch, distro string) (CrossToolchain, error) {
+	toolchains := CrossToolchainMap
+
+	// Try exact match first
+	if distroChains, exists := toolchains[arch]; exists {
+		if chain, exists := distroChains[distro]; exists {
+			return chain, nil
+		}
+	}
+
+	// Try fallback to debian for ubuntu/debian family
+	if distro == "ubuntu" || distro == "debian" {
+		if distroChains, exists := toolchains[arch]; exists {
+			if chain, exists := distroChains["debian"]; exists {
+				return chain, nil
+			}
+		}
+	}
+
+	return CrossToolchain{}, fmt.Errorf(
+		"unsupported cross-compilation toolchain: arch=%s, distro=%s",
+		arch,
+		distro,
+	)
+}
+
+// ValidateToolchain checks if the required cross-compilation toolchain is available
+// for the given target architecture and package format. It returns a detailed error
+// message with installation instructions if the toolchain is missing.
+func ValidateToolchain(targetArch, format string) error {
+	// Map package format to distribution for toolchain lookup
+	formatToDistro := map[string]string{
+		"deb":    "ubuntu",
+		"rpm":    "fedora",
+		"apk":    "alpine",
+		"pacman": "arch",
+	}
+
+	distro, exists := formatToDistro[format]
+	if !exists {
+		return fmt.Errorf(i18n.T("errors.cross_compilation.unsupported_format")+" %s", format)
+	}
+
+	// Get the toolchain configuration
+	toolchain, err := GetCrossToolchain(targetArch, distro)
+	if err != nil {
+		return fmt.Errorf(i18n.T("errors.cross_compilation.failed_to_get_toolchain")+" %s/%s: %w", targetArch, distro, err)
+	}
+
+	// Validate the toolchain
+	missing, err := (&toolchain).Validate()
+	if err == nil {
+		// All required tools are available
+		return nil
+	}
+
+	// Build detailed error message with missing executables and installation instructions
+	var msg strings.Builder
+
+	msg.WriteString(i18n.T("errors.cross_compilation.toolchain_validation_failed") + "\n")
+	archFormatMsg := i18n.T("errors.cross_compilation.target_architecture_format")
+	msg.WriteString(fmt.Sprintf("%s: %s (%s)\n", archFormatMsg, targetArch, format))
+	msg.WriteString("\n" + i18n.T("errors.cross_compilation.missing_executables") + ":\n")
+
+	for _, exe := range missing {
+		msg.WriteString(fmt.Sprintf("  - %s\n", exe))
+	}
+
+	// Get all required packages
+	packages := (&toolchain).GetAllPackages()
+	if len(packages) > 0 {
+		msg.WriteString("\n" + i18n.T("errors.cross_compilation.required_packages") + ":\n")
+
+		for _, pkg := range packages {
+			msg.WriteString(fmt.Sprintf("  - %s\n", pkg))
+		}
+	}
+
+	// Add installation command if available
+	if installCmd, exists := toolchain.InstallCommands[distro]; exists {
+		msg.WriteString("\n" + i18n.T("errors.cross_compilation.installation_command") + ":\n")
+		msg.WriteString(fmt.Sprintf("  %s", installCmd))
+
+		// Add additional packages if present
+		if len(toolchain.AdditionalPackages) > 0 {
+			for _, pkg := range toolchain.AdditionalPackages {
+				msg.WriteString(fmt.Sprintf(" %s", pkg))
+			}
+		}
+
+		if toolchain.BinutilsPackage != "" {
+			msg.WriteString(fmt.Sprintf(" %s", toolchain.BinutilsPackage))
+		}
+
+		msg.WriteString("\n")
+	}
+
+	// Add additional distribution-specific guidance
+	msg.WriteString("\n" + i18n.T("errors.cross_compilation.path_note") + "\n")
+
+	switch distro {
+	case "alpine":
+		msg.WriteString(i18n.T("errors.cross_compilation.alpine_note") + "\n")
+	case "arch":
+		if targetArch == "i686" {
+			msg.WriteString(i18n.T("errors.cross_compilation.arch_multilib_note") + "\n")
+		} else {
+			msg.WriteString(i18n.T("errors.cross_compilation.arch_prefix_note") + "\n")
+		}
+	}
+
+	// Add tip about skipping validation
+	msg.WriteString("\n" + i18n.T("errors.cross_compilation.skip_validation_tip") + "\n")
+
+	return fmt.Errorf("%s", msg.String())
 }
