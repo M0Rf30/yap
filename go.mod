@@ -7,7 +7,7 @@ toolchain go1.25.4
 require (
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/github/go-spdx/v2 v2.3.4
+	github.com/github/go-spdx/v2 v2.3.5
 	github.com/go-git/go-git/v5 v5.16.4
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/google/rpmpack v0.7.1
@@ -18,7 +18,7 @@ require (
 	github.com/otiai10/copy v1.14.1
 	github.com/pkg/errors v0.9.1
 	github.com/pterm/pterm v0.12.82
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/text v0.31.0
