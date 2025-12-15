@@ -197,7 +197,7 @@
 
 # Footer messages
 - id: footer.documentation
-  translation: "Documentation: https://opencode.ai/docs"
+  translation: "Documentation:"
 - id: footer.more_info
   translation: "For more information, visit:"
 - id: footer.report_issues
