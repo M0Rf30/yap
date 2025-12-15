@@ -305,7 +305,7 @@ jobs:
     steps:
       - name: 📥 Download analysis results
         if: needs.analyze.outputs.has-updates == 'true'
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: dependency-analysis
 
