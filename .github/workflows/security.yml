@@ -117,7 +117,7 @@ jobs:
           go-licenses report ./... >> licenses/report.md 2>/dev/null || echo "Unable to generate detailed license report" >> licenses/report.md
 
       - name: 📤 Upload license compliance results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: license-compliance-results
           path: licenses/
