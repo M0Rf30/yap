@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GO_VERSION: "1.25.4"
+  GO_VERSION: "1.25.5"
   REGISTRY: ghcr.io
 
 jobs:
@@ -130,7 +130,6 @@ jobs:
           - alpine
           - rocky-8
           - rocky-9
-          - ubuntu-focal
           - ubuntu-jammy
           - ubuntu-noble
 

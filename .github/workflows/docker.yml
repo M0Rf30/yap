@@ -20,7 +20,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  GO_VERSION: "1.25.4"
+  GO_VERSION: "1.25.5"
 
 jobs:
   # Generate matrix for all OS builds
@@ -33,7 +33,7 @@ jobs:
       - name: 📋 Set matrix
         id: set-matrix
         run: |
-          echo 'matrix=["alpine","rocky-8","rocky-9","rocky-10","ubuntu-focal","ubuntu-jammy","ubuntu-noble"]' >> "$GITHUB_OUTPUT"
+          echo 'matrix=["alpine","rocky-8","rocky-9","rocky-10","ubuntu-jammy","ubuntu-noble"]' >> "$GITHUB_OUTPUT"
 
   # Build each OS image
   docker-build:

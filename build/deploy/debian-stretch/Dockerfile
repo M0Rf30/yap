@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG GO_VERSION=1.25.4
+ARG GO_VERSION=1.25.5
 
 # Build stage
 FROM golang:${GO_VERSION}-alpine AS builder
@@ -43,7 +43,7 @@ FROM debian:stretch
 # Build arguments for runtime stage
 ARG VERSION=dev
 ARG TARGETARCH=amd64
-ARG GO_VERSION=1.25.4
+ARG GO_VERSION=1.25.5
 
 # Metadata labels
 LABEL org.opencontainers.image.title="yap-debian-stretch"
