@@ -9,7 +9,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.3.5
 	github.com/go-git/go-git/v5 v5.16.4
-	github.com/go-playground/validator/v10 v10.30.0
+	github.com/go-playground/validator/v10 v10.30.1
 	github.com/google/rpmpack v0.7.1
 	github.com/klauspost/compress v1.18.2
 	github.com/klauspost/pgzip v1.2.6
