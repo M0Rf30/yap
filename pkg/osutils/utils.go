@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/M0Rf30/yap/pkg/constants"
@@ -33,6 +34,10 @@ var (
 	Logger = pterm.DefaultLogger.WithLevel(pterm.LogLevelInfo).WithWriter(MultiPrinter.Writer)
 	// MultiPrinter is the default multi printer.
 	MultiPrinter = pterm.DefaultMultiPrinter
+	// ccacheOnce ensures ccache is configured only once.
+	ccacheOnce sync.Once
+	// ccacheErr stores any error from ccache setup.
+	ccacheErr error
 )
 
 // CheckGO checks if the GO executable is already installed.
@@ -51,38 +56,45 @@ func CheckGO() bool {
 }
 
 // SetupCcache checks if ccache is installed and configures environment variables.
+// It is safe to call multiple times; the actual setup only happens once.
 //
 // It does not take any parameters.
 // It returns an error if environment variable setup fails.
 func SetupCcache() error {
-	ccachePath := "/usr/bin/ccache"
+	ccacheOnce.Do(func() {
+		ccachePath := "/usr/bin/ccache"
 
-	_, err := os.Stat(ccachePath)
-	if os.IsNotExist(err) {
-		Logger.Info("ccache not found, skipping configuration")
+		_, err := os.Stat(ccachePath)
+		if os.IsNotExist(err) {
+			Logger.Info("ccache not found, skipping configuration")
 
-		return nil
-	}
-
-	if err != nil {
-		return errors.Errorf("failed to check ccache: %v", err)
-	}
-
-	Logger.Info("ccache detected, configuring environment")
-
-	envVars := map[string]string{
-		"CC":  "ccache gcc",
-		"CXX": "ccache g++",
-	}
-
-	for key, value := range envVars {
-		err := os.Setenv(key, value)
-		if err != nil {
-			return errors.Errorf("failed to set %s environment variable: %v", key, err)
+			return
 		}
-	}
 
-	return nil
+		if err != nil {
+			ccacheErr = errors.Errorf("failed to check ccache: %v", err)
+
+			return
+		}
+
+		Logger.Info("ccache detected, configuring environment")
+
+		envVars := map[string]string{
+			"CC":  "ccache gcc",
+			"CXX": "ccache g++",
+		}
+
+		for key, value := range envVars {
+			err := os.Setenv(key, value)
+			if err != nil {
+				ccacheErr = errors.Errorf("failed to set %s environment variable: %v", key, err)
+
+				return
+			}
+		}
+	})
+
+	return ccacheErr
 }
 
 // CreateTarZst creates a compressed tar.zst archive from the specified source
