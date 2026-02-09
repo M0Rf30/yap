@@ -11,7 +11,7 @@ require (
 	github.com/go-git/go-git/v5 v5.16.4
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/google/rpmpack v0.7.1
-	github.com/klauspost/compress v1.18.3
+	github.com/klauspost/compress v1.18.4
 	github.com/klauspost/pgzip v1.2.6
 	github.com/mholt/archives v0.1.6-0.20251107150748-4a3da7803a6f
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
