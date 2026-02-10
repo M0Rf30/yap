@@ -12,7 +12,7 @@ import (
 // node: A pointer to the syntax.Assign node representing the array.
 // []string: An array of strings representing the stringified elements of the array.
 func StringifyArray(node *syntax.Assign) []string {
-	fields := make([]string, 0)
+	fields := make([]string, 0, len(node.Array.Elems))
 	printer := syntax.NewPrinter(syntax.Indent(2))
 	out := &strings.Builder{}
 
@@ -77,6 +77,32 @@ func StringifyFuncDecl(node *syntax.FuncDecl) string {
 	}
 
 	return funcDecl
+}
+
+// FormatScript parses a shell script string and returns it formatted with
+// 2-space indentation and switch-case indentation (equivalent to shfmt -i 2 -ci).
+// If parsing fails, the original string is returned unchanged.
+func FormatScript(script string) string {
+	parser := syntax.NewParser(syntax.Variant(syntax.LangBash))
+
+	prog, err := parser.Parse(strings.NewReader(script), "")
+	if err != nil {
+		return script
+	}
+
+	printer := syntax.NewPrinter(
+		syntax.Indent(2),
+		syntax.SwitchCaseIndent(true),
+	)
+
+	out := &strings.Builder{}
+
+	err = printer.Print(out, prog)
+	if err != nil {
+		return script
+	}
+
+	return out.String()
 }
 
 // Contains checks if a string is present in an array of strings.

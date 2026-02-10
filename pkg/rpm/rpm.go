@@ -399,7 +399,7 @@ func handleFileEntry(path string, backupFiles []string,
 // prepareBackupFiles prepares a list of backup file paths by ensuring each path
 // has a leading slash and returns the resulting slice of backup file paths.
 func (r *RPM) prepareBackupFiles() []string {
-	backupFiles := make([]string, 0)
+	backupFiles := make([]string, 0, len(r.PKGBUILD.Backup))
 
 	for _, filePath := range r.PKGBUILD.Backup {
 		if !strings.HasPrefix(filePath, "/") {

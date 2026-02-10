@@ -123,7 +123,7 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) e
 			}
 		case *syntax.FuncDecl:
 			funcDecl = osutils.StringifyFuncDecl(nodeType)
-			err = pkgBuild.AddItem(nodeType.Name.Value, funcDecl)
+			err = pkgBuild.AddItem(nodeType.Name.Value, pkgbuild.FuncBody(funcDecl))
 		}
 
 		return true

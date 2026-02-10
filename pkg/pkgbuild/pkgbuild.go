@@ -3,8 +3,10 @@ package pkgbuild
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -14,64 +16,71 @@ import (
 	"github.com/pkg/errors"
 )
 
+// FuncBody is a distinct type for function body strings, used to distinguish
+// function declarations from scalar variable assignments in AddItem.
+type FuncBody string
+
 // PKGBUILD defines all the fields accepted by the yap specfile (variables,
 // arrays, functions). It adds some exotics fields to manage debconfig
 // templating and other rpm/deb descriptors.
 type PKGBUILD struct {
-	Arch           []string
-	ArchComputed   string
-	Backup         []string
-	Build          string
-	BuildDate      int64
-	Checksum       string
-	Codename       string
-	Conflicts      []string
-	Copyright      []string
-	DebConfig      string
-	DebTemplate    string
-	Depends        []string
-	Distro         string
-	Epoch          string
-	Files          []string
-	FullDistroName string
-	Group          string
-	HashSums       []string
-	Home           string
-	Install        string
-	InstalledSize  int64
-	License        []string
-	Maintainer     string
-	MakeDepends    []string
-	OptDepends     []string
-	Options        []string
-	Package        string
-	PackageDir     string
-	PkgDesc        string
-	PkgDest        string
-	PkgName        string
-	PkgRel         string
-	PkgType        string
-	PkgVer         string
-	PostInst       string
-	PostRm         string
-	PostTrans      string
-	PreInst        string
-	Prepare        string
-	PreRelease     string
-	PreRm          string
-	PreTrans       string
-	priorities     map[string]int
-	Priority       string
-	Provides       []string
-	Replaces       []string
-	Section        string
-	SourceDir      string
-	SourceURI      []string
-	StartDir       string
-	URL            string
-	StaticEnabled  bool
-	StripEnabled   bool
-	YAPVersion     string
+	Arch            []string
+	ArchComputed    string
+	Backup          []string
+	Build           string
+	BuildDate       int64
+	Checksum        string
+	Codename        string
+	Conflicts       []string
+	Copyright       []string
+	CustomArrays    map[string][]string
+	CustomVariables map[string]string
+	DebConfig       string
+	DebTemplate     string
+	Depends         []string
+	Distro          string
+	Epoch           string
+	Files           []string
+	FullDistroName  string
+	Group           string
+	HashSums        []string
+	HelperFunctions map[string]string
+	Home            string
+	Install         string
+	InstalledSize   int64
+	License         []string
+	Maintainer      string
+	MakeDepends     []string
+	OptDepends      []string
+	Options         []string
+	Package         string
+	PackageDir      string
+	PkgDesc         string
+	PkgDest         string
+	PkgName         string
+	PkgRel          string
+	PkgType         string
+	PkgVer          string
+	PostInst        string
+	PostRm          string
+	PostTrans       string
+	PreInst         string
+	Prepare         string
+	PreRelease      string
+	PreRm           string
+	PreTrans        string
+	priorities      map[string]int
+	Priority        string
+	Provides        []string
+	Replaces        []string
+	Section         string
+	SourceDir       string
+	SourceURI       []string
+	StartDir        string
+	URL             string
+	StaticEnabled   bool
+	StripEnabled    bool
+	YAPVersion      string
 }
 
 // AddItem adds an item to the PKGBUILD.
@@ -162,11 +171,98 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 // the Distro and Codename fields.
 func (pkgBuild *PKGBUILD) Init() {
 	pkgBuild.priorities = make(map[string]int)
+	pkgBuild.CustomVariables = make(map[string]string)
+	pkgBuild.CustomArrays = make(map[string][]string)
+	pkgBuild.HelperFunctions = make(map[string]string)
 
 	pkgBuild.FullDistroName = pkgBuild.Distro
 	if pkgBuild.Codename != "" {
 		pkgBuild.FullDistroName += "_" + pkgBuild.Codename
 	}
+}
+
+// PrepareScriptlets prepends helper function definitions to all non-empty
+// scriptlet fields (preinst, postinst, prerm, postrm, pretrans, posttrans).
+// Only helper functions that are actually referenced by a scriptlet are
+// included, to avoid injecting build-time helpers into install-time scripts.
+func (pkgBuild *PKGBUILD) PrepareScriptlets() {
+	if len(pkgBuild.HelperFunctions) == 0 {
+		return
+	}
+
+	scriptlets := []*string{
+		&pkgBuild.PreInst,
+		&pkgBuild.PostInst,
+		&pkgBuild.PreRm,
+		&pkgBuild.PostRm,
+		&pkgBuild.PreTrans,
+		&pkgBuild.PostTrans,
+	}
+
+	for _, scriptlet := range scriptlets {
+		if *scriptlet == "" {
+			continue
+		}
+
+		preamble := pkgBuild.scriptletPreamble(*scriptlet)
+		if preamble != "" {
+			*scriptlet = preamble + *scriptlet
+		}
+	}
+}
+
+// FormatScriptlets applies shfmt-style formatting (2-space indent, switch-case
+// indent) to all non-empty scriptlet fields.
+func (pkgBuild *PKGBUILD) FormatScriptlets() {
+	scriptlets := []*string{
+		&pkgBuild.PreInst,
+		&pkgBuild.PostInst,
+		&pkgBuild.PreRm,
+		&pkgBuild.PostRm,
+		&pkgBuild.PreTrans,
+		&pkgBuild.PostTrans,
+	}
+
+	for _, scriptlet := range scriptlets {
+		if *scriptlet != "" {
+			*scriptlet = osutils.FormatScript(*scriptlet)
+		}
+	}
+}
+
+// BuildScriptPreamble generates a bash preamble that declares custom arrays
+// and helper functions so they are available in build/package scripts.
+func (pkgBuild *PKGBUILD) BuildScriptPreamble() string {
+	var preamble strings.Builder
+
+	// Emit custom arrays as bash array declarations
+	keys := make([]string, 0, len(pkgBuild.CustomArrays))
+	for k := range pkgBuild.CustomArrays {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		preamble.WriteString(k)
+		preamble.WriteString("=(")
+
+		for idx, value := range pkgBuild.CustomArrays[k] {
+			if idx > 0 {
+				preamble.WriteByte(' ')
+			}
+
+			preamble.WriteByte('\'')
+			preamble.WriteString(strings.ReplaceAll(value, "'", "'\\''"))
+			preamble.WriteByte('\'')
+		}
+
+		preamble.WriteString(")\n")
+	}
+
+	preamble.WriteString(pkgBuild.helperFunctionsPreamble())
+
+	return preamble.String()
 }
 
 // RenderSpec initializes a new template with custom functions and parses the provided script.
@@ -192,6 +288,29 @@ func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
 	template.Must(tmpl.Parse(script))
 
 	return tmpl
+}
+
+// SetEnvironmentVariables sets the srcdir, pkgdir, and startdir environment
+// variables for this PKGBUILD. This must be called before executing any build
+// function to ensure the correct per-project values are available, especially
+// in multi-project builds where env vars may have been overwritten.
+func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
+	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
+	if err != nil {
+		return err
+	}
+
+	err = os.Setenv("srcdir", pkgBuild.SourceDir)
+	if err != nil {
+		return err
+	}
+
+	err = os.Setenv("startdir", pkgBuild.StartDir)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SetMainFolders sets the main folders for the PKGBUILD.
@@ -303,107 +422,189 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
 	}
 }
 
+// helperFunctionsPreamble returns helper function definitions as a bash string.
+func (pkgBuild *PKGBUILD) helperFunctionsPreamble() string {
+	if len(pkgBuild.HelperFunctions) == 0 {
+		return ""
+	}
+
+	var result strings.Builder
+
+	funcKeys := make([]string, 0, len(pkgBuild.HelperFunctions))
+	for k := range pkgBuild.HelperFunctions {
+		funcKeys = append(funcKeys, k)
+	}
+
+	sort.Strings(funcKeys)
+
+	for _, k := range funcKeys {
+		result.WriteString(pkgBuild.HelperFunctions[k])
+		result.WriteByte('\n')
+	}
+
+	return result.String()
+}
+
+// scriptletPreamble returns only the helper function definitions that are
+// referenced (directly or transitively) by the given scriptlet body.
+func (pkgBuild *PKGBUILD) scriptletPreamble(body string) string {
+	// Collect all helper function names that appear in the body,
+	// then transitively include any helpers called by those helpers.
+	needed := make(map[string]bool)
+	queue := make([]string, 0)
+
+	// Seed: find helpers referenced in the scriptlet body
+	for name := range pkgBuild.HelperFunctions {
+		if strings.Contains(body, name) {
+			needed[name] = true
+			queue = append(queue, name)
+		}
+	}
+
+	// Transitive closure: check helper bodies for references to other helpers
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		funcDef := pkgBuild.HelperFunctions[current]
+		for name := range pkgBuild.HelperFunctions {
+			if !needed[name] && strings.Contains(funcDef, name) {
+				needed[name] = true
+				queue = append(queue, name)
+			}
+		}
+	}
+
+	if len(needed) == 0 {
+		return ""
+	}
+
+	var result strings.Builder
+
+	funcKeys := make([]string, 0, len(needed))
+	for k := range needed {
+		funcKeys = append(funcKeys, k)
+	}
+
+	sort.Strings(funcKeys)
+
+	for _, k := range funcKeys {
+		result.WriteString(pkgBuild.HelperFunctions[k])
+		result.WriteByte('\n')
+	}
+
+	return result.String()
+}
+
 // mapArrays reads an array name and its content and maps them to the PKGBUILD
 // struct.
 func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
-	switch key {
-	case "arch":
-		pkgBuild.Arch = data.([]string)
-	case "copyright":
-		pkgBuild.Copyright = data.([]string)
-	case "license":
-		pkgBuild.License = data.([]string)
-	case "depends":
-		pkgBuild.Depends = data.([]string)
-	case "options":
-		pkgBuild.Options = data.([]string)
-	case "optdepends":
-		pkgBuild.OptDepends = data.([]string)
-	case "makedepends":
-		pkgBuild.MakeDepends = data.([]string)
-	case "provides":
-		pkgBuild.Provides = data.([]string)
-	case "conflicts":
-		pkgBuild.Conflicts = data.([]string)
-	case "replaces":
-		pkgBuild.Replaces = data.([]string)
-	case "source":
-		pkgBuild.SourceURI = data.([]string)
-	case "sha256sums":
-		pkgBuild.HashSums = data.([]string)
-	case "sha512sums":
-		pkgBuild.HashSums = data.([]string)
-	case "backup":
-		pkgBuild.Backup = data.([]string)
+	arrData, ok := data.([]string)
+	if !ok {
+		return
+	}
+
+	arrayFields := map[string]*[]string{
+		"arch":        &pkgBuild.Arch,
+		"backup":      &pkgBuild.Backup,
+		"conflicts":   &pkgBuild.Conflicts,
+		"copyright":   &pkgBuild.Copyright,
+		"depends":     &pkgBuild.Depends,
+		"license":     &pkgBuild.License,
+		"makedepends": &pkgBuild.MakeDepends,
+		"optdepends":  &pkgBuild.OptDepends,
+		"options":     &pkgBuild.Options,
+		"provides":    &pkgBuild.Provides,
+		"replaces":    &pkgBuild.Replaces,
+		"sha256sums":  &pkgBuild.HashSums,
+		"sha512sums":  &pkgBuild.HashSums,
+		"source":      &pkgBuild.SourceURI,
+	}
+
+	if field, exists := arrayFields[key]; exists {
+		*field = arrData
+	} else {
+		pkgBuild.CustomArrays[key] = arrData
 	}
 }
 
 // mapFunctions reads a function name and its content and maps them to the
 // PKGBUILD struct.
 func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
+	funcBody, ok := data.(FuncBody)
+	if !ok {
+		return
+	}
+
+	body := string(funcBody)
+
 	switch key {
 	case "build":
-		pkgBuild.Build = os.ExpandEnv(data.(string))
+		pkgBuild.Build = os.ExpandEnv(body)
 	case "package":
-		pkgBuild.Package = os.ExpandEnv(data.(string))
+		pkgBuild.Package = os.ExpandEnv(body)
 	case "preinst":
-		pkgBuild.PreInst = data.(string)
+		pkgBuild.PreInst = body
 	case "prepare":
-		pkgBuild.Prepare = os.ExpandEnv(data.(string))
+		pkgBuild.Prepare = os.ExpandEnv(body)
 	case "postinst":
-		pkgBuild.PostInst = data.(string)
+		pkgBuild.PostInst = body
 	case "posttrans":
-		pkgBuild.PostTrans = data.(string)
+		pkgBuild.PostTrans = body
 	case "prerm":
-		pkgBuild.PreRm = data.(string)
+		pkgBuild.PreRm = body
 	case "pretrans":
-		pkgBuild.PreTrans = data.(string)
+		pkgBuild.PreTrans = body
 	case "postrm":
-		pkgBuild.PostRm = data.(string)
+		pkgBuild.PostRm = body
+	default:
+		pkgBuild.HelperFunctions[key] = fmt.Sprintf("%s() {\n%s\n}", key, body)
 	}
 }
 
 // mapVariables reads a variable name and its content and maps them to the
 // PKGBUILD struct.
 func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
-	var err error
-
-	switch key {
-	case "pkgname":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.PkgName = data.(string)
-	case "epoch":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.Epoch = data.(string)
-	case "pkgver":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.PkgVer = data.(string)
-	case "pkgrel":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.PkgRel = data.(string)
-	case "pkgdesc":
-		pkgBuild.PkgDesc = data.(string)
-	case "maintainer":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.Maintainer = data.(string)
-	case "section":
-		pkgBuild.Section = data.(string)
-	case "priority":
-		pkgBuild.Priority = data.(string)
-	case "url":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.URL = data.(string)
-	case "debconf_template":
-		pkgBuild.DebTemplate = data.(string)
-	case "debconf_config":
-		pkgBuild.DebConfig = data.(string)
-	case "install":
-		pkgBuild.Install = data.(string)
+	strData, ok := data.(string)
+	if !ok {
+		return
 	}
 
-	if err != nil {
-		osutils.Logger.Fatal("failed to set variable",
-			osutils.Logger.Args("variable", key))
+	varFields := map[string]*string{
+		"debconf_config":   &pkgBuild.DebConfig,
+		"debconf_template": &pkgBuild.DebTemplate,
+		"epoch":            &pkgBuild.Epoch,
+		"install":          &pkgBuild.Install,
+		"maintainer":       &pkgBuild.Maintainer,
+		"pkgdesc":          &pkgBuild.PkgDesc,
+		"pkgname":          &pkgBuild.PkgName,
+		"pkgrel":           &pkgBuild.PkgRel,
+		"pkgver":           &pkgBuild.PkgVer,
+		"priority":         &pkgBuild.Priority,
+		"section":          &pkgBuild.Section,
+		"url":              &pkgBuild.URL,
+	}
+
+	// Keys that require corresponding environment variables.
+	envKeys := map[string]bool{
+		"epoch": true, "maintainer": true, "pkgname": true,
+		"pkgrel": true, "pkgver": true, "url": true,
+	}
+
+	field, isKnown := varFields[key]
+	if isKnown {
+		*field = strData
+	} else {
+		pkgBuild.CustomVariables[key] = strData
+	}
+
+	// Set environment variable if needed (known env keys + all custom variables).
+	if envKeys[key] || !isKnown {
+		err := os.Setenv(key, strData)
+		if err != nil {
+			osutils.Logger.Fatal("failed to set variable",
+				osutils.Logger.Args("variable", key))
+		}
 	}
 }
 

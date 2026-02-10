@@ -36,8 +36,8 @@ var (
 	MultiPrinter = pterm.DefaultMultiPrinter
 	// ccacheOnce ensures ccache is configured only once.
 	ccacheOnce sync.Once
-	// ccacheErr stores any error from ccache setup.
-	ccacheErr error
+	// errCcache stores any error from ccache setup.
+	errCcache error
 )
 
 // CheckGO checks if the GO executable is already installed.
@@ -72,7 +72,7 @@ func SetupCcache() error {
 		}
 
 		if err != nil {
-			ccacheErr = errors.Errorf("failed to check ccache: %v", err)
+			errCcache = errors.Errorf("failed to check ccache: %v", err)
 
 			return
 		}
@@ -87,14 +87,14 @@ func SetupCcache() error {
 		for key, value := range envVars {
 			err := os.Setenv(key, value)
 			if err != nil {
-				ccacheErr = errors.Errorf("failed to set %s environment variable: %v", key, err)
+				errCcache = errors.Errorf("failed to set %s environment variable: %v", key, err)
 
 				return
 			}
 		}
 	})
 
-	return ccacheErr
+	return errCcache
 }
 
 // CreateTarZst creates a compressed tar.zst archive from the specified source
