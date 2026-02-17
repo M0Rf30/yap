@@ -115,10 +115,16 @@ func (mpc *MultipleProject) BuildAll() error {
 		mpc.checkPkgsRange(FromPkgName, ToPkgName)
 	}
 
+	fromPkg := FromPkgName
+
 	for _, proj := range mpc.Projects {
-		if FromPkgName != "" && proj.Builder.PKGBUILD.PkgName != FromPkgName {
+		if fromPkg != "" && proj.Builder.PKGBUILD.PkgName != fromPkg {
 			continue
 		}
+
+		// Clear after the first match so that subsequent projects in
+		// the range are not skipped.
+		fromPkg = ""
 
 		osutils.Logger.Info("making package", osutils.Logger.Args("pkgname", proj.Builder.PKGBUILD.PkgName,
 			"pkgver", proj.Builder.PKGBUILD.PkgVer,
@@ -386,7 +392,17 @@ func (mpc *MultipleProject) getMakeDeps() {
 func (mpc *MultipleProject) populateProjects(distro, release, path string) error {
 	var projects = make([]*Project, 0)
 
+	// prevPkgBuild tracks the previously parsed PKGBUILD so we can clean
+	// its environment variables before parsing the next project. This
+	// prevents variable values (pkgver, pkgname, custom vars, etc.) from
+	// leaking between projects via os.Setenv/os.ExpandEnv during parsing.
+	var prevPkgBuild *pkgbuild.PKGBUILD
+
 	for _, child := range mpc.Projects {
+		if prevPkgBuild != nil {
+			prevPkgBuild.CleanEnvironment()
+		}
+
 		startDir := filepath.Join(mpc.BuildDir, child.Name)
 		home := filepath.Join(path, child.Name)
 
@@ -412,6 +428,7 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 		}
 
 		projects = append(projects, proj)
+		prevPkgBuild = pkgbuildFile
 	}
 
 	mpc.Projects = projects

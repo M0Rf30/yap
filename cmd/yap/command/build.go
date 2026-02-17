@@ -19,6 +19,7 @@ var (
 		Args:  cobra.RangeArgs(1, 2), // Allow 1 or 2 arguments
 		Run: func(_ *cobra.Command, args []string) {
 			fullJSONPath, _ := filepath.Abs(args[len(args)-1]) // Always take the last argument as path
+
 			var distro, release string
 
 			if len(args) == 2 {
@@ -39,6 +40,7 @@ var (
 			}
 
 			mpc := project.MultipleProject{}
+
 			err := mpc.MultiProject(distro, release, fullJSONPath)
 			if err != nil {
 				osutils.Logger.Fatal("fatal error",

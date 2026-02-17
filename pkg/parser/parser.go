@@ -124,6 +124,12 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) e
 		case *syntax.FuncDecl:
 			funcDecl = osutils.StringifyFuncDecl(nodeType)
 			err = pkgBuild.AddItem(nodeType.Name.Value, pkgbuild.FuncBody(funcDecl))
+
+			// Do not recurse into function bodies. The body is already
+			// captured as a string by StringifyFuncDecl above. Recursing
+			// would incorrectly treat assignments inside function bodies
+			// (e.g. export PATH=...) as top-level PKGBUILD variables.
+			return false
 		}
 
 		return true

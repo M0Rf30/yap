@@ -290,24 +290,60 @@ func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
 	return tmpl
 }
 
-// SetEnvironmentVariables sets the srcdir, pkgdir, and startdir environment
-// variables for this PKGBUILD. This must be called before executing any build
-// function to ensure the correct per-project values are available, especially
-// in multi-project builds where env vars may have been overwritten.
+// CleanEnvironment removes all environment variables that were set during
+// PKGBUILD parsing (known env keys, custom variables, and folder paths).
+// This must be called before parsing a new project's PKGBUILD in multi-project
+// builds to prevent variable values from leaking between projects.
+func (pkgBuild *PKGBUILD) CleanEnvironment() {
+	// Remove known env keys set by mapVariables.
+	for _, key := range []string{
+		"epoch", "maintainer", "pkgname",
+		"pkgrel", "pkgver", "url",
+	} {
+		os.Unsetenv(key)
+	}
+
+	// Remove custom variables set by mapVariables.
+	for key := range pkgBuild.CustomVariables {
+		os.Unsetenv(key)
+	}
+
+	// Remove folder paths set by SetMainFolders.
+	os.Unsetenv("pkgdir")
+	os.Unsetenv("srcdir")
+	os.Unsetenv("startdir")
+}
+
+// SetEnvironmentVariables sets all PKGBUILD environment variables that build
+// scripts may reference at runtime. This must be called before executing any
+// build function to ensure the correct per-project values are available,
+// especially in multi-project builds where env vars may have been overwritten
+// by a later project's parsing phase.
 func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
-	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
-	if err != nil {
-		return err
+	vars := map[string]string{
+		"pkgdir":   pkgBuild.PackageDir,
+		"srcdir":   pkgBuild.SourceDir,
+		"startdir": pkgBuild.StartDir,
+		"pkgname":  pkgBuild.PkgName,
+		"pkgver":   pkgBuild.PkgVer,
+		"pkgrel":   pkgBuild.PkgRel,
+		"epoch":    pkgBuild.Epoch,
+		"url":      pkgBuild.URL,
 	}
 
-	err = os.Setenv("srcdir", pkgBuild.SourceDir)
-	if err != nil {
-		return err
+	for key, value := range vars {
+		err := os.Setenv(key, value)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = os.Setenv("startdir", pkgBuild.StartDir)
-	if err != nil {
-		return err
+	// Also restore custom variables so helper functions can reference them.
+	for key, value := range pkgBuild.CustomVariables {
+		err := os.Setenv(key, value)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
