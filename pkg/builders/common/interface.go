@@ -36,6 +36,15 @@ const (
 // This is set by command-line flags and used by PrepareEnvironment.
 var SkipToolchainValidation bool
 
+// formatToRepresentativeDistro maps each package format to a canonical representative
+// distribution name used for cross-compilation toolchain lookup.
+var formatToRepresentativeDistro = map[string]string{
+	constants.FormatDEB:    distroUbuntu,
+	constants.FormatRPM:    distroFedora,
+	constants.FormatAPK:    distroAlpine,
+	constants.FormatPacman: distroArch,
+}
+
 // depVersionRegex matches version operators in dependency strings like "gcc<=11.0".
 var depVersionRegex = regexp.MustCompile(`(<=|>=|=|>|<)`)
 
@@ -408,16 +417,8 @@ func (bb *BaseBuilder) PrepareEnvironmentWithValidation(golang bool, targetArch 
 // This function uses the centralized CrossToolchainMap to get toolchain packages for the
 // specified target architecture based on the builder's package format.
 func (bb *BaseBuilder) getCrossCompilerDependencies(targetArch string) []string {
-	// Map package format to distribution key in CrossToolchainMap
-	formatToDistro := map[string]string{
-		constants.FormatDEB:    "ubuntu", // DEB format uses Ubuntu/Debian toolchains
-		constants.FormatRPM:    "fedora", // RPM format uses Fedora toolchains
-		constants.FormatAPK:    "alpine", // APK format uses Alpine toolchains
-		constants.FormatPacman: "arch",   // Pacman format uses Arch toolchains
-	}
-
 	// Get the distribution key for this format
-	distro, exists := formatToDistro[bb.Format]
+	distro, exists := formatToRepresentativeDistro[bb.Format]
 	if !exists {
 		return []string{}
 	}

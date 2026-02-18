@@ -202,7 +202,7 @@ func CalculateDataHash(baseDir string, skipPatterns []string) (string, error) {
 
 		// Hash file path and metadata
 		hasher.Write([]byte(relPath))
-		hasher.Write([]byte{byte(fileInfo.Mode())}) //nolint:gosec // intentional: only low bits of mode used for hashing
+		hasher.Write([]byte{byte(fileInfo.Mode())}) // #nosec G115 //nolint:gosec -- intentional: low bits of mode
 
 		// Hash file content if it's a regular file
 		if fileInfo.Mode().IsRegular() {

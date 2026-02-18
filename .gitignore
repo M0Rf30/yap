@@ -83,7 +83,7 @@ temp/
 .air.toml
 tmp/
 
-# AI releated
+# AI related
 .claude_consciousness.m8
 .codanna*
 .fastembed_cache
@@ -91,3 +91,17 @@ tmp/
 openspec/
 
 .grepai/
+
+# Security scan results
+*.sarif
+gosec.sarif
+
+# Local repository downloads
+local-repo/
+
+# Debian packaging artifacts (generated during builds)
+DEBIAN/
+
+# Scratch/one-off scripts
+script
+test_cross_compilation.sh
