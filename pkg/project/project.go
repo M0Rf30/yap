@@ -847,14 +847,12 @@ func (mpc *MultipleProject) readProject(path string) error {
 
 	if files.Exists(jsonFilePath) {
 		projectFilePath = jsonFilePath
-		logger.Info(i18n.T("logger.multi_project_file_found"),
-			"path", projectFilePath)
+		logger.Debug(i18n.T("logger.multi_project_file_found"), "path", projectFilePath)
 	}
 
 	if files.Exists(pkgbuildFilePath) {
 		projectFilePath = pkgbuildFilePath
-		logger.Info(i18n.T("logger.single_project_file_found"),
-			"path", projectFilePath)
+		logger.Debug(i18n.T("logger.single_project_file_found"), "path", projectFilePath)
 
 		mpc.setSingleProject(path)
 	}

@@ -15,9 +15,9 @@ import (
 // SetupEnhancedHelp configures enhanced help formatting for commands.
 func SetupEnhancedHelp() {
 	// Custom usage template with enhanced formatting
-	usageTemplate := `{{if .Runnable}}{{.UseLine | styleUsage}}{{else}}` +
-		`{{.CommandPath | styleUsage}}{{end}}{{if .HasAvailableSubCommands}}
-{{.CommandPath | styleUsage}} [command]{{end}}{{if gt (len .Aliases) 0}}
+	usageTemplate := `{{if .HasAvailableSubCommands}}` +
+		`{{.CommandPath | styleUsage}} [command]{{else if .Runnable}}` +
+		`{{.UseLine | styleUsage}}{{end}}{{if gt (len .Aliases) 0}}
 
 {{styleAliases}}
   {{.NameAndAliases}}{{end}}{{if .HasExample}}
