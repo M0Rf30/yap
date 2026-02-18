@@ -176,11 +176,9 @@ func TestGetMakeDepsDeduplication(t *testing.T) {
 		},
 	}
 
-	// Reset global makeDepends before test
+	// Reset global makeDepends before test and assign return value
 	makeDepends = []string{}
-
-	// Call getMakeDeps
-	mpc.getMakeDeps()
+	makeDepends = mpc.getMakeDeps()
 
 	// Check that dependencies are deduplicated
 	depCount := make(map[string]int)
@@ -253,11 +251,9 @@ func TestGetRuntimeDepsDeduplication(t *testing.T) {
 		},
 	}
 
-	// Reset global runtimeDepends before test
+	// Reset global runtimeDepends before test and assign return value
 	runtimeDepends = []string{}
-
-	// Call getRuntimeDeps
-	mpc.getRuntimeDeps()
+	runtimeDepends = mpc.getRuntimeDeps()
 
 	// Check that dependencies are deduplicated
 	depCount := make(map[string]int)
