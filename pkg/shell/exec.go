@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	logLevelInfo = " INFO"
+	logLevelInfo = "INFO "
 
 	// Buffer size constants for writer management
 	minBufferPoolSize = 1024 // Minimum buffer size to return to pool
