@@ -623,29 +623,89 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 
 	switch key {
 	case "arch":
-		pkgBuild.Arch = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Arch = arrVal
 	case "copyright":
-		pkgBuild.Copyright = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Copyright = arrVal
 	case "license":
-		pkgBuild.License = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.License = arrVal
 	case dependsKey:
-		pkgBuild.Depends = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Depends = arrVal
 	case "options":
-		pkgBuild.Options = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Options = arrVal
 	case "optdepends":
-		pkgBuild.OptDepends = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.OptDepends = arrVal
 	case "makedepends":
-		pkgBuild.MakeDepends = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.MakeDepends = arrVal
 	case "provides":
-		pkgBuild.Provides = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Provides = arrVal
 	case "conflicts":
-		pkgBuild.Conflicts = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Conflicts = arrVal
 	case "replaces":
-		pkgBuild.Replaces = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Replaces = arrVal
 	case "source":
-		pkgBuild.SourceURI = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.SourceURI = arrVal
 	case "backup":
-		pkgBuild.Backup = data.([]string)
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Backup = arrVal
 	default:
 		// Store unknown arrays (e.g. _modules, _extra_files) as custom arrays.
 		// They will be declared as bash array variables in the build script preamble.
@@ -662,23 +722,11 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 // mapChecksumsArrays handles mapping of checksum arrays and returns true if handled
 func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any) bool {
 	switch key {
-	case "sha512sums":
-		pkgBuild.HashSums = data.([]string)
-		return true
-	case "sha384sums":
-		pkgBuild.HashSums = data.([]string)
-		return true
-	case "sha256sums":
-		pkgBuild.HashSums = data.([]string)
-		return true
-	case "sha224sums":
-		pkgBuild.HashSums = data.([]string)
-		return true
-	case "b2sums":
-		pkgBuild.HashSums = data.([]string)
-		return true
-	case "cksums":
-		pkgBuild.HashSums = data.([]string)
+	case "sha512sums", "sha384sums", "sha256sums", "sha224sums", "b2sums", "cksums":
+		if arrVal, ok := data.([]string); ok {
+			pkgBuild.HashSums = arrVal
+		}
+
 		return true
 	default:
 		return false
@@ -741,45 +789,130 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 
 	switch key {
 	case "pkgname":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.PkgName = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		err = os.Setenv(key, strVal)
+		pkgBuild.PkgName = strVal
 	case "epoch":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.Epoch = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		err = os.Setenv(key, strVal)
+		pkgBuild.Epoch = strVal
 	case "pkgver":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.PkgVer = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		err = os.Setenv(key, strVal)
+		pkgBuild.PkgVer = strVal
 	case "pkgrel":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.PkgRel = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		err = os.Setenv(key, strVal)
+		pkgBuild.PkgRel = strVal
 	case "pkgdesc":
-		pkgBuild.PkgDesc = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.PkgDesc = strVal
 	case "maintainer":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.Maintainer = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		err = os.Setenv(key, strVal)
+		pkgBuild.Maintainer = strVal
 	case "section":
-		pkgBuild.Section = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Section = strVal
 	case "priority":
-		pkgBuild.Priority = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Priority = strVal
 	case "url":
-		err = os.Setenv(key, data.(string))
-		pkgBuild.URL = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		err = os.Setenv(key, strVal)
+		pkgBuild.URL = strVal
 	case "origin":
-		pkgBuild.Origin = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Origin = strVal
 	case "commit":
-		pkgBuild.Commit = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Commit = strVal
 	case "debconf_template":
-		pkgBuild.DebTemplate = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.DebTemplate = strVal
 	case "debconf_config":
-		pkgBuild.DebConfig = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.DebConfig = strVal
 	case "install":
-		pkgBuild.Install = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Install = strVal
 	case "target_arch":
-		pkgBuild.TargetArch = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.TargetArch = strVal
 	case "build_arch":
-		pkgBuild.BuildArch = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.BuildArch = strVal
 	case "host_arch":
-		pkgBuild.HostArch = data.(string)
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.HostArch = strVal
 	default:
 		// Store unknown scalar variables (e.g. _prefix, _destdir) as custom variables
 		// and expose them as environment variables so they are available in build scripts
