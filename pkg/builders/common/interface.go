@@ -36,8 +36,8 @@ const (
 // This is set by command-line flags and used by PrepareEnvironment.
 var SkipToolchainValidation bool
 
-// depVersionRegex matches version operators in dependency strings like "gcc>=11.0".
-var depVersionRegex = regexp.MustCompile(`(?m)(<|<=|>=|=|>|<)`)
+// depVersionRegex matches version operators in dependency strings like "gcc<=11.0".
+var depVersionRegex = regexp.MustCompile(`(<=|>=|=|>|<)`)
 
 // Builder defines the common interface that all package builders must implement.
 // This unifies the behavior across different package formats (APK, DEB, RPM, Pacman).
