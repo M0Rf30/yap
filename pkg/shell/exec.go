@@ -250,7 +250,7 @@ func ExecWithContext(
 	duration := time.Since(start)
 
 	if err != nil {
-		logger.Error(i18n.T("logger.execwithcontext.error.command_execution_failed_1"),
+		logger.Debug(i18n.T("logger.execwithcontext.error.command_execution_failed_1"),
 			"command", name,
 			"args", args,
 			"dir", dir,
@@ -516,7 +516,7 @@ func ExecWithSudoContext(
 	duration := time.Since(start)
 
 	if err != nil {
-		logger.Error(i18n.T("logger.unknown.error.command_execution_failed_1"),
+		logger.Debug(i18n.T("logger.unknown.error.command_execution_failed_1"),
 			"command", name,
 			"args", args,
 			"dir", dir,
