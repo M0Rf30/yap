@@ -1,5 +1,5 @@
 // Package binary provides binary file manipulation utilities.
-package binary
+package binary //nolint:revive // intentional name; conflicts with stdlib encoding/binary but scope is unambiguous
 
 import (
 	"os"

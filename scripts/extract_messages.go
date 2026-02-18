@@ -60,7 +60,7 @@ func extractMessages(dir string) ([]Message, error) {
 
 	messageSet := make(map[string]bool) // To avoid duplicates
 
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error { //nolint:gosec
 		if err != nil {
 			return err
 		}
@@ -222,5 +222,5 @@ func writeMessagesToFile(messages []Message, filename string) error {
 	// Write to file
 	content := header + string(data)
 
-	return os.WriteFile(filename, []byte(content), 0o600)
+	return os.WriteFile(filename, []byte(content), 0o600) //nolint:gosec // filename is a trusted output path from config
 }

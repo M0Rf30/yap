@@ -284,9 +284,11 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 					if override, exists := distroOverrides["gcc"]; exists {
 						gcc = override
 					}
+
 					if override, exists := distroOverrides["g++"]; exists {
 						gpp = override
 					}
+
 					if override, exists := distroOverrides["binutils"]; exists {
 						binutils = override
 					}
@@ -295,6 +297,7 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 
 			// Determine additional packages
 			var additional []string
+
 			if archAdd, exists := archAdditional[arch]; exists {
 				if add, exists := archAdd[distro]; exists {
 					additional = add
@@ -308,6 +311,7 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 
 			// Build install commands for each distribution
 			installCommands := make(map[string]string)
+
 			switch distro {
 			case distroDebian, distroUbuntu:
 				installCommands[distro] = fmt.Sprintf("sudo apt-get install %s %s", gcc, gpp)
@@ -431,11 +435,11 @@ func ValidateToolchain(targetArch, format string) error {
 
 	msg.WriteString(i18n.T("errors.cross_compilation.toolchain_validation_failed") + "\n")
 	archFormatMsg := i18n.T("errors.cross_compilation.target_architecture_format")
-	msg.WriteString(fmt.Sprintf("%s: %s (%s)\n", archFormatMsg, targetArch, format))
+	fmt.Fprintf(&msg, "%s: %s (%s)\n", archFormatMsg, targetArch, format)
 	msg.WriteString("\n" + i18n.T("errors.cross_compilation.missing_executables") + ":\n")
 
 	for _, exe := range missing {
-		msg.WriteString(fmt.Sprintf("  - %s\n", exe))
+		fmt.Fprintf(&msg, "  - %s\n", exe)
 	}
 
 	// Get all required packages
@@ -444,24 +448,24 @@ func ValidateToolchain(targetArch, format string) error {
 		msg.WriteString("\n" + i18n.T("errors.cross_compilation.required_packages") + ":\n")
 
 		for _, pkg := range packages {
-			msg.WriteString(fmt.Sprintf("  - %s\n", pkg))
+			fmt.Fprintf(&msg, "  - %s\n", pkg)
 		}
 	}
 
 	// Add installation command if available
 	if installCmd, exists := toolchain.InstallCommands[distro]; exists {
 		msg.WriteString("\n" + i18n.T("errors.cross_compilation.installation_command") + ":\n")
-		msg.WriteString(fmt.Sprintf("  %s", installCmd))
+		fmt.Fprintf(&msg, "  %s", installCmd)
 
 		// Add additional packages if present
 		if len(toolchain.AdditionalPackages) > 0 {
 			for _, pkg := range toolchain.AdditionalPackages {
-				msg.WriteString(fmt.Sprintf(" %s", pkg))
+				fmt.Fprintf(&msg, " %s", pkg)
 			}
 		}
 
 		if toolchain.BinutilsPackage != "" {
-			msg.WriteString(fmt.Sprintf(" %s", toolchain.BinutilsPackage))
+			fmt.Fprintf(&msg, " %s", toolchain.BinutilsPackage)
 		}
 
 		msg.WriteString("\n")

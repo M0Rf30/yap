@@ -321,7 +321,7 @@ func extractFileModTimeUint32(fileInfo os.FileInfo) uint32 {
 			"time", mTime)
 	}
 
-	return uint32(mTime)
+	return uint32(mTime) //nolint:gosec // range already validated above with fatal log
 }
 
 // getRelease updates the release information with RPM distribution suffix.

@@ -406,8 +406,8 @@ func parseDependencyLine(line string) []string {
 func cleanDependencyName(dep string) string {
 	// Remove version constraints like >=1.0, <2.0, etc.
 	for _, op := range []string{">=", "<=", "=", ">", "<"} {
-		if idx := strings.Index(dep, op); idx != -1 {
-			return strings.TrimSpace(dep[:idx])
+		if before, _, ok := strings.Cut(dep, op); ok {
+			return strings.TrimSpace(before)
 		}
 	}
 

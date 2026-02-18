@@ -291,13 +291,13 @@ func createSVGContentBody(graphData *graph.Data, bounds *graph.Bounds,
 
 	// Title and subtitle
 	centerX := bounds.Width / 2
-	content.WriteString(fmt.Sprintf(`
+	fmt.Fprintf(&content, `
   <text x="%.1f" y="40" class="title-text">Dependency Graph</text>
   <text x="%.1f" y="65" class="subtitle-text">Package Dependencies and Build Order</text>`,
-		centerX, centerX))
+		centerX, centerX)
 
 	// Offset content for title
-	content.WriteString(fmt.Sprintf(`<g transform="translate(0, %.1f)">`, titleHeight))
+	fmt.Fprintf(&content, `<g transform="translate(0, %.1f)">`, titleHeight)
 
 	// Draw edges and nodes
 	addEdges(&content, graphData, showExternal)

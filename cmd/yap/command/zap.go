@@ -61,6 +61,7 @@ var zapCmd = &cobra.Command{
 		}
 
 		logger.Info(i18n.T("logger.zap.done"), "distro", distro, "release", release)
+
 		return nil
 	},
 }

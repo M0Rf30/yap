@@ -146,6 +146,8 @@
   translation: "Skip building packages (prepare only)"
 - id: flags.build.nomakedeps
   translation: "Skip make dependencies installation"
+- id: flags.build.parallel
+  translation: "Enable parallel dependency resolution and concurrent package building"
 - id: flags.build.pkgrel
   translation: "Override package release number"
 - id: flags.build.pkgver

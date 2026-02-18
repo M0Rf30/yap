@@ -1,5 +1,5 @@
 // Package parser provides PKGBUILD parsing and processing functionality.
-package parser
+package parser //nolint:revive // intentional name; conflicts with stdlib go/parser but scope is unambiguous
 
 import (
 	"maps"
