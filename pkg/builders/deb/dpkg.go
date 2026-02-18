@@ -2,6 +2,7 @@ package deb
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -136,6 +137,41 @@ func addArFile(writer *ar.Writer, name string, body []byte, date time.Time) erro
 	return err
 }
 
+// addArFileFromPath streams a file from disk into the ar archive without
+// reading the entire file into memory.
+func addArFileFromPath(writer *ar.Writer, name string, filePath string, modtime time.Time) error {
+	f, err := os.Open(filepath.Clean(filePath))
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			logger.Warn("failed to close file", "path", filePath, "error", cerr)
+		}
+	}()
+
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	hdr := &ar.Header{
+		Name:    name,
+		ModTime: modtime,
+		Mode:    0o644,
+		Size:    info.Size(),
+	}
+
+	if err := writer.WriteHeader(hdr); err != nil {
+		return err
+	}
+
+	_, err = io.Copy(writer, f)
+
+	return err
+}
+
 // addScriptlets generates and writes the scripts for the Deb package.
 // It takes no parameters and returns an error if there was an issue
 // generating or writing the scripts.
@@ -260,20 +296,6 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		}
 	}()
 
-	cleanFilePath = filepath.Clean(control)
-
-	controlArchive, err := os.ReadFile(cleanFilePath)
-	if err != nil {
-		return err
-	}
-
-	cleanFilePath = filepath.Clean(data)
-
-	dataArchive, err := os.ReadFile(cleanFilePath)
-	if err != nil {
-		return err
-	}
-
 	writer := ar.NewWriter(debPackage)
 
 	err = writer.WriteGlobalHeader()
@@ -291,18 +313,12 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	err = addArFile(writer,
-		controlFilename,
-		controlArchive,
-		modtime)
+	err = addArFileFromPath(writer, controlFilename, control, modtime)
 	if err != nil {
 		return err
 	}
 
-	err = addArFile(writer,
-		dataFilename,
-		dataArchive,
-		modtime)
+	err = addArFileFromPath(writer, dataFilename, data, modtime)
 	if err != nil {
 		return err
 	}
