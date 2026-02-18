@@ -227,9 +227,12 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 
 // asRPMDirectory creates an RPMFile object for a directory based on the provided Entry.
 // It retrieves the directory's modification time and sets the appropriate fields in the RPMFile.
-func asRPMDirectory(entry *files.Entry) *rpmpack.RPMFile {
+func asRPMDirectory(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	// Get file information for the directory specified in the entry.
-	fileInfo, _ := os.Stat(filepath.Clean(entry.Source))
+	fileInfo, err := os.Stat(filepath.Clean(entry.Source))
+	if err != nil {
+		return nil, fmt.Errorf("stat directory %q: %w", entry.Source, err)
+	}
 
 	// Retrieve the modification time of the directory.
 	mTime := extractFileModTimeUint32(fileInfo)
@@ -242,7 +245,7 @@ func asRPMDirectory(entry *files.Entry) *rpmpack.RPMFile {
 		MTime: mTime,  // Set the modification time.
 		Owner: "root", // Set the owner to "root".
 		Group: "root", // Set the group to "root".
-	}
+	}, nil
 }
 
 // asRPMFile creates an RPMFile object for a regular file based on the provided Entry.
@@ -257,7 +260,11 @@ func asRPMFile(
 	}
 
 	cleanFilePath := filepath.Clean(entry.Source)
-	fileInfo, _ := os.Stat(cleanFilePath)
+
+	fileInfo, err := os.Stat(cleanFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("stat file %q: %w", entry.Source, err)
+	}
 
 	// Retrieve the modification time of the file.
 	mTime := extractFileModTimeUint32(fileInfo)
@@ -276,10 +283,18 @@ func asRPMFile(
 
 // asRPMSymlink creates an RPMFile object for a symbolic link based on the provided Entry.
 // It retrieves the link's target and modification time.
-func asRPMSymlink(entry *files.Entry) *rpmpack.RPMFile {
+func asRPMSymlink(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	cleanFilePath := filepath.Clean(entry.Source)
-	fileInfo, _ := os.Lstat(cleanFilePath) // Use Lstat to get information about the symlink.
-	body, _ := os.Readlink(cleanFilePath)  // Read the target of the symlink.
+
+	fileInfo, err := os.Lstat(cleanFilePath) // Use Lstat to get information about the symlink.
+	if err != nil {
+		return nil, fmt.Errorf("lstat symlink %q: %w", entry.Source, err)
+	}
+
+	body, err := os.Readlink(cleanFilePath) // Read the target of the symlink.
+	if err != nil {
+		return nil, fmt.Errorf("readlink %q: %w", entry.Source, err)
+	}
 
 	// Retrieve the modification time of the symlink.
 	mTime := extractFileModTimeUint32(fileInfo)
@@ -292,7 +307,7 @@ func asRPMSymlink(entry *files.Entry) *rpmpack.RPMFile {
 		MTime: mTime,               // Set the modification time.
 		Owner: "root",              // Set the owner to "root".
 		Group: "root",              // Set the group to "root".
-	}
+	}, nil
 }
 
 // createRPMFile converts an Entry object into an RPMFile object based on its type.
@@ -306,9 +321,9 @@ func createRPMFile(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	case files.TypeConfigNoReplace:
 		file, err = asRPMFile(entry, rpmpack.ConfigFile|rpmpack.NoReplaceFile)
 	case files.TypeSymlink:
-		file = asRPMSymlink(entry)
+		file, err = asRPMSymlink(entry)
 	case files.TypeDir:
-		file = asRPMDirectory(entry)
+		file, err = asRPMDirectory(entry)
 	case files.TypeFile:
 		file, err = asRPMFile(entry, rpmpack.GenericFile)
 	}
