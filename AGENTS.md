@@ -57,6 +57,7 @@ yap graph <project-path>                       # Show dependency graph
 # Package operations  
 yap build --skip-sync <project-path>           # Skip dependency sync (faster)
 yap build --cleanbuild <project-path>          # Clean source before build
+yap build --parallel <project-path>            # Enable parallel dep-aware topo-sort (opt-in)
 ```
 
 
@@ -427,7 +428,7 @@ yap build arch examples/yap           # Arch Linux
 ### Performance Considerations
 - Use `--skip-sync` for faster development builds
 - Container image caching improves build times
-- Parallel builds when possible (dependency-aware)
+- Sequential builds are the default; use `--parallel` (`-P`) to enable dependency-aware topo-sort with worker pools
 - Use `--cleanbuild` flag to clean source directory before builds
 
 ## Current Development Focus
@@ -443,6 +444,7 @@ yap build arch examples/yap           # Arch Linux
 - ✅ Integrated custom archives library for APK support
 - ✅ Documented APK format requirements and gaps
 - ✅ **Consolidated architecture handling and cross-compilation logging (2025-11-14)**
+- ✅ **Sequential build as default; `--parallel` / `-P` flag for opt-in parallel dep resolution (2026-02-18)**
 
 ### Architectural Decisions
 
