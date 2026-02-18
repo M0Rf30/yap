@@ -47,6 +47,7 @@ type Config struct {
 	FromPkgName             string // Specifies the source package name for transformation
 	ToPkgName               string // Specifies the target package name for transformation
 	TargetArch              string // Specifies the target architecture for cross-compilation
+	Parallel                bool   // Enables parallel dependency resolution and concurrent building
 
 	// Internal state
 	singleProject  bool          //nolint:unused // Reserved for future migration
@@ -77,6 +78,9 @@ var (
 	ToPkgName string
 	// TargetArch specifies the target architecture for cross-compilation
 	TargetArch string
+	// Parallel enables parallel dependency resolution and concurrent package building.
+	// When false (default), packages are built sequentially respecting "install" flags.
+	Parallel bool
 
 	// Global state variables
 	singleProject  bool
@@ -169,26 +173,30 @@ type Project struct {
 	HasToInstall   bool   `json:"install" validate:""`
 }
 
-// BuildAll builds all the projects in the MultipleProject struct with optimizations.
-//
-// It compiles each project's package and creates the necessary packages.
-// Uses proper dependency-aware parallel processing to improve performance.
-// If the project has to be installed, it installs the package.
-// If ToPkgName is not empty, it stops building after the specified package.
-// It returns an error if any error occurs during the build process.
+// BuildAll builds all projects in the correct order.
+// When Parallel is false (default), projects are built sequentially in file order;
+// packages with HasToInstall set are installed immediately after being built.
+// When Parallel is true, a topological sort determines build order and packages
+// are built concurrently using a worker pool.
 func (mpc *MultipleProject) BuildAll() error {
 	if !singleProject {
 		mpc.checkPkgsRange(FromPkgName, ToPkgName)
 	}
 
-	// Show verbose dependency information automatically via debug logging
+	// Show verbose dependency information at debug level regardless of build mode.
+	// In sequential mode this is informational only; resolution happens in the parallel path.
 	mpc.displayVerboseDependencyInfo()
 
-	// Filter projects based on --from and --to flags before building dependency graph
+	// Filter projects based on --from and --to flags before building
 	projectsToProcess := mpc.getProjectsInRange()
 
-	// Build dependency graph and get topologically sorted build order
-	// Only consider dependencies within the filtered project set
+	if !Parallel {
+		// Default: sequential build in file order.
+		// Packages with "install": true are installed immediately after building.
+		return mpc.buildProjectsSequential(projectsToProcess)
+	}
+
+	// Parallel path: dependency-aware topological sort + worker pools
 	buildOrder, err := mpc.resolveDependencies(projectsToProcess)
 	if err != nil {
 		return err
@@ -360,6 +368,48 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 	for err := range errorChan {
 		if err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// buildProjectsSequential builds projects one at a time in the order they appear
+// in the project list (file order from yap.json). If a project has HasToInstall set,
+// it is installed immediately after building, before the next project is processed.
+// This is the default (v1-compatible) build mode.
+func (mpc *MultipleProject) buildProjectsSequential(projects []*Project) error {
+	for _, proj := range projects {
+		pkgName := proj.Builder.PKGBUILD.PkgName
+
+		logger.Debug(i18n.T("logger.creating_package"),
+			"package", pkgName,
+			"version", proj.Builder.PKGBUILD.PkgVer,
+			"release", proj.Builder.PKGBUILD.PkgRel)
+
+		if err := proj.Builder.Compile(NoBuild); err != nil {
+			return err
+		}
+
+		if !NoBuild {
+			if err := mpc.createPackage(proj); err != nil {
+				return err
+			}
+
+			if proj.HasToInstall {
+				if err := mpc.installPackage(proj); err != nil {
+					return err
+				}
+			}
+		}
+
+		// ToPkgName is also enforced by getProjectsInRange, but we check here to log
+		// the stopping event, consistent with other build loop implementations.
+		if ToPkgName != "" && pkgName == ToPkgName {
+			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
+				"target_package", ToPkgName)
+
+			return nil
 		}
 	}
 

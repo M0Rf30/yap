@@ -147,6 +147,8 @@
   translation: "Salta la compilazione dei pacchetti (solo preparazione)"
 - id: flags.build.nomakedeps
   translation: "Salta l'installazione delle dipendenze di make"
+- id: flags.build.parallel
+  translation: "Abilita risoluzione parallela delle dipendenze e build concorrente"
 - id: flags.build.pkgrel
   translation: "Sovrascrive il numero di rilascio del pacchetto"
 - id: flags.build.pkgver

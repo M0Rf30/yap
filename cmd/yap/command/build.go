@@ -66,6 +66,7 @@ var buildCmd = &cobra.Command{
 
 		// Initialize MultipleProject
 		mpc := project.MultipleProject{}
+
 		err = mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
 			// Enhanced error logging with context
@@ -76,6 +77,7 @@ var buildCmd = &cobra.Command{
 				logger.Error(i18n.T("logger.build.project_init_failed"), "error", err)
 				return err
 			}
+
 			return err
 		}
 
@@ -94,10 +96,12 @@ var buildCmd = &cobra.Command{
 				logger.Error(i18n.T("logger.build.build_failed"), "error", err)
 				return err
 			}
+
 			return err
 		}
 
 		logger.Info(i18n.T("logger.build.build_completed"))
+
 		return nil
 	},
 }
@@ -137,6 +141,7 @@ func InitializeBuildDescriptions() {
 	buildCmd.Flag("nomakedeps").Usage = i18n.T("flags.build.nomakedeps")
 	buildCmd.Flag("skip-sync").Usage = i18n.T("flags.build.skip_sync")
 	buildCmd.Flag("skip-toolchain-validation").Usage = i18n.T("flags.build.skip_toolchain_validation")
+	buildCmd.Flag("parallel").Usage = i18n.T("flags.build.parallel")
 	buildCmd.Flag("pkgver").Usage = i18n.T("flags.build.pkgver")
 	buildCmd.Flag("pkgrel").Usage = i18n.T("flags.build.pkgrel")
 	buildCmd.Flag("ssh-password").Usage = i18n.T("flags.build.ssh_password")
@@ -187,6 +192,8 @@ func init() {
 		"skip-sync", "s", false, "")
 	buildCmd.Flags().BoolVarP(&project.SkipToolchainValidation,
 		"skip-toolchain-validation", "", false, "")
+	buildCmd.Flags().BoolVarP(&project.Parallel,
+		"parallel", "P", false, "")
 
 	// VERSION CONTROL FLAGS
 	buildCmd.PersistentFlags().StringVarP(&parser.OverridePkgVer,
