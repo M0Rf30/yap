@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -433,15 +432,5 @@ func TestAddScriptlets(t *testing.T) {
 		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 			t.Errorf("Script %s was not created", script)
 		}
-	}
-}
-
-func TestGetCurrentBuildTime(t *testing.T) {
-	before := time.Now()
-	modTime := getCurrentBuildTime()
-	after := time.Now()
-
-	if modTime.Before(before) || modTime.After(after) {
-		t.Error("getCurrentBuildTime returned time outside expected range")
 	}
 }

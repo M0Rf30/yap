@@ -303,7 +303,7 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	modtime := getCurrentBuildTime()
+	modtime := time.Now()
 
 	err = addArFile(writer,
 		binaryFilename,
@@ -392,12 +392,6 @@ func (d *Package) createDebResources() error {
 	}
 
 	return nil
-}
-
-// getCurrentBuildTime returns the current local time for package timestamping.
-// It uses the time.Now() function from the time package to retrieve the current time.
-func getCurrentBuildTime() time.Time {
-	return time.Now()
 }
 
 // getRelease updates the package release with distribution-specific suffix.
