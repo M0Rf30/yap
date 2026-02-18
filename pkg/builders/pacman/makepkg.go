@@ -1,3 +1,4 @@
+// Package pacman provides functionality for building Arch Linux (.pkg.tar.zst) packages from PKGBUILD specifications.
 package pacman
 
 import (

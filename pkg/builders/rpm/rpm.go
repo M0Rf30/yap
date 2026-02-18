@@ -1,3 +1,4 @@
+// Package rpm provides functionality for building RPM packages from PKGBUILD specifications.
 package rpm
 
 import (

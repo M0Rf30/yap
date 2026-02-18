@@ -1,3 +1,4 @@
+// Package deb provides functionality for building Debian (.deb) packages from PKGBUILD specifications.
 package deb
 
 import (
