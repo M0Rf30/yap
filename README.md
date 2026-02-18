@@ -31,7 +31,8 @@ YAP eliminates the need to learn multiple packaging formats and build systems by
 
 ### 🔧 **Advanced Build Features**
 - **Dependency-Aware Building**: Intelligent build ordering based on dependencies
-- **Parallel Builds**: Multi-package builds with optimal parallelization
+- **Sequential Builds by Default**: Predictable file-order builds using the `"install"` flag for inter-package ordering
+- **Parallel Builds (opt-in)**: Enable dependency-aware topo-sort with worker pools via `--parallel`
 - **Component Logging**: Clear, tagged logging for complex build processes
 - **Enhanced PKGBUILD Support**: Extended syntax with custom variables and arrays
 - **Cross-Distribution Variables**: Distribution-specific configurations in single file
@@ -509,6 +510,7 @@ yap build --zap                  # Deep clean staging directory
 # Dependency management
 yap build --nomakedeps           # Skip makedeps installation
 yap build --skip-sync            # Skip package manager sync
+yap build --parallel             # Enable parallel dependency resolution (opt-in)
 
 # Version control
 yap build --pkgver 1.2.3         # Override package version
@@ -610,21 +612,31 @@ Build multiple related packages with dependency management:
   "projects": [
     {
       "name": "core-library",
-      "depends": []
+      "install": true
     },
     {
       "name": "main-application",
-      "depends": ["core-library"]
+      "install": true
     },
     {
       "name": "plugins",
-      "depends": ["main-application"]
+      "install": false
     }
   ]
 }
 ```
 
-YAP will build packages in the correct order, installing dependencies as needed.
+By default YAP builds packages **sequentially in file order**. Packages with `"install": true` are installed immediately after building so subsequent packages can use them as build-time dependencies.
+
+To enable automatic dependency-aware topological ordering with parallel workers, pass `--parallel`:
+
+```bash
+# Sequential (default) — explicit install ordering via "install" field
+yap build .
+
+# Parallel — topo-sort + worker pool, install targets auto-derived from deps
+yap build --parallel .
+```
 
 ### Build Environment Preparation
 
