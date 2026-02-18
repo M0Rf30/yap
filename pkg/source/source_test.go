@@ -494,16 +494,16 @@ func TestFilename(t *testing.T) {
 func TestGlobalVariables(t *testing.T) {
 	t.Parallel()
 
-	// Test that global variables can be set
-	originalPassword := SSHPassword
+	// Test that the SSH password accessor functions work correctly.
+	originalPassword := GetSSHPassword()
 
 	defer func() {
-		SSHPassword = originalPassword
+		SetSSHPassword(originalPassword)
 	}()
 
 	testPassword := "test-password"
-	SSHPassword = testPassword
-	assert.Equal(t, testPassword, SSHPassword)
+	SetSSHPassword(testPassword)
+	assert.Equal(t, testPassword, GetSSHPassword())
 
 	// Test that download mutexes map is initialized
 	assert.NotNil(t, downloadMutexes)
