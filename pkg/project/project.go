@@ -425,12 +425,7 @@ func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, work
 		"package", pkgName,
 		"worker_id", workerID)
 
-	// Type assert to access BaseBuilder methods
-	type installOrExtractor interface {
-		InstallOrExtract(artifactsPath, buildDir, targetArch string) error
-	}
-
-	if installer, ok := proj.PackageManager.(installOrExtractor); ok {
+	if installer, ok := proj.PackageManager.(packer.InstallOrExtractor); ok {
 		err := installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
 		if err != nil {
 			logger.Error(
@@ -1390,11 +1385,7 @@ func (mpc *MultipleProject) installPackage(proj *Project) error {
 	logger.Info(i18n.T("logger.installing_package"), "package", pkgName)
 
 	// Use InstallOrExtract to handle both native and cross-compilation builds
-	type installOrExtractor interface {
-		InstallOrExtract(artifactsPath, buildDir, targetArch string) error
-	}
-
-	if installer, ok := proj.PackageManager.(installOrExtractor); ok {
+	if installer, ok := proj.PackageManager.(packer.InstallOrExtractor); ok {
 		err := installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
 		if err != nil {
 			logger.Error(

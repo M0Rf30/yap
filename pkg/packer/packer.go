@@ -13,6 +13,12 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
+// InstallOrExtractor is implemented by package builders that can install
+// or extract artifacts into a target directory.
+type InstallOrExtractor interface {
+	InstallOrExtract(artifactsPath, buildDir, targetArch string) error
+}
+
 // Packer is the common interface implemented by all package managers.
 type Packer interface {
 	// BuildPackage starts the package building process and writes the final artifact
