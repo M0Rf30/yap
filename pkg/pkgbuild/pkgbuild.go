@@ -549,7 +549,7 @@ func (pkgBuild *PKGBUILD) prependLibraryPaths(stagingRoot string) error {
 
 // ValidateGeneral checks that mandatory items are correctly provided by the PKGBUILD
 // file.
-func (pkgBuild *PKGBUILD) ValidateGeneral() {
+func (pkgBuild *PKGBUILD) ValidateGeneral() error {
 	var checkErrors []string
 
 	// Validate license
@@ -578,15 +578,18 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() {
 			"pkgname", pkgBuild.PkgName)
 	}
 
-	// Exit if there are validation errors
+	// Return error if there are validation errors
 	if len(checkErrors) > 0 {
-		os.Exit(1)
+		return fmt.Errorf("pkgbuild validation failed for %q: %s",
+			pkgBuild.PkgName, strings.Join(checkErrors, ", "))
 	}
+
+	return nil
 }
 
 // ValidateMandatoryItems checks that mandatory items are correctly provided by the PKGBUILD
 // file.
-func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
+func (pkgBuild *PKGBUILD) ValidateMandatoryItems() error {
 	var validationErrors []string
 
 	// Check mandatory variables
@@ -603,13 +606,12 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
 		}
 	}
 
-	// Exit if there are validation errors
+	// Return error if there are validation errors
 	if len(validationErrors) > 0 {
-		logger.Fatal(
-			"failed to set variables",
-			"variables",
-			strings.Join(validationErrors, " "))
+		return fmt.Errorf("missing mandatory variables: %s", strings.Join(validationErrors, ", "))
 	}
+
+	return nil
 }
 
 // mapArrays reads an array name and its content and maps them to the PKGBUILD
