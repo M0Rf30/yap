@@ -32,6 +32,25 @@ const (
 	dependsKey = "depends"
 )
 
+// Priority constants for PKGBUILD directive matching.
+// Higher values indicate a more specific (and therefore preferred) match.
+const (
+	// prioritySkip means this directive does not apply to the current system.
+	prioritySkip = -1
+	// priorityBase is the default priority for non-qualified directives.
+	priorityBase = 0
+	// priorityPackagerMatch is for directives matching the package manager (e.g. "apt").
+	priorityPackagerMatch = 1
+	// priorityDistroMatch is for directives matching the distro name (e.g. "ubuntu").
+	priorityDistroMatch = 2
+	// priorityFullDistroMatch is for directives matching distro+codename (e.g. "ubuntu_jammy").
+	priorityFullDistroMatch = 3
+	// priorityArchMatch is for architecture-specific directives.
+	priorityArchMatch = 4
+	// priorityArchDistroBoost is added to distro priority for arch+distro combined directives.
+	priorityArchDistroBoost = 4
+)
+
 // PKGBUILD defines all the fields accepted by the yap specfile (variables,
 // arrays, functions).
 // templating and other rpm/deb descriptors.
@@ -996,16 +1015,16 @@ func (pkgBuild *PKGBUILD) parseCombinedArchDistro(input string) (
 
 	currentArch := platform.GetArchitecture()
 	if possibleArch != currentArch {
-		return key, -1, true // Invalid architecture for current system
+		return key, prioritySkip, true // Invalid architecture for current system
 	}
 
 	// Check distribution part
 	distPriority := pkgBuild.getDistributionPriority(distributionPart)
-	if distPriority > 0 {
-		return key, distPriority + 4, true // Add 4 to boost arch+distro combinations
+	if distPriority > priorityBase {
+		return key, distPriority + priorityArchDistroBoost, true // Add boost for arch+distro combinations
 	}
 
-	return key, -1, true
+	return key, prioritySkip, true
 }
 
 // parseArchitectureOnly handles architecture-specific syntax
@@ -1030,10 +1049,10 @@ func (pkgBuild *PKGBUILD) parseArchitectureOnly(input string) (
 
 	currentArch := platform.GetArchitecture()
 	if possibleArch == currentArch {
-		return key, 4, true // Higher priority than distribution-specific
+		return key, priorityArchMatch, true // Higher priority than distribution-specific
 	}
 
-	return key, -1, true // Invalid architecture for current system
+	return key, prioritySkip, true // Invalid architecture for current system
 }
 
 // parseDistributionOnly handles distribution-only syntax
@@ -1044,15 +1063,15 @@ func (pkgBuild *PKGBUILD) parseDistributionOnly(input string) (
 	key = split[0]
 
 	if len(split) == 1 {
-		return key, 0, nil
+		return key, priorityBase, nil
 	}
 
 	if len(split) != 2 {
-		return key, 0, fmt.Errorf(i18n.T("errors.pkgbuild.invalid_directive_use"), input)
+		return key, priorityBase, fmt.Errorf(i18n.T("errors.pkgbuild.invalid_directive_use"), input)
 	}
 
 	if pkgBuild.FullDistroName == "" {
-		return key, 0, nil
+		return key, priorityBase, nil
 	}
 
 	directive := split[1]
@@ -1065,15 +1084,15 @@ func (pkgBuild *PKGBUILD) parseDistributionOnly(input string) (
 func (pkgBuild *PKGBUILD) getDistributionPriority(directive string) int {
 	switch {
 	case directive == pkgBuild.FullDistroName:
-		return 3
+		return priorityFullDistroMatch
 	case constants.DistrosSet.Contains(directive) &&
 		directive == pkgBuild.Distro:
-		return 2
+		return priorityDistroMatch
 	case constants.PackagersSet.Contains(directive) &&
 		directive == constants.DistroPackageManager[pkgBuild.Distro]:
-		return 1
+		return priorityPackagerMatch
 	default:
-		return -1
+		return prioritySkip
 	}
 }
 
