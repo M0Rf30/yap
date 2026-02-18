@@ -103,14 +103,14 @@ go test -timeout 30s ./pkg/download/...
 ```go
 // Use typed errors from pkg/errors
 if err := operation(); err != nil {
-    return errors.Wrap(err, "failed to perform operation").
+    return errors.Wrap(err, errors.ErrTypeBuild, "failed to perform operation").
         WithOperation("BuildPackage").
-        WithComponent("builder")
+        WithContext("config_path", configPath)
 }
 
 // Add context to errors
-return errors.New("invalid configuration").
-    WithField("config_path", configPath).
+return errors.New(errors.ErrTypeConfiguration, "invalid configuration").
+    WithContext("config_path", configPath).
     WithOperation("LoadConfig")
 ```
 
