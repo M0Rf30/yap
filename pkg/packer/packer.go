@@ -53,7 +53,7 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	// Get configuration for the package manager
 	config := core.GetConfig(pkgManager)
 	if config == nil {
-		logger.Fatal(i18n.T("errors.packer.unsupported_package_manager"), "manager", pkgManager)
+		logger.Fatal(i18n.T("errors.packer.unsupported_package_manager"), "distro", distro)
 		return nil
 	}
 

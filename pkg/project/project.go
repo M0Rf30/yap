@@ -421,26 +421,14 @@ func (mpc *MultipleProject) buildProjectsSequential(projects []*Project) error {
 // doInstallOrExtract performs the actual package installation or extraction.
 // It uses InstallOrExtract when available (handles both native and cross-compilation builds),
 // falling back to Install for package managers that don't implement InstallOrExtractor.
-func (mpc *MultipleProject) doInstallOrExtract(proj *Project, pkgName string) error {
+func (mpc *MultipleProject) doInstallOrExtract(proj *Project) error {
 	if installer, ok := proj.PackageManager.(packer.InstallOrExtractor); ok {
-		err := installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
-		if err != nil {
-			logger.Error(
-				i18n.T("logger.project.package_installation_failed"),
-				"package", pkgName,
-				"error", err)
-
+		if err := installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch); err != nil {
 			return err
 		}
 	} else {
 		// Fallback to regular Install if InstallOrExtract not available
-		err := proj.PackageManager.Install(mpc.Output)
-		if err != nil {
-			logger.Error(
-				i18n.T("logger.project.package_installation_failed"),
-				"package", pkgName,
-				"error", err)
-
+		if err := proj.PackageManager.Install(mpc.Output); err != nil {
 			return err
 		}
 	}
@@ -455,7 +443,7 @@ func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, work
 		"package", pkgName,
 		"worker_id", workerID)
 
-	if err := mpc.doInstallOrExtract(proj, pkgName); err != nil {
+	if err := mpc.doInstallOrExtract(proj); err != nil {
 		return err
 	}
 
@@ -1395,7 +1383,7 @@ func (mpc *MultipleProject) installPackage(proj *Project) error {
 	pkgName := proj.Builder.PKGBUILD.PkgName
 	logger.Info(i18n.T("logger.installing_package"), "package", pkgName)
 
-	if err := mpc.doInstallOrExtract(proj, pkgName); err != nil {
+	if err := mpc.doInstallOrExtract(proj); err != nil {
 		return err
 	}
 

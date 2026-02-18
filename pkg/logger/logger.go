@@ -47,7 +47,7 @@ const (
 var (
 	// MultiPrinter is the default multiprinter for concurrent logging.
 	MultiPrinter = pterm.DefaultMultiPrinter
-	// ptermLogger is the underlying pterm logger configured for yap with uniform color scheme
+	// ptermLogger is the underlying pterm logger configured for yap with uniform color scheme.
 	ptermLogger = pterm.DefaultLogger.
 			WithLevel(pterm.LogLevelTrace).
 			WithWriter(MultiPrinter.Writer).

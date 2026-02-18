@@ -57,31 +57,27 @@ var buildCmd = &cobra.Command{
 		if distro == "" {
 			osRelease, _ := platform.ParseOSRelease()
 			distro = osRelease.ID
-			logger.Warn(i18n.T("logger.build.no_distribution_specified"),
-				"distro", distro)
+			logger.Warn(i18n.T("logger.build.no_distribution_specified"), "distro", distro)
 		} else {
-			logger.Info(i18n.T("logger.build.building_for_distribution"),
-				"distro", distro, "release", release)
+			args := []any{"distro", distro}
+			if release != "" {
+				args = append(args, "release", release)
+			}
+
+			args = append(args, "path", fullJSONPath)
+			logger.Info(i18n.T("logger.build.building_for_distribution"), args...)
 		}
-
-		// Show project path
-		logger.Info(i18n.T("logger.build.project_path"), "path", fullJSONPath)
-
-		// Initialize project with timestamp logging
-		logger.Info(i18n.T("logger.build.initializing_project"))
 
 		// Initialize MultipleProject
 		mpc := project.MultipleProject{}
 
 		err = mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
-			// Enhanced error logging with context
 			var yapErr *yapErrors.YapError
 			if errors.As(err, &yapErr) {
 				logStructuredError(yapErr)
 			} else {
-				logger.Error(i18n.T("logger.build.project_init_failed"), "error", err)
-				return err
+				logger.Fatal(i18n.T("logger.build.project_init_failed"), "error", err)
 			}
 
 			return err
@@ -94,13 +90,11 @@ var buildCmd = &cobra.Command{
 
 		err = mpc.BuildAll()
 		if err != nil {
-			// Enhanced error logging with context
 			var yapErr *yapErrors.YapError
 			if errors.As(err, &yapErr) {
 				logStructuredError(yapErr)
 			} else {
-				logger.Error(i18n.T("logger.build.build_failed"), "error", err)
-				return err
+				logger.Fatal(i18n.T("logger.build.build_failed"), "error", err)
 			}
 
 			return err
@@ -112,25 +106,40 @@ var buildCmd = &cobra.Command{
 	},
 }
 
-// logStructuredError logs structured YapError with detailed context.
+// logStructuredError logs a concise fatal build error.
 func logStructuredError(yapErr *yapErrors.YapError) {
-	args := []any{"error_type", yapErr.Type, "message", yapErr.Message}
+	pkg, _ := yapErr.Context["package"].(string)
+	ver, _ := yapErr.Context["version"].(string)
+	rel, _ := yapErr.Context["release"].(string)
+	stage, _ := yapErr.Context["stage"].(string)
 
-	if yapErr.Operation != "" {
-		args = append(args, "operation", yapErr.Operation)
-	}
+	parts := []string{i18n.T("logger.build.build_failed")}
 
-	if yapErr.Context != nil {
-		for key, value := range yapErr.Context {
-			args = append(args, key, value)
+	if pkg != "" {
+		coord := pkg
+		if ver != "" {
+			coord += " " + ver
+			if rel != "" {
+				coord += "-" + rel
+			}
 		}
+
+		parts = append(parts, coord)
 	}
+
+	if stage != "" {
+		parts = append(parts, "(stage: "+stage+")")
+	} else if yapErr.Operation != "" {
+		parts = append(parts, "("+yapErr.Operation+")")
+	}
+
+	msg := strings.Join(parts, ": ")
 
 	if yapErr.Cause != nil {
-		args = append(args, "underlying_error", yapErr.Cause.Error())
+		msg += " — " + yapErr.Cause.Error()
 	}
 
-	logger.Fatal(i18n.T("logger.build.build_failed"), args...)
+	logger.Fatal(msg)
 }
 
 // InitializeBuildDescriptions sets the localized descriptions for the build command.
