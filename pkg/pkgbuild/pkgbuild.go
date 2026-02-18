@@ -505,15 +505,25 @@ func (pkgBuild *PKGBUILD) prependIncludePaths(stagingRoot string) error {
 		filepath.Join(stagingRoot, "opt", "zextras", "common", "include"),
 	}
 
+	// Build include flags separately
+	var includeFlags string
 	for _, path := range stagingPaths {
-		cflags = "-I" + path + " " + cflags
+		includeFlags = "-I" + path + " " + includeFlags
 	}
 
-	if err := os.Setenv("CFLAGS", cflags); err != nil {
+	includeFlags = strings.TrimSpace(includeFlags)
+
+	// CFLAGS gets include flags prepended to existing CFLAGS
+	newCflags := strings.TrimSpace(includeFlags + " " + cflags)
+	if err := os.Setenv("CFLAGS", newCflags); err != nil {
 		return err
 	}
 
-	return os.Setenv("CPPFLAGS", cflags)
+	// CPPFLAGS gets include flags prepended to existing CPPFLAGS (NOT CFLAGS)
+	existingCPPFLAGS := os.Getenv("CPPFLAGS")
+	newCPPFLAGS := strings.TrimSpace(includeFlags + " " + existingCPPFLAGS)
+
+	return os.Setenv("CPPFLAGS", newCPPFLAGS)
 }
 
 // prependLibraryPaths adds staging directory library paths to LDFLAGS and LD_LIBRARY_PATH.
