@@ -351,7 +351,11 @@ func (d *Package) createDebResources() error {
 		return err
 	}
 
-	size, _ := files.GetDirSize(d.PKGBUILD.PackageDir)
+	size, err := files.GetDirSize(d.PKGBUILD.PackageDir)
+	if err != nil {
+		return fmt.Errorf("failed to get package dir size: %w", err)
+	}
+
 	d.PKGBUILD.InstalledSize = size / 1024
 	d.PKGBUILD.Depends = d.ProcessDependencies(d.PKGBUILD.Depends)
 	d.PKGBUILD.MakeDepends = d.ProcessDependencies(d.PKGBUILD.MakeDepends)
