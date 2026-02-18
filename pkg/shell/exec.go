@@ -221,7 +221,7 @@ func Exec(excludeStdout bool, dir, name string, args ...string) error {
 func ExecWithContext(
 	ctx context.Context, excludeStdout bool, dir, name string, args ...string,
 ) error {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 //nolint:gosec -- internal build system cmd
 
 	if !excludeStdout {
 		_, err := MultiPrinter.Start()
@@ -486,7 +486,7 @@ func ExecWithSudoContext(
 
 		logger.Debug(i18n.T("logger.shell.debug.exec_sudo"), "command", name, "args", args, "dir", dir)
 	} else {
-		cmd = exec.CommandContext(ctx, name, args...)
+		cmd = exec.CommandContext(ctx, name, args...) // #nosec G204 //nolint:gosec -- internal build system cmd
 		logger.Debug(i18n.T("logger.shell.debug.exec_sudo_cmd"),
 			"command", name, "args", args, "dir", dir)
 	}

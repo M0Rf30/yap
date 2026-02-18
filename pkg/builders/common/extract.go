@@ -137,14 +137,14 @@ func extractDEB(packagePath, stagingRoot string) error {
 			// Copy data.tar to temp file
 			if _, err := io.Copy(tmpFile, arReader); err != nil {
 				_ = tmpFile.Close()
-				_ = os.Remove(dataTarPath) //nolint:gosec // path comes from os.CreateTemp, not user input
+				_ = os.Remove(dataTarPath) // #nosec G703 -- path comes from os.CreateTemp, not user input //nolint:gosec
 
 				return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write temp file").
 					WithOperation("extractDEB")
 			}
 
 			if err := tmpFile.Close(); err != nil {
-				_ = os.Remove(dataTarPath) //nolint:gosec // path comes from os.CreateTemp, not user input
+				_ = os.Remove(dataTarPath) // #nosec G703 -- path comes from os.CreateTemp, not user input //nolint:gosec
 
 				return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to close temp file").
 					WithOperation("extractDEB")

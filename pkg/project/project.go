@@ -418,13 +418,10 @@ func (mpc *MultipleProject) buildProjectsSequential(projects []*Project) error {
 	return nil
 }
 
-// installPackageForWorker handles package installation or extraction for a worker.
-// It uses InstallOrExtract to handle both native builds (install) and cross-compilation (extract).
-func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, workerID string) error {
-	logger.Info(i18n.T("logger.installing_package"),
-		"package", pkgName,
-		"worker_id", workerID)
-
+// doInstallOrExtract performs the actual package installation or extraction.
+// It uses InstallOrExtract when available (handles both native and cross-compilation builds),
+// falling back to Install for package managers that don't implement InstallOrExtractor.
+func (mpc *MultipleProject) doInstallOrExtract(proj *Project, pkgName string) error {
 	if installer, ok := proj.PackageManager.(packer.InstallOrExtractor); ok {
 		err := installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
 		if err != nil {
@@ -446,6 +443,20 @@ func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, work
 
 			return err
 		}
+	}
+
+	return nil
+}
+
+// installPackageForWorker handles package installation or extraction for a worker.
+// It uses InstallOrExtract to handle both native builds (install) and cross-compilation (extract).
+func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, workerID string) error {
+	logger.Info(i18n.T("logger.installing_package"),
+		"package", pkgName,
+		"worker_id", workerID)
+
+	if err := mpc.doInstallOrExtract(proj, pkgName); err != nil {
+		return err
 	}
 
 	logger.Info(i18n.T("logger.package_installed"),
@@ -1384,28 +1395,8 @@ func (mpc *MultipleProject) installPackage(proj *Project) error {
 	pkgName := proj.Builder.PKGBUILD.PkgName
 	logger.Info(i18n.T("logger.installing_package"), "package", pkgName)
 
-	// Use InstallOrExtract to handle both native and cross-compilation builds
-	if installer, ok := proj.PackageManager.(packer.InstallOrExtractor); ok {
-		err := installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
-		if err != nil {
-			logger.Error(
-				i18n.T("logger.project.package_installation_failed"),
-				"package", pkgName,
-				"error", err)
-
-			return err
-		}
-	} else {
-		// Fallback to regular Install if InstallOrExtract not available
-		err := proj.PackageManager.Install(mpc.Output)
-		if err != nil {
-			logger.Error(
-				i18n.T("logger.project.package_installation_failed"),
-				"package", pkgName,
-				"error", err)
-
-			return err
-		}
+	if err := mpc.doInstallOrExtract(proj, pkgName); err != nil {
+		return err
 	}
 
 	logger.Info(i18n.T("logger.package_installed"), "package", pkgName)
