@@ -31,12 +31,22 @@ const (
 
 // Global variables for source handling
 var (
-	// SSHPassword contains the SSH password for authentication.
-	SSHPassword string
+	// sshPassword contains the SSH password for authentication.
+	sshPassword string
 	// downloadMutexes tracks ongoing downloads to prevent duplicate downloads.
 	downloadMutexes  = make(map[string]*sync.Mutex)
 	downloadMapMutex = sync.Mutex{}
 )
+
+// SetSSHPassword sets the SSH password used for authenticated git clone operations.
+func SetSSHPassword(password string) {
+	sshPassword = password
+}
+
+// GetSSHPassword returns the SSH password used for authenticated git clone operations.
+func GetSSHPassword() string {
+	return sshPassword
+}
 
 // Source defines all the fields accepted by a source item.
 type Source struct {
@@ -101,7 +111,7 @@ func (src *Source) Get() error {
 
 		// Check again after acquiring the lock (double-checked locking pattern)
 		if !files.Exists(sourceFilePath) {
-			err = src.getURL(sourceType, sourceFilePath, SSHPassword)
+			err = src.getURL(sourceType, sourceFilePath, sshPassword)
 		}
 
 		if err != nil {

@@ -18,6 +18,9 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/source"
 )
 
+// sshPassword is the local holder for the --ssh-password flag value.
+var sshPassword string
+
 // buildCmd represents the command to build the entire project.
 var buildCmd = &cobra.Command{
 	Use:     "build [distro] <path>",
@@ -29,6 +32,9 @@ var buildCmd = &cobra.Command{
 	Args:    cobra.RangeArgs(1, 2),                               // Allow 1-2 arguments
 	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
+		// Propagate ssh-password flag value to the source package.
+		source.SetSSHPassword(sshPassword)
+
 		// Set the skip toolchain validation flag
 		common.SkipToolchainValidation = project.SkipToolchainValidation
 
@@ -202,7 +208,7 @@ func init() {
 		"pkgrel", "r", "", "")
 
 	// SOURCE ACCESS FLAGS
-	buildCmd.Flags().StringVarP(&source.SSHPassword,
+	buildCmd.Flags().StringVarP(&sshPassword,
 		"ssh-password", "p", "", "")
 
 	// BUILD RANGE CONTROL FLAGS
