@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/interp"
@@ -227,7 +226,7 @@ func ExecWithContext(
 	if !excludeStdout {
 		_, err := MultiPrinter.Start()
 		if err != nil {
-			return errors.Wrap(err, i18n.T("errors.shell.failed_to_start_multiprinter"))
+			return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_start_multiprinter"), err)
 		}
 
 		decoratedWriter := NewPackageDecoratedWriter(MultiPrinter.Writer, "yap")
@@ -258,7 +257,7 @@ func ExecWithContext(
 			"duration", duration,
 			"error", err)
 
-		return errors.Wrapf(err, "failed to execute command %s", name)
+		return fmt.Errorf("failed to execute command %s: %w", name, err)
 	}
 
 	logger.Debug(i18n.T("logger.execwithcontext.debug.command_execution_completed_1"),
@@ -385,12 +384,12 @@ func RunScriptWithPackage(cmds, packageName string) error {
 	// "${_modules[@]}" cause a parse error in the default POSIX mode.
 	script, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(cmds), "")
 	if err != nil {
-		return errors.Wrap(err, i18n.T("errors.shell.failed_to_parse_script"))
+		return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_parse_script"), err)
 	}
 
 	_, err = MultiPrinter.Start()
 	if err != nil {
-		return errors.Wrap(err, i18n.T("errors.shell.failed_to_start_multiprinter"))
+		return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_start_multiprinter"), err)
 	}
 
 	writer := MultiPrinter.Writer
@@ -411,7 +410,7 @@ func RunScriptWithPackage(cmds, packageName string) error {
 		interp.StdIO(nil, writer, writer),
 	)
 	if err != nil {
-		return errors.Wrap(err, i18n.T("errors.shell.failed_to_create_script_runner"))
+		return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_create_script_runner"), err)
 	}
 
 	logger.Debug(i18n.T("logger.runscriptwithpackage.debug.starting_script_execution_1"))
@@ -431,7 +430,7 @@ func RunScriptWithPackage(cmds, packageName string) error {
 				"duration", duration)
 		}
 
-		return errors.Wrap(err, i18n.T("errors.shell.script_execution_failed"))
+		return fmt.Errorf("%s: %w", i18n.T("errors.shell.script_execution_failed"), err)
 	}
 
 	if packageName != "" {
@@ -495,7 +494,7 @@ func ExecWithSudoContext(
 	if !excludeStdout {
 		_, err := MultiPrinter.Start()
 		if err != nil {
-			return errors.Wrap(err, i18n.T("errors.shell.failed_to_start_multiprinter"))
+			return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_start_multiprinter"), err)
 		}
 
 		decoratedWriter := NewPackageDecoratedWriter(MultiPrinter.Writer, "yap")
@@ -525,7 +524,7 @@ func ExecWithSudoContext(
 			"error", err,
 			"sudo", needsSudo)
 
-		return errors.Wrapf(err, "failed to execute command %s", name)
+		return fmt.Errorf("failed to execute command %s: %w", name, err)
 	}
 
 	logger.Debug(i18n.T("logger.unknown.debug.command_execution_completed_1"),

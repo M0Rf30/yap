@@ -3,6 +3,7 @@ package project
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/otiai10/copy"
-	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
 	"github.com/M0Rf30/yap/v2/pkg/files"

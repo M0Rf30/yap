@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"fmt"
 	"hash"
 	"io"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"sync"
 
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -109,7 +109,7 @@ func (src *Source) Get() error {
 		}
 	case fileProtocol:
 	default:
-		return errors.Errorf("%s", i18n.T("errors.source.unsupported_source_type"))
+		return fmt.Errorf("%s", i18n.T("errors.source.unsupported_source_type"))
 	}
 
 	err := src.validateSource(sourceFilePath)
@@ -249,7 +249,7 @@ func (src *Source) symlinkSources(symlinkSource string) error {
 func (src *Source) validateSource(sourceFilePath string) error {
 	info, err := os.Stat(sourceFilePath)
 	if err != nil {
-		return errors.Errorf(i18n.T("errors.source.failed_to_open_file_for_hash"), sourceFilePath)
+		return fmt.Errorf(i18n.T("errors.source.failed_to_open_file_for_hash"), sourceFilePath)
 	}
 
 	// If it's a directory, handle based on protocol (like makepkg)
@@ -265,7 +265,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		// For non-VCS, non-file protocols, directories are not supported (like makepkg)
 		// The file protocol (local files) also shouldn't accept directories in source arrays
 
-		return errors.Errorf(i18n.T("errors.source.directory_not_supported"), sourceFilePath)
+		return fmt.Errorf(i18n.T("errors.source.directory_not_supported"), sourceFilePath)
 	}
 
 	if src.Hash == "SKIP" {
@@ -283,7 +283,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	case 128:
 		hashSum = sha512.New()
 	default:
-		return errors.Errorf(i18n.T("errors.source.unsupported_hash_length"), len(src.Hash))
+		return fmt.Errorf(i18n.T("errors.source.unsupported_hash_length"), len(src.Hash))
 	}
 
 	file, err := files.Open(filepath.Clean(sourceFilePath))
@@ -303,14 +303,14 @@ func (src *Source) validateSource(sourceFilePath string) error {
 
 	_, err = io.Copy(hashSum, file)
 	if err != nil {
-		return errors.Errorf(i18n.T("errors.source.failed_to_copy_file"), sourceFilePath)
+		return fmt.Errorf(i18n.T("errors.source.failed_to_copy_file"), sourceFilePath)
 	}
 
 	sum := hashSum.Sum(nil)
 	hexSum := hex.EncodeToString(sum)
 
 	if hexSum != src.Hash {
-		return errors.Errorf(i18n.T("errors.source.hash_verification_failed"), src.SourceItemPath)
+		return fmt.Errorf(i18n.T("errors.source.hash_verification_failed"), src.SourceItemPath)
 	}
 
 	logger.Info(i18n.T("logger.integrity_check_for"),
