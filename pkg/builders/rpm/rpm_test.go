@@ -448,7 +448,10 @@ func TestAsRPMDirectory(t *testing.T) {
 		Type:        files.TypeDir,
 	}
 
-	rpmFile := asRPMDirectory(entry)
+	rpmFile, err := asRPMDirectory(entry)
+	if err != nil {
+		t.Fatalf("asRPMDirectory failed: %v", err)
+	}
 
 	if rpmFile.Name != "/test/dir" {
 		t.Errorf("Expected name /test/dir, got %s", rpmFile.Name)
@@ -529,7 +532,10 @@ func TestAsRPMSymlink(t *testing.T) {
 		Type:        files.TypeSymlink,
 	}
 
-	rpmFile := asRPMSymlink(entry)
+	rpmFile, err := asRPMSymlink(entry)
+	if err != nil {
+		t.Fatalf("asRPMSymlink failed: %v", err)
+	}
 
 	if rpmFile.Name != "/test/link" {
 		t.Errorf("Expected name /test/link, got %s", rpmFile.Name)
