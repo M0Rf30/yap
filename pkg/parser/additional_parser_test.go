@@ -107,13 +107,15 @@ package() {
 		t.Errorf("Expected License ['MIT'], got %v", pkgBuild.License)
 	}
 
-	// Verify functions contain expanded variables
-	if !strings.Contains(pkgBuild.Build, "PREFIX=\"/usr\"") {
-		t.Errorf("Build function should contain expanded prefix variable, got: %s", pkgBuild.Build)
+	// Verify functions contain raw (unexpanded) variable references.
+	// Variables are resolved at runtime via the script preamble and environment,
+	// not pre-expanded at parse time.
+	if !strings.Contains(pkgBuild.Build, "PREFIX=") {
+		t.Errorf("Build function should reference PREFIX variable, got: %s", pkgBuild.Build)
 	}
 
-	if !strings.Contains(pkgBuild.Package, "DESTDIR=\"") {
-		t.Errorf("Package function should contain expanded pkgdir, got: %s", pkgBuild.Package)
+	if !strings.Contains(pkgBuild.Package, "DESTDIR=") {
+		t.Errorf("Package function should reference DESTDIR variable, got: %s", pkgBuild.Package)
 	}
 
 	// Verify source directory setup

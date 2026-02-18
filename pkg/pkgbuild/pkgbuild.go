@@ -2,8 +2,10 @@
 package pkgbuild
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -21,6 +23,12 @@ import (
 // ArchAny represents architecture-independent packages.
 const ArchAny = "any"
 
+// FuncBody is a tagged string type used exclusively for PKGBUILD function
+// bodies.  AddItem uses this type to distinguish function declarations from
+// plain string variable values so that mapFunctions does not misidentify
+// variables like "maintainer" as helper function definitions.
+type FuncBody string
+
 const (
 	dependsKey = "depends"
 )
@@ -29,66 +37,69 @@ const (
 // arrays, functions).
 // templating and other rpm/deb descriptors.
 type PKGBUILD struct {
-	Arch           []string
-	ArchComputed   string
-	Backup         []string
-	Build          string
-	BuildArch      string // Build architecture for cross-compilation (where compilation happens)
-	BuildDate      int64
-	Checksum       string
-	Codename       string
-	Commit         string
-	Conflicts      []string
-	Copyright      []string
-	DataHash       string
-	DebConfig      string
-	DebTemplate    string
-	Depends        []string
-	Distro         string
-	Epoch          string
-	Files          []string
-	FullDistroName string
-	Group          string
-	HashSums       []string
-	Home           string
-	HostArch       string // Host architecture for cross-compilation (where package will run)
-	Install        string
-	InstalledSize  int64
-	License        []string
-	Maintainer     string
-	MakeDepends    []string
-	OptDepends     []string
-	Options        []string
-	Origin         string
-	Package        string
-	PackageDir     string
-	PkgDesc        string
-	PkgDest        string
-	PkgName        string
-	PkgRel         string
-	PkgType        string
-	PkgVer         string
-	PostInst       string
-	PostRm         string
-	PostTrans      string
-	PreInst        string
-	Prepare        string
-	PreRelease     string
-	PreRm          string
-	PreTrans       string
-	priorities     map[string]int
-	Priority       string
-	Provides       []string
-	Replaces       []string
-	Section        string
-	SourceDir      string
-	SourceURI      []string
-	StartDir       string
-	TargetArch     string // Target architecture for cross-compilation (what we're building for)
-	URL            string
-	StaticEnabled  bool
-	StripEnabled   bool
-	YAPVersion     string
+	Arch            []string
+	ArchComputed    string
+	Backup          []string
+	Build           string
+	BuildArch       string // Build architecture for cross-compilation (where compilation happens)
+	BuildDate       int64
+	Checksum        string
+	Codename        string
+	Commit          string
+	Conflicts       []string
+	Copyright       []string
+	CustomArrays    map[string][]string
+	CustomVariables map[string]string
+	DataHash        string
+	DebConfig       string
+	DebTemplate     string
+	Depends         []string
+	Distro          string
+	Epoch           string
+	Files           []string
+	FullDistroName  string
+	Group           string
+	HashSums        []string
+	HelperFunctions map[string]string
+	Home            string
+	HostArch        string // Host architecture for cross-compilation (where package will run)
+	Install         string
+	InstalledSize   int64
+	License         []string
+	Maintainer      string
+	MakeDepends     []string
+	OptDepends      []string
+	Options         []string
+	Origin          string
+	Package         string
+	PackageDir      string
+	PkgDesc         string
+	PkgDest         string
+	PkgName         string
+	PkgRel          string
+	PkgType         string
+	PkgVer          string
+	PostInst        string
+	PostRm          string
+	PostTrans       string
+	PreInst         string
+	Prepare         string
+	PreRelease      string
+	PreRm           string
+	PreTrans        string
+	priorities      map[string]int
+	Priority        string
+	Provides        []string
+	Replaces        []string
+	Section         string
+	SourceDir       string
+	SourceURI       []string
+	StartDir        string
+	TargetArch      string // Target architecture for cross-compilation (what we're building for)
+	URL             string
+	StaticEnabled   bool
+	StripEnabled    bool
+	YAPVersion      string
 }
 
 // AddItem adds an item to the PKGBUILD.
@@ -255,11 +266,115 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 // the Distro and Codename fields.
 func (pkgBuild *PKGBUILD) Init() {
 	pkgBuild.priorities = make(map[string]int)
+	pkgBuild.CustomVariables = make(map[string]string)
+	pkgBuild.CustomArrays = make(map[string][]string)
+	pkgBuild.HelperFunctions = make(map[string]string)
 
 	pkgBuild.FullDistroName = pkgBuild.Distro
 	if pkgBuild.Codename != "" {
 		pkgBuild.FullDistroName += "_" + pkgBuild.Codename
 	}
+}
+
+// BuildScriptPreamble generates a bash preamble that declares custom scalar
+// variables, custom array variables, and helper function definitions so that
+// they are available inside build(), prepare(), and package() scripts.
+//
+// The preamble is prepended to every script body before execution.  Declarations
+// are emitted in sorted order so that the output is deterministic.
+func (pkgBuild *PKGBUILD) BuildScriptPreamble() string {
+	var preamble strings.Builder
+
+	// Emit custom scalar variables (e.g. _prefix="/usr")
+	varKeys := make([]string, 0, len(pkgBuild.CustomVariables))
+	for k := range pkgBuild.CustomVariables {
+		varKeys = append(varKeys, k)
+	}
+
+	sort.Strings(varKeys)
+
+	for _, k := range varKeys {
+		preamble.WriteString(k)
+		preamble.WriteString("='")
+		preamble.WriteString(strings.ReplaceAll(pkgBuild.CustomVariables[k], "'", "'\\''"))
+		preamble.WriteString("'\n")
+	}
+
+	// Emit custom array variables (e.g. _modules=('a' 'b'))
+	arrKeys := make([]string, 0, len(pkgBuild.CustomArrays))
+	for k := range pkgBuild.CustomArrays {
+		arrKeys = append(arrKeys, k)
+	}
+
+	sort.Strings(arrKeys)
+
+	for _, k := range arrKeys {
+		preamble.WriteString(k)
+		preamble.WriteString("=(")
+
+		for idx, value := range pkgBuild.CustomArrays[k] {
+			if idx > 0 {
+				preamble.WriteByte(' ')
+			}
+
+			preamble.WriteByte('\'')
+			preamble.WriteString(strings.ReplaceAll(value, "'", "'\\''"))
+			preamble.WriteByte('\'')
+		}
+
+		preamble.WriteString(")\n")
+	}
+
+	// Emit helper function definitions in sorted order
+	funcKeys := make([]string, 0, len(pkgBuild.HelperFunctions))
+	for k := range pkgBuild.HelperFunctions {
+		funcKeys = append(funcKeys, k)
+	}
+
+	sort.Strings(funcKeys)
+
+	for _, k := range funcKeys {
+		preamble.WriteString(pkgBuild.HelperFunctions[k])
+		preamble.WriteByte('\n')
+	}
+
+	return preamble.String()
+}
+
+// HelperFunctionsPreamble returns a bash snippet containing only the helper
+// function definitions that are referenced by the given scriptlet body.
+// Unlike BuildScriptPreamble it does NOT emit custom scalar or array variable
+// declarations, which are build-time values and have no meaning inside
+// package-manager scriptlets (preinst, postinst, prerm, postrm).
+//
+// Only helpers whose names appear as call-sites in scriptletBody are included,
+// so build-time helpers like _package or _package_systemd are not injected
+// into install-time scripts.
+func (pkgBuild *PKGBUILD) HelperFunctionsPreamble(scriptletBody string) string {
+	if len(pkgBuild.HelperFunctions) == 0 {
+		return ""
+	}
+
+	funcKeys := make([]string, 0, len(pkgBuild.HelperFunctions))
+	for k := range pkgBuild.HelperFunctions {
+		funcKeys = append(funcKeys, k)
+	}
+
+	sort.Strings(funcKeys)
+
+	var preamble strings.Builder
+
+	for _, k := range funcKeys {
+		// Only include helpers that are actually called in the scriptlet body.
+		// This prevents build-time helpers (e.g. _package, _package_systemd)
+		// from being injected into package-manager scriptlets.
+		if strings.Contains(scriptletBody, k) {
+			preamble.WriteString(pkgBuild.HelperFunctions[k])
+			preamble.WriteByte('\n')
+		}
+	}
+
+	return preamble.String()
 }
 
 // RenderSpec initializes a new template with custom functions and parses the provided script.
@@ -499,6 +614,8 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() {
 
 // mapArrays reads an array name and its content and maps them to the PKGBUILD
 // struct.
+//
+//nolint:gocyclo,cyclop // Central dispatch function for PKGBUILD array field mapping
 func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 	if pkgBuild.mapChecksumsArrays(key, data) {
 		return
@@ -529,6 +646,16 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 		pkgBuild.SourceURI = data.([]string)
 	case "backup":
 		pkgBuild.Backup = data.([]string)
+	default:
+		// Store unknown arrays (e.g. _modules, _extra_files) as custom arrays.
+		// They will be declared as bash array variables in the build script preamble.
+		if arrVal, ok := data.([]string); ok {
+			if pkgBuild.CustomArrays == nil {
+				pkgBuild.CustomArrays = make(map[string][]string)
+			}
+
+			pkgBuild.CustomArrays[key] = arrVal
+		}
 	}
 }
 
@@ -559,33 +686,49 @@ func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any) bool {
 }
 
 // mapFunctions reads a function name and its content and maps them to the
-// PKGBUILD struct.
+// PKGBUILD struct. Any function name not matching a known PKGBUILD lifecycle
+// hook is stored as a helper function and will be injected as a preamble into
+// build, prepare, and package scripts so that callers such as _package() or
+// _install_files() are available at runtime.
+//
+// data must be of type FuncBody; plain string values (variables) are ignored so
+// that scalar variables such as "maintainer" are not confused with functions.
 func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
+	fb, ok := data.(FuncBody)
+	if !ok {
+		return
+	}
+
+	body := string(fb)
+
 	switch key {
 	case "build":
-		// Don't use os.ExpandEnv here as it removes runtime variables like ${bin}
-		// Variable expansion is now handled properly in the parser
-		pkgBuild.Build = data.(string)
+		pkgBuild.Build = body
 	case "package":
-		// Don't use os.ExpandEnv here as it removes runtime variables
-		// Variable expansion is now handled properly in the parser
-		pkgBuild.Package = data.(string)
+		pkgBuild.Package = body
 	case "preinst":
-		pkgBuild.PreInst = data.(string)
+		pkgBuild.PreInst = body
 	case "prepare":
-		// Don't use os.ExpandEnv here as it removes runtime variables
-		// Variable expansion is now handled properly in the parser
-		pkgBuild.Prepare = data.(string)
+		pkgBuild.Prepare = body
 	case "postinst":
-		pkgBuild.PostInst = data.(string)
+		pkgBuild.PostInst = body
 	case "posttrans":
-		pkgBuild.PostTrans = data.(string)
+		pkgBuild.PostTrans = body
 	case "prerm":
-		pkgBuild.PreRm = data.(string)
+		pkgBuild.PreRm = body
 	case "pretrans":
-		pkgBuild.PreTrans = data.(string)
+		pkgBuild.PreTrans = body
 	case "postrm":
-		pkgBuild.PostRm = data.(string)
+		pkgBuild.PostRm = body
+	default:
+		// Store any other function (e.g. _package, _package_systemd, _install_helper)
+		// as a helper. The full definition is reconstructed so it can be prepended to
+		// build scripts verbatim.
+		if pkgBuild.HelperFunctions == nil {
+			pkgBuild.HelperFunctions = make(map[string]string)
+		}
+
+		pkgBuild.HelperFunctions[key] = fmt.Sprintf("%s() {\n%s\n}", key, body)
 	}
 }
 
@@ -637,6 +780,19 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 		pkgBuild.BuildArch = data.(string)
 	case "host_arch":
 		pkgBuild.HostArch = data.(string)
+	default:
+		// Store unknown scalar variables (e.g. _prefix, _destdir) as custom variables
+		// and expose them as environment variables so they are available in build scripts
+		// via the sh interpreter's inherited environment.
+		if strVal, ok := data.(string); ok {
+			if pkgBuild.CustomVariables == nil {
+				pkgBuild.CustomVariables = make(map[string]string)
+			}
+
+			pkgBuild.CustomVariables[key] = strVal
+
+			err = os.Setenv(key, strVal)
+		}
 	}
 
 	if err != nil {

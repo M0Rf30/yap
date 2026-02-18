@@ -57,8 +57,8 @@ func TestPKGBUILD_AddItem(t *testing.T) {
 		t.Errorf("Expected Arch ['x86_64', 'any'], got %v", pb.Arch)
 	}
 
-	// Test adding a function
-	err = pb.AddItem("build", "make && make install")
+	// Test adding a function (must use FuncBody type so mapFunctions activates)
+	err = pb.AddItem("build", FuncBody("make && make install"))
 	if err != nil {
 		t.Errorf("AddItem() returned error: %v", err)
 	}
@@ -334,35 +334,35 @@ func TestPKGBUILD_mapArrays(t *testing.T) {
 func TestPKGBUILD_mapFunctions(t *testing.T) {
 	pb := &PKGBUILD{}
 
-	// Test mapping build function
-	pb.mapFunctions("build", "make")
+	// Test mapping build function (must use FuncBody so mapFunctions activates)
+	pb.mapFunctions("build", FuncBody("make"))
 
 	if pb.Build != "make" {
 		t.Errorf("Expected Build 'make', got '%s'", pb.Build)
 	}
 
 	// Test mapping package function
-	pb.mapFunctions("package", "make install DESTDIR=$pkgdir")
+	pb.mapFunctions("package", FuncBody("make install DESTDIR=$pkgdir"))
 
 	if pb.Package != "make install DESTDIR=$pkgdir" {
 		t.Errorf("Expected Package 'make install DESTDIR=$pkgdir', got '%s'", pb.Package)
 	}
 
 	// Test mapping prepare function
-	pb.mapFunctions("prepare", "patch -p1 < fix.patch")
+	pb.mapFunctions("prepare", FuncBody("patch -p1 < fix.patch"))
 
 	if pb.Prepare != "patch -p1 < fix.patch" {
 		t.Errorf("Expected Prepare 'patch -p1 < fix.patch', got '%s'", pb.Prepare)
 	}
 
 	// Test mapping scriptlets
-	pb.mapFunctions("preinst", "echo pre-install")
+	pb.mapFunctions("preinst", FuncBody("echo pre-install"))
 
 	if pb.PreInst != "echo pre-install" {
 		t.Errorf("Expected PreInst 'echo pre-install', got '%s'", pb.PreInst)
 	}
 
-	pb.mapFunctions("postinst", "echo post-install")
+	pb.mapFunctions("postinst", FuncBody("echo post-install"))
 
 	if pb.PostInst != "echo post-install" {
 		t.Errorf("Expected PostInst 'echo post-install', got '%s'", pb.PostInst)
@@ -536,7 +536,7 @@ func TestPKGBUILD_Integration(t *testing.T) {
 		t.Errorf("AddItem failed: %v", err)
 	}
 
-	err = pb.AddItem("package", "make install DESTDIR=$pkgdir")
+	err = pb.AddItem("package", FuncBody("make install DESTDIR=$pkgdir"))
 	if err != nil {
 		t.Errorf("AddItem failed: %v", err)
 	}
@@ -831,18 +831,18 @@ func TestPKGBUILD_mapArrays_EdgeCases(t *testing.T) {
 func TestPKGBUILD_mapFunctions_EdgeCases(t *testing.T) {
 	pb := &PKGBUILD{}
 
-	// Test unknown function
-	pb.mapFunctions("unknown_function", "echo unknown")
-	// Should not panic, just ignore unknown functions
+	// Test unknown function (must use FuncBody; plain strings are ignored)
+	pb.mapFunctions("unknown_function", FuncBody("echo unknown"))
+	// Should not panic, stores in HelperFunctions
 
 	// Test all supported scriptlets
-	pb.mapFunctions("prerm", "echo pre-remove")
+	pb.mapFunctions("prerm", FuncBody("echo pre-remove"))
 
 	if pb.PreRm != "echo pre-remove" {
 		t.Errorf("Expected PreRm 'echo pre-remove', got '%s'", pb.PreRm)
 	}
 
-	pb.mapFunctions("postrm", "echo post-remove")
+	pb.mapFunctions("postrm", FuncBody("echo post-remove"))
 
 	if pb.PostRm != "echo post-remove" {
 		t.Errorf("Expected PostRm 'echo post-remove', got '%s'", pb.PostRm)

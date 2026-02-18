@@ -132,7 +132,7 @@ func StringifyAssign(node *syntax.Assign) string {
 // It takes a pointer to a syntax.FuncDecl node as a parameter and returns a string.
 func StringifyFuncDecl(node *syntax.FuncDecl) string {
 	out := &strings.Builder{}
-	printer := syntax.NewPrinter(syntax.Indent(2))
+	printer := syntax.NewPrinter(syntax.Indent(2), syntax.SwitchCaseIndent(true))
 
 	err := printer.Print(out, node.Body)
 	if err != nil {

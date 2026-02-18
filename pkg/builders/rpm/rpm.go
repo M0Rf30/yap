@@ -187,28 +187,41 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 	// to have a similar behaviour between deb and rpm.
 	onlyOnUninstall := "if [ $1 -ne 0 ]; then exit 0; fi\n"
 
+	// withHelpers prepends only the helper function definitions that are
+	// actually called within the given scriptlet body, so that helpers like
+	// _postinst() are available at install time without injecting unrelated
+	// build-time helpers (_package, _package_systemd, etc.).
+	withHelpers := func(body string) string {
+		preamble := r.PKGBUILD.HelperFunctionsPreamble(body)
+		if preamble == "" {
+			return body
+		}
+
+		return preamble + body
+	}
+
 	if r.PKGBUILD.PreTrans != "" {
-		rpm.AddPretrans(r.PKGBUILD.PreTrans)
+		rpm.AddPretrans(withHelpers(r.PKGBUILD.PreTrans))
 	}
 
 	if r.PKGBUILD.PreInst != "" {
-		rpm.AddPrein(r.PKGBUILD.PreInst)
+		rpm.AddPrein(withHelpers(r.PKGBUILD.PreInst))
 	}
 
 	if r.PKGBUILD.PostInst != "" {
-		rpm.AddPostin(r.PKGBUILD.PostInst)
+		rpm.AddPostin(withHelpers(r.PKGBUILD.PostInst))
 	}
 
 	if r.PKGBUILD.PreRm != "" {
-		rpm.AddPreun(onlyOnUninstall + r.PKGBUILD.PreRm)
+		rpm.AddPreun(withHelpers(onlyOnUninstall + r.PKGBUILD.PreRm))
 	}
 
 	if r.PKGBUILD.PostRm != "" {
-		rpm.AddPostun(onlyOnUninstall + r.PKGBUILD.PostRm)
+		rpm.AddPostun(withHelpers(onlyOnUninstall + r.PKGBUILD.PostRm))
 	}
 
 	if r.PKGBUILD.PostTrans != "" {
-		rpm.AddPosttrans(r.PKGBUILD.PostTrans)
+		rpm.AddPosttrans(withHelpers(r.PKGBUILD.PostTrans))
 	}
 }
 

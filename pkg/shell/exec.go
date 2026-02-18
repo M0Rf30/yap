@@ -380,7 +380,10 @@ func RunScriptWithPackage(cmds, packageName string) error {
 		logScriptContent(cmds)
 	}
 
-	script, err := syntax.NewParser().Parse(strings.NewReader(cmds), "")
+	// Use LangBash so that bash-specific syntax (arrays, [[ ]], process substitution,
+	// etc.) is accepted by the parser. Without this, bash array expansions like
+	// "${_modules[@]}" cause a parse error in the default POSIX mode.
+	script, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(cmds), "")
 	if err != nil {
 		return errors.Wrap(err, i18n.T("errors.shell.failed_to_parse_script"))
 	}
