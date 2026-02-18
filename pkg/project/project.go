@@ -279,7 +279,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	}
 
 	if !NoMakeDeps {
-		mpc.getMakeDeps()
+		makeDepends = mpc.getMakeDeps()
 
 		err := packageManager.Prepare(makeDepends, TargetArch)
 		if err != nil {
@@ -289,7 +289,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 
 	// Install external runtime dependencies
 	if !SkipSyncDeps {
-		mpc.getRuntimeDeps()
+		runtimeDepends = mpc.getRuntimeDeps()
 
 		if len(runtimeDepends) > 0 {
 			logger.Debug(i18n.T("logger.installing_external_runtime_dependencies"),
@@ -723,11 +723,13 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) (int, error) {
 
 // getMakeDeps retrieves the make dependencies for the MultipleProject.
 //
-// It iterates over each child project and appends their make dependencies
-// to the makeDepends slice, ensuring no duplicates are added.
-func (mpc *MultipleProject) getMakeDeps() {
+// It iterates over each child project and collects their make dependencies,
+// ensuring no duplicates are included. Returns the collected dependencies.
+func (mpc *MultipleProject) getMakeDeps() []string {
 	// Use a map to track unique dependencies and prevent duplicates
 	uniqueDeps := make(map[string]bool)
+
+	var result []string
 
 	for _, child := range mpc.Projects {
 		for _, dep := range child.Builder.PKGBUILD.MakeDepends {
@@ -735,16 +737,19 @@ func (mpc *MultipleProject) getMakeDeps() {
 			if !uniqueDeps[depName] {
 				uniqueDeps[depName] = true
 
-				makeDepends = append(makeDepends, dep)
+				result = append(result, dep)
 			}
 		}
 	}
+
+	return result
 }
 
 // getRuntimeDeps retrieves the runtime dependencies for the MultipleProject.
 // It filters out internal dependencies (packages within the project) and only
 // collects external dependencies that need to be installed via package manager.
-func (mpc *MultipleProject) getRuntimeDeps() {
+// Returns the collected external dependencies.
+func (mpc *MultipleProject) getRuntimeDeps() []string {
 	// Create a set of internal package names for filtering
 	internalPackages := make(map[string]bool)
 	for _, proj := range mpc.Projects {
@@ -754,6 +759,8 @@ func (mpc *MultipleProject) getRuntimeDeps() {
 	// Use a map to track unique dependencies and prevent duplicates
 	uniqueDeps := make(map[string]bool)
 
+	var result []string
+
 	// Collect external runtime dependencies
 	for _, child := range mpc.Projects {
 		for _, dep := range child.Builder.PKGBUILD.Depends {
@@ -762,16 +769,18 @@ func (mpc *MultipleProject) getRuntimeDeps() {
 			if !internalPackages[depName] && !uniqueDeps[depName] {
 				uniqueDeps[depName] = true
 
-				runtimeDepends = append(runtimeDepends, dep)
+				result = append(result, dep)
 			}
 		}
 	}
 
-	if len(runtimeDepends) > 0 {
+	if len(result) > 0 {
 		logger.Info(i18n.T("logger.external_runtime_dependencies_collected"),
-			"count", len(runtimeDepends),
-			"dependencies", runtimeDepends)
+			"count", len(result),
+			"dependencies", result)
 	}
+
+	return result
 }
 
 // populateProjects populates the MultipleProject with projects based on the
