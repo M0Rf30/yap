@@ -147,8 +147,7 @@ func TestPKGBUILD_SetMainFolders(t *testing.T) {
 }
 
 func TestPKGBUILD_ValidateMandatoryItems(t *testing.T) {
-	// This test needs to be careful since ValidateMandatoryItems calls os.Exit
-	// We'll test the positive case where all mandatory items are present
+	// Test the positive case where all mandatory items are present
 	pb := &PKGBUILD{
 		PkgName: "test-package",
 		PkgVer:  "1.0.0",
@@ -156,10 +155,20 @@ func TestPKGBUILD_ValidateMandatoryItems(t *testing.T) {
 		PkgDesc: "Test package description",
 	}
 
-	// This should not panic or exit if all mandatory items are present
-	pb.ValidateMandatoryItems()
+	// This should return nil if all mandatory items are present
+	if err := pb.ValidateMandatoryItems(); err != nil {
+		t.Errorf("ValidateMandatoryItems should not return error when all mandatory items are set, got: %v", err)
+	}
 
-	// Test will pass if we reach this point without exiting
+	// Test missing mandatory items return an error
+	pbMissing := &PKGBUILD{
+		PkgName: "test-package",
+		// PkgVer, PkgRel, PkgDesc missing
+	}
+
+	if err := pbMissing.ValidateMandatoryItems(); err == nil {
+		t.Error("ValidateMandatoryItems should return error when mandatory items are missing")
+	}
 }
 
 func TestPKGBUILD_ValidateGeneral(t *testing.T) {
@@ -171,10 +180,23 @@ func TestPKGBUILD_ValidateGeneral(t *testing.T) {
 		Package:   "cp file $pkgdir/",
 	}
 
-	// This should not panic or exit if validation passes
-	pb.ValidateGeneral()
+	// This should return nil if validation passes
+	if err := pb.ValidateGeneral(); err != nil {
+		t.Errorf("ValidateGeneral should not return error for valid PKGBUILD, got: %v", err)
+	}
 
-	// Test will pass if we reach this point without exiting
+	// Test that invalid PKGBUILD returns an error
+	pbInvalid := &PKGBUILD{
+		PkgName:   "test-package",
+		License:   []string{"INVALID_LICENSE"},
+		SourceURI: []string{"https://example.com/source.tar.gz"},
+		HashSums:  []string{"sha256sum"},
+		Package:   "cp file $pkgdir/",
+	}
+
+	if err := pbInvalid.ValidateGeneral(); err == nil {
+		t.Error("ValidateGeneral should return error for invalid license")
+	}
 }
 
 func TestPKGBUILD_checkLicense(t *testing.T) {
@@ -560,9 +582,14 @@ func TestPKGBUILD_Integration(t *testing.T) {
 		t.Error("Package function not set correctly")
 	}
 
-	// Test validation (should not panic)
-	pb.ValidateMandatoryItems()
-	pb.ValidateGeneral()
+	// Test validation (should not return errors for valid PKGBUILD)
+	if err := pb.ValidateMandatoryItems(); err != nil {
+		t.Errorf("ValidateMandatoryItems should not return error: %v", err)
+	}
+
+	if err := pb.ValidateGeneral(); err != nil {
+		t.Errorf("ValidateGeneral should not return error: %v", err)
+	}
 }
 
 func TestPKGBUILD_GetDepends(t *testing.T) {
@@ -703,8 +730,10 @@ func TestPKGBUILD_ValidateGeneral_AllValidationPaths(t *testing.T) {
 			HashSums:  []string{"sha256sum"},
 			Package:   "cp file $pkgdir/",
 		}
-		// This should pass all validation checks and not exit
-		pb.ValidateGeneral()
+		// This should pass all validation checks and return nil
+		if err := pb.ValidateGeneral(); err != nil {
+			t.Errorf("ValidateGeneral should not return error for valid PKGBUILD, got: %v", err)
+		}
 	})
 
 	// Test case 2: Valid license, no sources (empty arrays), has package function
@@ -717,7 +746,9 @@ func TestPKGBUILD_ValidateGeneral_AllValidationPaths(t *testing.T) {
 			Package:   "echo 'no sources needed'",
 		}
 		// This should pass all validation checks
-		pb.ValidateGeneral()
+		if err := pb.ValidateGeneral(); err != nil {
+			t.Errorf("ValidateGeneral should not return error for valid PKGBUILD, got: %v", err)
+		}
 	})
 
 	// Test case 3: PROPRIETARY license (special case), valid other fields
@@ -729,7 +760,9 @@ func TestPKGBUILD_ValidateGeneral_AllValidationPaths(t *testing.T) {
 			HashSums:  []string{"sha256sum"},
 			Package:   "cp file $pkgdir/",
 		}
-		pb.ValidateGeneral()
+		if err := pb.ValidateGeneral(); err != nil {
+			t.Errorf("ValidateGeneral should not return error for PROPRIETARY license, got: %v", err)
+		}
 	})
 
 	// Test case 4: CUSTOM license (special case), valid other fields
@@ -741,7 +774,9 @@ func TestPKGBUILD_ValidateGeneral_AllValidationPaths(t *testing.T) {
 			HashSums:  []string{"sha256sum"},
 			Package:   "cp file $pkgdir/",
 		}
-		pb.ValidateGeneral()
+		if err := pb.ValidateGeneral(); err != nil {
+			t.Errorf("ValidateGeneral should not return error for CUSTOM license, got: %v", err)
+		}
 	})
 
 	// Test case 5: Multiple valid licenses
@@ -753,7 +788,9 @@ func TestPKGBUILD_ValidateGeneral_AllValidationPaths(t *testing.T) {
 			HashSums:  []string{"sha256sum1", "sha256sum2"},
 			Package:   "cp files $pkgdir/",
 		}
-		pb.ValidateGeneral()
+		if err := pb.ValidateGeneral(); err != nil {
+			t.Errorf("ValidateGeneral should not return error for multiple valid licenses, got: %v", err)
+		}
 	})
 }
 

@@ -180,7 +180,9 @@ type Project struct {
 // are built concurrently using a worker pool.
 func (mpc *MultipleProject) BuildAll() error {
 	if !singleProject {
-		mpc.checkPkgsRange(FromPkgName, ToPkgName)
+		if err := mpc.checkPkgsRange(FromPkgName, ToPkgName); err != nil {
+			return err
+		}
 	}
 
 	// Show verbose dependency information at debug level regardless of build mode.
@@ -552,22 +554,33 @@ func (mpc *MultipleProject) buildAndInstallProjectsParallel(projects []*Project,
 // It takes two parameters:
 // - fromPkgName: string representing the name of the starting package.
 // - toPkgName: string representing the name of the ending package.
-func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) {
+func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) error {
 	var firstIndex, lastIndex int
 
 	if fromPkgName != "" {
-		firstIndex = mpc.findPackageInProjects(fromPkgName)
+		idx, err := mpc.findPackageInProjects(fromPkgName)
+		if err != nil {
+			return err
+		}
+
+		firstIndex = idx
 	}
 
 	if toPkgName != "" {
-		lastIndex = mpc.findPackageInProjects(toPkgName)
+		idx, err := mpc.findPackageInProjects(toPkgName)
+		if err != nil {
+			return err
+		}
+
+		lastIndex = idx
 	}
 
 	if fromPkgName != "" && toPkgName != "" && firstIndex > lastIndex {
-		logger.Fatal(i18n.T("logger.invalid_package_order"),
-			"required_first", fromPkgName,
-			"required_second", toPkgName)
+		return fmt.Errorf(i18n.T("logger.invalid_package_order")+": required_first=%s required_second=%s",
+			fromPkgName, toPkgName)
 	}
+
+	return nil
 }
 
 // shouldSkipFile determines if a file should be skipped during copying.
@@ -697,25 +710,15 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 // findPackageInProjects finds a package in the MultipleProject struct.
 //
 // pkgName: the name of the package to find.
-// int: the index of the package if found, else -1.
-func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
-	var matchFound bool
-
-	var index int
-
+// Returns the index of the package if found, and an error if not found.
+func (mpc *MultipleProject) findPackageInProjects(pkgName string) (int, error) {
 	for i, proj := range mpc.Projects {
 		if pkgName == proj.Builder.PKGBUILD.PkgName {
-			matchFound = true
-			index = i
+			return i, nil
 		}
 	}
 
-	if !matchFound {
-		logger.Fatal(i18n.T("logger.package_not_found"),
-			"package", pkgName)
-	}
-
-	return index
+	return -1, fmt.Errorf("package %q not found in projects", pkgName)
 }
 
 // getMakeDeps retrieves the make dependencies for the MultipleProject.
@@ -802,8 +805,13 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			pkgbuildFile.ComputeArchitecture()
 		}
 
-		pkgbuildFile.ValidateMandatoryItems()
-		pkgbuildFile.ValidateGeneral()
+		if err := pkgbuildFile.ValidateMandatoryItems(); err != nil {
+			return err
+		}
+
+		if err := pkgbuildFile.ValidateGeneral(); err != nil {
+			return err
+		}
 
 		packageManager = packer.GetPackageManager(pkgbuildFile, distro)
 
