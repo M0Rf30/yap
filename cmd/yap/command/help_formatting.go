@@ -105,7 +105,8 @@ func SetupEnhancedHelp() {
 
 	cobra.AddTemplateFunc("styleFooter", func() string {
 		return fmt.Sprintf(`%s %s
-%s %s`,
+%s %s
+`,
 			pterm.FgBlue.Sprint(i18n.T("footer.documentation")),
 			pterm.FgLightBlue.Sprint("https://github.com/M0Rf30/yap"),
 			pterm.FgRed.Sprint(i18n.T("footer.report_issues")),

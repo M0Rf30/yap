@@ -203,7 +203,7 @@
 - id: footer.more_info
   translation: "For more information, visit:"
 - id: footer.report_issues
-  translation: "Report issues: https://github.com/M0Rf30/yap/issues"
+  translation: "Report issues:"
 
 # General messages
 - id: messages.verbose_mode_enabled
