@@ -152,6 +152,14 @@ func (d *Package) addScriptlets() error {
 			continue
 		}
 
+		// Prepend only the helper function definitions that are actually
+		// called within this scriptlet, so that helpers like _postinst() or
+		// _postinst_legacy() are available at install time without injecting
+		// unrelated build-time helpers (_package, _package_systemd, etc.).
+		if helperPreamble := d.PKGBUILD.HelperFunctionsPreamble(script); helperPreamble != "" {
+			script = helperPreamble + script
+		}
+
 		if name == "prerm" || name == "postrm" {
 			script = removeHeader + script
 		}

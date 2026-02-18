@@ -127,8 +127,14 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 		}
 	}
 
+	// Build preamble: custom scalar variables, custom arrays, and helper function
+	// definitions (e.g. _package, _package_systemd, _install_files).  The preamble
+	// is prepended to every script so that helper callers in build/package/prepare
+	// bodies resolve at runtime instead of failing with "not found in $PATH".
+	preamble := builder.PKGBUILD.BuildScriptPreamble()
+
 	// Execute script with package decoration
-	err = shell.RunScriptWithPackage("  set -e\n"+pkgbuildFunction, pkgName)
+	err = shell.RunScriptWithPackage("  set -e\n"+preamble+pkgbuildFunction, pkgName)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).

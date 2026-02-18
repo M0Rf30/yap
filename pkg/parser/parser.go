@@ -2,10 +2,8 @@
 package parser //nolint:revive // intentional name; conflicts with stdlib go/parser but scope is unambiguous
 
 import (
-	"maps"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
@@ -110,26 +108,21 @@ func getSyntaxFile(path string) (*syntax.File, error) {
 }
 
 // parseSyntaxFile parses the given pkgbuildSyntax and populates the pkgBuild object.
-// Enhanced version with support for custom variables in build() and package() functions.
 //
 // It takes in a pkgbuildSyntax object and a pkgBuild object as parameters.
 // It returns an error if any error occurs during parsing.
 func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) error {
-	customVars := make(map[string]string)
-
-	// First pass: collect variables and arrays
-	err := collectVariablesAndArrays(pkgbuildSyntax, pkgBuild, customVars)
+	// First pass: collect top-level variables and arrays (does NOT recurse into functions)
+	err := collectVariablesAndArrays(pkgbuildSyntax, pkgBuild)
 	if err != nil {
 		return err
 	}
 
-	// Second pass: process functions with enhanced variable support
-	return processFunctions(pkgbuildSyntax, pkgBuild, customVars)
+	// Second pass: process function declarations
+	return processFunctions(pkgbuildSyntax, pkgBuild)
 }
 
-func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD,
-	customVars map[string]string,
-) error {
+func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) error {
 	var (
 		err       error
 		arrayDecl []string
@@ -137,6 +130,12 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 	)
 
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
+		// Do NOT recurse into function bodies — assignments inside functions are
+		// local and must not be treated as top-level PKGBUILD variables.
+		if _, ok := node.(*syntax.FuncDecl); ok {
+			return false
+		}
+
 		if nodeType, ok := node.(*syntax.Assign); ok {
 			if nodeType.Array != nil {
 				for _, line := range set.StringifyArray(nodeType) {
@@ -144,12 +143,8 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 				}
 
 				err = pkgBuild.AddItem(nodeType.Name.Value, arrayDecl)
-				// Store array elements as unquoted space-separated string for proper bash expansion
-				// This allows "${array_name[@]}" to expand to individual elements
-				customVars[nodeType.Name.Value] = strings.Join(arrayDecl, " ")
 			} else {
 				varDecl, _ = shell.Expand(set.StringifyAssign(nodeType), os.Getenv)
-				customVars[nodeType.Name.Value] = varDecl
 				err = pkgBuild.AddItem(nodeType.Name.Value, varDecl)
 			}
 		}
@@ -160,74 +155,25 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 	return err
 }
 
-func processFunctions(
-	pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD, customVars map[string]string) error {
+func processFunctions(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) error {
 	var err error
 
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
 		if nodeType, ok := node.(*syntax.FuncDecl); ok {
+			// Store the raw function body wrapped in pkgbuild.FuncBody so that
+			// mapFunctions can distinguish it from plain string variables.
+			// Variables will be resolved at runtime via the preamble emitted by
+			// BuildScriptPreamble() and the environment variables set by
+			// SetEnvironmentVariables().
 			funcDecl := set.StringifyFuncDecl(nodeType)
+			err = pkgBuild.AddItem(nodeType.Name.Value, pkgbuild.FuncBody(funcDecl))
 
-			// Pre-process array expansions before any other processing
-			expandedFunc := preprocessArrayExpansions(funcDecl, customVars)
-
-			// Only expand known variables, preserve runtime variables like ${bin}
-			expandedFunc = expandKnownVariables(expandedFunc, customVars, pkgBuild)
-
-			err = pkgBuild.AddItem(nodeType.Name.Value, expandedFunc)
+			// Do not recurse into nested function declarations.
+			return false
 		}
 
 		return true
 	})
 
 	return err
-}
-
-// preprocessArrayExpansions handles bash array syntax like "${array[@]}" before shell.Expand.
-func preprocessArrayExpansions(funcDecl string, customVars map[string]string) string {
-	// Handle "${array[@]}" syntax
-	for arrayName, arrayValue := range customVars {
-		// Look for "${arrayName[@]}" patterns
-		pattern := `"${` + arrayName + `[@]}"`
-		if strings.Contains(funcDecl, pattern) {
-			// Replace with unquoted space-separated values for proper bash expansion
-			funcDecl = strings.ReplaceAll(funcDecl, pattern, arrayValue)
-		}
-	}
-
-	return funcDecl
-}
-
-// expandKnownVariables expands only variables we know about, leaving runtime variables intact.
-func expandKnownVariables(
-	funcDecl string, customVars map[string]string, pkgBuild *pkgbuild.PKGBUILD) string {
-	// Create a map of all known variables
-	knownVars := make(map[string]string)
-
-	// Add custom variables
-	maps.Copy(knownVars, customVars)
-
-	// Add PKGBUILD standard variables
-	knownVars["pkgdir"] = pkgBuild.PackageDir
-	knownVars["srcdir"] = pkgBuild.SourceDir
-	knownVars["startdir"] = pkgBuild.StartDir
-	knownVars["pkgname"] = pkgBuild.PkgName
-	knownVars["pkgver"] = pkgBuild.PkgVer
-	knownVars["pkgrel"] = pkgBuild.PkgRel
-	knownVars["epoch"] = pkgBuild.Epoch
-	knownVars["url"] = pkgBuild.URL
-	knownVars["maintainer"] = pkgBuild.Maintainer
-
-	// Only expand variables that we know about
-	for varName, varValue := range knownVars {
-		if varValue != "" {
-			// Replace ${varName} with varValue
-			pattern := "${" + varName + "}"
-			if strings.Contains(funcDecl, pattern) {
-				funcDecl = strings.ReplaceAll(funcDecl, pattern, varValue)
-			}
-		}
-	}
-
-	return funcDecl
 }
