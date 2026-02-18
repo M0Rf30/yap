@@ -120,7 +120,6 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	pkgBuild.mapVariables(key, data)
 	pkgBuild.mapArrays(key, data)
 	pkgBuild.mapFunctions(key, data)
-	pkgBuild.processOptions()
 
 	return nil
 }
@@ -669,6 +668,7 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 		}
 
 		pkgBuild.Options = arrVal
+		pkgBuild.processOptions()
 	case "optdepends":
 		arrVal, ok := data.([]string)
 		if !ok {
