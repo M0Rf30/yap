@@ -64,7 +64,12 @@ func (a *Apk) BuildPackage(artifactsPath string, targetArch string) error {
 func (a *Apk) PrepareFakeroot(artifactsPath string, targetArch string) error {
 	a.SetTargetArchitecture(targetArch)
 
-	a.PKGBUILD.InstalledSize, _ = files.GetDirSize(a.PKGBUILD.PackageDir)
+	installedSize, err := files.GetDirSize(a.PKGBUILD.PackageDir)
+	if err != nil {
+		return fmt.Errorf("failed to get package dir size: %w", err)
+	}
+
+	a.PKGBUILD.InstalledSize = installedSize
 	a.PKGBUILD.BuildDate = time.Now().Unix()
 	a.PKGBUILD.PkgDest = artifactsPath
 	a.PKGBUILD.YAPVersion = constants.YAPVersion
@@ -77,7 +82,7 @@ func (a *Apk) PrepareFakeroot(artifactsPath string, targetArch string) error {
 		a.PKGBUILD.Commit = git.GetCommitHash(a.PKGBUILD.StartDir)
 	}
 
-	err := a.createPkgInfo()
+	err = a.createPkgInfo()
 	if err != nil {
 		return err
 	}

@@ -84,7 +84,12 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 	// Note: Don't override ArchComputed here - it should remain the native architecture
 	// The targetArch is used for package naming in BuildPackage method
 
-	m.PKGBUILD.InstalledSize, _ = files.GetDirSize(m.PKGBUILD.PackageDir)
+	installedSize, err := files.GetDirSize(m.PKGBUILD.PackageDir)
+	if err != nil {
+		return fmt.Errorf("failed to get package dir size: %w", err)
+	}
+
+	m.PKGBUILD.InstalledSize = installedSize
 	m.PKGBUILD.BuildDate = time.Now().Unix()
 	m.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 	m.PKGBUILD.PkgType = "pkg" // can be pkg, split, debug, src
