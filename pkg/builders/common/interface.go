@@ -36,6 +36,9 @@ const (
 // This is set by command-line flags and used by PrepareEnvironment.
 var SkipToolchainValidation bool
 
+// depVersionRegex matches version operators in dependency strings like "gcc>=11.0".
+var depVersionRegex = regexp.MustCompile(`(?m)(<|<=|>=|=|>|<)`)
+
 // Builder defines the common interface that all package builders must implement.
 // This unifies the behavior across different package formats (APK, DEB, RPM, Pacman).
 type Builder interface {
@@ -75,12 +78,10 @@ func NewBaseBuilder(pkgBuild *pkgbuild.PKGBUILD, format string) *BaseBuilder {
 // ProcessDependencies processes dependency strings with version operators.
 // This consolidates the duplicated dependency processing logic across package formats.
 func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
-	pattern := `(?m)(<|<=|>=|=|>|<)`
-	regex := regexp.MustCompile(pattern)
 	processed := make([]string, len(depends))
 
 	for index, depend := range depends {
-		result := regex.Split(depend, -1)
+		result := depVersionRegex.Split(depend, -1)
 		if len(result) == 2 {
 			name := result[0]
 			operator := strings.Trim(depend, result[0]+result[1])
