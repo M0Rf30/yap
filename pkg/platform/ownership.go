@@ -2,13 +2,12 @@
 package platform
 
 import (
+	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strconv"
 	"syscall"
-
-	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -38,12 +37,12 @@ func GetOriginalUser() (*OriginalUser, error) {
 
 	uid, err := strconv.Atoi(sudoUID)
 	if err != nil {
-		return nil, errors.Wrap(err, i18n.T("errors.platform.parse_sudo_uid_failed"))
+		return nil, fmt.Errorf("%s: %w", i18n.T("errors.platform.parse_sudo_uid_failed"), err)
 	}
 
 	gid, err := strconv.Atoi(sudoGID)
 	if err != nil {
-		return nil, errors.Wrap(err, i18n.T("errors.platform.parse_sudo_gid_failed"))
+		return nil, fmt.Errorf("%s: %w", i18n.T("errors.platform.parse_sudo_gid_failed"), err)
 	}
 
 	// Get user info for additional details
@@ -81,7 +80,7 @@ func (ou *OriginalUser) ChownToOriginalUser(path string) error {
 
 	err := os.Chown(path, ou.UID, ou.GID)
 	if err != nil {
-		return errors.Wrapf(err, i18n.T("errors.platform.chown_failed"), path, ou.Name, ou.UID, ou.GID)
+		return fmt.Errorf(i18n.T("errors.platform.chown_failed")+": %w", path, ou.Name, ou.UID, ou.GID, err)
 	}
 
 	logger.Debug(i18n.T("logger.chowntooriginaluser.debug.changed_ownership_to_original_1"),
@@ -101,7 +100,7 @@ func (ou *OriginalUser) ChownRecursiveToOriginalUser(path string) error {
 
 	err := syscall.Chown(path, ou.UID, ou.GID)
 	if err != nil {
-		return errors.Wrapf(err, i18n.T("errors.platform.chown_root_directory_failed"), path)
+		return fmt.Errorf(i18n.T("errors.platform.chown_root_directory_failed")+": %w", path, err)
 	}
 
 	// Use filepath.Walk to recursively change ownership

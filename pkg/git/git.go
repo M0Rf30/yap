@@ -10,7 +10,6 @@ import (
 	ggit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -30,7 +29,7 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 	referenceName plumbing.ReferenceName,
 ) error {
 	if dloadFilePath == "" {
-		return errors.New(i18n.T("errors.git.empty_download_path"))
+		return fmt.Errorf("%s", i18n.T("errors.git.empty_download_path"))
 	}
 	// Start multiprinter for consistent output handling
 	_, err := shell.MultiPrinter.Start()
@@ -149,7 +148,7 @@ func checkoutReference(repo *ggit.Repository, referenceName plumbing.ReferenceNa
 	// Check if the remote branch exists
 	remoteRef, err := repo.Reference(remoteBranchRef, true)
 	if err != nil {
-		return errors.Errorf(i18n.T("errors.git.remote_branch_not_found"), branchName, err)
+		return fmt.Errorf(i18n.T("errors.git.remote_branch_not_found"), branchName, err)
 	}
 
 	// Create a new local branch that tracks the remote branch

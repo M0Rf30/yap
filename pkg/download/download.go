@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
-	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -31,7 +30,7 @@ func Download(destination, uri string, writer io.Writer) error {
 
 	req, err := grab.NewRequest(destination, uri)
 	if err != nil {
-		return errors.Errorf(i18n.T("errors.download.download_failed")+" %s", err)
+		return fmt.Errorf(i18n.T("errors.download.download_failed")+" %s", err)
 	}
 
 	resp := client.Do(req)
@@ -89,7 +88,7 @@ func WithResume(destination, uri string, maxRetries int, writer io.Writer) error
 		}
 	}
 
-	return errors.Errorf(i18n.T("errors.download.download_failed_after_attempts"),
+	return fmt.Errorf(i18n.T("errors.download.download_failed_after_attempts"),
 		maxRetries+1, lastErr)
 }
 
@@ -142,7 +141,7 @@ func WithResumeContext(
 		}
 	}
 
-	return errors.Errorf(i18n.T("errors.download.download_failed_after_attempts"),
+	return fmt.Errorf(i18n.T("errors.download.download_failed_after_attempts"),
 		maxRetries+1, lastErr)
 }
 
@@ -158,7 +157,7 @@ func downloadWithResumeInternal(
 
 	resp := client.Do(req)
 	if resp.HTTPResponse == nil {
-		return errors.Errorf("%s", i18n.T("errors.download.download_failed_no_response"))
+		return fmt.Errorf("%s", i18n.T("errors.download.download_failed_no_response"))
 	}
 
 	logDownloadStart(uri, resp)
@@ -176,7 +175,7 @@ func prepareDownloadRequest(
 
 	req, err := grab.NewRequest(destination, uri)
 	if err != nil {
-		return nil, nil, errors.Errorf(i18n.T("errors.download.download_failed")+" %s", err)
+		return nil, nil, fmt.Errorf(i18n.T("errors.download.download_failed")+" %s", err)
 	}
 
 	configureResumeIfPossible(req, destination, uri)

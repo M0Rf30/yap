@@ -10,7 +10,6 @@ import (
 	"text/template"
 
 	"github.com/github/go-spdx/v2/spdxexp"
-	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -1049,7 +1048,7 @@ func (pkgBuild *PKGBUILD) parseDistributionOnly(input string) (
 	}
 
 	if len(split) != 2 {
-		return key, 0, errors.Errorf(i18n.T("errors.pkgbuild.invalid_directive_use"), input)
+		return key, 0, fmt.Errorf(i18n.T("errors.pkgbuild.invalid_directive_use"), input)
 	}
 
 	if pkgBuild.FullDistroName == "" {

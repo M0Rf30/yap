@@ -3,11 +3,10 @@ package files
 
 import (
 	"debug/elf"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -17,11 +16,11 @@ import (
 func CheckWritable(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
-		return errors.Wrap(err, i18n.T("errors.files.failed_to_stat_file"))
+		return fmt.Errorf("%s: %w", i18n.T("errors.files.failed_to_stat_file"), err)
 	}
 
 	if info.Mode().Perm()&0o200 == 0 {
-		return errors.Errorf(i18n.T("errors.files.file_not_writable"), path)
+		return fmt.Errorf(i18n.T("errors.files.file_not_writable"), path)
 	}
 
 	return nil
@@ -31,7 +30,7 @@ func CheckWritable(path string) error {
 func Chmod(path string, perm os.FileMode) error {
 	if err := os.Chmod(path, perm); err != nil {
 		logger.Error(i18n.T("logger.chmod.error.failed_to_chmod_1"), "path", path, "error", err)
-		return errors.Wrap(err, i18n.T("errors.files.failed_to_change_permissions"))
+		return fmt.Errorf("%s: %w", i18n.T("errors.files.failed_to_change_permissions"), err)
 	}
 
 	return nil
@@ -82,10 +81,10 @@ func ExistsMakeDir(path string) error {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(path, 0o750); err != nil {
-			return errors.Errorf(i18n.T("errors.files.failed_to_create_directory"), path)
+			return fmt.Errorf(i18n.T("errors.files.failed_to_create_directory"), path)
 		}
 	} else if err != nil {
-		return errors.Errorf(i18n.T("errors.files.failed_to_access_directory"), path)
+		return fmt.Errorf(i18n.T("errors.files.failed_to_access_directory"), path)
 	}
 
 	return nil
