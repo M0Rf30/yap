@@ -420,6 +420,8 @@
   translation: "Building packages"
 - id: logger.build.initializing_project
   translation: "Initializing project"
+- id: logger.build.auto_detected_codename
+  translation: "Auto-detected codename for dependency resolution"
 - id: logger.build.no_distribution_specified
   translation: "No distribution specified, using system default"
 - id: logger.build.project_init_failed

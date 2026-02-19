@@ -366,7 +366,11 @@ func RunScript(cmds string) error {
 }
 
 // RunScriptWithPackage executes a shell script with package-specific output formatting.
-func RunScriptWithPackage(cmds, packageName string) error {
+// An optional extraEnv slice of "KEY=VALUE" pairs may be supplied; each entry overrides
+// or extends the inherited process environment for this script invocation only,
+// without mutating os.Environ().  This makes the function safe to call concurrently
+// from parallel build goroutines.
+func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error {
 	start := time.Now()
 
 	if packageName != "" {
@@ -413,8 +417,34 @@ func RunScriptWithPackage(cmds, packageName string) error {
 
 	teeWriter := io.MultiWriter(writer, &outputBuf)
 
+	// Build the effective environment: start with the inherited process env, then
+	// overlay any per-package overrides supplied by the caller.  Using a map-then-slice
+	// approach guarantees that package-specific values (e.g. pkgdir, srcdir) shadow
+	// the global ones without touching os.Setenv, making this safe for parallel builds.
+	envMap := make(map[string]string)
+
+	for _, kv := range os.Environ() {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			envMap[k] = v
+		}
+	}
+
+	for _, extra := range extraEnv {
+		for _, kv := range extra {
+			if k, v, ok := strings.Cut(kv, "="); ok {
+				envMap[k] = v
+			}
+		}
+	}
+
+	mergedEnv := make([]string, 0, len(envMap))
+
+	for k, v := range envMap {
+		mergedEnv = append(mergedEnv, k+"="+v)
+	}
+
 	runner, err := interp.New(
-		interp.Env(expand.ListEnviron(os.Environ()...)),
+		interp.Env(expand.ListEnviron(mergedEnv...)),
 		interp.StdIO(nil, teeWriter, teeWriter),
 	)
 	if err != nil {

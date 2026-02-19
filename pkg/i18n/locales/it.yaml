@@ -421,6 +421,8 @@
   translation: "Compilazione dei pacchetti"
 - id: logger.build.initializing_project
   translation: "Inizializzazione del progetto"
+- id: logger.build.auto_detected_codename
+  translation: "Codename rilevato automaticamente per la risoluzione delle dipendenze"
 - id: logger.build.no_distribution_specified
   translation: "Nessuna distribuzione specificata, uso il default del sistema"
 - id: logger.build.project_init_failed
