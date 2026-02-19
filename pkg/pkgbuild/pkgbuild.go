@@ -464,6 +464,24 @@ func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
 		return err
 	}
 
+	// Always refresh pkgname/pkgver/pkgrel so that scripts for each package
+	// in a multi-package build see their own values, not stale ones left in
+	// the environment by the previously built package.
+	err = os.Setenv("pkgname", pkgBuild.PkgName)
+	if err != nil {
+		return err
+	}
+
+	err = os.Setenv("pkgver", pkgBuild.PkgVer)
+	if err != nil {
+		return err
+	}
+
+	err = os.Setenv("pkgrel", pkgBuild.PkgRel)
+	if err != nil {
+		return err
+	}
+
 	// If cross-compiling, prepend staging directory paths to search paths
 	if pkgBuild.TargetArch != "" && pkgBuild.TargetArch != pkgBuild.ArchComputed {
 		return pkgBuild.setupCrossCompilationPaths()

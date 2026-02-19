@@ -744,6 +744,12 @@
 # Logger messages - Retrieving sources
 - id: logger.retrieving_sources
   translation: "Retrieving sources"
+- id: logger.preparing_sources
+  translation: "Preparing sources"
+- id: logger.building
+  translation: "Building"
+- id: logger.generating_package
+  translation: "Generating package"
 
 # Logger messages - Run graph command
 - id: logger.rungraphcommand.info.generating_dependency_graph_1

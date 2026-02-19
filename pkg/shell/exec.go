@@ -405,9 +405,16 @@ func RunScriptWithPackage(cmds, packageName string) error {
 		writer = decoratedWriter
 	}
 
+	// Tee stdout+stderr into a buffer so we can include the output in the
+	// error message when the script fails. mvdan/sh routes both stdout and
+	// stderr of the script through the writers passed to StdIO; capturing
+	// both gives us the most complete failure context.
+	var outputBuf bytes.Buffer
+	teeWriter := io.MultiWriter(writer, &outputBuf)
+
 	runner, err := interp.New(
 		interp.Env(expand.ListEnviron(os.Environ()...)),
-		interp.StdIO(nil, writer, writer),
+		interp.StdIO(nil, teeWriter, teeWriter),
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_create_script_runner"), err)
@@ -419,14 +426,19 @@ func RunScriptWithPackage(cmds, packageName string) error {
 	duration := time.Since(start)
 
 	if err != nil {
+		scriptErr := err.Error()
+		if captured := strings.TrimSpace(outputBuf.String()); captured != "" {
+			scriptErr = captured
+		}
+
 		if packageName != "" {
 			logger.Error(i18n.T("logger.runscriptwithpackage.error.script_execution_failed_1"),
-				"error", err,
+				"error", scriptErr,
 				"duration", duration,
 				"package", packageName)
 		} else {
 			logger.Error(i18n.T("logger.runscriptwithpackage.error.script_execution_failed_3"),
-				"error", err,
+				"error", scriptErr,
 				"duration", duration)
 		}
 
