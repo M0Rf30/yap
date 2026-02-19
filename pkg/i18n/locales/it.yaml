@@ -761,6 +761,12 @@
 # Messaggi logger - Retrieving sources
 - id: logger.retrieving_sources
   translation: "Recupero dei sorgenti"
+- id: logger.preparing_sources
+  translation: "Preparazione dei sorgenti"
+- id: logger.building
+  translation: "Compilazione"
+- id: logger.generating_package
+  translation: "Generazione del pacchetto"
 
 # Messaggi logger - Run graph command
 - id: logger.rungraphcommand.info.generating_dependency_graph_1

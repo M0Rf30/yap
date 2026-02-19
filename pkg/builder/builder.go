@@ -142,8 +142,11 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	// bodies resolve at runtime instead of failing with "not found in $PATH".
 	preamble := builder.PKGBUILD.BuildScriptPreamble()
 
-	// Execute script with package decoration
-	err = shell.RunScriptWithPackage("  set -e\n"+preamble+pkgbuildFunction, pkgName)
+	// Execute script with package decoration.
+	// set -x traces each command to stderr before execution so that when a
+	// command fails we can see which one it was (mvdan/sh builtins like cd
+	// produce no output on failure — only an exit status).
+	err = shell.RunScriptWithPackage("  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).
