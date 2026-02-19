@@ -138,6 +138,22 @@ func addArFile(writer *ar.Writer, name string, body []byte, date time.Time) erro
 	return err
 }
 
+// arWriterCompat wraps ar.Writer to fix its non-standard Write contract.
+// ar.Writer.Write returns n+1 for odd-sized payloads (padding byte), which
+// causes io.Copy to return errInvalidWrite. This wrapper caps nw to len(b).
+type arWriterCompat struct {
+	w *ar.Writer
+}
+
+func (a arWriterCompat) Write(b []byte) (int, error) {
+	nw, err := a.w.Write(b)
+	if nw > len(b) {
+		nw = len(b)
+	}
+
+	return nw, err
+}
+
 // addArFileFromPath streams a file from disk into the ar archive without
 // reading the entire file into memory.
 func addArFileFromPath(writer *ar.Writer, name string, filePath string, modtime time.Time) error {
@@ -168,7 +184,7 @@ func addArFileFromPath(writer *ar.Writer, name string, filePath string, modtime 
 		return err
 	}
 
-	_, err = io.Copy(writer, f)
+	_, err = io.Copy(arWriterCompat{w: writer}, f)
 
 	return err
 }
