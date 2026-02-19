@@ -20,6 +20,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/git"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -66,7 +67,8 @@ func (a *Apk) PrepareFakeroot(artifactsPath string, targetArch string) error {
 
 	installedSize, err := files.GetDirSize(a.PKGBUILD.PackageDir)
 	if err != nil {
-		return fmt.Errorf("failed to get package dir size: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to get package dir size").
+			WithOperation("PrepareFakeroot")
 	}
 
 	a.PKGBUILD.InstalledSize = installedSize
@@ -282,7 +284,8 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 
 // writeFileWithChecksum writes a file to the tar archive with optional PAX checksum.
 // Control files use USTAR format, data files use PAX format with SHA1 checksums.
-// nolint:gocyclo,nestif
+//
+//nolint:gocyclo,nestif // writeFileWithChecksum handles multiple PAX/USTAR format branches inline
 func (a *Apk) writeFileWithChecksum(
 	ctx context.Context, tw *tar.Writer, file archives.FileInfo,
 ) error {
@@ -292,7 +295,10 @@ func (a *Apk) writeFileWithChecksum(
 
 	hdr, err := tar.FileInfoHeader(file, file.LinkTarget)
 	if err != nil {
-		return fmt.Errorf("file %s: creating header: %w", file.NameInArchive, err)
+		return errors.Wrap(err, errors.ErrTypePackaging,
+			fmt.Sprintf("file %s: creating header", file.NameInArchive)).
+			WithOperation("writeFileWithChecksum").
+			WithContext("file", file.NameInArchive)
 	}
 
 	hdr.Name = file.NameInArchive
@@ -322,7 +328,10 @@ func (a *Apk) writeFileWithChecksum(
 	if !isControlFile(hdr.Name) && hdr.Typeflag == tar.TypeReg {
 		f, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("file %s: opening for checksum: %w", file.NameInArchive, err)
+			return errors.Wrap(err, errors.ErrTypePackaging,
+				fmt.Sprintf("file %s: opening for checksum", file.NameInArchive)).
+				WithOperation("writeFileWithChecksum").
+				WithContext("file", file.NameInArchive)
 		}
 
 		defer func() {
@@ -334,28 +343,43 @@ func (a *Apk) writeFileWithChecksum(
 
 		content, err := io.ReadAll(f)
 		if err != nil {
-			return fmt.Errorf("file %s: reading for checksum: %w", file.NameInArchive, err)
+			return errors.Wrap(err, errors.ErrTypePackaging,
+				fmt.Sprintf("file %s: reading for checksum", file.NameInArchive)).
+				WithOperation("writeFileWithChecksum").
+				WithContext("file", file.NameInArchive)
 		}
 
 		if _, err := hasher.Write(content); err != nil {
-			return fmt.Errorf("file %s: computing checksum: %w", file.NameInArchive, err)
+			return errors.Wrap(err, errors.ErrTypePackaging,
+				fmt.Sprintf("file %s: computing checksum", file.NameInArchive)).
+				WithOperation("writeFileWithChecksum").
+				WithContext("file", file.NameInArchive)
 		}
 
 		hdr.PAXRecords["APK-TOOLS.checksum.SHA1"] = hex.EncodeToString(hasher.Sum(nil))
 
 		if err := tw.WriteHeader(hdr); err != nil {
-			return fmt.Errorf("file %s: writing header: %w", file.NameInArchive, err)
+			return errors.Wrap(err, errors.ErrTypePackaging,
+				fmt.Sprintf("file %s: writing header", file.NameInArchive)).
+				WithOperation("writeFileWithChecksum").
+				WithContext("file", file.NameInArchive)
 		}
 
 		if _, err := tw.Write(content); err != nil {
-			return fmt.Errorf("file %s: writing data: %w", file.NameInArchive, err)
+			return errors.Wrap(err, errors.ErrTypePackaging,
+				fmt.Sprintf("file %s: writing data", file.NameInArchive)).
+				WithOperation("writeFileWithChecksum").
+				WithContext("file", file.NameInArchive)
 		}
 
 		return nil
 	}
 
 	if err := tw.WriteHeader(hdr); err != nil {
-		return fmt.Errorf("file %s: writing header: %w", file.NameInArchive, err)
+		return errors.Wrap(err, errors.ErrTypePackaging,
+			fmt.Sprintf("file %s: writing header", file.NameInArchive)).
+			WithOperation("writeFileWithChecksum").
+			WithContext("file", file.NameInArchive)
 	}
 
 	if hdr.Typeflag != tar.TypeReg {
@@ -364,7 +388,10 @@ func (a *Apk) writeFileWithChecksum(
 
 	f, err := file.Open()
 	if err != nil {
-		return fmt.Errorf("file %s: opening: %w", file.NameInArchive, err)
+		return errors.Wrap(err, errors.ErrTypePackaging,
+			fmt.Sprintf("file %s: opening", file.NameInArchive)).
+			WithOperation("writeFileWithChecksum").
+			WithContext("file", file.NameInArchive)
 	}
 
 	defer func() {
@@ -372,7 +399,10 @@ func (a *Apk) writeFileWithChecksum(
 	}()
 
 	if _, err := io.Copy(tw, f); err != nil {
-		return fmt.Errorf("file %s: writing data: %w", file.NameInArchive, err)
+		return errors.Wrap(err, errors.ErrTypePackaging,
+			fmt.Sprintf("file %s: writing data", file.NameInArchive)).
+			WithOperation("writeFileWithChecksum").
+			WithContext("file", file.NameInArchive)
 	}
 
 	return nil

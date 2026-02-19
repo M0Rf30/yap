@@ -212,13 +212,13 @@ func TestWithResume(t *testing.T) {
 	destination := filepath.Join(tempDir, "test.txt")
 
 	// Test with invalid URL - should fail
-	err = WithResume(destination, "invalid://url", 0, nil)
+	err = WithResume(context.Background(), destination, "invalid://url", 0, nil)
 	if err == nil {
 		t.Error("Expected error for invalid URL")
 	}
 
 	// Test with non-retryable error (should not retry)
-	err = WithResume(destination, "invalid://url", 2, nil)
+	err = WithResume(context.Background(), destination, "invalid://url", 2, nil)
 	if err == nil {
 		t.Error("Expected error for invalid URL")
 	}
@@ -317,7 +317,7 @@ func TestWithResumeWithMockServer(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	err = WithResume(destination, server.URL, 1, &buf)
+	err = WithResume(context.Background(), destination, server.URL, 1, &buf)
 	if err != nil {
 		t.Errorf("WithResume failed: %v", err)
 	}

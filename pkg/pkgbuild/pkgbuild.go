@@ -2,6 +2,7 @@
 package pkgbuild
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -229,7 +230,7 @@ func filterInstalledPackages(packageManager string, packages []string) []string 
 		copy(args, queryArgs)
 		args[len(queryArgs)] = pkg
 
-		err := shell.Exec(true, "", queryCmd, args...)
+		err := shell.Exec(context.Background(), true, "", queryCmd, args...)
 		if err != nil {
 			// Package not installed or query failed, add to missing list
 			missingPackages = append(missingPackages, pkg)
@@ -267,14 +268,14 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 
 	args = append(args, missingPackages...)
 
-	return shell.ExecWithSudo(false, "", packageManager, args...)
+	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
 }
 
 // GetUpdates reads the package manager name and its arguments to perform
 // a sync with remotes and consequently retrieve updates.
 // It returns any error if encountered.
 func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
-	return shell.ExecWithSudo(false, "", packageManager, args...)
+	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
 }
 
 // Init initializes the PKGBUILD struct.

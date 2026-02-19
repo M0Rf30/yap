@@ -15,6 +15,8 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 )
 
+const defaultVersion = "1.0.0"
+
 // LoadProjectForGraph loads project configuration and creates graph data.
 func LoadProjectForGraph(projectPath, themeName string) (*graph.Data, error) {
 	// Read yap.json directly for graph generation
@@ -71,7 +73,7 @@ func createSinglePackageGraph(packageName, themeName string) *graph.Data {
 			packageName: {
 				Name:         packageName,
 				PkgName:      packageName, // Use packageName as pkgname for single packages
-				Version:      "1.0.0",
+				Version:      defaultVersion,
 				Release:      "1",
 				X:            0,
 				Y:            0,
@@ -147,7 +149,7 @@ func parsePKGBUILD(projectDir string) (pkgName, version, release string) {
 	pkgBuild, err := parser.ParseFile("", "", projectDir, projectDir)
 	if err != nil {
 		// Return defaults if we can't parse the file
-		return "", "1.0.0", "1"
+		return "", defaultVersion, "1"
 	}
 
 	// Extract the values from the parsed PKGBUILD
@@ -157,7 +159,7 @@ func parsePKGBUILD(projectDir string) (pkgName, version, release string) {
 
 	// Set defaults if not found
 	if version == "" {
-		version = "1.0.0"
+		version = defaultVersion
 	}
 
 	if release == "" {

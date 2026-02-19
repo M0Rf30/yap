@@ -2,6 +2,7 @@
 package binary //nolint:revive // intentional name; conflicts with stdlib encoding/binary but scope is unambiguous
 
 import (
+	"context"
 	"os"
 
 	"github.com/M0Rf30/yap/v2/pkg/shell"
@@ -31,5 +32,5 @@ func strip(path string, args ...string) error {
 		stripCmd = "strip"
 	}
 
-	return shell.Exec(false, "", stripCmd, args...)
+	return shell.Exec(context.Background(), false, "", stripCmd, args...)
 }

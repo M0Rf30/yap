@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
@@ -59,7 +60,9 @@ func (ct *CrossToolchain) Validate() ([]string, error) {
 	}
 
 	if len(missing) > 0 {
-		return missing, fmt.Errorf("missing required toolchain executables: %v", missing)
+		return missing, errors.New(errors.ErrTypeBuild, "missing required toolchain executables").
+			WithOperation("Validate").
+			WithContext("missing", fmt.Sprintf("%v", missing))
 	}
 
 	return nil, nil
@@ -393,11 +396,11 @@ func GetCrossToolchain(arch, distro string) (CrossToolchain, error) {
 		}
 	}
 
-	return CrossToolchain{}, fmt.Errorf(
-		"unsupported cross-compilation toolchain: arch=%s, distro=%s",
-		arch,
-		distro,
-	)
+	return CrossToolchain{}, errors.New(errors.ErrTypeBuild,
+		fmt.Sprintf("unsupported cross-compilation toolchain: arch=%s, distro=%s", arch, distro)).
+		WithOperation("GetCrossToolchain").
+		WithContext("targetArch", arch).
+		WithContext("distro", distro)
 }
 
 // ValidateToolchain checks if the required cross-compilation toolchain is available
@@ -414,13 +417,20 @@ func ValidateToolchain(targetArch, format string) error {
 
 	distro, exists := formatToDistro[format]
 	if !exists {
-		return fmt.Errorf(i18n.T("errors.cross_compilation.unsupported_format")+" %s", format)
+		msg := fmt.Sprintf("%s %s", i18n.T("errors.cross_compilation.unsupported_format"), format)
+
+		return errors.New(errors.ErrTypeBuild, msg).
+			WithOperation("ValidateToolchain").
+			WithContext("format", format)
 	}
 
 	// Get the toolchain configuration
 	toolchain, err := GetCrossToolchain(targetArch, distro)
 	if err != nil {
-		return fmt.Errorf(i18n.T("errors.cross_compilation.failed_to_get_toolchain")+" %s/%s: %w", targetArch, distro, err)
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.cross_compilation.failed_to_get_toolchain")).
+			WithOperation("ValidateToolchain").
+			WithContext("targetArch", targetArch).
+			WithContext("distro", distro)
 	}
 
 	// Validate the toolchain
@@ -488,5 +498,6 @@ func ValidateToolchain(targetArch, format string) error {
 	// Add tip about skipping validation
 	msg.WriteString("\n" + i18n.T("errors.cross_compilation.skip_validation_tip") + "\n")
 
-	return fmt.Errorf("%s", msg.String())
+	return errors.New(errors.ErrTypeBuild, msg.String()).
+		WithOperation("ValidateToolchain")
 }

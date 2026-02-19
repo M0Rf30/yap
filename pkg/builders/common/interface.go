@@ -2,6 +2,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -357,7 +359,7 @@ func (bb *BaseBuilder) PrepareEnvironmentWithValidation(golang bool, targetArch 
 	useSudo := bb.Format == constants.FormatAPK
 
 	// Install dependencies first
-	err := shell.ExecWithSudo(useSudo, "", getPackageManager(bb.Format), allArgs...)
+	err := shell.ExecWithSudo(context.Background(), useSudo, "", getPackageManager(bb.Format), allArgs...)
 	if err != nil {
 		return err
 	}
@@ -366,7 +368,8 @@ func (bb *BaseBuilder) PrepareEnvironmentWithValidation(golang bool, targetArch 
 	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
 		err = bb.SetupCrossCompilationEnvironment(targetArch)
 		if err != nil {
-			return fmt.Errorf("failed to setup cross-compilation environment: %w", err)
+			return errors.Wrap(err, errors.ErrTypeBuild, "failed to setup cross-compilation environment").
+				WithOperation("PrepareEnvironmentWithValidation")
 		}
 	}
 
@@ -431,7 +434,7 @@ func (bb *BaseBuilder) validateCrossToolchain(targetArch string) error {
 
 	if err := ValidateToolchain(targetArch, bb.Format); err != nil {
 		// Return detailed validation error with installation instructions
-		return fmt.Errorf("%w", err)
+		return err
 	}
 
 	logger.Debug("Cross-compilation toolchain validation passed",
@@ -493,9 +496,7 @@ func (bb *BaseBuilder) SetupCcache() error {
 // SetupCrossCompilationEnvironment configures environment variables for cross-compilation.
 // This function sets up environment variables for C/C++, Rust, and Go cross-compilation.
 //
-//nolint:gocyclo,cyclop
-//nolint:cyclop
-//nolint:gocyclo
+//nolint:gocyclo,cyclop // SetupCrossCompilationEnvironment is inherently complex; splitting would harm readability
 func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error {
 	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
 		// No cross-compilation needed
@@ -509,7 +510,9 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	// Get the appropriate cross-compiler toolchain for the target architecture
 	toolchain, exists := CrossToolchainMap[targetArch]
 	if !exists {
-		return fmt.Errorf("no cross-compilation toolchain available for architecture: %s", targetArch)
+		return errors.New(errors.ErrTypeBuild, "no cross-compilation toolchain available").
+			WithOperation("SetupCrossCompilationEnvironment").
+			WithContext("targetArch", targetArch)
 	}
 
 	// Determine the distribution-specific toolchain packages
@@ -537,7 +540,10 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 		}
 
 		if toolchainPackages.GCCPackage == "" {
-			return fmt.Errorf("no cross-compilation toolchain available for %s on %s", targetArch, distro)
+			return errors.New(errors.ErrTypeBuild, "no cross-compilation toolchain available").
+				WithOperation("SetupCrossCompilationEnvironment").
+				WithContext("targetArch", targetArch).
+				WithContext("distro", distro)
 		}
 	}
 

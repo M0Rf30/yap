@@ -2,6 +2,7 @@
 package source
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
@@ -132,7 +133,7 @@ func (src *Source) Get() error {
 		return err
 	}
 
-	err = archive.Extract(sourceFilePath, src.SrcDir)
+	err = archive.Extract(context.Background(), sourceFilePath, src.SrcDir)
 	if err != nil {
 		return err
 	}

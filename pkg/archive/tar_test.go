@@ -1,6 +1,7 @@
 package archive_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,7 +29,7 @@ func TestCreateTarZst(t *testing.T) {
 	}
 
 	// Test creating tar.zst archive
-	err = archive.CreateTarZst(sourceDir, outputFile, false)
+	err = archive.CreateTarZst(context.Background(), sourceDir, outputFile, false)
 	if err != nil {
 		t.Fatalf("CreateTarZst failed: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestCreateTarZstWithDirectories(t *testing.T) {
 	}
 
 	// Test creating tar.zst archive with directories
-	err = archive.CreateTarZst(sourceDir, outputFile, true)
+	err = archive.CreateTarZst(context.Background(), sourceDir, outputFile, true)
 	if err != nil {
 		t.Fatalf("CreateTarZst failed: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestCreateTarZstInvalidSourceDir(t *testing.T) {
 	outputFile := filepath.Join(tempDir, "test.tar.zst")
 	invalidSourceDir := "/non/existent/directory"
 
-	err := archive.CreateTarZst(invalidSourceDir, outputFile, false)
+	err := archive.CreateTarZst(context.Background(), invalidSourceDir, outputFile, false)
 	if err == nil {
 		t.Fatal("Expected error for invalid source directory, got nil")
 	}
@@ -104,7 +105,7 @@ func TestExtract(t *testing.T) {
 	}
 
 	// Create archive
-	err = archive.CreateTarZst(sourceDir, archiveFile, false)
+	err = archive.CreateTarZst(context.Background(), sourceDir, archiveFile, false)
 	if err != nil {
 		t.Fatalf("Failed to create archive: %v", err)
 	}
@@ -116,7 +117,7 @@ func TestExtract(t *testing.T) {
 	}
 
 	// Test extraction
-	err = archive.Extract(archiveFile, extractDir)
+	err = archive.Extract(context.Background(), archiveFile, extractDir)
 	if err != nil {
 		t.Fatalf("Extract failed: %v", err)
 	}
@@ -148,7 +149,7 @@ func TestExtractInvalidArchive(t *testing.T) {
 		t.Fatalf("Failed to create extract directory: %v", err)
 	}
 
-	err = archive.Extract(invalidArchive, extractDir)
+	err = archive.Extract(context.Background(), invalidArchive, extractDir)
 	if err == nil {
 		t.Fatal("Expected error for invalid archive file, got nil")
 	}

@@ -176,7 +176,7 @@ func TestGitProgressWriterCarriageReturn(t *testing.T) {
 
 func TestExec(t *testing.T) {
 	// Test with a simple command that should exist on most systems
-	err := Exec(true, "", "echo", "test")
+	err := Exec(context.Background(), true, "", "echo", "test")
 	if err != nil {
 		t.Fatalf("Exec failed: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestExecWithContextTimeout(t *testing.T) {
 
 func TestExecInvalidCommand(t *testing.T) {
 	// Test with non-existent command
-	err := Exec(true, "", "non-existent-command-xyz")
+	err := Exec(context.Background(), true, "", "non-existent-command-xyz")
 	if err == nil {
 		t.Fatal("Expected error for non-existent command, got nil")
 	}
@@ -304,7 +304,7 @@ func TestExecWithSudoValidation(t *testing.T) {
 	_ = i18n.Init("en")
 
 	// Test individual invalid commands (should be rejected by validation before execution)
-	err := ExecWithSudo(true, "", "rm", "test")
+	err := ExecWithSudo(context.Background(), true, "", "rm", "test")
 	if err == nil {
 		t.Fatal("Expected error for rm command, got nil")
 	}
@@ -313,7 +313,7 @@ func TestExecWithSudoValidation(t *testing.T) {
 		t.Fatalf("Expected validation error for rm, got: %v", err)
 	}
 
-	err = ExecWithSudo(true, "", "curl", "test")
+	err = ExecWithSudo(context.Background(), true, "", "curl", "test")
 	if err == nil {
 		t.Fatal("Expected error for curl command, got nil")
 	}
@@ -322,7 +322,7 @@ func TestExecWithSudoValidation(t *testing.T) {
 		t.Fatalf("Expected validation error for curl, got: %v", err)
 	}
 
-	err = ExecWithSudo(true, "", "bash", "test")
+	err = ExecWithSudo(context.Background(), true, "", "bash", "test")
 	if err == nil {
 		t.Fatal("Expected error for bash command, got nil")
 	}

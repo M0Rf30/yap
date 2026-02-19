@@ -2,6 +2,7 @@
 package deb
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -62,7 +63,7 @@ func (d *Package) BuildPackage(artifactsPath string, targetArch string) error {
 	dataArchive := filepath.Join(debTemp, dataFilename)
 
 	// Create control archive
-	err = archive.CreateTarZst(d.debDir, controlArchive, true)
+	err = archive.CreateTarZst(context.Background(), d.debDir, controlArchive, true)
 	if err != nil {
 		return err
 	}
@@ -73,7 +74,7 @@ func (d *Package) BuildPackage(artifactsPath string, targetArch string) error {
 	}
 
 	// Create data archive
-	err = archive.CreateTarZst(d.PKGBUILD.PackageDir, dataArchive, true)
+	err = archive.CreateTarZst(context.Background(), d.PKGBUILD.PackageDir, dataArchive, true)
 	if err != nil {
 		return err
 	}

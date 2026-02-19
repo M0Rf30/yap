@@ -3,6 +3,7 @@ package pacman
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -63,7 +64,7 @@ func (m *Pkg) BuildPackage(artifactsPath string, targetArch string) error {
 		m.PKGBUILD.ArchComputed)
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-	err := archive.CreateTarZst(m.PKGBUILD.PackageDir, pkgFilePath, false)
+	err := archive.CreateTarZst(context.Background(), m.PKGBUILD.PackageDir, pkgFilePath, false)
 	if err != nil {
 		return err
 	}

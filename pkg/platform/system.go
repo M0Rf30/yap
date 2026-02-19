@@ -3,6 +3,7 @@ package platform
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -134,7 +135,7 @@ func GOSetup() error {
 		return fmt.Errorf("%s: %w", i18n.T("errors.platform.download_go_archive_failed"), err)
 	}
 
-	if err := archive.Extract(goArchivePath, "/usr/lib"); err != nil {
+	if err := archive.Extract(context.Background(), goArchivePath, "/usr/lib"); err != nil {
 		return fmt.Errorf("%s: %w", i18n.T("errors.platform.extract_go_archive_failed"), err)
 	}
 
@@ -174,7 +175,7 @@ func PullContainers(distro string) error {
 	}
 
 	if _, err := os.Stat(containerApp); err == nil {
-		return shell.Exec(false, "", containerApp, args...)
+		return shell.Exec(context.Background(), false, "", containerApp, args...)
 	}
 
 	return nil

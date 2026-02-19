@@ -153,6 +153,50 @@ func TestBuildDepsConsistency(t *testing.T) {
 	}
 }
 
+func TestDistroFormat(t *testing.T) {
+	tests := []struct {
+		distro string
+		want   string
+	}{
+		// APK
+		{"alpine", FormatAPK},
+		{"Alpine", FormatAPK}, // case-insensitive
+		// DEB family
+		{"ubuntu", FormatDEB},
+		{"debian", FormatDEB},
+		{"linuxmint", FormatDEB},
+		{"pop", FormatDEB},
+		// RPM family – canonical Releases names
+		{"fedora", FormatRPM},
+		{"rhel", FormatRPM},
+		{"centos", FormatRPM},
+		{"rocky", FormatRPM},
+		{"almalinux", FormatRPM},
+		{"amzn", FormatRPM},
+		{"ol", FormatRPM},
+		{"opensuse-leap", FormatRPM},
+		{"opensuse-tumbleweed", FormatRPM},
+		// RPM family – legacy/alternate names
+		{"alma", FormatRPM},
+		{"opensuse", FormatRPM},
+		{"suse", FormatRPM},
+		// Pacman
+		{"arch", FormatPacman},
+		// Unknown
+		{"unknown", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.distro, func(t *testing.T) {
+			got := DistroFormat(tt.distro)
+			if got != tt.want {
+				t.Errorf("DistroFormat(%q) = %q, want %q", tt.distro, got, tt.want)
+			}
+		})
+	}
+}
+
 func contains(slice []string, item string) bool {
 	return slices.Contains(slice, item)
 }

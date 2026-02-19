@@ -2,6 +2,7 @@
 package common
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -44,7 +45,7 @@ func (bb *BaseBuilder) ExtractToSysroot(packagePath, sysrootDir string) error {
 		extractErr = extractDEB(packagePath, sysrootDir)
 	case constants.FormatRPM, constants.FormatAPK, constants.FormatPacman:
 		// Use generic archive extraction for RPM, APK, and Pacman formats
-		extractErr = archive.Extract(packagePath, sysrootDir)
+		extractErr = archive.Extract(context.Background(), packagePath, sysrootDir)
 	default:
 		return errors.New(errors.ErrTypePackaging, "unsupported package format for extraction").
 			WithContext("format", bb.Format).
@@ -165,7 +166,7 @@ func extractDEB(packagePath, sysrootDir string) error {
 	}()
 
 	// Use archive.Extract to handle the tar extraction (with compression auto-detection)
-	return archive.Extract(dataTarPath, sysrootDir)
+	return archive.Extract(context.Background(), dataTarPath, sysrootDir)
 }
 
 // GetSysrootDir returns the sysroot directory path for cross-compilation.
