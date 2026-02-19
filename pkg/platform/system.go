@@ -25,10 +25,14 @@ const (
 
 // OSRelease represents operating system release information.
 type OSRelease struct {
-	ID string
+	ID       string
+	Codename string // VERSION_CODENAME from /etc/os-release (e.g. "jammy" for Ubuntu 22.04)
 }
 
 // ParseOSRelease reads and parses the /etc/os-release file.
+// It populates ID (e.g. "ubuntu") and Codename (e.g. "jammy") from the
+// VERSION_CODENAME field so that callers can resolve distro-codename-specific
+// PKGBUILD directives such as depends__ubuntu_jammy.
 func ParseOSRelease() (OSRelease, error) {
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
@@ -46,7 +50,8 @@ func ParseOSRelease() (OSRelease, error) {
 	scanner := bufio.NewScanner(file)
 
 	fieldMap := map[string]*string{
-		"ID": &osRelease.ID,
+		"ID":               &osRelease.ID,
+		"VERSION_CODENAME": &osRelease.Codename,
 	}
 
 	for scanner.Scan() {

@@ -41,7 +41,8 @@ UBUNTU_CODENAME=jammy`
 	var osRelease OSRelease
 
 	fieldMap := map[string]*string{
-		"ID": &osRelease.ID,
+		"ID":               &osRelease.ID,
+		"VERSION_CODENAME": &osRelease.Codename,
 	}
 
 	for _, line := range lines {
@@ -62,6 +63,10 @@ UBUNTU_CODENAME=jammy`
 
 	if osRelease.ID != "ubuntu" {
 		t.Fatalf("Expected ID to be 'ubuntu', got '%s'", osRelease.ID)
+	}
+
+	if osRelease.Codename != "jammy" {
+		t.Fatalf("Expected Codename to be 'jammy', got '%s'", osRelease.Codename)
 	}
 }
 

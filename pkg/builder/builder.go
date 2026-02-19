@@ -93,22 +93,20 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	pkgVer := builder.PKGBUILD.PkgVer
 	pkgRel := builder.PKGBUILD.PkgRel
 
-	// Set environment variables for this package before executing any function
-	// This ensures each package uses its own pkgdir, srcdir, and startdir
-	err := builder.PKGBUILD.SetEnvironmentVariables()
-	if err != nil {
-		errMsg := i18n.T("errors.pkgbuild.failed_to_set_environment_variables")
-
-		return errors.Wrap(err, errors.ErrTypeBuild, errMsg).
-			WithContext("package", pkgName).
-			WithContext("stage", stage).
-			WithOperation("SetEnvironmentVariables")
-	}
+	// Build a per-package environment slice without mutating os.Setenv.
+	// This is safe to call concurrently from multiple parallel-build goroutines
+	// because it does not touch the global process environment.
+	pkgEnv := builder.PKGBUILD.BuildEnvironmentSlice()
 
 	// Use logger for consistent formatting
 	logger.Info(i18n.T(message), "pkgver", pkgVer, "pkgrel", pkgRel)
 
-	// Set up ccache for the build stage if ccache is available
+	// Set up ccache for the build stage if ccache is available.
+	// SetupCcache / SetupCrossCompilationEnvironment still call os.Setenv, so
+	// capture the resulting env *after* they run and before the shell interpreter
+	// snapshots it, reducing (but not fully eliminating) the race window for
+	// cross-compilation / ccache vars.  A full fix for those helpers is tracked
+	// separately.
 	if stage == "build" {
 		// Create a temporary BaseBuilder to access the SetupCcache and
 		// SetupCrossCompilationEnvironment methods
@@ -118,7 +116,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 			Format:   format,
 		}
 
-		err = tempBuilder.SetupCcache()
+		err := tempBuilder.SetupCcache()
 		if err != nil {
 			logger.Warn(i18n.T("logger.setupccache.warn.ccache_setup_failed_1"),
 				"package", pkgName, "error", err)
@@ -146,7 +144,9 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	// set -x traces each command to stderr before execution so that when a
 	// command fails we can see which one it was (mvdan/sh builtins like cd
 	// produce no output on failure — only an exit status).
-	err = shell.RunScriptWithPackage("  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName)
+	// Pass pkgEnv so the interpreter receives per-package dirs/names without
+	// relying on the (racy) global os environment.
+	err := shell.RunScriptWithPackage("  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).

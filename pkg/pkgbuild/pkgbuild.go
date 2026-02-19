@@ -440,9 +440,67 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 	}
 }
 
+// BuildEnvironmentSlice returns the package-specific environment variables as a
+// "KEY=VALUE" slice that can be merged with os.Environ() for safe concurrent use.
+// Unlike SetEnvironmentVariables, it does NOT mutate the process environment, making
+// it safe to call from multiple goroutines simultaneously (parallel builds).
+//
+// The returned slice includes:
+//   - pkgdir, srcdir, startdir — per-package directory paths
+//   - pkgname, pkgver, pkgrel — per-package identity fields
+//   - CPATH, LIBRARY_PATH, PKG_CONFIG_PATH — sysroot search paths prepended to
+//     their current global values
+func (pkgBuild *PKGBUILD) BuildEnvironmentSlice() []string {
+	sysrootDir := filepath.Join(filepath.Dir(pkgBuild.StartDir), "yap-sysroot")
+
+	// Build sysroot path additions without touching the global env.
+	cpathDirs := []string{
+		filepath.Join(sysrootDir, "usr", "include"),
+		filepath.Join(sysrootDir, "usr", "local", "include"),
+	}
+
+	libDirs := []string{
+		filepath.Join(sysrootDir, "usr", "lib"),
+		filepath.Join(sysrootDir, "usr", "local", "lib"),
+	}
+
+	pkgConfigDirs := []string{
+		filepath.Join(sysrootDir, "usr", "lib", "pkgconfig"),
+		filepath.Join(sysrootDir, "usr", "share", "pkgconfig"),
+		filepath.Join(sysrootDir, "usr", "local", "lib", "pkgconfig"),
+	}
+
+	buildEnvPath := func(key string, prepend []string) string {
+		existing := os.Getenv(key)
+		parts := make([]string, 0, len(prepend)+1)
+		parts = append(parts, prepend...)
+
+		if existing != "" {
+			parts = append(parts, existing)
+		}
+
+		return key + "=" + strings.Join(parts, ":")
+	}
+
+	return []string{
+		"pkgdir=" + pkgBuild.PackageDir,
+		"srcdir=" + pkgBuild.SourceDir,
+		"startdir=" + pkgBuild.StartDir,
+		"pkgname=" + pkgBuild.PkgName,
+		"pkgver=" + pkgBuild.PkgVer,
+		"pkgrel=" + pkgBuild.PkgRel,
+		buildEnvPath("CPATH", cpathDirs),
+		buildEnvPath("LIBRARY_PATH", libDirs),
+		buildEnvPath("PKG_CONFIG_PATH", pkgConfigDirs),
+	}
+}
+
 // SetEnvironmentVariables sets the environment variables for the PKGBUILD execution context.
 // This should be called just before executing build/package functions to ensure
 // each package uses its own directories, even when building multiple packages.
+//
+// NOTE: For parallel builds, prefer BuildEnvironmentSlice() which does not mutate
+// the global process environment and is safe to call from multiple goroutines.
 //
 // It always sets up sysroot environment paths (CPATH, LIBRARY_PATH, PKG_CONFIG_PATH)
 // pointing to yap-sysroot/ so that internal dependencies extracted there are visible
