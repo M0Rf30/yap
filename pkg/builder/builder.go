@@ -51,6 +51,15 @@ func (builder *Builder) Compile(noBuild bool) error {
 			WithOperation("getSources")
 	}
 
+	// After extraction, recursively restore ownership of the source tree to the
+	// original (pre-sudo) user. initDirs only chowned the src/ directory itself;
+	// the tarball contents are extracted as root and must be fixed here so the
+	// build script can write into them (e.g. Configure creating doc/html/).
+	if err := platform.PreserveOwnershipRecursive(builder.PKGBUILD.SourceDir); err != nil {
+		logger.Warn(i18n.T("logger.failed_to_preserve_ownership"),
+			"path", builder.PKGBUILD.SourceDir, "error", err)
+	}
+
 	if !noBuild {
 		err := builder.processFunction(builder.PKGBUILD.Prepare, "logger.preparing_sources", "prepare")
 		if err != nil {
@@ -265,11 +274,6 @@ func (builder *Builder) initDirs() error {
 	err := files.ExistsMakeDir(builder.PKGBUILD.SourceDir)
 	if err != nil {
 		return err
-	}
-
-	if err := platform.PreserveOwnership(builder.PKGBUILD.SourceDir); err != nil {
-		logger.Warn(i18n.T("logger.failed_to_preserve_ownership"),
-			"path", builder.PKGBUILD.SourceDir, "error", err)
 	}
 
 	return nil
