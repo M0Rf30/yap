@@ -13,8 +13,9 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
-// InstallOrExtractor is implemented by package builders that can install
-// or extract artifacts into a target directory.
+// InstallOrExtractor is implemented by package builders that extract built
+// artifacts into the yap-sysroot directory so that dependent packages can
+// resolve headers and libraries without installing to the root filesystem.
 type InstallOrExtractor interface {
 	InstallOrExtract(artifactsPath, buildDir, targetArch string) error
 }
@@ -24,9 +25,6 @@ type Packer interface {
 	// BuildPackage starts the package building process and writes the final artifact
 	// to the specified output path. It returns an error if any issues occur during the build.
 	BuildPackage(output string, targetArch string) error
-	// Install reads the path where the final artifact will be written. It returns
-	// any error if encountered.
-	Install(output string) error
 	// Prepare appends the dependencies required to build all the projects. It
 	// returns any error if encountered.
 	Prepare(depends []string, targetArch string) error

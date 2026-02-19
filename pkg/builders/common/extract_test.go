@@ -66,15 +66,15 @@ Description: Test package for extraction
 	return debPath
 }
 
-func TestExtractToStaging(t *testing.T) {
+func TestExtractToSysroot(t *testing.T) {
 	// Create temporary directory
 	tmpDir := t.TempDir()
 
 	// Create test DEB package
 	debPath := createTestDEB(t, tmpDir)
 
-	// Create staging directory
-	stagingDir := filepath.Join(tmpDir, "staging")
+	// Create sysroot directory
+	sysrootDir := filepath.Join(tmpDir, "sysroot")
 
 	// Create BaseBuilder
 	pkg := &pkgbuild.PKGBUILD{
@@ -89,15 +89,15 @@ func TestExtractToStaging(t *testing.T) {
 	}
 
 	// Test extraction
-	err := bb.ExtractToStaging(debPath, stagingDir)
+	err := bb.ExtractToSysroot(debPath, sysrootDir)
 	if err != nil {
-		t.Fatalf("ExtractToStaging failed: %v", err)
+		t.Fatalf("ExtractToSysroot failed: %v", err)
 	}
 
 	// Verify extracted files
 	expectedFiles := []string{
-		filepath.Join(stagingDir, "opt", "test", "lib", "libtest.so"),
-		filepath.Join(stagingDir, "opt", "test", "include", "test.h"),
+		filepath.Join(sysrootDir, "opt", "test", "lib", "libtest.so"),
+		filepath.Join(sysrootDir, "opt", "test", "include", "test.h"),
 	}
 
 	for _, expectedFile := range expectedFiles {
@@ -107,7 +107,7 @@ func TestExtractToStaging(t *testing.T) {
 	}
 }
 
-func TestExtractToStaging_UnsupportedFormat(t *testing.T) {
+func TestExtractToSysroot_UnsupportedFormat(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	pkg := &pkgbuild.PKGBUILD{
@@ -120,31 +120,31 @@ func TestExtractToStaging_UnsupportedFormat(t *testing.T) {
 		Format:   "unsupported",
 	}
 
-	err := bb.ExtractToStaging("/fake/path.deb", tmpDir)
+	err := bb.ExtractToSysroot("/fake/path.deb", tmpDir)
 	if err == nil {
 		t.Error("Expected error for unsupported format, got nil")
 	}
 }
 
-func TestGetStagingRoot(t *testing.T) {
+func TestGetSysrootDir(t *testing.T) {
 	buildDir := "/tmp/test-build"
-	expected := filepath.Join(buildDir, "yap-cross-staging")
+	expected := filepath.Join(buildDir, "yap-sysroot")
 
-	result := GetStagingRoot(buildDir)
+	result := GetSysrootDir(buildDir)
 
 	if result != expected {
-		t.Errorf("GetStagingRoot() = %s, want %s", result, expected)
+		t.Errorf("GetSysrootDir() = %s, want %s", result, expected)
 	}
 }
 
-func TestCleanupStaging(t *testing.T) {
+func TestCleanupSysroot(t *testing.T) {
 	tmpDir := t.TempDir()
-	stagingDir := GetStagingRoot(tmpDir)
+	sysrootDir := GetSysrootDir(tmpDir)
 
-	// Create staging directory with files
-	testDir := filepath.Join(stagingDir, "opt", "test")
+	// Create sysroot directory with files
+	testDir := filepath.Join(sysrootDir, "opt", "test")
 	if err := os.MkdirAll(testDir, 0o755); err != nil {
-		t.Fatalf("Failed to create staging dir: %v", err)
+		t.Fatalf("Failed to create sysroot dir: %v", err)
 	}
 
 	testFile := filepath.Join(testDir, "file.txt")
@@ -153,20 +153,20 @@ func TestCleanupStaging(t *testing.T) {
 	}
 
 	// Cleanup
-	err := CleanupStaging(tmpDir)
+	err := CleanupSysroot(tmpDir)
 	if err != nil {
-		t.Fatalf("CleanupStaging failed: %v", err)
+		t.Fatalf("CleanupSysroot failed: %v", err)
 	}
 
-	// Verify staging directory is removed
-	if _, err := os.Stat(stagingDir); !os.IsNotExist(err) {
-		t.Error("Staging directory should be removed")
+	// Verify sysroot directory is removed
+	if _, err := os.Stat(sysrootDir); !os.IsNotExist(err) {
+		t.Error("Sysroot directory should be removed")
 	}
 
 	// Cleanup again should not error
-	err = CleanupStaging(tmpDir)
+	err = CleanupSysroot(tmpDir)
 	if err != nil {
-		t.Errorf("CleanupStaging on non-existent dir should not error: %v", err)
+		t.Errorf("CleanupSysroot on non-existent dir should not error: %v", err)
 	}
 }
 
@@ -229,9 +229,9 @@ func TestExtractDEB_MissingDataTar(t *testing.T) {
 		t.Fatalf("Failed to create invalid DEB: %v", err)
 	}
 
-	stagingDir := filepath.Join(tmpDir, "staging")
+	sysrootDir := filepath.Join(tmpDir, "sysroot")
 
-	err := extractDEB(invalidDEB, stagingDir)
+	err := extractDEB(invalidDEB, sysrootDir)
 	if err == nil {
 		t.Error("Expected error for invalid DEB, got nil")
 	}

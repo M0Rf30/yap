@@ -418,26 +418,23 @@ func (mpc *MultipleProject) buildProjectsSequential(projects []*Project) error {
 	return nil
 }
 
-// doInstallOrExtract performs the actual package installation or extraction.
-// It uses InstallOrExtract when available (handles both native and cross-compilation builds),
-// falling back to Install for package managers that don't implement InstallOrExtractor.
+// doInstallOrExtract performs the actual package extraction.
+// All packers implement InstallOrExtractor and always extract to sysroot.
 func (mpc *MultipleProject) doInstallOrExtract(proj *Project) error {
-	if installer, ok := proj.PackageManager.(packer.InstallOrExtractor); ok {
-		if err := installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch); err != nil {
-			return err
-		}
-	} else {
-		// Fallback to regular Install if InstallOrExtract not available
-		if err := proj.PackageManager.Install(mpc.Output); err != nil {
-			return err
-		}
+	installer, ok := proj.PackageManager.(packer.InstallOrExtractor)
+	if !ok {
+		// This branch is an invariant violation: all BaseBuilder-backed packers implement
+		// InstallOrExtractor. If this error fires, a new packer was added without embedding
+		// BaseBuilder or implementing InstallOrExtract.
+		return fmt.Errorf("package manager does not implement InstallOrExtractor")
 	}
 
-	return nil
+	return installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
 }
 
-// installPackageForWorker handles package installation or extraction for a worker.
-// It uses InstallOrExtract to handle both native builds (install) and cross-compilation (extract).
+// installPackageForWorker handles package extraction for a worker.
+// It calls doInstallOrExtract, which always extracts to sysroot — extraction is
+// goroutine-safe because each project writes to its own yap-sysroot directory.
 func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, workerID string) error {
 	logger.Info(i18n.T("logger.installing_package"),
 		"package", pkgName,
@@ -1530,6 +1527,14 @@ func (mpc *MultipleProject) cleanSingleProjectArtifacts(proj *Project) error {
 	pkgDir := filepath.Join(proj.Builder.PKGBUILD.StartDir, "pkg")
 	if _, err := os.Stat(pkgDir); err == nil {
 		if err := os.RemoveAll(pkgDir); err != nil {
+			return err
+		}
+	}
+
+	// Remove yap-sysroot directory (contains extracted internal dependencies)
+	sysrootDir := filepath.Join(proj.Builder.PKGBUILD.StartDir, "yap-sysroot")
+	if _, err := os.Stat(sysrootDir); err == nil {
+		if err := os.RemoveAll(sysrootDir); err != nil {
 			return err
 		}
 	}

@@ -578,19 +578,15 @@
 
 # Messaggi logger - Extract
 - id: logger.extract.extracting_package
-  translation: "Estrazione del pacchetto nella directory di staging"
+  translation: "Estrazione del pacchetto nella directory sysroot"
 - id: logger.extract.package_extracted
-  translation: "Pacchetto estratto con successo nella directory di staging"
-- id: logger.extract.cross_compilation_detected
-  translation: "Cross-compilation rilevata - estrazione del pacchetto invece dell'installazione"
-- id: logger.extract.staging_cleaned
-  translation: "Directory di staging pulita"
-- id: logger.extract.staging_directory_created
-  translation: "Directory di staging creata per la cross-compilation"
-- id: logger.extract.staging_directory_reused
-  translation: "Riutilizzo della directory di staging esistente"
+  translation: "Pacchetto estratto con successo nella directory sysroot"
+- id: logger.extract.sysroot_cleaned
+  translation: "Directory sysroot pulita"
 - id: logger.extract.extraction_stats
   translation: "Estrazione completata"
+- id: logger.extract.extracting_to_sysroot
+  translation: "Estrazione pacchetto nel sysroot"
 
 # Messaggi logger - Exec with context
 - id: logger.execwithcontext.debug.command_execution_completed_1

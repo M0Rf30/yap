@@ -1847,3 +1847,57 @@ func TestPKGBUILD_AddItemWithCrossCompilationVariables(t *testing.T) {
 		t.Error("Expected IsCrossCompilation to return true when variables are set")
 	}
 }
+
+func TestSetupSysrootEnvironment_SetsEnvVars(t *testing.T) {
+	for _, v := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "CFLAGS", "LDFLAGS"} {
+		t.Setenv(v, "")
+	}
+
+	// SetupSysrootEnvironment derives sysrootDir as filepath.Dir(StartDir)/yap-sysroot.
+	// Set StartDir one level below parent so the derived sysroot lands in parent/.
+	parent := t.TempDir()
+	pb := &PKGBUILD{StartDir: filepath.Join(parent, "mypkg")}
+	sysroot := filepath.Join(parent, "yap-sysroot")
+
+	if err := pb.SetupSysrootEnvironment(); err != nil {
+		t.Fatalf("SetupSysrootEnvironment: %v", err)
+	}
+
+	cpath := os.Getenv("CPATH")
+	if !strings.Contains(cpath, filepath.Join(sysroot, "usr", "include")) {
+		t.Errorf("CPATH=%q does not contain sysroot include dir", cpath)
+	}
+
+	libpath := os.Getenv("LIBRARY_PATH")
+	if !strings.Contains(libpath, filepath.Join(sysroot, "usr", "lib")) {
+		t.Errorf("LIBRARY_PATH=%q does not contain sysroot lib dir", libpath)
+	}
+
+	// CFLAGS and LDFLAGS must NOT be mutated
+	if os.Getenv("CFLAGS") != "" {
+		t.Error("CFLAGS must not be set by SetupSysrootEnvironment")
+	}
+
+	if os.Getenv("LDFLAGS") != "" {
+		t.Error("LDFLAGS must not be set by SetupSysrootEnvironment")
+	}
+}
+
+func TestSetupSysrootEnvironment_NoZextras(t *testing.T) {
+	for _, v := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH"} {
+		t.Setenv(v, "")
+	}
+
+	parent := t.TempDir()
+	pb := &PKGBUILD{StartDir: filepath.Join(parent, "mypkg")}
+
+	if err := pb.SetupSysrootEnvironment(); err != nil {
+		t.Fatalf("SetupSysrootEnvironment: %v", err)
+	}
+
+	for _, envVar := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH"} {
+		if strings.Contains(os.Getenv(envVar), "zextras") {
+			t.Errorf("%s must not contain zextras paths, got: %s", envVar, os.Getenv(envVar))
+		}
+	}
+}
