@@ -52,11 +52,12 @@ func Download(destination, uri string, writer io.Writer) error {
 // It extends the basic Download function with the ability to resume interrupted downloads.
 //
 // Parameters:
+// - ctx: context for cancellation.
 // - destination: the path where the downloaded file will be saved.
 // - uri: the URL of the file to download.
 // - maxRetries: maximum number of retry attempts (0 = no retries, default: 3).
 // - writer: writer for progress output (can be nil)
-func WithResume(destination, uri string, maxRetries int, writer io.Writer) error {
+func WithResume(ctx context.Context, destination, uri string, maxRetries int, writer io.Writer) error {
 	if maxRetries <= 0 {
 		maxRetries = 3
 	}
@@ -75,7 +76,7 @@ func WithResume(destination, uri string, maxRetries int, writer io.Writer) error
 			time.Sleep(backoff)
 		}
 
-		err := downloadWithResumeInternal(context.Background(), destination, uri, "", "", writer)
+		err := downloadWithResumeInternal(ctx, destination, uri, "", "", writer)
 		if err == nil {
 			return nil
 		}

@@ -445,6 +445,7 @@ yap build arch examples/yap           # Arch Linux
 - ✅ Documented APK format requirements and gaps
 - ✅ **Consolidated architecture handling and cross-compilation logging (2025-11-14)**
 - ✅ **Sequential build as default; `--parallel` / `-P` flag for opt-in parallel dep resolution (2026-02-18)**
+- ✅ **Code quality pass 2: fixed malformed nolint, migrated ~30 fmt.Errorf to pkg/errors, threaded context.Context through archive/shell/download APIs (2026-02-19)**
 
 ### Architectural Decisions
 

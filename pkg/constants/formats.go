@@ -1,6 +1,8 @@
 // Package constants provides centralized constants and mappings for all package formats.
 package constants
 
+import "strings"
+
 // Package format constants
 const (
 	FormatAPK    = "apk"
@@ -97,6 +99,36 @@ func GetBuildDeps() *BuildEnvironmentDeps {
 			"ccache",
 		},
 	}
+}
+
+// distroFormatMap maps distribution names (lowercase) to their package format.
+// Legacy aliases (alma, opensuse, suse) are kept for backward compatibility.
+var distroFormatMap = map[string]string{
+	"almalinux":           FormatRPM,
+	"alpine":              FormatAPK,
+	"amzn":                FormatRPM,
+	"arch":                FormatPacman,
+	"centos":              FormatRPM,
+	"debian":              FormatDEB,
+	"fedora":              FormatRPM,
+	"linuxmint":           FormatDEB,
+	"ol":                  FormatRPM,
+	"opensuse-leap":       FormatRPM, // zypper-based; format is still RPM
+	"opensuse-tumbleweed": FormatRPM, // zypper-based; format is still RPM
+	"pop":                 FormatDEB,
+	"rhel":                FormatRPM,
+	"rocky":               FormatRPM,
+	"ubuntu":              FormatDEB,
+	// Legacy aliases kept for backward compatibility
+	"alma":     FormatRPM,
+	"opensuse": FormatRPM,
+	"suse":     FormatRPM,
+}
+
+// DistroFormat returns the package format for a given distribution name.
+// Returns an empty string if the distribution is not recognized.
+func DistroFormat(distro string) string {
+	return distroFormatMap[strings.ToLower(distro)]
 }
 
 // GetInstallArgs returns the package manager install arguments.

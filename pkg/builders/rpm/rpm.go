@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -60,7 +61,8 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) error {
 	license := strings.Join(r.PKGBUILD.License, " ")
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
-	rpm, _ := rpmpack.NewRPM(rpmpack.RPMMetaData{
+
+	rpm, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
 		Name:        r.PKGBUILD.PkgName,
 		Summary:     r.PKGBUILD.PkgDesc,
 		Description: r.PKGBUILD.PkgDesc,
@@ -81,8 +83,12 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) error {
 		Recommends:  r.processDepends(r.PKGBUILD.OptDepends),
 		BuildTime:   time.Now(),
 	})
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypePackaging, "failed to create RPM metadata").
+			WithOperation("BuildPackage")
+	}
 
-	err := r.createFilesInsideRPM(rpm)
+	err = r.createFilesInsideRPM(rpm)
 	if err != nil {
 		return err
 	}
@@ -232,7 +238,9 @@ func asRPMDirectory(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	// Get file information for the directory specified in the entry.
 	fileInfo, err := os.Stat(filepath.Clean(entry.Source))
 	if err != nil {
-		return nil, fmt.Errorf("stat directory %q: %w", entry.Source, err)
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, fmt.Sprintf("stat directory %q", entry.Source)).
+			WithOperation("asRPMDirectory").
+			WithContext("path", entry.Source)
 	}
 
 	// Retrieve the modification time of the directory.
@@ -264,7 +272,9 @@ func asRPMFile(
 
 	fileInfo, err := os.Stat(cleanFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("stat file %q: %w", entry.Source, err)
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, fmt.Sprintf("stat file %q", entry.Source)).
+			WithOperation("asRPMFile").
+			WithContext("path", entry.Source)
 	}
 
 	// Retrieve the modification time of the file.
@@ -289,12 +299,16 @@ func asRPMSymlink(entry *files.Entry) (*rpmpack.RPMFile, error) {
 
 	fileInfo, err := os.Lstat(cleanFilePath) // Use Lstat to get information about the symlink.
 	if err != nil {
-		return nil, fmt.Errorf("lstat symlink %q: %w", entry.Source, err)
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, fmt.Sprintf("lstat symlink %q", entry.Source)).
+			WithOperation("asRPMSymlink").
+			WithContext("path", entry.Source)
 	}
 
 	body, err := os.Readlink(cleanFilePath) // Read the target of the symlink.
 	if err != nil {
-		return nil, fmt.Errorf("readlink %q: %w", entry.Source, err)
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, fmt.Sprintf("readlink %q", entry.Source)).
+			WithOperation("asRPMSymlink").
+			WithContext("path", entry.Source)
 	}
 
 	// Retrieve the modification time of the symlink.

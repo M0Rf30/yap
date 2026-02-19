@@ -18,6 +18,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/buffers"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -213,8 +214,8 @@ func (gpw *GitProgressWriter) Close() error {
 }
 
 // Exec executes a command in the specified directory with optional stdout exclusion.
-func Exec(excludeStdout bool, dir, name string, args ...string) error {
-	return ExecWithContext(context.Background(), excludeStdout, dir, name, args...)
+func Exec(ctx context.Context, excludeStdout bool, dir, name string, args ...string) error {
+	return ExecWithContext(ctx, excludeStdout, dir, name, args...)
 }
 
 // ExecWithContext executes a command with context for cancellation control.
@@ -226,7 +227,8 @@ func ExecWithContext(
 	if !excludeStdout {
 		_, err := MultiPrinter.Start()
 		if err != nil {
-			return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_start_multiprinter"), err)
+			return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.failed_to_start_multiprinter")).
+				WithOperation("ExecWithContext")
 		}
 
 		decoratedWriter := NewPackageDecoratedWriter(MultiPrinter.Writer, "yap")
@@ -257,7 +259,9 @@ func ExecWithContext(
 			"duration", duration,
 			"error", err)
 
-		return fmt.Errorf("failed to execute command %s: %w", name, err)
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to execute command").
+			WithOperation("ExecWithContext").
+			WithContext("command", name)
 	}
 
 	logger.Debug(i18n.T("logger.execwithcontext.debug.command_execution_completed_1"),
@@ -370,6 +374,8 @@ func RunScript(cmds string) error {
 // or extends the inherited process environment for this script invocation only,
 // without mutating os.Environ().  This makes the function safe to call concurrently
 // from parallel build goroutines.
+//
+//nolint:gocyclo,cyclop // RunScriptWithPackage handles multiple script edge cases inline
 func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error {
 	start := time.Now()
 
@@ -388,12 +394,14 @@ func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error 
 	// "${_modules[@]}" cause a parse error in the default POSIX mode.
 	script, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(cmds), "")
 	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_parse_script"), err)
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.failed_to_parse_script")).
+			WithOperation("RunScriptWithPackage")
 	}
 
 	_, err = MultiPrinter.Start()
 	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_start_multiprinter"), err)
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.failed_to_start_multiprinter")).
+			WithOperation("RunScriptWithPackage")
 	}
 
 	writer := MultiPrinter.Writer
@@ -448,7 +456,8 @@ func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error 
 		interp.StdIO(nil, teeWriter, teeWriter),
 	)
 	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_create_script_runner"), err)
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.failed_to_create_script_runner")).
+			WithOperation("RunScriptWithPackage")
 	}
 
 	logger.Debug(i18n.T("logger.runscriptwithpackage.debug.starting_script_execution_1"))
@@ -473,7 +482,8 @@ func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error 
 				"duration", duration)
 		}
 
-		return fmt.Errorf("%s: %w", i18n.T("errors.shell.script_execution_failed"), err)
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.script_execution_failed")).
+			WithOperation("RunScriptWithPackage")
 	}
 
 	if packageName != "" {
@@ -490,8 +500,8 @@ func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error 
 
 // ExecWithSudo executes a command with sudo if the user is not running as root.
 // This is specifically for package manager commands that need elevated privileges.
-func ExecWithSudo(excludeStdout bool, dir, name string, args ...string) error {
-	return ExecWithSudoContext(context.Background(), excludeStdout, dir, name, args...)
+func ExecWithSudo(ctx context.Context, excludeStdout bool, dir, name string, args ...string) error {
+	return ExecWithSudoContext(ctx, excludeStdout, dir, name, args...)
 }
 
 // ExecWithSudoContext executes a command with sudo if needed, with context for cancellation.
@@ -513,7 +523,9 @@ func ExecWithSudoContext(
 	}
 
 	if !allowedCommands[name] {
-		return fmt.Errorf(i18n.T("errors.shell.command_not_allowed_for_sudo"), name)
+		return errors.New(errors.ErrTypeBuild, fmt.Sprintf(i18n.T("errors.shell.command_not_allowed_for_sudo"), name)).
+			WithOperation("ExecWithSudoContext").
+			WithContext("command", name)
 	}
 
 	// Check if we need sudo (not running as root and not already under sudo)
@@ -537,7 +549,8 @@ func ExecWithSudoContext(
 	if !excludeStdout {
 		_, err := MultiPrinter.Start()
 		if err != nil {
-			return fmt.Errorf("%s: %w", i18n.T("errors.shell.failed_to_start_multiprinter"), err)
+			return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.failed_to_start_multiprinter")).
+				WithOperation("ExecWithSudoContext")
 		}
 
 		decoratedWriter := NewPackageDecoratedWriter(MultiPrinter.Writer, "yap")
@@ -567,7 +580,9 @@ func ExecWithSudoContext(
 			"error", err,
 			"sudo", needsSudo)
 
-		return fmt.Errorf("failed to execute command %s: %w", name, err)
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to execute command").
+			WithOperation("ExecWithSudoContext").
+			WithContext("command", name)
 	}
 
 	logger.Debug(i18n.T("logger.unknown.debug.command_execution_completed_1"),

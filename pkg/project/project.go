@@ -17,6 +17,7 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
+	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -33,28 +34,6 @@ var (
 	ErrCircularRuntimeDependency = errors.New(
 		i18n.T("errors.project.circular_runtime_dependency_detected"))
 )
-
-// Config encapsulates all build configuration and state variables.
-type Config struct {
-	// Build configuration flags
-	Verbose                 bool   // Enables verbose output for debugging
-	CleanBuild              bool   // Enables clean build mode
-	NoBuild                 bool   // Disables the build process
-	NoMakeDeps              bool   // Disables make dependencies installation
-	SkipSyncDeps            bool   // Controls whether to skip dependency synchronization
-	SkipToolchainValidation bool   // Controls whether to skip cross-compilation toolchain validation
-	Zap                     bool   // Controls whether to use zap functionality
-	FromPkgName             string // Specifies the source package name for transformation
-	ToPkgName               string // Specifies the target package name for transformation
-	TargetArch              string // Specifies the target architecture for cross-compilation
-	Parallel                bool   // Enables parallel dependency resolution and concurrent building
-
-	// Internal state
-	singleProject  bool          //nolint:unused // Reserved for future migration
-	packageManager packer.Packer //nolint:unused // Reserved for future migration
-	makeDepends    []string      //nolint:unused // Reserved for dependency tracking
-	runtimeDepends []string      //nolint:unused // Reserved for dependency tracking
-}
 
 // Global variables for build configuration
 var (
@@ -152,7 +131,6 @@ type MultipleProject struct {
 	Name        string     `json:"name"        validate:"required"`
 	Output      string     `json:"output"      validate:"required"`
 	Projects    []*Project `json:"projects"    validate:"required,dive,required"`
-	Config      *Config    // Configuration for this project build
 }
 
 // Project represents a single project.
@@ -306,157 +284,9 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 }
 
 // buildProjectsParallel builds multiple projects in parallel for better performance.
-func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorkers int) error {
-	projectChan := make(chan *Project, len(projects))
-	errorChan := make(chan error, len(projects))
-
-	var waitGroup sync.WaitGroup
-
-	// Start workers
-	for workerNum := range maxWorkers {
-		waitGroup.Add(1)
-
-		go func(workerID int) {
-			defer waitGroup.Done()
-
-			workerIDStr := fmt.Sprintf("worker-%d", workerID)
-
-			for proj := range projectChan {
-				logger.Debug(i18n.T("logger.creating_package"),
-					"package", proj.Builder.PKGBUILD.PkgName,
-					"version", proj.Builder.PKGBUILD.PkgVer,
-					"release", proj.Builder.PKGBUILD.PkgRel,
-					"worker_id", workerIDStr)
-
-				err := proj.Builder.Compile(NoBuild)
-				if err != nil {
-					errorChan <- err
-
-					return
-				}
-
-				if !NoBuild {
-					err := mpc.createPackage(proj)
-					if err != nil {
-						errorChan <- err
-
-						return
-					}
-				}
-
-				if ToPkgName != "" && proj.Builder.PKGBUILD.PkgName == ToPkgName {
-					return
-				}
-			}
-		}(workerNum)
-	}
-
-	// Send projects to workers
-	go func() {
-		defer close(projectChan)
-
-		for _, proj := range projects {
-			projectChan <- proj
-		}
-	}()
-
-	// Wait for completion
-	go func() {
-		waitGroup.Wait()
-		close(errorChan)
-	}()
-
-	// Check for errors
-	for err := range errorChan {
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// buildProjectsSequential builds projects one at a time in the order they appear
-// in the project list (file order from yap.json). If a project has HasToInstall set,
-// it is installed immediately after building, before the next project is processed.
-// This is the default (v1-compatible) build mode.
-func (mpc *MultipleProject) buildProjectsSequential(projects []*Project) error {
-	for _, proj := range projects {
-		pkgName := proj.Builder.PKGBUILD.PkgName
-
-		logger.Debug(i18n.T("logger.creating_package"),
-			"package", pkgName,
-			"version", proj.Builder.PKGBUILD.PkgVer,
-			"release", proj.Builder.PKGBUILD.PkgRel)
-
-		if err := proj.Builder.Compile(NoBuild); err != nil {
-			return err
-		}
-
-		if !NoBuild {
-			if err := mpc.createPackage(proj); err != nil {
-				return err
-			}
-
-			if proj.HasToInstall {
-				if err := mpc.installPackage(proj); err != nil {
-					return err
-				}
-			}
-		}
-
-		// ToPkgName is also enforced by getProjectsInRange, but we check here to log
-		// the stopping event, consistent with other build loop implementations.
-		if ToPkgName != "" && pkgName == ToPkgName {
-			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
-				"target_package", ToPkgName)
-
-			return nil
-		}
-	}
-
-	return nil
-}
-
-// doInstallOrExtract performs the actual package extraction.
-// All packers implement InstallOrExtractor and always extract to sysroot.
-func (mpc *MultipleProject) doInstallOrExtract(proj *Project) error {
-	installer, ok := proj.PackageManager.(packer.InstallOrExtractor)
-	if !ok {
-		// This branch is an invariant violation: all BaseBuilder-backed packers implement
-		// InstallOrExtractor. If this error fires, a new packer was added without embedding
-		// BaseBuilder or implementing InstallOrExtract.
-		return fmt.Errorf("package manager does not implement InstallOrExtractor")
-	}
-
-	return installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
-}
-
-// installPackageForWorker handles package extraction for a worker.
-// It calls doInstallOrExtract, which always extracts to sysroot — extraction is
-// goroutine-safe because each project writes to its own yap-sysroot directory.
-func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, workerID string) error {
-	logger.Info(i18n.T("logger.installing_package"),
-		"package", pkgName,
-		"worker_id", workerID)
-
-	if err := mpc.doInstallOrExtract(proj); err != nil {
-		return err
-	}
-
-	logger.Info(i18n.T("logger.package_installed"),
-		"package", pkgName,
-		"worker_id", workerID)
-
-	return nil
-}
-
-// buildAndInstallProjectsParallel builds projects in parallel with immediate installation.
-// This implements Arch Linux-style dependency handling: each package is installed
-// immediately after building, making it available for other packages building in parallel.
-// This ensures that packages with runtime dependencies (depends) can access those
-// dependencies during their build phase, even if they're in the same batch.
-func (mpc *MultipleProject) buildAndInstallProjectsParallel(projects []*Project, maxWorkers int,
+// If shouldInstall is true, each package is installed immediately after building
+// (Arch Linux style), making it available for other packages building in parallel.
+func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorkers int,
 	shouldInstall bool) error {
 	projectChan := make(chan *Project, len(projects))
 	errorChan := make(chan error, len(projects))
@@ -540,6 +370,82 @@ func (mpc *MultipleProject) buildAndInstallProjectsParallel(projects []*Project,
 	return nil
 }
 
+// buildProjectsSequential builds projects one at a time in the order they appear
+// in the project list (file order from yap.json). If a project has HasToInstall set,
+// it is installed immediately after building, before the next project is processed.
+// This is the default (v1-compatible) build mode.
+func (mpc *MultipleProject) buildProjectsSequential(projects []*Project) error {
+	for _, proj := range projects {
+		pkgName := proj.Builder.PKGBUILD.PkgName
+
+		logger.Debug(i18n.T("logger.creating_package"),
+			"package", pkgName,
+			"version", proj.Builder.PKGBUILD.PkgVer,
+			"release", proj.Builder.PKGBUILD.PkgRel)
+
+		if err := proj.Builder.Compile(NoBuild); err != nil {
+			return err
+		}
+
+		if !NoBuild {
+			if err := mpc.createPackage(proj); err != nil {
+				return err
+			}
+
+			if proj.HasToInstall {
+				if err := mpc.installPackage(proj); err != nil {
+					return err
+				}
+			}
+		}
+
+		// ToPkgName is also enforced by getProjectsInRange, but we check here to log
+		// the stopping event, consistent with other build loop implementations.
+		if ToPkgName != "" && pkgName == ToPkgName {
+			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
+				"target_package", ToPkgName)
+
+			return nil
+		}
+	}
+
+	return nil
+}
+
+// doInstallOrExtract performs the actual package extraction.
+// All packers implement InstallOrExtractor and always extract to sysroot.
+func (mpc *MultipleProject) doInstallOrExtract(proj *Project) error {
+	installer, ok := proj.PackageManager.(packer.InstallOrExtractor)
+	if !ok {
+		// This branch is an invariant violation: all BaseBuilder-backed packers implement
+		// InstallOrExtractor. If this error fires, a new packer was added without embedding
+		// BaseBuilder or implementing InstallOrExtract.
+		return yerrors.New(yerrors.ErrTypeInternal, "package manager does not implement InstallOrExtractor").
+			WithOperation("doInstallOrExtract")
+	}
+
+	return installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
+}
+
+// installPackageForWorker handles package extraction for a worker.
+// It calls doInstallOrExtract, which always extracts to sysroot — extraction is
+// goroutine-safe because each project writes to its own yap-sysroot directory.
+func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, workerID string) error {
+	logger.Info(i18n.T("logger.installing_package"),
+		"package", pkgName,
+		"worker_id", workerID)
+
+	if err := mpc.doInstallOrExtract(proj); err != nil {
+		return err
+	}
+
+	logger.Info(i18n.T("logger.package_installed"),
+		"package", pkgName,
+		"worker_id", workerID)
+
+	return nil
+}
+
 // checkPkgsRange checks the range of packages from `fromPkgName` to `toPkgName`.
 //
 // It takes two parameters:
@@ -567,8 +473,10 @@ func (mpc *MultipleProject) checkPkgsRange(fromPkgName, toPkgName string) error 
 	}
 
 	if fromPkgName != "" && toPkgName != "" && firstIndex > lastIndex {
-		return fmt.Errorf(i18n.T("logger.invalid_package_order")+": required_first=%s required_second=%s",
-			fromPkgName, toPkgName)
+		return yerrors.New(yerrors.ErrTypeInternal, i18n.T("logger.invalid_package_order")).
+			WithOperation("checkPkgsRange").
+			WithContext("required_first", fromPkgName).
+			WithContext("required_second", toPkgName)
 	}
 
 	return nil
@@ -709,7 +617,9 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) (int, error) {
 		}
 	}
 
-	return -1, fmt.Errorf("package %q not found in projects", pkgName)
+	return -1, yerrors.New(yerrors.ErrTypeInternal, "package not found in projects").
+		WithOperation("findPackageInProjects").
+		WithContext("package", pkgName)
 }
 
 // getMakeDeps retrieves the make dependencies for the MultipleProject.
@@ -1347,7 +1257,7 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 		"count", len(regularPackages))
 
 	// Build packages in parallel
-	err := mpc.buildProjectsParallel(regularPackages, maxWorkers)
+	err := mpc.buildProjectsParallel(regularPackages, maxWorkers, false)
 	if err != nil {
 		return err
 	}
@@ -1490,7 +1400,7 @@ func (mpc *MultipleProject) buildAndInstallRuntimeBatches(
 		// Build and install this batch in parallel with immediate installation
 		// This ensures packages are installed as soon as they're built,
 		// making them available for other packages building in parallel
-		err := mpc.buildAndInstallProjectsParallel(batch, min(maxWorkers, batchSize), true)
+		err := mpc.buildProjectsParallel(batch, min(maxWorkers, batchSize), true)
 		if err != nil {
 			return err
 		}
@@ -1565,64 +1475,21 @@ func (mpc *MultipleProject) removeBuildArtifacts(dir string) error {
 }
 
 // topologicalSortRuntimeDeps performs topological sort specifically for runtime dependencies.
+// It delegates to topologicalSort and translates ErrCircularDependency into
+// ErrCircularRuntimeDependency so callers can distinguish the two error kinds.
 func (mpc *MultipleProject) topologicalSortRuntimeDeps(projectMap map[string]*Project,
 	dependsOn map[string][]string, dependedBy map[string][]string,
 ) ([][]*Project, error) {
-	var result [][]*Project
-
-	inDegree := make(map[string]int)
-
-	// Calculate in-degrees for runtime dependencies
-	for pkgName := range projectMap {
-		inDegree[pkgName] = len(dependsOn[pkgName])
-	}
-
-	batchNum := 1
-
-	for len(inDegree) > 0 {
-		var currentBatch []*Project
-
-		var candidatePackages []string
-
-		// Find packages with no dependencies
-		for pkgName, degree := range inDegree {
-			if degree == 0 {
-				candidatePackages = append(candidatePackages, pkgName)
-			}
+	result, err := mpc.topologicalSort(projectMap, dependsOn, dependedBy)
+	if err != nil {
+		// Translate the generic circular-dependency error into the runtime-specific one
+		// so that callers (and tests) can distinguish build-order cycles from
+		// runtime-dependency cycles via errors.Is / errors.As.
+		if errors.Is(err, ErrCircularDependency) {
+			return nil, fmt.Errorf("%w: %w", ErrCircularRuntimeDependency, err)
 		}
 
-		if len(candidatePackages) == 0 {
-			var problematicPackages []string
-			for pkgName, degree := range inDegree {
-				problematicPackages = append(problematicPackages, fmt.Sprintf("%s(%d)", pkgName, degree))
-			}
-
-			return nil, fmt.Errorf("%w: %v", ErrCircularRuntimeDependency, problematicPackages)
-		}
-
-		// Build current batch
-		for _, pkgName := range candidatePackages {
-			currentBatch = append(currentBatch, projectMap[pkgName])
-		}
-
-		logger.Info(i18n.T("logger.project.runtime_dependency_batch_analysis"),
-			"batch_number", batchNum,
-			"parallel_packages", len(currentBatch))
-
-		result = append(result, currentBatch)
-
-		// Update in-degrees
-		for _, pkgName := range candidatePackages {
-			delete(inDegree, pkgName)
-
-			for _, dependent := range dependedBy[pkgName] {
-				if _, exists := inDegree[dependent]; exists {
-					inDegree[dependent]--
-				}
-			}
-		}
-
-		batchNum++
+		return nil, err
 	}
 
 	return result, nil

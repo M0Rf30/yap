@@ -16,8 +16,7 @@ import (
 
 // CreateTarZst creates a compressed tar.zst archive from the specified source
 // directory. This consolidates the archive creation logic for YAP packages.
-func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
-	ctx := context.Background()
+func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU bool) error {
 	options := &archives.FromDiskOptions{
 		FollowSymlinks: false,
 	}
@@ -72,9 +71,7 @@ func CreateTarZst(sourceDir, outputFile string, formatGNU bool) error {
 // It opens the source archive file, identifies its format, and extracts it to the destination.
 //
 // Returns an error if there was a problem extracting the files.
-func Extract(source, destination string) error {
-	ctx := context.Background()
-
+func Extract(ctx context.Context, source, destination string) error {
 	// Open the source archive file
 	sourceFile, err := os.Open(filepath.Clean(source))
 	if err != nil {

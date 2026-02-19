@@ -2,10 +2,10 @@
 package builder
 
 import (
-	"strings"
 	"sync"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -110,7 +110,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	if stage == "build" {
 		// Create a temporary BaseBuilder to access the SetupCcache and
 		// SetupCrossCompilationEnvironment methods
-		format := determineFormatFromContext(builder.PKGBUILD.Distro)
+		format := constants.DistroFormat(builder.PKGBUILD.Distro)
 		tempBuilder := &common.BaseBuilder{
 			PKGBUILD: builder.PKGBUILD,
 			Format:   format,
@@ -157,35 +157,6 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	}
 
 	return nil
-}
-
-// determineFormatFromContext determines the package format based on the distribution.
-// This maps distribution names to their corresponding package formats.
-func determineFormatFromContext(distro string) string {
-	// Map common distribution names to package formats
-	distroFormatMap := map[string]string{
-		"arch":     "pacman",
-		"alpine":   "apk",
-		"debian":   "deb",
-		"ubuntu":   "deb",
-		"fedora":   "rpm",
-		"rhel":     "rpm",
-		"centos":   "rpm",
-		"rocky":    "rpm",
-		"alma":     "rpm",
-		"opensuse": "rpm",
-		"suse":     "rpm",
-	}
-
-	// Normalize distro name to lowercase for case-insensitive matching
-	distroLower := strings.ToLower(distro)
-
-	if format, exists := distroFormatMap[distroLower]; exists {
-		return format
-	}
-
-	// Fallback to empty string - SetupCrossCompilationEnvironment will use "debian" as fallback
-	return ""
 }
 
 // getSources detects sources provided by a single project source array and

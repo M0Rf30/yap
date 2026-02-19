@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -114,7 +115,7 @@ func installPackage(packageType, artifactPath string) error {
 		"artifact", artifactPath)
 
 	// Execute the installation command with the same pattern as internal managers
-	err := shell.Exec(false, "", cmd, args...)
+	err := shell.Exec(context.Background(), false, "", cmd, args...)
 	if err != nil {
 		return fmt.Errorf(i18n.T("errors.install.installation_failed")+": %w", cmd, err)
 	}
