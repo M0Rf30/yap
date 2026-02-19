@@ -57,9 +57,6 @@ type Builder interface {
 	// PrepareFakeroot sets up the package metadata and prepares the build environment
 	PrepareFakeroot(artifactsPath string, targetArch string) error
 
-	// Install installs the built package (requires appropriate package manager)
-	Install(artifactsPath string) error
-
 	// Prepare installs build dependencies and prepares the build environment
 	Prepare(makeDepends []string, targetArch string) error
 
@@ -312,43 +309,6 @@ func getUpdateCommand(format string) string {
 	default:
 		return ""
 	}
-}
-
-// Install installs the built package using the appropriate package manager.
-// This consolidates duplicated Install methods across all builders.
-func (bb *BaseBuilder) Install(artifactsPath string) error {
-	pkgName := bb.BuildPackageName(getExtension(bb.Format))
-	pkgPath := filepath.Join(artifactsPath, pkgName)
-
-	// Use format-specific direct installation tools to avoid dependency resolution issues
-	// with foreign architectures during cross-compilation
-
-	if bb.Format == constants.FormatPacman {
-		// Pacman uses -U flag for local files
-		return shell.Exec(false, "", "pacman", "-U", "--noconfirm", pkgPath)
-	}
-
-	if bb.Format == constants.FormatDEB {
-		// Use dpkg instead of apt-get to avoid dependency resolution issues
-		return shell.ExecWithSudo(false, "", "dpkg", "-i", pkgPath)
-	}
-
-	if bb.Format == constants.FormatRPM {
-		// Use rpm instead of yum/dnf to avoid dependency resolution issues
-		return shell.ExecWithSudo(false, "", "rpm", "-i", pkgPath)
-	}
-
-	if bb.Format == constants.FormatAPK {
-		// Use --no-network flag to prevent dependency resolution from repos
-		return shell.ExecWithSudo(true, "", "apk", "add", "--allow-untrusted", "--no-network", pkgPath)
-	}
-
-	// Fallback to generic installation (should not be reached for supported formats)
-	installArgs := constants.GetInstallArgs(bb.Format)
-	installArgs = append(installArgs, pkgPath)
-	useSudo := bb.Format == constants.FormatAPK
-
-	return shell.ExecWithSudo(useSudo, "", getPackageManager(bb.Format), installArgs...)
 }
 
 // Prepare installs build dependencies using the appropriate package manager.
@@ -689,10 +649,19 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	_ = os.Setenv("HOST_ARCH", bb.PKGBUILD.ArchComputed)
 	_ = os.Setenv("BUILD_ARCH", bb.PKGBUILD.ArchComputed)
 
-	// Configure pkg-config for cross-compilation
-	pkgConfigPath := "/usr/lib/" + ccPrefix + "/pkgconfig:/usr/local/lib/" +
-		ccPrefix + "/pkgconfig"
-	_ = os.Setenv("PKG_CONFIG_PATH", pkgConfigPath)
+	// Configure pkg-config for cross-compilation: prepend toolchain paths to
+	// any existing PKG_CONFIG_PATH (set earlier by SetupSysrootEnvironment).
+	crossPkgConfigPaths := []string{
+		"/usr/lib/" + ccPrefix + "/pkgconfig",
+		"/usr/local/lib/" + ccPrefix + "/pkgconfig",
+	}
+
+	existingPkgConfig := os.Getenv("PKG_CONFIG_PATH")
+	if existingPkgConfig != "" {
+		crossPkgConfigPaths = append(crossPkgConfigPaths, existingPkgConfig)
+	}
+
+	_ = os.Setenv("PKG_CONFIG_PATH", strings.Join(crossPkgConfigPaths, ":"))
 	_ = os.Setenv("PKG_CONFIG_LIBDIR", "/usr/lib/"+ccPrefix+"/pkgconfig")
 
 	// Set up autoconf cross-compilation configuration

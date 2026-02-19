@@ -290,29 +290,6 @@ func TestPrepareFakerootWithSpecCreation(t *testing.T) {
 	}
 }
 
-func TestInstall(t *testing.T) {
-	// Skip if not running as root and no sudo available (would prompt for password)
-	if os.Geteuid() != 0 && os.Getenv("SUDO_USER") == "" && os.Getenv("CI") == "" {
-		t.Skip("Skipping Install test - requires sudo privileges or CI environment")
-	}
-
-	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
-
-	tempDir, err := os.MkdirTemp("", "pacman-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	// This will likely fail since pacman isn't available, but we test the method call
-	err = pkg.Install(tempDir)
-	if err == nil {
-		t.Log("Install succeeded (unexpected in test environment)")
-	}
-}
-
 func TestPrepare(t *testing.T) {
 	// Skip if not running as root and no sudo available (would prompt for password)
 	if os.Geteuid() != 0 && os.Getenv("SUDO_USER") == "" && os.Getenv("CI") == "" {

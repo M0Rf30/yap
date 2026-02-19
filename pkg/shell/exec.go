@@ -410,6 +410,7 @@ func RunScriptWithPackage(cmds, packageName string) error {
 	// stderr of the script through the writers passed to StdIO; capturing
 	// both gives us the most complete failure context.
 	var outputBuf bytes.Buffer
+
 	teeWriter := io.MultiWriter(writer, &outputBuf)
 
 	runner, err := interp.New(

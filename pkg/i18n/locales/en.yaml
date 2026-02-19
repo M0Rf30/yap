@@ -873,16 +873,12 @@
 
 # Logger messages - Package extraction (cross-compilation)
 - id: logger.extract.extracting_package
-  translation: "Extracting package to staging directory"
+  translation: "Extracting package to sysroot directory"
 - id: logger.extract.package_extracted
-  translation: "Package extracted successfully to staging"
-- id: logger.extract.cross_compilation_detected
-  translation: "Cross-compilation detected - extracting package instead of installing"
-- id: logger.extract.staging_cleaned
-  translation: "Staging directory cleaned up"
-- id: logger.extract.staging_directory_created
-  translation: "Created staging directory for cross-compilation"
-- id: logger.extract.staging_directory_reused
-  translation: "Reusing existing staging directory"
+  translation: "Package extracted successfully to sysroot"
+- id: logger.extract.sysroot_cleaned
+  translation: "Sysroot directory cleaned up"
 - id: logger.extract.extraction_stats
   translation: "Extraction complete"
+- id: logger.extract.extracting_to_sysroot
+  translation: "Extracting package to sysroot"

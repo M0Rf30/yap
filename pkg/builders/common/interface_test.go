@@ -1022,124 +1022,23 @@ func TestCrossCompilationEnvironmentVariables(t *testing.T) {
 	}
 }
 
-func TestInstallCrossCompiled(t *testing.T) {
-	// Create a temporary directory for artifacts
-	tmpDir := t.TempDir()
+func TestSetupCrossCompilationEnvironment_AppendsPkgConfigPath(t *testing.T) {
+	existing := "/my/existing/pkgconfig"
+	t.Setenv("PKG_CONFIG_PATH", existing)
+	t.Setenv("LD_LIBRARY_PATH", "")
 
-	tests := []struct {
-		name          string
-		format        string
-		targetArch    string
-		buildArch     string
-		expectedTool  string // Expected installation tool
-		skipExecution bool   // Skip actual execution since we're in unit test
-	}{
-		{
-			name:          "cross-compiled DEB uses dpkg",
-			format:        constants.FormatDEB,
-			targetArch:    "arm64",
-			buildArch:     "amd64",
-			expectedTool:  "dpkg",
-			skipExecution: true,
-		},
-		{
-			name:          "native DEB uses dpkg",
-			format:        constants.FormatDEB,
-			targetArch:    "amd64",
-			buildArch:     "amd64",
-			expectedTool:  "dpkg",
-			skipExecution: true,
-		},
-		{
-			name:          "cross-compiled RPM uses rpm",
-			format:        constants.FormatRPM,
-			targetArch:    "aarch64",
-			buildArch:     "x86_64",
-			expectedTool:  "rpm",
-			skipExecution: true,
-		},
-		{
-			name:          "native RPM uses rpm",
-			format:        constants.FormatRPM,
-			targetArch:    "x86_64",
-			buildArch:     "x86_64",
-			expectedTool:  "rpm",
-			skipExecution: true,
-		},
-		{
-			name:          "cross-compiled APK uses apk with --no-network",
-			format:        constants.FormatAPK,
-			targetArch:    "aarch64",
-			buildArch:     "x86_64",
-			expectedTool:  "apk",
-			skipExecution: true,
-		},
-		{
-			name:          "native APK uses apk with --no-network",
-			format:        constants.FormatAPK,
-			targetArch:    "x86_64",
-			buildArch:     "x86_64",
-			expectedTool:  "apk",
-			skipExecution: true,
-		},
-		{
-			name:          "cross-compiled Pacman uses pacman -U",
-			format:        constants.FormatPacman,
-			targetArch:    "aarch64",
-			buildArch:     "x86_64",
-			expectedTool:  "pacman",
-			skipExecution: true,
-		},
-		{
-			name:          "native Pacman uses pacman -U",
-			format:        constants.FormatPacman,
-			targetArch:    "x86_64",
-			buildArch:     "x86_64",
-			expectedTool:  "pacman",
-			skipExecution: true,
-		},
+	bb := NewBaseBuilder(&pkgbuild.PKGBUILD{
+		PkgName:      "test",
+		ArchComputed: "x86_64",
+	}, constants.FormatDEB)
+
+	err := bb.SetupCrossCompilationEnvironment("aarch64")
+	if err != nil {
+		t.Fatalf("SetupCrossCompilationEnvironment: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pkg := &pkgbuild.PKGBUILD{
-				PkgName:      "test-package",
-				PkgVer:       "1.0.0",
-				PkgRel:       "1",
-				ArchComputed: tt.buildArch,
-				TargetArch:   tt.targetArch,
-			}
-
-			builder := NewBaseBuilder(pkg, tt.format)
-
-			// Create a dummy package file
-			pkgName := builder.BuildPackageName(getExtension(tt.format))
-			pkgPath := filepath.Join(tmpDir, pkgName)
-
-			err := os.WriteFile(pkgPath, []byte("dummy package"), 0o644)
-			if err != nil {
-				t.Fatalf("Failed to create dummy package: %v", err)
-			}
-
-			// Verify that each format uses the expected direct installation tool
-			switch tt.format {
-			case constants.FormatDEB:
-				if tt.expectedTool != "dpkg" {
-					t.Errorf("DEB format should always use dpkg, but expected %s", tt.expectedTool)
-				}
-			case constants.FormatRPM:
-				if tt.expectedTool != "rpm" {
-					t.Errorf("RPM format should always use rpm, but expected %s", tt.expectedTool)
-				}
-			case constants.FormatAPK:
-				if tt.expectedTool != "apk" {
-					t.Errorf("APK format should always use apk, but expected %s", tt.expectedTool)
-				}
-			case constants.FormatPacman:
-				if tt.expectedTool != "pacman" {
-					t.Errorf("Pacman format should always use pacman, but expected %s", tt.expectedTool)
-				}
-			}
-		})
+	result := os.Getenv("PKG_CONFIG_PATH")
+	if !strings.Contains(result, existing) {
+		t.Errorf("PKG_CONFIG_PATH=%q lost existing value %q", result, existing)
 	}
 }
