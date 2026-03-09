@@ -1849,55 +1849,157 @@ func TestPKGBUILD_AddItemWithCrossCompilationVariables(t *testing.T) {
 }
 
 func TestSetupSysrootEnvironment_SetsEnvVars(t *testing.T) {
-	for _, v := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "CFLAGS", "LDFLAGS"} {
+	for _, v := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "CFLAGS", "CPPFLAGS", "LDFLAGS"} {
 		t.Setenv(v, "")
 	}
 
-	// SetupSysrootEnvironment derives sysrootDir as filepath.Dir(StartDir)/yap-sysroot.
-	// Set StartDir one level below parent so the derived sysroot lands in parent/.
 	parent := t.TempDir()
-	pb := &PKGBUILD{StartDir: filepath.Join(parent, "mypkg")}
+	pb := &PKGBUILD{StartDir: filepath.Join(parent, "mypkg"), ArchComputed: "x86_64"}
 	sysroot := filepath.Join(parent, "yap-sysroot")
 
 	if err := pb.SetupSysrootEnvironment(); err != nil {
 		t.Fatalf("SetupSysrootEnvironment: %v", err)
 	}
 
+	// Standard include dir.
 	cpath := os.Getenv("CPATH")
 	if !strings.Contains(cpath, filepath.Join(sysroot, "usr", "include")) {
-		t.Errorf("CPATH=%q does not contain sysroot include dir", cpath)
+		t.Errorf("CPATH=%q missing usr/include", cpath)
 	}
 
+	// Debian multiarch include dir.
+	if !strings.Contains(cpath, filepath.Join(sysroot, "usr", "include", "x86_64-linux-gnu")) {
+		t.Errorf("CPATH=%q missing multiarch include dir", cpath)
+	}
+
+	// Standard lib dir.
 	libpath := os.Getenv("LIBRARY_PATH")
 	if !strings.Contains(libpath, filepath.Join(sysroot, "usr", "lib")) {
-		t.Errorf("LIBRARY_PATH=%q does not contain sysroot lib dir", libpath)
+		t.Errorf("LIBRARY_PATH=%q missing usr/lib", libpath)
 	}
 
-	// CFLAGS and LDFLAGS must NOT be mutated
-	if os.Getenv("CFLAGS") != "" {
-		t.Error("CFLAGS must not be set by SetupSysrootEnvironment")
+	// lib64 dir.
+	if !strings.Contains(libpath, filepath.Join(sysroot, "usr", "lib64")) {
+		t.Errorf("LIBRARY_PATH=%q missing usr/lib64", libpath)
 	}
 
-	if os.Getenv("LDFLAGS") != "" {
-		t.Error("LDFLAGS must not be set by SetupSysrootEnvironment")
+	// Debian multiarch lib dir.
+	if !strings.Contains(libpath, filepath.Join(sysroot, "usr", "lib", "x86_64-linux-gnu")) {
+		t.Errorf("LIBRARY_PATH=%q missing multiarch lib dir", libpath)
+	}
+
+	// CFLAGS must contain -I flags for sysroot include dirs.
+	cflags := os.Getenv("CFLAGS")
+	if !strings.Contains(cflags, "-I"+filepath.Join(sysroot, "usr", "include")) {
+		t.Errorf("CFLAGS=%q missing -I flag for usr/include", cflags)
+	}
+
+	// LDFLAGS must contain -L flags for sysroot lib dirs.
+	ldflags := os.Getenv("LDFLAGS")
+	if !strings.Contains(ldflags, "-L"+filepath.Join(sysroot, "usr", "lib")) {
+		t.Errorf("LDFLAGS=%q missing -L flag for usr/lib", ldflags)
+	}
+
+	// PKG_CONFIG_PATH must contain multiarch pkgconfig dir.
+	pkgconfig := os.Getenv("PKG_CONFIG_PATH")
+	if !strings.Contains(pkgconfig, filepath.Join(sysroot, "usr", "lib", "x86_64-linux-gnu", "pkgconfig")) {
+		t.Errorf("PKG_CONFIG_PATH=%q missing multiarch pkgconfig dir", pkgconfig)
 	}
 }
 
-func TestSetupSysrootEnvironment_NoZextras(t *testing.T) {
-	for _, v := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH"} {
-		t.Setenv(v, "")
-	}
+func TestSetupSysrootEnvironment_PrependsToExisting(t *testing.T) {
+	t.Setenv("CFLAGS", "-O2 -pipe")
+	t.Setenv("PKG_CONFIG_PATH", "/existing/pkgconfig")
+	t.Setenv("CPATH", "")
+	t.Setenv("LIBRARY_PATH", "")
+	t.Setenv("CPPFLAGS", "")
+	t.Setenv("LDFLAGS", "")
 
 	parent := t.TempDir()
-	pb := &PKGBUILD{StartDir: filepath.Join(parent, "mypkg")}
+	pb := &PKGBUILD{StartDir: filepath.Join(parent, "mypkg"), ArchComputed: "x86_64"}
 
 	if err := pb.SetupSysrootEnvironment(); err != nil {
 		t.Fatalf("SetupSysrootEnvironment: %v", err)
 	}
 
-	for _, envVar := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH"} {
+	// Existing CFLAGS value must be preserved at the end.
+	cflags := os.Getenv("CFLAGS")
+	if !strings.HasSuffix(cflags, "-O2 -pipe") {
+		t.Errorf("CFLAGS=%q should end with existing value '-O2 -pipe'", cflags)
+	}
+
+	// Existing PKG_CONFIG_PATH must be preserved at the end.
+	pkgconfig := os.Getenv("PKG_CONFIG_PATH")
+	if !strings.HasSuffix(pkgconfig, "/existing/pkgconfig") {
+		t.Errorf("PKG_CONFIG_PATH=%q should end with existing value", pkgconfig)
+	}
+}
+
+func TestSetupSysrootEnvironment_NoZextras(t *testing.T) {
+	for _, v := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "CFLAGS", "CPPFLAGS", "LDFLAGS"} {
+		t.Setenv(v, "")
+	}
+
+	parent := t.TempDir()
+	pb := &PKGBUILD{StartDir: filepath.Join(parent, "mypkg"), ArchComputed: "x86_64"}
+
+	if err := pb.SetupSysrootEnvironment(); err != nil {
+		t.Fatalf("SetupSysrootEnvironment: %v", err)
+	}
+
+	for _, envVar := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "CFLAGS", "LDFLAGS"} {
 		if strings.Contains(os.Getenv(envVar), "zextras") {
 			t.Errorf("%s must not contain zextras paths, got: %s", envVar, os.Getenv(envVar))
+		}
+	}
+}
+
+func TestSetupSysrootEnvironment_NoMultiarchForUnknownArch(t *testing.T) {
+	for _, v := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "CFLAGS", "CPPFLAGS", "LDFLAGS"} {
+		t.Setenv(v, "")
+	}
+
+	parent := t.TempDir()
+	pb := &PKGBUILD{StartDir: filepath.Join(parent, "mypkg"), ArchComputed: "any"}
+
+	if err := pb.SetupSysrootEnvironment(); err != nil {
+		t.Fatalf("SetupSysrootEnvironment: %v", err)
+	}
+
+	// "any" has no triplet, so no multiarch dirs should appear.
+	cpath := os.Getenv("CPATH")
+	if strings.Contains(cpath, "linux-gnu") {
+		t.Errorf("CPATH=%q should not contain multiarch dir for arch=any", cpath)
+	}
+
+	// Standard dirs must still be present.
+	sysroot := filepath.Join(parent, "yap-sysroot")
+	if !strings.Contains(cpath, filepath.Join(sysroot, "usr", "include")) {
+		t.Errorf("CPATH=%q missing usr/include even for arch=any", cpath)
+	}
+}
+
+func TestGnuTriplet(t *testing.T) {
+	cases := []struct {
+		arch, want string
+	}{
+		{"x86_64", "x86_64-linux-gnu"},
+		{"aarch64", "aarch64-linux-gnu"},
+		{"armv7", "arm-linux-gnueabihf"},
+		{"armv6", "arm-linux-gnueabihf"},
+		{"i686", "i686-linux-gnu"},
+		{"ppc64le", "powerpc64le-linux-gnu"},
+		{"s390x", "s390x-linux-gnu"},
+		{"riscv64", "riscv64-linux-gnu"},
+		{"any", ""},
+		{"", ""},
+		{"mips", ""},
+	}
+
+	for _, tc := range cases {
+		got := gnuTriplet(tc.arch)
+		if got != tc.want {
+			t.Errorf("gnuTriplet(%q) = %q, want %q", tc.arch, got, tc.want)
 		}
 	}
 }

@@ -88,13 +88,23 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: 📋 Prepare image list
+        id: images
+        run: |
+          IMAGES="${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.os }}"
+          if [ -n "${{ secrets.DOCKER_USERNAME }}" ]; then
+            IMAGES="$IMAGES
+          ${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}"
+          fi
+          echo "list<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$IMAGES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: 📋 Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.os }}
-            ${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}
+          images: ${{ steps.images.outputs.list }}
           labels: |
             maintainer=M0Rf30
             org.opencontainers.image.authors=M0Rf30

@@ -206,7 +206,12 @@ func CalculateDataHash(baseDir string, skipPatterns []string) (string, error) {
 
 		// Hash file content if it's a regular file
 		if fileInfo.Mode().IsRegular() {
-			file, err := os.Open(filepath.Clean(path))
+			relPath2, err := filepath.Rel(baseDir, path)
+			if err != nil {
+				return err
+			}
+
+			file, err := os.OpenInRoot(baseDir, relPath2)
 			if err != nil {
 				return err
 			}
