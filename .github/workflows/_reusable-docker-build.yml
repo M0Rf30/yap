@@ -17,7 +17,7 @@ on:
         description: "Go version to use"
         required: false
         type: string
-        default: "1.25.5"
+        default: "1.26.1"
       push:
         description: "Push image to registry"
         required: false
