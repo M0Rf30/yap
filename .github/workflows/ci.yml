@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25.5"
+  GO_VERSION: "1.26.1"
 
 jobs:
   # ===================================
@@ -75,7 +75,7 @@ jobs:
     name: 🔒 Security Scan
     uses: ./.github/workflows/_reusable-security-scan.yml
     with:
-      go-version: "1.25.5"
+      go-version: "1.26.1"
       upload-sarif: true
       run-gosec: true
       run-vulncheck: false
@@ -93,7 +93,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         # os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ["1.25.5"]
+        go-version: ["1.26.1"]
 
     steps:
       - name: 📂 Checkout code
@@ -179,7 +179,7 @@ jobs:
     timeout-minutes: 20
     needs: [build]
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-    continue-on-error: true  # Integration tests require Docker/container runtime; may fail in CI environment
+    continue-on-error: true # Integration tests require Docker/container runtime; may fail in CI environment
 
     services:
       docker:

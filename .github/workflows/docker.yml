@@ -20,7 +20,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  GO_VERSION: "1.25.5"
+  GO_VERSION: "1.26.1"
 
 jobs:
   # Generate matrix for all OS builds

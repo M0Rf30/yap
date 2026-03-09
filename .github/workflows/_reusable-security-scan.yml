@@ -8,7 +8,7 @@ on:
         description: "Go version to use"
         required: false
         type: string
-        default: "1.25.5"
+        default: "1.26.1"
       upload-sarif:
         description: "Upload SARIF to GitHub Security"
         required: false
@@ -78,7 +78,7 @@ jobs:
         id: vulncheck
         run: |
           echo "🔍 Running vulnerability scan..."
-          
+
           if govulncheck -json ./... > vulncheck.json 2>&1; then
             echo "result=success" >> "$GITHUB_OUTPUT"
             echo "✅ No vulnerabilities found"
