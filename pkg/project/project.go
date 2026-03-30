@@ -371,14 +371,17 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 	return index
 }
 
-// getMakeDeps retrieves the make dependencies for the MultipleProject.
+// getMakeDeps retrieves the make and runtime dependencies for the MultipleProject.
 //
 // It iterates over each child project and appends their make dependencies
-// to the makeDepends slice. The makeDepends slice is then assigned to the
-// makeDepends field of the MultipleProject.
+// and runtime dependencies to the makeDepends slice, so that both are
+// installed before the build starts. This is needed when building a subset
+// of packages with external repos configured, so that runtime dependencies
+// (e.g., carbonio-openssl) can be resolved from the repository.
 func (mpc *MultipleProject) getMakeDeps() {
 	for _, child := range mpc.Projects {
 		makeDepends = append(makeDepends, child.Builder.PKGBUILD.MakeDepends...)
+		makeDepends = append(makeDepends, child.Builder.PKGBUILD.Depends...)
 	}
 }
 
