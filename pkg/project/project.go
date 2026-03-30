@@ -381,8 +381,24 @@ func (mpc *MultipleProject) findPackageInProjects(pkgName string) int {
 func (mpc *MultipleProject) getMakeDeps() {
 	for _, child := range mpc.Projects {
 		makeDepends = append(makeDepends, child.Builder.PKGBUILD.MakeDepends...)
-		makeDepends = append(makeDepends, child.Builder.PKGBUILD.Depends...)
+
+		for _, dep := range child.Builder.PKGBUILD.Depends {
+			makeDepends = append(makeDepends, stripVersionConstraint(dep))
+		}
 	}
+}
+
+// stripVersionConstraint removes version operators (>=, <=, >, <, =) and
+// everything after them from a dependency string. For example,
+// "carbonio-mariadb>10.1.48" becomes "carbonio-mariadb".
+func stripVersionConstraint(dep string) string {
+	for i, c := range dep {
+		if c == '>' || c == '<' || c == '=' {
+			return dep[:i]
+		}
+	}
+
+	return dep
 }
 
 // populateProjects populates the MultipleProject with projects based on the
