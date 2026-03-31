@@ -160,6 +160,8 @@
   translation: "SSH password for Git repositories"
 - id: flags.build.target_arch
   translation: "Target architecture for cross-compilation"
+- id: flags.build.only
+  translation: "Comma-separated list of project names to build (filters yap.json)"
 - id: flags.build.to
   translation: "Stop building at this distribution"
 - id: flags.build.zap
@@ -550,6 +552,8 @@
   translation: "Dependency popularity"
 - id: logger.dependency_popularity_analysis
   translation: "Analyzing dependency popularity"
+- id: logger.filtered_projects_with_only
+  translation: "Filtered projects with --only"
 - id: logger.external_dependency
   translation: "External dependency"
 - id: logger.external_runtime_dependencies_collected

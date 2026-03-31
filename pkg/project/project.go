@@ -57,6 +57,9 @@ var (
 	ToPkgName string
 	// TargetArch specifies the target architecture for cross-compilation
 	TargetArch string
+	// OnlyPkgNames is a comma-separated list of project names to build.
+	// When set, only matching projects from yap.json are built.
+	OnlyPkgNames string
 	// Parallel enables parallel dependency resolution and concurrent package building.
 	// When false (default), packages are built sequentially respecting "install" flags.
 	Parallel bool
@@ -684,6 +687,36 @@ func (mpc *MultipleProject) getRuntimeDeps() []string {
 	return result
 }
 
+// filterProjects filters mpc.Projects to only include projects whose Name
+// matches one of the comma-separated names in the only parameter.
+func (mpc *MultipleProject) filterProjects(only string) {
+	nameSet := make(map[string]bool)
+
+	for name := range strings.SplitSeq(only, ",") {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			nameSet[name] = true
+		}
+	}
+
+	if len(nameSet) == 0 {
+		return
+	}
+
+	filtered := make([]*Project, 0)
+
+	for _, proj := range mpc.Projects {
+		if nameSet[proj.Name] {
+			filtered = append(filtered, proj)
+		}
+	}
+
+	logger.Info(i18n.T("logger.filtered_projects_with_only"),
+		"requested", len(nameSet), "matched", len(filtered))
+
+	mpc.Projects = filtered
+}
+
 // populateProjects populates the MultipleProject with projects based on the
 // given distro, release, and path.
 //
@@ -736,6 +769,11 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 	}
 
 	mpc.Projects = projects
+
+	// Filter projects when --only is specified
+	if OnlyPkgNames != "" {
+		mpc.filterProjects(OnlyPkgNames)
+	}
 
 	return nil
 }
