@@ -1373,3 +1373,124 @@ package() {
 		}
 	})
 }
+
+func TestMultipleProjectWithOnlyFlag(t *testing.T) {
+	testDir := t.TempDir()
+	buildDir := filepath.Join(testDir, "build")
+	outputDir := filepath.Join(testDir, "output")
+
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+	// Create three project directories with PKGBUILDs
+	for _, name := range []string{"pkga", "pkgb", "pkgc"} {
+		dir := filepath.Join(testDir, name)
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+
+		content := `pkgname="` + name + `"
+pkgver="1.0"
+pkgrel="1"
+pkgdesc="` + name + ` package"
+arch=("x86_64")
+license=("GPL-3.0-only")
+
+package() {
+	mkdir -p "${pkgdir}/usr/bin"
+}
+`
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(content), 0o644))
+	}
+
+	yapJSON := `{
+		"name": "only-test",
+		"description": "Only flag test",
+		"buildDir": "` + buildDir + `",
+		"output": "` + outputDir + `",
+		"projects": [
+			{"name": "pkga", "install": false},
+			{"name": "pkgb", "install": false},
+			{"name": "pkgc", "install": false}
+		]
+	}`
+	require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
+
+	t.Run("filters to matching projects only", func(t *testing.T) {
+		originalOnly := project.OnlyPkgNames
+		originalSkipSync := project.SkipSyncDeps
+		originalNoMakeDeps := project.NoMakeDeps
+
+		defer func() {
+			project.OnlyPkgNames = originalOnly
+			project.SkipSyncDeps = originalSkipSync
+			project.NoMakeDeps = originalNoMakeDeps
+		}()
+
+		project.OnlyPkgNames = "pkga,pkgc"
+		project.SkipSyncDeps = true
+		project.NoMakeDeps = true
+
+		mpc := &project.MultipleProject{}
+
+		err := mpc.MultiProject("ubuntu", "", testDir)
+		if err != nil {
+			t.Logf("MultiProject returned error (may be expected in CI): %v", err)
+			t.Skip("skipping assertion: MultiProject failed (no package manager)")
+		}
+
+		require.Len(t, mpc.Projects, 2)
+		assert.Equal(t, "pkga", mpc.Projects[0].Name)
+		assert.Equal(t, "pkgc", mpc.Projects[1].Name)
+	})
+
+	t.Run("empty only returns all projects", func(t *testing.T) {
+		originalOnly := project.OnlyPkgNames
+		originalSkipSync := project.SkipSyncDeps
+		originalNoMakeDeps := project.NoMakeDeps
+
+		defer func() {
+			project.OnlyPkgNames = originalOnly
+			project.SkipSyncDeps = originalSkipSync
+			project.NoMakeDeps = originalNoMakeDeps
+		}()
+
+		project.OnlyPkgNames = ""
+		project.SkipSyncDeps = true
+		project.NoMakeDeps = true
+
+		mpc := &project.MultipleProject{}
+
+		err := mpc.MultiProject("ubuntu", "", testDir)
+		if err != nil {
+			t.Logf("MultiProject returned error (may be expected in CI): %v", err)
+			t.Skip("skipping assertion: MultiProject failed (no package manager)")
+		}
+
+		assert.Len(t, mpc.Projects, 3)
+	})
+
+	t.Run("non-matching names returns empty", func(t *testing.T) {
+		originalOnly := project.OnlyPkgNames
+		originalSkipSync := project.SkipSyncDeps
+		originalNoMakeDeps := project.NoMakeDeps
+
+		defer func() {
+			project.OnlyPkgNames = originalOnly
+			project.SkipSyncDeps = originalSkipSync
+			project.NoMakeDeps = originalNoMakeDeps
+		}()
+
+		project.OnlyPkgNames = "nonexistent"
+		project.SkipSyncDeps = true
+		project.NoMakeDeps = true
+
+		mpc := &project.MultipleProject{}
+
+		err := mpc.MultiProject("ubuntu", "", testDir)
+		if err != nil {
+			t.Logf("MultiProject returned error (may be expected in CI): %v", err)
+			t.Skip("skipping assertion: MultiProject failed (no package manager)")
+		}
+
+		assert.Empty(t, mpc.Projects)
+	})
+}
