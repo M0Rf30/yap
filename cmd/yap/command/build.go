@@ -78,4 +78,6 @@ func init() {
 		"to", "", "", "Build until a defined package name")
 	buildCmd.Flags().BoolVarP(&project.Zap,
 		"zap", "z", false, "Remove entire staging dir before building the package")
+	buildCmd.Flags().StringVarP(&project.OnlyPkgNames,
+		"only", "", "", "Comma-separated list of project names to build (filters yap.json)")
 }

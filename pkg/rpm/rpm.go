@@ -361,7 +361,7 @@ func getModTime(fileInfo os.FileInfo) uint32 {
 			osutils.Logger.Args("time", mTime))
 	}
 
-	return uint32(mTime)
+	return uint32(mTime) // #nosec G115 //nolint:gosec -- range validated above
 }
 
 // getRelease updates the release information of the RPM struct.

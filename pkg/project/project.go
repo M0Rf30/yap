@@ -52,6 +52,10 @@ var (
 	// ToPkgName is used to stop the build process after a specific package.
 	ToPkgName string
 
+	// OnlyPkgNames is a comma-separated list of project names to build.
+	// When set, only matching projects from yap.json are built.
+	OnlyPkgNames string
+
 	// Zap indicates whether resources should be aggressively cleaned up
 	// after operations, such as removing temporary files or caches.
 	Zap bool
@@ -196,6 +200,11 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	err := mpc.readProject(path)
 	if err != nil {
 		return err
+	}
+
+	// Filter projects when --only is specified
+	if OnlyPkgNames != "" {
+		mpc.filterProjects(OnlyPkgNames)
 	}
 
 	err = osutils.ExistsMakeDir(mpc.BuildDir)
@@ -399,6 +408,36 @@ func stripVersionConstraint(dep string) string {
 	}
 
 	return dep
+}
+
+// filterProjects filters mpc.Projects to only include projects whose Name
+// matches one of the comma-separated names in the only parameter.
+func (mpc *MultipleProject) filterProjects(only string) {
+	nameSet := make(map[string]bool)
+
+	for name := range strings.SplitSeq(only, ",") {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			nameSet[name] = true
+		}
+	}
+
+	if len(nameSet) == 0 {
+		return
+	}
+
+	filtered := make([]*Project, 0)
+
+	for _, proj := range mpc.Projects {
+		if nameSet[proj.Name] {
+			filtered = append(filtered, proj)
+		}
+	}
+
+	osutils.Logger.Info("filtered projects with --only",
+		osutils.Logger.Args("requested", len(nameSet), "matched", len(filtered)))
+
+	mpc.Projects = filtered
 }
 
 // populateProjects populates the MultipleProject with projects based on the
