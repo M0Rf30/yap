@@ -161,6 +161,8 @@
   translation: "Password SSH per i repository Git"
 - id: flags.build.target_arch
   translation: "Architettura di destinazione per il cross-compile"
+- id: flags.build.only
+  translation: "Lista separata da virgole di nomi di progetto da compilare (filtra yap.json)"
 - id: flags.build.to
   translation: "Ferma la compilazione a questa distribuzione"
 - id: flags.build.zap
@@ -551,6 +553,8 @@
   translation: "Popolarità dipendenza"
 - id: logger.dependency_popularity_analysis
   translation: "Analisi della popolarità delle dipendenze"
+- id: logger.filtered_projects_with_only
+  translation: "Progetti filtrati con --only"
 - id: logger.external_dependency
   translation: "Dipendenza esterna"
 - id: logger.external_runtime_dependencies_collected

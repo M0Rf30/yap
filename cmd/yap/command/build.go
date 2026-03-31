@@ -182,6 +182,7 @@ func InitializeBuildDescriptions() {
 	buildCmd.Flag("ssh-password").Usage = i18n.T("flags.build.ssh_password")
 	buildCmd.Flag("from").Usage = i18n.T("flags.build.from")
 	buildCmd.Flag("to").Usage = i18n.T("flags.build.to")
+	buildCmd.Flag("only").Usage = i18n.T("flags.build.only")
 	buildCmd.Flag("target-arch").Usage = i18n.T("flags.build.target_arch")
 }
 
@@ -245,6 +246,10 @@ func init() {
 		"from", "", "", "")
 	buildCmd.Flags().StringVarP(&project.ToPkgName,
 		"to", "", "", "")
+
+	// PROJECT FILTER FLAGS
+	buildCmd.Flags().StringVarP(&project.OnlyPkgNames,
+		"only", "", "", "Comma-separated list of project names to build (filters yap.json)")
 
 	// CROSS-COMPILATION FLAGS
 	buildCmd.Flags().StringVarP(&project.TargetArch,
