@@ -254,4 +254,8 @@ func init() {
 	// CROSS-COMPILATION FLAGS
 	buildCmd.Flags().StringVarP(&project.TargetArch,
 		"target-arch", "t", "", "Target architecture for cross-compilation (e.g., arm64, armv7, x86_64)")
+
+	// DEBUG SYMBOL FLAGS
+	buildCmd.Flags().StringVarP(&project.DebugDir,
+		"debug-dir", "", "", "Output directory for separated debug symbols (.build-id structure for debuginfod)")
 }
