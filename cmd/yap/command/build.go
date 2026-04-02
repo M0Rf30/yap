@@ -80,4 +80,6 @@ func init() {
 		"zap", "z", false, "Remove entire staging dir before building the package")
 	buildCmd.Flags().StringVarP(&project.OnlyPkgNames,
 		"only", "", "", "Comma-separated list of project names to build (filters yap.json)")
+	buildCmd.Flags().StringVarP(&project.DebugDir,
+		"debug-dir", "", "", "Output directory for separated debug symbols (.build-id structure for debuginfod)")
 }

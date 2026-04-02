@@ -29,6 +29,7 @@ COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
     dnf -y install \
     bash-completion \
+    binutils \
     ca-certificates \
     dnf-plugins-core \
     epel-release \

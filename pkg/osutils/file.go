@@ -309,6 +309,102 @@ func Open(path string) (*os.File, error) {
 	return file, err
 }
 
+// ReadBuildID reads the ELF build-id from the given binary.
+// Returns an empty string if the binary has no build-id.
+func ReadBuildID(path string) string {
+	cleanFilePath := filepath.Clean(path)
+
+	file, err := os.Open(cleanFilePath)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	elfFile, err := elf.NewFile(file)
+	if err != nil {
+		return ""
+	}
+
+	for _, section := range elfFile.Sections {
+		if section.Name != ".note.gnu.build-id" {
+			continue
+		}
+
+		data, err := section.Data()
+		if err != nil || len(data) < 16 {
+			return ""
+		}
+
+		// ELF note format: namesz(4) + descsz(4) + type(4) + name + desc
+		nameSize := elfFile.ByteOrder.Uint32(data[0:4])
+		descSize := elfFile.ByteOrder.Uint32(data[4:8])
+
+		// Align name to 4 bytes
+		nameEnd := 12 + nameSize
+		if nameEnd%4 != 0 {
+			nameEnd += 4 - nameEnd%4
+		}
+
+		descEnd := nameEnd + descSize
+		if int(descEnd) > len(data) {
+			return ""
+		}
+
+		desc := data[nameEnd:descEnd]
+
+		hexStr := make([]byte, len(desc)*2)
+
+		for i, b := range desc {
+			const hexChars = "0123456789abcdef"
+
+			hexStr[i*2] = hexChars[b>>4]
+			hexStr[i*2+1] = hexChars[b&0x0f]
+		}
+
+		return string(hexStr)
+	}
+
+	return ""
+}
+
+// SeparateDebugInfo extracts debug information from the binary into a separate
+// file organized by build-id, then adds a .gnu_debuglink to the original binary.
+// The debug file is stored at <debugDir>/.build-id/<prefix>/<suffix>.debug.
+// Returns the path to the debug file, or empty string if no build-id was found.
+func SeparateDebugInfo(binary, debugDir string) (string, error) {
+	buildID := ReadBuildID(binary)
+	if buildID == "" || len(buildID) < 3 {
+		return "", nil
+	}
+
+	prefix := buildID[:2]
+	suffix := buildID[2:]
+	debugSubDir := filepath.Join(debugDir, ".build-id", prefix)
+
+	err := ExistsMakeDir(debugSubDir)
+	if err != nil {
+		return "", err
+	}
+
+	debugFile := filepath.Join(debugSubDir, suffix+".debug")
+
+	// Extract debug info: objcopy --only-keep-debug <binary> <debugFile>
+	err = Exec(false, "", "objcopy", "--only-keep-debug", binary, debugFile)
+	if err != nil {
+		return "", err
+	}
+
+	// Add debuglink to the binary: objcopy --add-gnu-debuglink=<debugFile> <binary>
+	err = Exec(false, "", "objcopy", "--add-gnu-debuglink="+debugFile, binary)
+	if err != nil {
+		// Non-fatal: the debug file is still valid even without the link
+		Logger.Warn("failed to add debuglink",
+			Logger.Args("binary", binary, "error", err))
+	}
+
+	return debugFile, nil
+}
+
 // StripFile strips the binary file using the strip command.
 func StripFile(path string, args ...string) error {
 	return strip(path, args...)
