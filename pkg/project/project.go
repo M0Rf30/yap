@@ -21,6 +21,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -63,6 +64,10 @@ var (
 	// Parallel enables parallel dependency resolution and concurrent package building.
 	// When false (default), packages are built sequentially respecting "install" flags.
 	Parallel bool
+	// DebugDir is the output directory for separated debug symbol files.
+	// When set, debug info is extracted from ELF binaries before stripping
+	// and saved in a .build-id directory structure suitable for debuginfod.
+	DebugDir string
 
 	// Global state variables
 	singleProject  bool
@@ -589,6 +594,20 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 	err := files.ExistsMakeDir(mpc.Output)
 	if err != nil {
 		return err
+	}
+
+	// Configure debug symbol separation before stripping occurs in PrepareFakeroot.
+	if DebugDir != "" {
+		absDebugDir, absErr := filepath.Abs(DebugDir)
+		if absErr != nil {
+			return absErr
+		}
+
+		if mkErr := files.ExistsMakeDir(absDebugDir); mkErr != nil {
+			return mkErr
+		}
+
+		options.SetDebugDir(absDebugDir)
 	}
 
 	err = proj.PackageManager.PrepareFakeroot(mpc.Output, TargetArch)

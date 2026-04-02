@@ -14,6 +14,14 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
+// debugDir holds the output directory for separated debug symbols.
+var debugDir string
+
+// SetDebugDir sets the output directory for debug symbols.
+func SetDebugDir(dir string) {
+	debugDir = dir
+}
+
 // Strip walks through the directory to process each file.
 func Strip(packageDir string) error {
 	logger.Info(i18n.T("logger.strip.info.stripping_binaries_1"))
@@ -67,6 +75,18 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	fileType := files.GetFileType(binary)
 	if fileType == "" || fileType == "ET_NONE" {
 		return err
+	}
+
+	// Separate debug info before stripping, if a debug directory is configured.
+	if debugDir != "" {
+		debugFile, sepErr := binutil.SeparateDebugInfo(binary, debugDir)
+		if sepErr != nil {
+			logger.Warn("failed to separate debug info",
+				"binary", binary, "error", sepErr)
+		} else if debugFile != "" {
+			logger.Info("separated debug info",
+				"binary", binary, "debug", debugFile)
+		}
 	}
 
 	stripFlags, stripLTO := determineStripFlags(fileType, binary)

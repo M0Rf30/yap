@@ -22,6 +22,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -130,6 +131,13 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 		".BUILDINFO"), tmpl)
 	if err != nil {
 		return err
+	}
+
+	if m.PKGBUILD.StripEnabled {
+		err = options.Strip(m.PKGBUILD.PackageDir)
+		if err != nil {
+			return err
+		}
 	}
 
 	var mtreeEntries []*files.Entry
