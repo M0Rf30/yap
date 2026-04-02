@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/pkg/constants"
+	"github.com/M0Rf30/yap/pkg/options"
 	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/pkgbuild"
 	"github.com/klauspost/pgzip"
@@ -108,6 +109,13 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 		".BUILDINFO"), tmpl)
 	if err != nil {
 		return err
+	}
+
+	if m.PKGBUILD.StripEnabled {
+		err = options.Strip(m.PKGBUILD.PackageDir)
+		if err != nil {
+			return err
+		}
 	}
 
 	var mtreeEntries []osutils.FileContent

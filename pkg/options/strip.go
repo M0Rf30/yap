@@ -8,6 +8,15 @@ import (
 	"github.com/M0Rf30/yap/pkg/osutils"
 )
 
+// debugDir holds the output directory for separated debug symbols.
+// When empty, debug info separation is skipped and binaries are stripped normally.
+var debugDir string
+
+// SetDebugDir sets the output directory for debug symbols.
+func SetDebugDir(dir string) {
+	debugDir = dir
+}
+
 // Strip walks through the directory to process each file.
 func Strip(packageDir string) error {
 	osutils.Logger.Info("stripping binaries")
@@ -35,6 +44,18 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	fileType := osutils.GetFileType(binary)
 	if fileType == "" || fileType == "ET_NONE" {
 		return err
+	}
+
+	// Separate debug info before stripping, if a debug directory is configured.
+	if debugDir != "" {
+		debugFile, sepErr := osutils.SeparateDebugInfo(binary, debugDir)
+		if sepErr != nil {
+			osutils.Logger.Warn("failed to separate debug info",
+				osutils.Logger.Args("binary", binary, "error", sepErr))
+		} else if debugFile != "" {
+			osutils.Logger.Info("separated debug info",
+				osutils.Logger.Args("binary", binary, "debug", debugFile))
+		}
 	}
 
 	stripFlags, stripLTO := determineStripFlags(fileType, binary)

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/pkg/builder"
+	"github.com/M0Rf30/yap/pkg/options"
 	"github.com/M0Rf30/yap/pkg/osutils"
 	"github.com/M0Rf30/yap/pkg/packer"
 	"github.com/M0Rf30/yap/pkg/parser"
@@ -55,6 +56,11 @@ var (
 	// OnlyPkgNames is a comma-separated list of project names to build.
 	// When set, only matching projects from yap.json are built.
 	OnlyPkgNames string
+
+	// DebugDir is the output directory for separated debug symbol files.
+	// When set, debug info is extracted from ELF binaries before stripping
+	// and saved in a .build-id directory structure suitable for debuginfod.
+	DebugDir string
 
 	// Zap indicates whether resources should be aggressively cleaned up
 	// after operations, such as removing temporary files or caches.
@@ -339,6 +345,21 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 	err := osutils.ExistsMakeDir(mpc.Output)
 	if err != nil {
 		return err
+	}
+
+	// Configure debug symbol separation before stripping occurs in PrepareFakeroot.
+	if DebugDir != "" {
+		absDebugDir, absErr := filepath.Abs(DebugDir)
+		if absErr != nil {
+			return absErr
+		}
+
+		err = osutils.ExistsMakeDir(absDebugDir)
+		if err != nil {
+			return err
+		}
+
+		options.SetDebugDir(absDebugDir)
 	}
 
 	err = proj.PackageManager.PrepareFakeroot(mpc.Output)
