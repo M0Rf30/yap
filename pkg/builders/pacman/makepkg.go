@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/klauspost/pgzip"
 
@@ -93,7 +92,13 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 	}
 
 	m.PKGBUILD.InstalledSize = installedSize
-	m.PKGBUILD.BuildDate = time.Now().Unix()
+
+	sourceDateEpoch, err := files.ResolveSourceDateEpoch(m.PKGBUILD.Home)
+	if err != nil {
+		return err
+	}
+
+	m.PKGBUILD.BuildDate = sourceDateEpoch.Unix()
 	m.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 	m.PKGBUILD.PkgType = "pkg" // can be pkg, split, debug, src
 	m.PKGBUILD.YAPVersion = constants.YAPVersion

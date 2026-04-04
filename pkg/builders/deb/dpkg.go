@@ -321,7 +321,7 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		return err
 	}
 
-	modtime := time.Now()
+	modtime := files.SourceDateEpochFromEnv()
 
 	err = addArFile(writer,
 		binaryFilename,
