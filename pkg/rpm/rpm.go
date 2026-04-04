@@ -63,7 +63,7 @@ func (r *RPM) BuildPackage(artifactsPath string) error {
 		Requires:    processDepends(r.PKGBUILD.Depends),
 		Conflicts:   processDepends(r.PKGBUILD.Conflicts),
 		Recommends:  processDepends(r.PKGBUILD.OptDepends),
-		BuildTime:   time.Now(),
+		BuildTime:   resolveRPMBuildTime(),
 	})
 
 	err := r.createFilesInsideRPM(rpm)
@@ -464,4 +464,18 @@ func walkPackageDirectory(packageDir string, backupFiles []string) ([]*osutils.F
 	}
 
 	return contents, nil
+}
+
+// resolveRPMBuildTime returns a deterministic build timestamp for reproducible
+// builds. It reads SOURCE_DATE_EPOCH from the environment and falls back to
+// time.Now() when the variable is absent.
+func resolveRPMBuildTime() time.Time {
+	if env := os.Getenv("SOURCE_DATE_EPOCH"); env != "" {
+		epoch, err := strconv.ParseInt(env, 10, 64)
+		if err == nil {
+			return time.Unix(epoch, 0).UTC()
+		}
+	}
+
+	return time.Now()
 }

@@ -346,6 +346,14 @@ func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
 		}
 	}
 
+	// Resolve and export SOURCE_DATE_EPOCH for reproducible builds.
+	// If already set in the environment (by the user or CI), it is preserved;
+	// otherwise it is derived from the PKGBUILD file modification time.
+	_, err := osutils.ResolveSourceDateEpoch(pkgBuild.Home)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

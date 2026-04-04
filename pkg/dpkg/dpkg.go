@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -404,9 +405,18 @@ func (d *Deb) createDebResources() error {
 	return nil
 }
 
-// getModTime returns the current local time. It uses the time.Now() function
-// from the time package to retrieve the current time.
+// getModTime returns a deterministic build timestamp for reproducible builds.
+// It reads SOURCE_DATE_EPOCH from the environment (set by
+// ResolveSourceDateEpoch during the build setup) and falls back to
+// time.Now() only when the variable is absent.
 func getModTime() time.Time {
+	if env := os.Getenv("SOURCE_DATE_EPOCH"); env != "" {
+		epoch, err := strconv.ParseInt(env, 10, 64)
+		if err == nil {
+			return time.Unix(epoch, 0).UTC()
+		}
+	}
+
 	return time.Now()
 }
 

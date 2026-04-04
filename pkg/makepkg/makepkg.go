@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/M0Rf30/yap/pkg/constants"
 	"github.com/M0Rf30/yap/pkg/options"
@@ -71,7 +70,13 @@ func (m *Pkg) BuildPackage(artifactsPath string) error {
 func (m *Pkg) PrepareFakeroot(artifactsPath string) error {
 	m.pacmanDir = m.PKGBUILD.StartDir
 	m.PKGBUILD.InstalledSize, _ = osutils.GetDirSize(m.PKGBUILD.PackageDir)
-	m.PKGBUILD.BuildDate = time.Now().Unix()
+
+	sourceDateEpoch, err := osutils.ResolveSourceDateEpoch(m.PKGBUILD.Home)
+	if err != nil {
+		return err
+	}
+
+	m.PKGBUILD.BuildDate = sourceDateEpoch.Unix()
 	m.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
 	m.PKGBUILD.PkgType = "pkg" // can be pkg, split, debug, src
 	m.PKGBUILD.YAPVersion = constants.YAPVersion
