@@ -13,6 +13,7 @@ import (
 	"github.com/github/go-spdx/v2/spdxexp"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
@@ -487,7 +488,7 @@ func (pkgBuild *PKGBUILD) BuildEnvironmentSlice() []string {
 		return key + "=" + strings.TrimSpace(flags.String())
 	}
 
-	return []string{
+	env := []string{
 		"pkgdir=" + pkgBuild.PackageDir,
 		"srcdir=" + pkgBuild.SourceDir,
 		"startdir=" + pkgBuild.StartDir,
@@ -501,6 +502,13 @@ func (pkgBuild *PKGBUILD) BuildEnvironmentSlice() []string {
 		buildEnvFlags("CPPFLAGS", "-I", includeDirs),
 		buildEnvFlags("LDFLAGS", "-L", libDirs),
 	}
+
+	// Propagate SOURCE_DATE_EPOCH to build scripts for reproducible builds.
+	if sde := os.Getenv("SOURCE_DATE_EPOCH"); sde != "" {
+		env = append(env, "SOURCE_DATE_EPOCH="+sde)
+	}
+
+	return env
 }
 
 // SetEnvironmentVariables sets the environment variables for the PKGBUILD execution context.
@@ -547,6 +555,13 @@ func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
 
 	err = os.Setenv("pkgrel", pkgBuild.PkgRel)
 	if err != nil {
+		return err
+	}
+
+	// Resolve and export SOURCE_DATE_EPOCH for reproducible builds.
+	// If already set in the environment (by the user or CI), it is preserved;
+	// otherwise it is derived from the PKGBUILD file modification time.
+	if _, err := files.ResolveSourceDateEpoch(pkgBuild.Home); err != nil {
 		return err
 	}
 
