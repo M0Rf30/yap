@@ -2,9 +2,11 @@
 package pkgbuild
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -21,8 +23,12 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
-// ArchAny represents architecture-independent packages.
-const ArchAny = "any"
+// Architecture constants.
+const (
+	ArchAny     = "any"
+	ArchAarch64 = "aarch64"
+	ArchArmv7   = "armv7"
+)
 
 // FuncBody is a tagged string type used exclusively for PKGBUILD function
 // bodies.  AddItem uses this type to distinguish function declarations from
@@ -267,9 +273,86 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 			"missing", len(missingPackages))
 	}
 
+	// Resolve virtual packages to concrete providers (apt-get only)
+	if packageManager == "apt-get" {
+		missingPackages = resolveVirtualPackages(missingPackages)
+	}
+
 	args = append(args, missingPackages...)
 
 	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
+}
+
+// resolveVirtualPackages checks each dependency and replaces virtual packages
+// (those with no installation candidate) with the first concrete provider.
+// This handles cases where a package like "service-discover" is a virtual
+// package provided by multiple concrete packages.
+func resolveVirtualPackages(deps []string) []string {
+	resolved := make([]string, 0, len(deps))
+
+	for _, dep := range deps {
+		resolved = append(resolved, resolveVirtualPackage(dep))
+	}
+
+	return resolved
+}
+
+// resolveVirtualPackage checks if a package is a virtual package and returns
+// the first concrete provider if so, or the original package name otherwise.
+func resolveVirtualPackage(pkg string) string {
+	ctx := context.Background()
+
+	cmd := exec.CommandContext(ctx,
+		"apt-cache", "policy", pkg) // #nosec G204
+
+	var out bytes.Buffer
+
+	cmd.Stdout = &out
+
+	err := cmd.Run()
+	if err != nil {
+		return pkg
+	}
+
+	if !strings.Contains(out.String(), "Candidate: (none)") {
+		return pkg
+	}
+
+	cmd = exec.CommandContext(ctx,
+		"apt-cache", "showpkg", pkg) // #nosec G204
+
+	out.Reset()
+	cmd.Stdout = &out
+
+	err = cmd.Run()
+	if err != nil {
+		return pkg
+	}
+
+	output := out.String()
+
+	idx := strings.Index(output, "Reverse Provides:")
+	if idx == -1 {
+		return pkg
+	}
+
+	lines := strings.Split(output[idx:], "\n")
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) >= 1 {
+			logger.Info("resolved virtual package",
+				"virtual", pkg, "provider", fields[0])
+
+			return fields[0]
+		}
+	}
+
+	return pkg
 }
 
 // GetUpdates reads the package manager name and its arguments to perform
@@ -645,9 +728,9 @@ func (pkgBuild *PKGBUILD) sysrootPaths() (includeDirs, libDirs, pkgConfigDirs []
 // architectures without a known multiarch layout.
 func gnuTriplet(arch string) string {
 	switch arch {
-	case "aarch64":
+	case ArchAarch64:
 		return "aarch64-linux-gnu"
-	case "armv7", "armv6":
+	case ArchArmv7, "armv6":
 		return "arm-linux-gnueabihf"
 	case "i686":
 		return "i686-linux-gnu"
@@ -1268,7 +1351,7 @@ func (pkgBuild *PKGBUILD) processOptions() {
 // isValidArchitecture checks if the provided architecture string is a valid architecture.
 func (pkgBuild *PKGBUILD) isValidArchitecture(arch string) bool {
 	validArchitectures := []string{
-		"x86_64", "i686", "aarch64", "armv7h", "armv6h", "armv5",
+		"x86_64", "i686", ArchAarch64, "armv7h", "armv6h", "armv5",
 		"ppc64", "ppc64le", "s390x", "mips", "mipsle", "riscv64",
 		"pentium4", // Arch Linux 32 support
 		ArchAny,    // Architecture-independent packages
