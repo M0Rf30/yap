@@ -30,6 +30,7 @@ RUN \
 FROM docker.io/ubuntu:focal
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
+    echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections; \
     apt-get update; \
     apt-get upgrade; \
     apt-get install -y --no-install-recommends \
