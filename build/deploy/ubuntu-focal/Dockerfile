@@ -56,6 +56,9 @@ LABEL org.opencontainers.image.version="${VERSION}"
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Preseed debconf to prevent resolvconf postinst failure in containers
+RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
+
 # Install minimal runtime dependencies
 RUN apt-get update && \
     apt-get upgrade -y && \
