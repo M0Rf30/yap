@@ -1,8 +1,11 @@
 package dpkg
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -94,7 +97,85 @@ func (d *Deb) Install(artifactsPath string) error {
 // makeDepends: a slice of strings representing the dependencies to be installed.
 // Returns an error if there was a problem installing the dependencies.
 func (d *Deb) Prepare(makeDepends []string) error {
+	makeDepends = resolveVirtualPackages(makeDepends)
+
 	return d.PKGBUILD.GetDepends("apt-get", installArgs, makeDepends)
+}
+
+// resolveVirtualPackages checks each dependency and replaces virtual packages
+// (those with no installation candidate) with the first concrete provider.
+// This handles cases where a package like "service-discover" is a virtual
+// package provided by multiple concrete packages.
+func resolveVirtualPackages(deps []string) []string {
+	resolved := make([]string, 0, len(deps))
+
+	for _, dep := range deps {
+		provider := resolveVirtualPackage(dep)
+		resolved = append(resolved, provider)
+	}
+
+	return resolved
+}
+
+// resolveVirtualPackage checks if a package is a virtual package and returns
+// the first concrete provider if so, or the original package name otherwise.
+func resolveVirtualPackage(pkg string) string {
+	// Check if the package has an installation candidate
+	cmd := exec.CommandContext(context.Background(),
+		"apt-cache", "policy", pkg) // #nosec G204
+
+	var out bytes.Buffer
+
+	cmd.Stdout = &out
+
+	err := cmd.Run()
+	if err != nil {
+		return pkg
+	}
+
+	// If "Candidate: (none)" is present, this is a virtual package
+	if !strings.Contains(out.String(), "Candidate: (none)") {
+		return pkg
+	}
+
+	// Find a concrete provider using apt-cache showpkg
+	cmd = exec.CommandContext(context.Background(),
+		"apt-cache", "showpkg", pkg) // #nosec G204
+
+	out.Reset()
+	cmd.Stdout = &out
+
+	err = cmd.Run()
+	if err != nil {
+		return pkg
+	}
+
+	// Parse the "Reverse Provides:" section to find providers
+	output := out.String()
+
+	idx := strings.Index(output, "Reverse Provides:")
+	if idx == -1 {
+		return pkg
+	}
+
+	lines := strings.Split(output[idx:], "\n")
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Each line is "provider-name version"
+		fields := strings.Fields(line)
+		if len(fields) >= 1 {
+			osutils.Logger.Info("resolved virtual package",
+				osutils.Logger.Args("virtual", pkg, "provider", fields[0]))
+
+			return fields[0]
+		}
+	}
+
+	return pkg
 }
 
 // PrepareEnvironment prepares the environment for the Deb package.
