@@ -32,6 +32,7 @@ RUN \
     upx /usr/bin/yap
 
 FROM docker.io/ubuntu:jammy
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY --from=builder /usr/bin/yap /usr/bin/yap
 RUN \
     echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections; \
