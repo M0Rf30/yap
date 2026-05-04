@@ -75,7 +75,7 @@ func printOrganizedFlags(cmd *cobra.Command) {
 	// Define flag categories for the build command
 	flagCategories := map[string][]string{
 		"Build Behavior": {
-			"cleanbuild", "nobuild", "zap",
+			"cleanbuild", "nobuild", commandZap,
 		},
 		"Dependency Management": {
 			"nomakedeps", "skip-sync",

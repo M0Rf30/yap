@@ -37,7 +37,31 @@ const (
 type FuncBody string
 
 const (
-	dependsKey = "depends"
+	dependsKey        = "depends"
+	alpineDistro      = "alpine"
+	archDistro        = "arch"
+	armLinuxGnueabihf = "arm-linux-gnueabihf"
+	i686Arch          = "i686"
+	x86_64Arch        = "x86_64"
+	ppc64leArch       = "ppc64le"
+	s390xArch         = "s390x"
+	riscv64Arch       = "riscv64"
+	pkgdescKey        = "pkgdesc"
+	pkgnameKey        = "pkgname"
+	pkgrelKey         = "pkgrel"
+	pkgverKey         = "pkgver"
+	makedependsKey    = "makedepends"
+	sourceKey         = "source"
+	b2sumsKey         = "b2sums"
+	customKey         = "CUSTOM"
+	armv7hArch        = "armv7h"
+	mipsArch          = "mips"
+	cksumsKey         = "cksums"
+	proprietaryKey    = "PROPRIETARY"
+	sha224sumsKey     = "sha224sums"
+	sha256sumsKey     = "sha256sums"
+	sha384sumsKey     = "sha384sums"
+	sha512sumsKey     = "sha512sums"
 )
 
 // Priority constants for PKGBUILD directive matching.
@@ -511,11 +535,11 @@ func (pkgBuild *PKGBUILD) RenderSpec(script string) *template.Template {
 // It does not return anything.
 func (pkgBuild *PKGBUILD) SetMainFolders() {
 	switch pkgBuild.Distro {
-	case "alpine":
+	case alpineDistro:
 		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", pkgBuild.PkgName)
 	default:
 		var folderName string
-		if pkgBuild.Distro == "arch" {
+		if pkgBuild.Distro == archDistro {
 			folderName = "pkg"
 		} else {
 			folderName = "pkg-" + pkgBuild.Distro
@@ -729,19 +753,19 @@ func (pkgBuild *PKGBUILD) sysrootPaths() (includeDirs, libDirs, pkgConfigDirs []
 func gnuTriplet(arch string) string {
 	switch arch {
 	case ArchAarch64:
-		return "aarch64-linux-gnu"
+		return constants.TripletAarch64Linux
 	case ArchArmv7, "armv6":
-		return "arm-linux-gnueabihf"
-	case "i686":
-		return "i686-linux-gnu"
-	case "x86_64":
-		return "x86_64-linux-gnu"
-	case "ppc64le":
-		return "powerpc64le-linux-gnu"
-	case "s390x":
-		return "s390x-linux-gnu"
-	case "riscv64":
-		return "riscv64-linux-gnu"
+		return armLinuxGnueabihf
+	case i686Arch:
+		return constants.TripletI686Linux
+	case x86_64Arch:
+		return constants.TripletX8664Linux
+	case ppc64leArch:
+		return constants.TripletPpc64leLinux
+	case s390xArch:
+		return constants.TripletS390xLinux
+	case riscv64Arch:
+		return constants.TripletRiscv64Linux
 	default:
 		return ""
 	}
@@ -834,10 +858,10 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() error {
 
 	// Check mandatory variables
 	mandatoryChecks := map[string]string{
-		"pkgdesc": pkgBuild.PkgDesc,
-		"pkgname": pkgBuild.PkgName,
-		"pkgrel":  pkgBuild.PkgRel,
-		"pkgver":  pkgBuild.PkgVer,
+		pkgdescKey: pkgBuild.PkgDesc,
+		pkgnameKey: pkgBuild.PkgName,
+		pkgrelKey:  pkgBuild.PkgRel,
+		pkgverKey:  pkgBuild.PkgVer,
 	}
 
 	for variable, value := range mandatoryChecks {
@@ -864,7 +888,7 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 	}
 
 	switch key {
-	case "arch":
+	case archDistro:
 		arrVal, ok := data.([]string)
 		if !ok {
 			return
@@ -907,7 +931,7 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 		}
 
 		pkgBuild.OptDepends = arrVal
-	case "makedepends":
+	case makedependsKey:
 		arrVal, ok := data.([]string)
 		if !ok {
 			return
@@ -935,7 +959,7 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 		}
 
 		pkgBuild.Replaces = arrVal
-	case "source":
+	case sourceKey:
 		arrVal, ok := data.([]string)
 		if !ok {
 			return
@@ -965,7 +989,7 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 // mapChecksumsArrays handles mapping of checksum arrays and returns true if handled
 func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any) bool {
 	switch key {
-	case "sha512sums", "sha384sums", "sha256sums", "sha224sums", "b2sums", "cksums":
+	case sha512sumsKey, sha384sumsKey, sha256sumsKey, sha224sumsKey, b2sumsKey, cksumsKey:
 		if arrVal, ok := data.([]string); ok {
 			pkgBuild.HashSums = arrVal
 		}
@@ -1031,7 +1055,7 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	var err error
 
 	switch key {
-	case "pkgname":
+	case pkgnameKey:
 		strVal, ok := data.(string)
 		if !ok {
 			return
@@ -1322,7 +1346,7 @@ func (pkgBuild *PKGBUILD) getDistributionPriority(directive string) int {
 // Returns a boolean indicating if the license is valid.
 func (pkgBuild *PKGBUILD) checkLicense() bool {
 	for _, license := range pkgBuild.License {
-		if license == "PROPRIETARY" || license == "CUSTOM" {
+		if license == proprietaryKey || license == customKey {
 			return true
 		}
 	}
@@ -1351,8 +1375,8 @@ func (pkgBuild *PKGBUILD) processOptions() {
 // isValidArchitecture checks if the provided architecture string is a valid architecture.
 func (pkgBuild *PKGBUILD) isValidArchitecture(arch string) bool {
 	validArchitectures := []string{
-		"x86_64", "i686", ArchAarch64, "armv7h", "armv6h", "armv5",
-		"ppc64", "ppc64le", "s390x", "mips", "mipsle", "riscv64",
+		x86_64Arch, i686Arch, ArchAarch64, armv7hArch, "armv6h", "armv5",
+		"ppc64", ppc64leArch, s390xArch, mipsArch, "mipsle", riscv64Arch,
 		"pentium4", // Arch Linux 32 support
 		ArchAny,    // Architecture-independent packages
 	}

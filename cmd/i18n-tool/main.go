@@ -10,6 +10,12 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
+const (
+	checkCommand = "check"
+	listCommand  = "list"
+	statsCommand = "stats"
+)
+
 // NewRootCmd creates the root command for the i18n tool
 func NewRootCmd() *cobra.Command {
 	var rootCmd = &cobra.Command{
@@ -19,7 +25,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	var checkCmd = &cobra.Command{
-		Use:   "check",
+		Use:   checkCommand,
 		Short: "Check integrity of localization files",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Checking localization file integrity...")
@@ -36,7 +42,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	var listCmd = &cobra.Command{
-		Use:   "list",
+		Use:   listCommand,
 		Short: "List all message IDs",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ids, err := i18n.GetMessageIDs()
@@ -57,7 +63,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	var statsCmd = &cobra.Command{
-		Use:   "stats",
+		Use:   statsCommand,
 		Short: "Show localization statistics",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Localization Statistics:")

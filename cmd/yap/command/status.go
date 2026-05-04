@@ -17,8 +17,8 @@ import (
 
 // statusCmd provides system and environment information.
 var statusCmd = &cobra.Command{
-	Use:     "status",
-	GroupID: "utility",
+	Use:     commandStatus,
+	GroupID: commandUtility,
 	Aliases: []string{"info", "env"},
 	Short:   "📊 Display system status and environment information",
 	Long: `Show comprehensive system information including:
@@ -158,19 +158,19 @@ yap build --help    - Get help with building packages`)
 
 func getDistroFamily(release string) string {
 	switch {
-	case contains(release, "ubuntu") || contains(release, "debian"):
-		return "debian"
+	case contains(release, "ubuntu") || contains(release, distroFamilyDebian):
+		return distroFamilyDebian
 	case contains(release, "fedora") || contains(release, "rhel") ||
 		contains(release, "centos") || contains(release, "rocky"):
-		return "redhat"
+		return distroFamilyRedhat
 	case contains(release, "opensuse") || contains(release, "suse"):
 		return "suse"
-	case contains(release, "arch"):
-		return "arch"
-	case contains(release, "alpine"):
-		return "alpine"
+	case contains(release, archDistro):
+		return archDistro
+	case contains(release, alpineDistro):
+		return alpineDistro
 	default:
-		return "unknown"
+		return distroFamilyUnknown
 	}
 }
 

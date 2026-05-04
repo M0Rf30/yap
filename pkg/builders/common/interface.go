@@ -21,6 +21,10 @@ import (
 )
 
 const (
+	linuxOS = "linux"
+)
+
+const (
 	updateCommand = "update"
 	formatDeb     = "deb"
 	formatPacman  = "pacman"
@@ -116,15 +120,15 @@ func (bb *BaseBuilder) BuildPackageName(extension string) string {
 	name := fmt.Sprintf("%s-%s-%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.PkgVer, bb.PKGBUILD.PkgRel)
 
 	// Handle epoch for certain package types
-	if bb.PKGBUILD.Epoch != "" && (extension == ".pkg.tar.zst" || extension == ".rpm") {
+	if bb.PKGBUILD.Epoch != "" && (extension == constants.ExtPacmanZst || extension == constants.ExtRPM) {
 		name = fmt.Sprintf("%s-%s:%s-%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.Epoch,
 			bb.PKGBUILD.PkgVer, bb.PKGBUILD.PkgRel)
 	}
 
 	switch extension {
-	case ".apk":
+	case constants.ExtAPK:
 		name += "." + bb.PKGBUILD.ArchComputed
-	case ".deb":
+	case constants.ExtDEB:
 		name = fmt.Sprintf("%s_%s-%s_%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.PkgVer,
 			bb.PKGBUILD.PkgRel, bb.PKGBUILD.ArchComputed)
 	default:
@@ -285,13 +289,13 @@ func getPackageManager(format string) string {
 func getExtension(format string) string {
 	switch format {
 	case constants.FormatDEB:
-		return ".deb"
+		return constants.ExtDEB
 	case constants.FormatRPM:
-		return ".rpm"
+		return constants.ExtRPM
 	case constants.FormatPacman:
-		return ".pkg.tar.zst"
+		return constants.ExtPacmanZst
 	case constants.FormatAPK:
-		return ".apk"
+		return constants.ExtAPK
 	default:
 		return ""
 	}
@@ -628,7 +632,7 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	// Set up Go cross-compilation environment variables
 	goArch := bb.getGoTargetArchitecture(targetArch)
 
-	goOS := "linux" // Default to Linux for cross-compilation
+	goOS := linuxOS // Default to Linux for cross-compilation
 	if goArch != "" {
 		_ = os.Setenv("GOOS", goOS)
 		_ = os.Setenv("GOARCH", goArch)
@@ -718,15 +722,21 @@ export -f configure_cross 2>/dev/null || true
 
 // getRustTargetArchitecture maps YAP architecture names to Rust target triples
 func (bb *BaseBuilder) getRustTargetArchitecture(arch string) string {
+	const (
+		rustAarch64Target = "aarch64-unknown-linux-gnu"
+		rustArmv7Target   = "armv7-unknown-linux-gnueabihf"
+		rustUnknownLinux  = "-unknown-linux-gnu"
+	)
+
 	rustTargets := map[string]string{
-		"aarch64": "aarch64-unknown-linux-gnu",
-		"armv7":   "armv7-unknown-linux-gnueabihf",
-		"armv6":   "arm-unknown-linux-gnueabihf",
-		"i686":    "i686-unknown-linux-gnu",
-		"x86_64":  "x86_64-unknown-linux-gnu",
-		"ppc64le": "powerpc64le-unknown-linux-gnu",
-		"s390x":   "s390x-unknown-linux-gnu",
-		"riscv64": "riscv64gc-unknown-linux-gnu",
+		constants.ArchAarch64: rustAarch64Target,
+		constants.ArchArmv7:   rustArmv7Target,
+		constants.ArchArmv6:   "arm-unknown-linux-gnueabihf",
+		constants.ArchI686:    constants.ArchI686 + rustUnknownLinux,
+		constants.ArchX86_64:  constants.ArchX86_64 + rustUnknownLinux,
+		constants.ArchPpc64le: "powerpc64le" + rustUnknownLinux,
+		constants.ArchS390x:   constants.ArchS390x + rustUnknownLinux,
+		constants.ArchRiscv64: "riscv64gc" + rustUnknownLinux,
 	}
 
 	if target, exists := rustTargets[arch]; exists {
@@ -739,14 +749,14 @@ func (bb *BaseBuilder) getRustTargetArchitecture(arch string) string {
 // getGoTargetArchitecture maps YAP architecture names to Go GOARCH values
 func (bb *BaseBuilder) getGoTargetArchitecture(arch string) string {
 	goArchs := map[string]string{
-		"aarch64": "arm64",
-		"armv7":   "arm",
-		"armv6":   "arm",
-		"i686":    "386",
-		"x86_64":  "amd64",
-		"ppc64le": "ppc64le",
-		"s390x":   "s390x",
-		"riscv64": "riscv64",
+		constants.ArchAarch64: constants.ArchArm64,
+		constants.ArchArmv7:   constants.ArchArm,
+		constants.ArchArmv6:   constants.ArchArm,
+		constants.ArchI686:    "386",
+		constants.ArchX86_64:  constants.ArchAmd64,
+		constants.ArchPpc64le: constants.ArchPpc64le,
+		constants.ArchS390x:   constants.ArchS390x,
+		constants.ArchRiscv64: constants.ArchRiscv64,
 	}
 
 	if goArch, exists := goArchs[arch]; exists {
@@ -761,14 +771,14 @@ func (bb *BaseBuilder) getGoTargetArchitecture(arch string) string {
 // This is used for autoconf's --host and --build flags during cross-compilation.
 func (bb *BaseBuilder) getGNUTriplet(arch string) string {
 	gnuTriplets := map[string]string{
-		"aarch64": "aarch64-linux-gnu",
-		"armv7":   "arm-linux-gnueabihf",
-		"armv6":   "arm-linux-gnueabihf",
-		"i686":    "i686-linux-gnu",
-		"x86_64":  "x86_64-linux-gnu",
-		"ppc64le": "powerpc64le-linux-gnu",
-		"s390x":   "s390x-linux-gnu",
-		"riscv64": "riscv64-linux-gnu",
+		constants.ArchAarch64: constants.TripletAarch64Linux,
+		constants.ArchArmv7:   constants.TripletArmLinuxHf,
+		constants.ArchArmv6:   constants.TripletArmLinuxHf,
+		constants.ArchI686:    constants.TripletI686Linux,
+		constants.ArchX86_64:  constants.TripletX8664Linux,
+		constants.ArchPpc64le: constants.TripletPpc64leLinux,
+		constants.ArchS390x:   constants.TripletS390xLinux,
+		constants.ArchRiscv64: constants.TripletRiscv64Linux,
 	}
 
 	if triplet, exists := gnuTriplets[arch]; exists {

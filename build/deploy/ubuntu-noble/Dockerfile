@@ -40,6 +40,9 @@ RUN if [ "${TARGETARCH}" = "$(go env GOARCH)" ]; then \
 # Runtime stage
 FROM ubuntu:noble
 
+# Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Build arguments for runtime stage
 ARG VERSION=dev
 ARG TARGETARCH=amd64

@@ -23,9 +23,9 @@ var (
 
 	// prepareCmd represents the prepare command.
 	prepareCmd = &cobra.Command{
-		Use:     "prepare [distro]",
-		GroupID: "environment",
-		Aliases: []string{"prep", "setup"},
+		Use:     prepareCommand + " [distro]",
+		GroupID: commandEnvironment,
+		Aliases: []string{aliasPrep, "setup"},
 		Short:   "🛠️  Prepare build environment with development packages", // Will be set in init()
 		Long:    "",                                                        // Will be set in init()
 		Example: "",                                                        // Will be set in init()

@@ -6,8 +6,43 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
+)
+
+const (
+	gccKey           = "gcc"
+	gppKey           = "g++"
+	binutilsKey      = "binutils"
+	additionalKey    = "additional"
+	defaultKey       = "default"
+	muslDevPkg       = "musl-dev"
+	gccMultilibPkg   = "gcc-multilib"
+	binutilsMultilib = "binutils-multilib"
+	gppArmv7Pkg      = "g++-armv7"
+	lib32GccLibs     = "lib32-gcc-libs"
+	libc6DevI386     = "libc6-dev-i386-cross"
+	gccFmtPattern    = "gcc-%s"
+	gppFmtPattern    = "g++-%s"
+	binutilsFmtPat   = "binutils-%s"
+	gppCxxFmtPat     = "gcc-c++-%s"
+	archGccFmtPat    = "%s-gcc"
+	archGppFmtPat    = "%s-g++"
+	archBinFmtPat    = "%s-binutils"
+	libc6DevFmtPat   = "libc6-dev-%s-cross"
+	gccCxxMultilib   = "gcc-c++-multilib"
+	gccX86FmtPat     = "gcc-x86_64-linux-gnu"
+	gppX86FmtPat     = "gcc-c++-x86_64-linux-gnu"
+	binX86FmtPat     = "binutils-x86_64-linux-gnu"
+	gccArmhf         = "gcc-armhf"
+	gppArmhf         = "g++-armhf"
+	binArmhf         = "binutils-armhf"
+	gccS390xRH       = "gcc-s390x-redhat-linux"
+	gppS390xRH       = "gcc-c++-s390x-redhat-linux"
+	binS390xRH       = "binutils-s390x-redhat-linux"
+	aarch64ArchGcc   = "aarch64-linux-gnu-gcc"
+	aarch64ArchGpp   = "aarch64-linux-gnu-g++"
 )
 
 // CrossToolchain represents a cross-compilation toolchain for a specific target architecture.
@@ -116,141 +151,144 @@ func (ct *CrossToolchain) GetPackagesByType() map[string][]string {
 var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 	// Define base patterns for each distribution
 	basePatterns := map[string]map[string]string{
-		"debian": {
-			"gcc":        "gcc-%s",
-			"g++":        "g++-%s",
-			"binutils":   "binutils-%s",
-			"additional": "libc6-dev-%s-cross",
+		constants.DistroDebian: {
+			gccKey:        gccFmtPattern,
+			gppKey:        gppFmtPattern,
+			binutilsKey:   binutilsFmtPat,
+			additionalKey: libc6DevFmtPat,
 		},
-		"ubuntu": {
-			"gcc":        "gcc-%s",
-			"g++":        "g++-%s",
-			"binutils":   "binutils-%s",
-			"additional": "libc6-dev-%s-cross",
+		constants.DistroUbuntu: {
+			gccKey:        gccFmtPattern,
+			gppKey:        gppFmtPattern,
+			binutilsKey:   binutilsFmtPat,
+			additionalKey: libc6DevFmtPat,
 		},
-		"fedora": {
-			"gcc":        "gcc-%s",
-			"g++":        "gcc-c++-%s",
-			"binutils":   "binutils-%s",
-			"additional": "",
+		constants.DistroFedora: {
+			gccKey:        gccFmtPattern,
+			gppKey:        gppCxxFmtPat,
+			binutilsKey:   binutilsFmtPat,
+			additionalKey: "",
 		},
-		"alpine": {
-			"gcc":        "gcc-%s",
-			"g++":        "g++-%s",
-			"binutils":   "binutils-%s",
-			"additional": "musl-dev",
+		constants.DistroAlpine: {
+			gccKey:        gccFmtPattern,
+			gppKey:        gppFmtPattern,
+			binutilsKey:   binutilsFmtPat,
+			additionalKey: muslDevPkg,
 		},
-		"arch": {
-			"gcc":        "%s-gcc",
-			"g++":        "%s-g++",
-			"binutils":   "%s-binutils",
-			"additional": "",
+		constants.DistroArch: {
+			gccKey:        archGccFmtPat,
+			gppKey:        archGppFmtPat,
+			binutilsKey:   archBinFmtPat,
+			additionalKey: "",
 		},
 	}
 
 	// Define architecture-specific mappings for special cases
 	archSpecific := map[string]map[string]map[string]string{
-		"i686": {
-			"arch": {
-				"gcc":      "gcc-multilib",
-				"g++":      "gcc-c++-multilib",
-				"binutils": "binutils-multilib",
+		constants.ArchI686: {
+			constants.DistroArch: {
+				gccKey:      gccMultilibPkg,
+				gppKey:      gccCxxMultilib,
+				binutilsKey: binutilsMultilib,
 			},
 		},
-		"x86_64": {
-			"fedora": {
-				"gcc":      "gcc-x86_64-linux-gnu",
-				"g++":      "gcc-c++-x86_64-linux-gnu",
-				"binutils": "binutils-x86_64-linux-gnu",
+		constants.ArchX86_64: {
+			constants.DistroFedora: {
+				gccKey:      gccX86FmtPat,
+				gppKey:      gppX86FmtPat,
+				binutilsKey: binX86FmtPat,
 			},
 		},
-		"aarch64": {
-			"arch": {
-				"gcc":      "aarch64-linux-gnu-gcc",
-				"g++":      "aarch64-linux-gnu-g++",
-				"binutils": "aarch64-linux-gnu-binutils",
+		constants.ArchAarch64: {
+			constants.DistroArch: {
+				gccKey:      aarch64ArchGcc,
+				gppKey:      aarch64ArchGpp,
+				binutilsKey: "aarch64-linux-gnu-binutils",
 			},
 		},
-		"armv6": {
-			"alpine": {
-				"gcc":      "gcc-armhf",
-				"g++":      "g++-armhf",
-				"binutils": "binutils-armhf",
+		constants.ArchArmv6: {
+			constants.DistroAlpine: {
+				gccKey:      gccArmhf,
+				gppKey:      gppArmhf,
+				binutilsKey: binArmhf,
 			},
 		},
-		"armv7": {
-			"alpine": {
-				"gcc":      "gcc-armv7",
-				"g++":      "g++-armv7",
-				"binutils": "binutils-armv7",
+		constants.ArchArmv7: {
+			constants.DistroAlpine: {
+				gccKey:      "gcc-armv7",
+				gppKey:      gppArmv7Pkg,
+				binutilsKey: "binutils-armv7",
 			},
 		},
-		"s390x": {
-			"fedora": {
-				"gcc":      "gcc-s390x-redhat-linux",
-				"g++":      "gcc-c++-s390x-redhat-linux",
-				"binutils": "binutils-s390x-redhat-linux",
+		constants.ArchS390x: {
+			constants.DistroFedora: {
+				gccKey:      gccS390xRH,
+				gppKey:      gppS390xRH,
+				binutilsKey: binS390xRH,
 			},
 		},
 	}
 
 	// Define architecture-specific additional packages
 	archAdditional := map[string]map[string][]string{
-		"aarch64": {
-			"alpine":  {"musl-dev"},
-			"default": {"libc6-dev-arm64-cross"},
+		constants.ArchAarch64: {
+			constants.DistroAlpine: {muslDevPkg},
+			defaultKey:             {"libc6-dev-arm64-cross"},
 		},
-		"armv7": {
-			"alpine":  {"musl-dev"},
-			"default": {"libc6-dev-armhf-cross"},
+		constants.ArchArmv7: {
+			constants.DistroAlpine: {muslDevPkg},
+			defaultKey:             {"libc6-dev-armhf-cross"},
 		},
-		"armv6": {
-			"alpine":  {"musl-dev"},
-			"default": {"libc6-dev-armhf-cross"},
+		constants.ArchArmv6: {
+			constants.DistroAlpine: {muslDevPkg},
+			defaultKey:             {"libc6-dev-armhf-cross"},
 		},
-		"i686": {
-			"alpine":  {"musl-dev"},
-			"arch":    {"lib32-gcc-libs"}, // Arch multilib needs lib32 libraries
-			"default": {"libc6-dev-i386-cross"},
+		constants.ArchI686: {
+			constants.DistroAlpine: {muslDevPkg},
+			constants.DistroArch:   {lib32GccLibs}, // Arch multilib needs lib32 libraries
+			defaultKey:             {libc6DevI386},
 		},
-		"x86_64": {
-			"alpine":  {"musl-dev"},
-			"default": {"libc6-dev-amd64-cross"},
+		constants.ArchX86_64: {
+			constants.DistroAlpine: {muslDevPkg},
+			defaultKey:             {"libc6-dev-amd64-cross"},
 		},
-		"ppc64le": {
-			"alpine":  {"musl-dev"},
-			"default": {"libc6-dev-ppc64el-cross"},
+		constants.ArchPpc64le: {
+			constants.DistroAlpine: {muslDevPkg},
+			defaultKey:             {"libc6-dev-ppc64el-cross"},
 		},
-		"s390x": {
-			"alpine":  {"musl-dev"},
-			"default": {"libc6-dev-s390x-cross"},
+		constants.ArchS390x: {
+			constants.DistroAlpine: {muslDevPkg},
+			defaultKey:             {"libc6-dev-s390x-cross"},
 		},
-		"riscv64": {
-			"alpine":  {"musl-dev"},
-			"default": {"libc6-dev-riscv64-cross"},
+		constants.ArchRiscv64: {
+			constants.DistroAlpine: {muslDevPkg},
+			defaultKey:             {"libc6-dev-riscv64-cross"},
 		},
 	}
 
 	// Define architecture-specific patterns that need special handling
 	archPatterns := map[string]string{
-		"aarch64": "aarch64-linux-gnu",
-		"armv7":   "arm-linux-gnueabihf",
-		"armv6":   "arm-linux-gnueabihf",
-		"i686":    "i686-linux-gnu",
-		"x86_64":  "x86-64-linux-gnu",
-		"ppc64le": "powerpc64le-linux-gnu",
-		"s390x":   "s390x-linux-gnu",
-		"riscv64": "riscv64-linux-gnu",
+		constants.ArchAarch64: constants.TripletAarch64Linux,
+		constants.ArchArmv7:   constants.TripletArmLinuxHf,
+		constants.ArchArmv6:   constants.TripletArmLinuxHf,
+		constants.ArchI686:    constants.TripletI686Linux,
+		constants.ArchX86_64:  "x86-64-linux-gnu",
+		constants.ArchPpc64le: constants.TripletPpc64leLinux,
+		constants.ArchS390x:   constants.TripletS390xLinux,
+		constants.ArchRiscv64: constants.TripletRiscv64Linux,
 	}
 
 	result := make(map[string]map[string]CrossToolchain)
 
 	// Architectures to process
 	architectures := []string{
-		"aarch64", "armv7", "armv6", "i686",
-		"x86_64", "ppc64le", "s390x", "riscv64",
+		constants.ArchAarch64, constants.ArchArmv7, constants.ArchArmv6, constants.ArchI686,
+		constants.ArchX86_64, constants.ArchPpc64le, constants.ArchS390x, constants.ArchRiscv64,
 	}
-	distributions := []string{"debian", "ubuntu", "fedora", "alpine", "arch"}
+	distributions := []string{
+		constants.DistroDebian, constants.DistroUbuntu, constants.DistroFedora,
+		constants.DistroAlpine, constants.DistroArch,
+	}
 
 	for _, arch := range architectures {
 		result[arch] = make(map[string]CrossToolchain)
@@ -266,7 +304,7 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 			// For Alpine, use simple arch name (armv7, aarch64, etc.)
 			// For Debian/Ubuntu/Fedora/Arch, use GNU triplet from archPatterns
 			archPattern := arch
-			if distro == "alpine" {
+			if distro == constants.DistroAlpine {
 				// Alpine uses simplified names
 				archPattern = arch
 			} else {
@@ -277,22 +315,22 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 			}
 
 			// Start with base values using the appropriate pattern
-			gcc := fmt.Sprintf(patterns["gcc"], archPattern)
-			gpp := fmt.Sprintf(patterns["g++"], archPattern)
-			binutils := fmt.Sprintf(patterns["binutils"], archPattern)
+			gcc := fmt.Sprintf(patterns[gccKey], archPattern)
+			gpp := fmt.Sprintf(patterns[gppKey], archPattern)
+			binutils := fmt.Sprintf(patterns[binutilsKey], archPattern)
 
 			// Apply architecture-specific overrides if they exist
 			if archOverrides, exists := archSpecific[arch]; exists {
 				if distroOverrides, exists := archOverrides[distro]; exists {
-					if override, exists := distroOverrides["gcc"]; exists {
+					if override, exists := distroOverrides[gccKey]; exists {
 						gcc = override
 					}
 
-					if override, exists := distroOverrides["g++"]; exists {
+					if override, exists := distroOverrides[gppKey]; exists {
 						gpp = override
 					}
 
-					if override, exists := distroOverrides["binutils"]; exists {
+					if override, exists := distroOverrides[binutilsKey]; exists {
 						binutils = override
 					}
 				}
@@ -304,7 +342,7 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 			if archAdd, exists := archAdditional[arch]; exists {
 				if add, exists := archAdd[distro]; exists {
 					additional = add
-				} else if add, exists := archAdd["default"]; exists {
+				} else if add, exists := archAdd[defaultKey]; exists {
 					additional = add
 				}
 			}
@@ -316,13 +354,13 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 			installCommands := make(map[string]string)
 
 			switch distro {
-			case distroDebian, distroUbuntu:
+			case constants.DistroDebian, constants.DistroUbuntu:
 				installCommands[distro] = fmt.Sprintf("sudo apt-get install %s %s", gcc, gpp)
-			case distroFedora:
+			case constants.DistroFedora:
 				installCommands[distro] = fmt.Sprintf("sudo dnf install %s %s", gcc, gpp)
-			case distroArch:
+			case constants.DistroArch:
 				installCommands[distro] = fmt.Sprintf("sudo pacman -S %s %s", gcc, gpp)
-			case distroAlpine:
+			case constants.DistroAlpine:
 				installCommands[distro] = fmt.Sprintf("sudo apk add %s %s", gcc, gpp)
 			}
 
@@ -388,9 +426,9 @@ func GetCrossToolchain(arch, distro string) (CrossToolchain, error) {
 	}
 
 	// Try fallback to debian for ubuntu/debian family
-	if distro == "ubuntu" || distro == "debian" {
+	if distro == constants.DistroUbuntu || distro == constants.DistroDebian {
 		if distroChains, exists := toolchains[arch]; exists {
-			if chain, exists := distroChains["debian"]; exists {
+			if chain, exists := distroChains[constants.DistroDebian]; exists {
 				return chain, nil
 			}
 		}
@@ -409,10 +447,10 @@ func GetCrossToolchain(arch, distro string) (CrossToolchain, error) {
 func ValidateToolchain(targetArch, format string) error {
 	// Map package format to distribution for toolchain lookup
 	formatToDistro := map[string]string{
-		"deb":    "ubuntu",
-		"rpm":    "fedora",
-		"apk":    "alpine",
-		"pacman": "arch",
+		constants.FormatDEB:    constants.DistroUbuntu,
+		constants.FormatRPM:    constants.DistroFedora,
+		constants.FormatAPK:    constants.DistroAlpine,
+		constants.FormatPacman: constants.DistroArch,
 	}
 
 	distro, exists := formatToDistro[format]
@@ -485,10 +523,10 @@ func ValidateToolchain(targetArch, format string) error {
 	msg.WriteString("\n" + i18n.T("errors.cross_compilation.path_note") + "\n")
 
 	switch distro {
-	case "alpine":
+	case constants.DistroAlpine:
 		msg.WriteString(i18n.T("errors.cross_compilation.alpine_note") + "\n")
-	case "arch":
-		if targetArch == "i686" {
+	case constants.DistroArch:
+		if targetArch == constants.ArchI686 {
 			msg.WriteString(i18n.T("errors.cross_compilation.arch_multilib_note") + "\n")
 		} else {
 			msg.WriteString(i18n.T("errors.cross_compilation.arch_prefix_note") + "\n")

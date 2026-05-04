@@ -13,8 +13,8 @@ import (
 
 // zapCmd represents the command to deeply clean build environments.
 var zapCmd = &cobra.Command{
-	Use:     "zap [distro] <path>",
-	GroupID: "build",
+	Use:     commandZap + " [distro] <path>",
+	GroupID: buildGroup,
 	Aliases: []string{"clean"},
 	Short:   "🧹 Deeply clean build environment and artifacts", // Will be set in init()
 	Long:    "",                                               // Will be set in init()

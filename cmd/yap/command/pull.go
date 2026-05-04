@@ -17,8 +17,8 @@ const (
 
 // pullCmd represents the pull command.
 var pullCmd = &cobra.Command{
-	Use:     "pull <distro>",
-	GroupID: "environment",
+	Use:     commandPull + " <distro>",
+	GroupID: commandEnvironment,
 	Aliases: []string{"download"},
 	Short:   "📦 Pull pre-built container images for building",
 	Long: `Download container images used for isolated package building environments.

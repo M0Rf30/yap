@@ -10,8 +10,8 @@ import (
 
 // listDistrosCmd represents the listDistros command.
 var listDistrosCmd = &cobra.Command{
-	Use:     "list-distros",
-	GroupID: "utility",
+	Use:     commandListDistro,
+	GroupID: commandUtility,
 	Aliases: []string{"list", "distros"},
 	Short:   "📋 List all supported distributions and releases", // Will be set in init()
 	Long:    "",                                                // Will be set in init()

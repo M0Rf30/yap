@@ -22,6 +22,23 @@ import (
 const (
 	goArchivePath = "/tmp/go.tar.gz"
 	goExecutable  = "/usr/bin/go"
+	amd64Arch     = "amd64"
+	i686Arch      = "386"
+	armArch       = "arm"
+	aarch64Arch   = "arm64"
+	ppc64Arch     = "ppc64"
+	ppc64leArch   = "ppc64le"
+	s390xArch     = "s390x"
+	mipsArch      = "mips"
+	mipsleArch    = "mipsle"
+	riscv64Arch   = "riscv64"
+	armv7hArch    = "armv7h"
+	ppc64Value    = "ppc64"
+	ppc64leValue  = "ppc64le"
+	s390xValue    = "s390x"
+	mipsValue     = "mips"
+	mipsleValue   = "mipsle"
+	riscv64Value  = "riscv64"
 )
 
 // OSRelease represents operating system release information.
@@ -83,16 +100,16 @@ func ParseOSRelease() (OSRelease, error) {
 // GetArchitecture returns the system architecture mapped to package manager conventions.
 func GetArchitecture() string {
 	architectureMap := map[string]string{
-		"amd64":   "x86_64",
-		"386":     "i686",
-		"arm":     "armv7h",
-		"arm64":   "aarch64",
-		"ppc64":   "ppc64",
-		"ppc64le": "ppc64le",
-		"s390x":   "s390x",
-		"mips":    "mips",
-		"mipsle":  "mipsle",
-		"riscv64": "riscv64",
+		amd64Arch:   constants.ArchX86_64,
+		i686Arch:    constants.ArchI686,
+		armArch:     armv7hArch,
+		aarch64Arch: constants.ArchAarch64,
+		ppc64Arch:   ppc64Value,
+		ppc64leArch: ppc64leValue,
+		s390xArch:   s390xValue,
+		mipsArch:    mipsValue,
+		mipsleArch:  mipsleValue,
+		riscv64Arch: riscv64Value,
 	}
 
 	currentArch := runtime.GOARCH
