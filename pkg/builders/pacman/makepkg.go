@@ -46,8 +46,8 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Pkg {
 // - artifactsPath: a string representing the path where the build artifacts will be stored.
 //
 // The method calls the internal pacmanBuild function to perform the actual build process.
-// It returns an error if the build process encounters any issues.
-func (m *Pkg) BuildPackage(artifactsPath string, targetArch string) error {
+// Returns the path to the created package file.
+func (m *Pkg) BuildPackage(artifactsPath string, targetArch string) (string, error) {
 	m.SetTargetArchitecture(targetArch)
 
 	completeVersion := m.PKGBUILD.PkgVer
@@ -66,13 +66,13 @@ func (m *Pkg) BuildPackage(artifactsPath string, targetArch string) error {
 
 	err := archive.CreateTarZst(context.Background(), m.PKGBUILD.PackageDir, pkgFilePath, false)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Log package creation using common functionality
 	m.LogPackageCreated(pkgFilePath)
 
-	return nil
+	return pkgFilePath, nil
 }
 
 // PrepareFakeroot sets um the environment for building a package in a fakeroot context.
@@ -86,6 +86,38 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 	// Note: Don't override ArchComputed here - it should remain the native architecture
 	// The targetArch is used for package naming in BuildPackage method
 
+	if err := m.computeBuildMetadata(artifactsPath); err != nil {
+		return err
+	}
+
+	if err := m.renderPKGBUILDFile(); err != nil {
+		return err
+	}
+
+	if err := m.writePackageMetadata(); err != nil {
+		return err
+	}
+
+	if m.PKGBUILD.StripEnabled {
+		if err := options.Strip(m.PKGBUILD.PackageDir); err != nil {
+			return err
+		}
+	}
+
+	if err := m.writeMTREE(); err != nil {
+		return err
+	}
+
+	if err := m.writeInstallScriptIfNeeded(); err != nil {
+		return err
+	}
+
+	return m.writeChangelogIfPresent()
+}
+
+// computeBuildMetadata computes installed size, source date epoch, and other
+// PKGBUILD metadata fields needed for spec rendering.
+func (m *Pkg) computeBuildMetadata(artifactsPath string) error {
 	installedSize, err := files.GetDirSize(m.PKGBUILD.PackageDir)
 	if err != nil {
 		return fmt.Errorf("failed to get package dir size: %w", err)
@@ -105,14 +137,17 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 	m.PKGBUILD.PkgType = pkgTypeDefault // can be pkg, split, debug, src
 	m.PKGBUILD.YAPVersion = constants.YAPVersion
 
-	tmpl := m.PKGBUILD.RenderSpec(specFile)
+	return nil
+}
 
-	// Define the path to the PKGBUILD file
+// renderPKGBUILDFile renders and writes the PKGBUILD spec, then computes its
+// SHA256 checksum for inclusion in .BUILDINFO.
+func (m *Pkg) renderPKGBUILDFile() error {
+	tmpl := m.PKGBUILD.RenderSpec(specFile)
 	pkgBuildFile := filepath.Join(m.pacmanDir, "PKGBUILD")
 
 	if m.PKGBUILD.Home != m.PKGBUILD.StartDir {
-		err := m.PKGBUILD.CreateSpec(pkgBuildFile, tmpl)
-		if err != nil {
+		if err := m.PKGBUILD.CreateSpec(pkgBuildFile, tmpl); err != nil {
 			return err
 		}
 	}
@@ -124,63 +159,71 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 
 	m.PKGBUILD.Checksum = hex.EncodeToString(checksumBytes)
 
-	tmpl = m.PKGBUILD.RenderSpec(dotPkginfo)
+	return nil
+}
 
-	err = m.PKGBUILD.CreateSpec(filepath.Join(m.PKGBUILD.PackageDir,
-		".PKGINFO"), tmpl)
-	if err != nil {
+// writePackageMetadata renders and writes the .PKGINFO and .BUILDINFO files.
+func (m *Pkg) writePackageMetadata() error {
+	pkgInfoTmpl := m.PKGBUILD.RenderSpec(dotPkginfo)
+	if err := m.PKGBUILD.CreateSpec(
+		filepath.Join(m.PKGBUILD.PackageDir, ".PKGINFO"), pkgInfoTmpl); err != nil {
 		return err
 	}
 
-	tmpl = m.PKGBUILD.RenderSpec(dotBuildinfo)
+	buildInfoTmpl := m.PKGBUILD.RenderSpec(dotBuildinfo)
 
-	err = m.PKGBUILD.CreateSpec(filepath.Join(m.PKGBUILD.PackageDir,
-		".BUILDINFO"), tmpl)
-	if err != nil {
-		return err
-	}
+	return m.PKGBUILD.CreateSpec(
+		filepath.Join(m.PKGBUILD.PackageDir, ".BUILDINFO"), buildInfoTmpl)
+}
 
-	if m.PKGBUILD.StripEnabled {
-		err = options.Strip(m.PKGBUILD.PackageDir)
-		if err != nil {
-			return err
-		}
-	}
-
-	var mtreeEntries []*files.Entry
-
-	// Create file walker using common functionality
+// writeMTREE walks the package directory and writes a gzip-compressed .MTREE.
+func (m *Pkg) writeMTREE() error {
 	walker := m.CreateFileWalker()
 
-	// Walk through the package directory and retrieve the contents.
 	entries, err := walker.Walk()
 	if err != nil {
-		return err // Return the error if walking the directory fails.
+		return err
 	}
 
-	// Use entries directly
-	mtreeEntries = entries
-
-	mtreeFile, err := renderMtree(mtreeEntries)
+	mtreeFile, err := renderMtree(entries)
 	if err != nil {
 		return err
 	}
 
-	err = createMTREEGzip(mtreeFile,
-		filepath.Join(m.PKGBUILD.PackageDir, ".MTREE"))
+	return createMTREEGzip(mtreeFile, filepath.Join(m.PKGBUILD.PackageDir, ".MTREE"))
+}
+
+// writeInstallScriptIfNeeded writes the <pkgname>.install file when the
+// PKGBUILD declares any of the six scriptlet hooks.
+func (m *Pkg) writeInstallScriptIfNeeded() error {
+	if m.PKGBUILD.PreInst == "" && m.PKGBUILD.PostInst == "" &&
+		m.PKGBUILD.PreRm == "" && m.PKGBUILD.PostRm == "" &&
+		m.PKGBUILD.PreUpgrade == "" && m.PKGBUILD.PostUpgrade == "" {
+		return nil
+	}
+
+	tmpl := m.PKGBUILD.RenderSpec(postInstall)
+
+	return m.PKGBUILD.CreateSpec(
+		filepath.Join(m.pacmanDir, m.PKGBUILD.PkgName+".install"), tmpl)
+}
+
+// writeChangelogIfPresent writes a .CHANGELOG file in the package root when
+// the PKGBUILD declares a changelog source.
+func (m *Pkg) writeChangelogIfPresent() error {
+	changelogData, err := m.PKGBUILD.ReadChangelog()
 	if err != nil {
 		return err
 	}
 
-	tmpl = m.PKGBUILD.RenderSpec(postInstall)
-
-	err = m.PKGBUILD.CreateSpec(filepath.Join(m.pacmanDir,
-		m.PKGBUILD.PkgName+".install"), tmpl)
-	if err != nil {
-		return err
+	if changelogData == nil {
+		return nil
 	}
 
-	return nil
+	changelogPath := filepath.Join(m.PKGBUILD.PackageDir, ".CHANGELOG")
+
+	// nolint:gosec // .CHANGELOG matches Pacman world-readable convention
+	return os.WriteFile(filepath.Clean(changelogPath), changelogData, 0o644)
 }
 
 func renderMtree(entries []*files.Entry) (string, error) {

@@ -44,7 +44,8 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Apk {
 // BuildPackage creates an APK package in pure Go without external dependencies.
 // The package is created as a gzip-compressed tar archive containing the package
 // files and metadata (.PKGINFO and optional .install script).
-func (a *Apk) BuildPackage(artifactsPath string, targetArch string) error {
+// Returns the path to the created APK file.
+func (a *Apk) BuildPackage(artifactsPath string, targetArch string) (string, error) {
 	a.SetTargetArchitecture(targetArch)
 
 	pkgName := a.BuildPackageName(".apk")
@@ -52,12 +53,12 @@ func (a *Apk) BuildPackage(artifactsPath string, targetArch string) error {
 
 	err := a.createAPKPackage(pkgFilePath, artifactsPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	a.LogPackageCreated(pkgFilePath)
 
-	return nil
+	return pkgFilePath, nil
 }
 
 // PrepareFakeroot sets up the APK package metadata.
@@ -96,6 +97,9 @@ func (a *Apk) PrepareFakeroot(artifactsPath string, targetArch string) error {
 			return err
 		}
 	}
+
+	// Note: APK format does not have a native changelog convention.
+	// Changelog support is skipped for APK packages.
 
 	return nil
 }

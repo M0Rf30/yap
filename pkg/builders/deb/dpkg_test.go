@@ -38,7 +38,7 @@ func createTestPKGBUILD() *pkgbuild.PKGBUILD {
 
 func TestNewBuilder(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	if pkg == nil {
 		t.Fatal("NewBuilder returned nil")
@@ -51,7 +51,7 @@ func TestNewBuilder(t *testing.T) {
 
 func TestBuildPackage(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -94,7 +94,7 @@ func TestBuildPackage(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = pkg.BuildPackage(artifactsDir, "")
+	_, err = pkg.BuildPackage(artifactsDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestPrepare(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	makeDepends := []string{"make", "gcc"}
 	err := pkg.Prepare(makeDepends, "")
@@ -124,7 +124,7 @@ func TestPrepareEnvironment(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	err := pkg.PrepareEnvironment(false, "")
 	// This will likely fail since apt-get isn't available, but we test the method call
@@ -140,7 +140,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	err := pkg.PrepareEnvironment(true, "")
 	// This will likely fail since apt-get isn't available, but we test the method call
@@ -151,7 +151,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 
 func TestPrepareFakeroot(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -194,7 +194,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	err := pkg.Update()
 	// This will likely fail since apt-get isn't available, but we test the method call
@@ -205,7 +205,7 @@ func TestUpdate(t *testing.T) {
 
 func TestGetRelease(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	originalRel := pkg.PKGBUILD.PkgRel
 	pkg.getRelease()
@@ -223,7 +223,7 @@ func TestGetRelease(t *testing.T) {
 func TestGetReleaseWithDistro(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkgBuild.Codename = "" // Remove codename to test distro fallback
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	originalRel := pkg.PKGBUILD.PkgRel
 	pkg.getRelease()
@@ -239,7 +239,7 @@ func TestGetReleaseWithDistro(t *testing.T) {
 
 func TestProcessDepends(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	testCases := []struct {
 		input    []string
@@ -276,7 +276,7 @@ func TestProcessDepends(t *testing.T) {
 
 func TestCreateDebResources(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -320,7 +320,7 @@ func TestCreateDebResources(t *testing.T) {
 
 func TestCreateConfFiles(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -361,7 +361,7 @@ func TestCreateConfFiles(t *testing.T) {
 func TestCreateConfFilesEmpty(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkgBuild.Backup = []string{} // No backup files
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -386,7 +386,7 @@ func TestCreateConfFilesEmpty(t *testing.T) {
 
 func TestAddScriptlets(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
-	pkg := NewBuilder(pkgBuild)
+	pkg := NewBuilder(pkgBuild, "")
 
 	tempDir, err := os.MkdirTemp("", "deb-test")
 	if err != nil {
@@ -409,5 +409,87 @@ func TestAddScriptlets(t *testing.T) {
 		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 			t.Errorf("Script %s was not created", script)
 		}
+	}
+}
+
+func TestCreateChangelogFile(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+
+	tempDir, err := os.MkdirTemp("", "deb-changelog-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	// Create a changelog file
+	changelogPath := filepath.Join(tempDir, "CHANGELOG.md")
+	changelogContent := "# Changelog\n\n## Version 1.0\n- Initial release\n"
+
+	err = os.WriteFile(changelogPath, []byte(changelogContent), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create changelog file: %v", err)
+	}
+
+	// Create package directory
+	packageDir := filepath.Join(tempDir, "package")
+
+	err = os.MkdirAll(packageDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create package dir: %v", err)
+	}
+
+	pkgBuild.StartDir = tempDir
+	pkgBuild.Changelog = "CHANGELOG.md"
+	pkgBuild.PackageDir = packageDir
+
+	pkg := NewBuilder(pkgBuild, "")
+
+	err = pkg.createChangelogFile()
+	if err != nil {
+		t.Errorf("createChangelogFile failed: %v", err)
+	}
+
+	// Check that the changelog file was created
+	expectedPath := filepath.Join(packageDir, "usr", "share", "doc",
+		pkgBuild.PkgName, "changelog.Debian.gz")
+	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
+		t.Errorf("Changelog file was not created at %s", expectedPath)
+	}
+}
+
+func TestCreateChangelogFile_NoChangelog(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+
+	tempDir, err := os.MkdirTemp("", "deb-no-changelog-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	// Create package directory
+	packageDir := filepath.Join(tempDir, "package")
+
+	err = os.MkdirAll(packageDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create package dir: %v", err)
+	}
+
+	pkgBuild.StartDir = tempDir
+	pkgBuild.Changelog = ""
+	pkgBuild.PackageDir = packageDir
+
+	pkg := NewBuilder(pkgBuild, "")
+
+	err = pkg.createChangelogFile()
+	if err != nil {
+		t.Errorf("createChangelogFile failed: %v", err)
+	}
+
+	// Check that no changelog directory was created
+	docDir := filepath.Join(packageDir, "usr", "share", "doc")
+	if _, err := os.Stat(docDir); err == nil {
+		t.Errorf("Doc directory should not be created when changelog is empty")
 	}
 }

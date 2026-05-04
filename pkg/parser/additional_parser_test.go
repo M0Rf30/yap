@@ -198,3 +198,109 @@ func TestParseFileErrors(t *testing.T) {
 		t.Error("ParseFile() should return error for invalid home directory")
 	}
 }
+
+func TestParseFileWithUpgradeScriptlets(t *testing.T) {
+	// Create a temporary directory with a PKGBUILD file containing upgrade scriptlets
+	tempDir := t.TempDir()
+
+	pkgbuildContent := `# Test PKGBUILD with upgrade scriptlets
+pkgname="test-upgrade"
+pkgver="1.0.0"
+pkgrel="1"
+pkgdesc="A test package with upgrade scriptlets"
+arch=("x86_64")
+url="https://example.com"
+license=("MIT")
+
+preinst() {
+    echo "Running pre-install"
+}
+
+postinst() {
+    echo "Running post-install"
+}
+
+pre_upgrade() {
+    echo "Running pre-upgrade"
+}
+
+post_upgrade() {
+    echo "Running post-upgrade"
+}
+
+prerm() {
+    echo "Running pre-remove"
+}
+
+postrm() {
+    echo "Running post-remove"
+}
+
+package() {
+    mkdir -p "${pkgdir}/usr/bin"
+    echo "test" > "${pkgdir}/usr/bin/test"
+}
+`
+
+	pkgbuildPath := filepath.Join(tempDir, "PKGBUILD")
+
+	err := os.WriteFile(pkgbuildPath, []byte(pkgbuildContent), 0o600)
+	if err != nil {
+		t.Fatalf("Failed to write PKGBUILD: %v", err)
+	}
+
+	// Test parsing
+	pkgBuild, err := parser.ParseFile("arch", "", tempDir, tempDir)
+	if err != nil {
+		t.Fatalf("ParseFile() error = %v", err)
+	}
+
+	// Verify scriptlet fields
+	if pkgBuild.PreInst == "" {
+		t.Error("PreInst should not be empty")
+	}
+
+	if !strings.Contains(pkgBuild.PreInst, "pre-install") {
+		t.Errorf("PreInst should contain 'pre-install', got '%s'", pkgBuild.PreInst)
+	}
+
+	if pkgBuild.PostInst == "" {
+		t.Error("PostInst should not be empty")
+	}
+
+	if !strings.Contains(pkgBuild.PostInst, "post-install") {
+		t.Errorf("PostInst should contain 'post-install', got '%s'", pkgBuild.PostInst)
+	}
+
+	if pkgBuild.PreUpgrade == "" {
+		t.Error("PreUpgrade should not be empty")
+	}
+
+	if !strings.Contains(pkgBuild.PreUpgrade, "pre-upgrade") {
+		t.Errorf("PreUpgrade should contain 'pre-upgrade', got '%s'", pkgBuild.PreUpgrade)
+	}
+
+	if pkgBuild.PostUpgrade == "" {
+		t.Error("PostUpgrade should not be empty")
+	}
+
+	if !strings.Contains(pkgBuild.PostUpgrade, "post-upgrade") {
+		t.Errorf("PostUpgrade should contain 'post-upgrade', got '%s'", pkgBuild.PostUpgrade)
+	}
+
+	if pkgBuild.PreRm == "" {
+		t.Error("PreRm should not be empty")
+	}
+
+	if !strings.Contains(pkgBuild.PreRm, "pre-remove") {
+		t.Errorf("PreRm should contain 'pre-remove', got '%s'", pkgBuild.PreRm)
+	}
+
+	if pkgBuild.PostRm == "" {
+		t.Error("PostRm should not be empty")
+	}
+
+	if !strings.Contains(pkgBuild.PostRm, "post-remove") {
+		t.Errorf("PostRm should contain 'post-remove', got '%s'", pkgBuild.PostRm)
+	}
+}

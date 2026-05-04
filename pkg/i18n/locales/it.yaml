@@ -167,6 +167,22 @@
   translation: "Ferma la compilazione a questa distribuzione"
 - id: flags.build.zap
   translation: "Pulisce gli artefatti prima della compilazione"
+- id: flags.build.sbom
+  translation: "Genera Software Bill of Materials (SBOM) per i pacchetti"
+- id: flags.build.sbom_format
+  translation: "Formato(i) SBOM da generare (cyclonedx, spdx, both)"
+- id: flags.build.compression_deb
+  translation: "Algoritmo di compressione DEB (zstd, gzip, xz)"
+- id: flags.build.compression_rpm
+  translation: "Algoritmo di compressione RPM (zstd, gzip, xz)"
+- id: flags.build.sign
+  translation: "Abilita la firma dei pacchetti"
+- id: flags.build.sign_key
+  translation: "Percorso della chiave privata per la firma (PEM per RSA, ASCII-armored per GPG)"
+- id: flags.build.sign_passphrase
+  translation: "Passphrase per la chiave privata (preferire la variabile d'ambiente YAP_SIGN_PASSPHRASE)"
+- id: flags.build.sign_key_name
+  translation: "Nome della chiave per la firma APK (es. 'mykey')"
 
 # Flag graph
 - id: flags.graph.format
@@ -889,3 +905,13 @@
   translation: "Tutti i pacchetti richiesti sono già installati"
 - id: logger.pkgbuild.info.packages_already_installed
   translation: "Alcuni pacchetti sono già installati"
+
+# Logger messages - SBOM
+- id: logger.sbom_generated
+  translation: "SBOM generato con successo"
+- id: logger.sbom_generation_failed
+  translation: "Generazione SBOM non riuscita"
+
+# Logger messages - Package signing
+- id: logger.signing_artifact
+  translation: "Firma artefatto del pacchetto"

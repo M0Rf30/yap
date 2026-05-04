@@ -111,13 +111,21 @@ post_install() {
 }
 {{- end }}
 
-{{- if .PreInst}}
+{{- if .PreUpgrade}}
+pre_upgrade() {
+{{.PreUpgrade}}
+}
+{{- else if .PreInst}}
 pre_upgrade() {
 {{.PreInst}}
 }
 {{- end }}
 
-{{- if .PostInst}}
+{{- if .PostUpgrade}}
+post_upgrade() {
+{{.PostUpgrade}}
+}
+{{- else if .PostInst}}
 post_upgrade() {
 {{.PostInst}}
 }
@@ -197,7 +205,9 @@ options=(
   {{ end }}
 )
 {{- end }}
+{{- if or .PreInst .PostInst .PreRm .PostRm .PreUpgrade .PostUpgrade}}
 install={{.PkgName}}.install
+{{- end }}
 
 package() {
 {{.Package}}

@@ -23,8 +23,9 @@ type InstallOrExtractor interface {
 // Packer is the common interface implemented by all package managers.
 type Packer interface {
 	// BuildPackage starts the package building process and writes the final artifact
-	// to the specified output path. It returns an error if any issues occur during the build.
-	BuildPackage(output string, targetArch string) error
+	// to the specified output path. It returns the path to the built artifact and an error
+	// if any issues occur during the build.
+	BuildPackage(output string, targetArch string) (string, error)
 	// Prepare appends the dependencies required to build all the projects. It
 	// returns any error if encountered.
 	Prepare(depends []string, targetArch string) error
@@ -44,8 +45,15 @@ type Packer interface {
 //
 // pkgBuild: A pointer to a pkgbuild.PKGBUILD struct.
 // distro: A string representing the distribution.
+// compressionDeb: Compression algorithm for DEB packages (empty string uses default).
+// compressionRpm: Compression algorithm for RPM packages (empty string uses default).
 // Returns a Packer interface.
-func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
+func GetPackageManager(
+	pkgBuild *pkgbuild.PKGBUILD,
+	distro string,
+	compressionDeb string,
+	compressionRpm string,
+) Packer {
 	pkgManager := constants.DistroToPackageManager[distro]
 
 	// Get configuration for the package manager
@@ -59,13 +67,13 @@ func GetPackageManager(pkgBuild *pkgbuild.PKGBUILD, distro string) Packer {
 	case "apk":
 		return apk.NewBuilder(pkgBuild)
 	case "apt":
-		return deb.NewBuilder(pkgBuild)
+		return deb.NewBuilder(pkgBuild, compressionDeb)
 	case "pacman":
 		return pacman.NewBuilder(pkgBuild)
 	case "yum":
-		return rpm.NewBuilder(pkgBuild)
+		return rpm.NewBuilder(pkgBuild, compressionRpm)
 	case "zypper":
-		return rpm.NewBuilder(pkgBuild)
+		return rpm.NewBuilder(pkgBuild, compressionRpm)
 	default:
 		logger.Fatal(i18n.T("errors.packer.unsupported_linux_distro"),
 			"distro", distro)

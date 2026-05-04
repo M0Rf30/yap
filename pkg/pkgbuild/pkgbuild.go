@@ -93,6 +93,7 @@ type PKGBUILD struct {
 	Build           string
 	BuildArch       string // Build architecture for cross-compilation (where compilation happens)
 	BuildDate       int64
+	Changelog       string `json:"changelog,omitempty"`
 	Checksum        string
 	Codename        string
 	Commit          string
@@ -132,11 +133,13 @@ type PKGBUILD struct {
 	PostInst        string
 	PostRm          string
 	PostTrans       string
+	PostUpgrade     string
 	PreInst         string
 	Prepare         string
 	PreRelease      string
 	PreRm           string
 	PreTrans        string
+	PreUpgrade      string
 	priorities      map[string]int
 	Priority        string
 	Provides        []string
@@ -1035,6 +1038,10 @@ func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 		pkgBuild.PreTrans = body
 	case "postrm":
 		pkgBuild.PostRm = body
+	case "pre_upgrade":
+		pkgBuild.PreUpgrade = body
+	case "post_upgrade":
+		pkgBuild.PostUpgrade = body
 	default:
 		// Store any other function (e.g. _package, _package_systemd, _install_helper)
 		// as a helper. The full definition is reconstructed so it can be prepended to
@@ -1159,6 +1166,13 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 		}
 
 		pkgBuild.Install = strVal
+	case "changelog":
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Changelog = strVal
 	case "target_arch":
 		strVal, ok := data.(string)
 		if !ok {

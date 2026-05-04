@@ -166,6 +166,22 @@
   translation: "Stop building at this distribution"
 - id: flags.build.zap
   translation: "Clean artifacts before building"
+- id: flags.build.sbom
+  translation: "Generate Software Bill of Materials (SBOM) for packages"
+- id: flags.build.sbom_format
+  translation: "SBOM format(s) to generate (cyclonedx, spdx, both)"
+- id: flags.build.compression_deb
+  translation: "DEB compression algorithm (zstd, gzip, xz)"
+- id: flags.build.compression_rpm
+  translation: "RPM compression algorithm (zstd, gzip, xz)"
+- id: flags.build.sign
+  translation: "Enable package signing"
+- id: flags.build.sign_key
+  translation: "Path to private key for signing (PEM for RSA, ASCII-armored for GPG)"
+- id: flags.build.sign_passphrase
+  translation: "Passphrase for private key (prefer env var YAP_SIGN_PASSPHRASE)"
+- id: flags.build.sign_key_name
+  translation: "Key name for APK signing (e.g., 'mykey')"
 
 # Graph flags
 - id: flags.graph.format
@@ -888,3 +904,13 @@
   translation: "Extraction complete"
 - id: logger.extract.extracting_to_sysroot
   translation: "Extracting package to sysroot"
+
+# Logger messages - SBOM generation
+- id: logger.sbom_generated
+  translation: "SBOM generated successfully"
+- id: logger.sbom_generation_failed
+  translation: "Failed to generate SBOM"
+
+# Logger messages - Package signing
+- id: logger.signing_artifact
+  translation: "Signing package artifact"

@@ -2,6 +2,7 @@
 package deb
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -28,27 +29,34 @@ import (
 // contains the metadata and build instructions for the package.
 type Package struct {
 	*common.BaseBuilder
-	debDir string
+	debDir      string
+	compression string
 }
 
-// NewBuilder creates a new Debian package manager.
-func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Package {
+// NewBuilder creates a new Debian package manager with optional compression setting.
+// If compression is empty, defaults to "zstd".
+func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string) *Package {
+	if compression == "" {
+		compression = "zstd"
+	}
+
 	return &Package{
 		BaseBuilder: common.NewBaseBuilder(pkgBuild, "deb"),
 		debDir:      "",
+		compression: compression,
 	}
 }
 
 // BuildPackage builds the Debian package and cleans up afterward.
 // It takes artifactsPath to specify where to store the package.
 // The method calls dpkgDeb to create the package and removes the
-// package directory, returning an error if any step fails.
-func (d *Package) BuildPackage(artifactsPath string, targetArch string) error {
+// package directory, returning the path to the created DEB file and an error if any step fails.
+func (d *Package) BuildPackage(artifactsPath string, targetArch string) (string, error) {
 	d.LogCrossCompilation(targetArch)
 
 	debTemp, err := os.MkdirTemp(d.PKGBUILD.SourceDir, "tmp")
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	defer func() {
@@ -63,33 +71,35 @@ func (d *Package) BuildPackage(artifactsPath string, targetArch string) error {
 	dataArchive := filepath.Join(debTemp, dataFilename)
 
 	// Create control archive
-	err = archive.CreateTarZst(context.Background(), d.debDir, controlArchive, true)
+	err = archive.CreateTarCompressed(context.Background(), d.debDir, controlArchive,
+		d.compression, true)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = os.RemoveAll(d.debDir)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Create data archive
-	err = archive.CreateTarZst(context.Background(), d.PKGBUILD.PackageDir, dataArchive, true)
+	err = archive.CreateTarCompressed(context.Background(), d.PKGBUILD.PackageDir,
+		dataArchive, d.compression, true)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	err = d.createDeb(artifactsPath, controlArchive, dataArchive)
+	debPath, err := d.createDeb(artifactsPath, controlArchive, dataArchive)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = os.RemoveAll(d.PKGBUILD.PackageDir)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return debPath, nil
 }
 
 // PrepareFakeroot sets up the environment for building a Debian package in a fakeroot context.
@@ -293,11 +303,68 @@ func (d *Package) createDebconfFile(name, variable string) error {
 	return copy.Copy(assetPath, destPath)
 }
 
+// createChangelogFile creates the changelog file for the Debian package.
+// It reads the changelog from PKGBUILD, gzip-compresses it, and writes it to
+// usr/share/doc/<pkgname>/changelog.Debian.gz in the package directory.
+// Returns nil if no changelog is specified.
+func (d *Package) createChangelogFile() error {
+	changelogData, err := d.PKGBUILD.ReadChangelog()
+	if err != nil {
+		return err
+	}
+
+	if changelogData == nil {
+		return nil
+	}
+
+	// Create the doc directory structure
+	docDir := filepath.Join(d.PKGBUILD.PackageDir, "usr", "share", "doc",
+		d.PKGBUILD.PkgName)
+
+	err = files.ExistsMakeDir(docDir)
+	if err != nil {
+		return err
+	}
+
+	// Create and write the gzip-compressed changelog
+	changelogPath := filepath.Join(docDir, "changelog.Debian.gz")
+
+	changelogFile, err := os.Create(filepath.Clean(changelogPath))
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if cerr := changelogFile.Close(); cerr != nil {
+			logger.Warn("failed to close changelog file", "path", changelogPath,
+				"error", cerr)
+		}
+	}()
+
+	gzWriter := gzip.NewWriter(changelogFile)
+	defer func() {
+		if cerr := gzWriter.Close(); cerr != nil {
+			logger.Warn("failed to close gzip writer", "path", changelogPath,
+				"error", cerr)
+		}
+	}()
+
+	// Set the modification time for reproducibility
+	gzWriter.ModTime = files.SourceDateEpochFromEnv()
+
+	_, err = gzWriter.Write(changelogData)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // createDeb generates Deb package files from the given artifact path.
 // It takes a string parameter `artifactPath` which represents the path
 // where the Deb package files will be generated. The function returns
-// an error if there was an issue generating the Deb package files.
-func (d *Package) createDeb(artifactPath, control, data string) error {
+// the path to the created DEB file and an error if there was an issue generating the Deb package files.
+func (d *Package) createDeb(artifactPath, control, data string) (string, error) {
 	// Create the .deb package
 	artifactFilePath := filepath.Join(artifactPath,
 		fmt.Sprintf("%s_%s-%s_%s.deb",
@@ -309,7 +376,7 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 
 	debPackage, err := os.Create(cleanFilePath)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	defer func() {
@@ -323,7 +390,7 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 
 	err = writer.WriteGlobalHeader()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	modtime := files.SourceDateEpochFromEnv()
@@ -333,23 +400,23 @@ func (d *Package) createDeb(artifactPath, control, data string) error {
 		debianBinary,
 		modtime)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = addArFileFromPath(writer, controlFilename, control, modtime)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = addArFileFromPath(writer, dataFilename, data, modtime)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Log package creation using common functionality
 	d.LogPackageCreated(artifactFilePath)
 
-	return nil
+	return cleanFilePath, nil
 }
 
 // createDebResources creates the Deb package resources.
@@ -410,6 +477,11 @@ func (d *Package) createDebResources() error {
 
 	err = d.createDebconfFile("templates",
 		d.PKGBUILD.DebTemplate)
+	if err != nil {
+		return err
+	}
+
+	err = d.createChangelogFile()
 	if err != nil {
 		return err
 	}
