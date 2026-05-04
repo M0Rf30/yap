@@ -2,29 +2,33 @@
 
 ## Project Overview
 
-**YAP (Yet Another Packager)** is a modern, cross-distribution package building tool that creates native packages for multiple GNU/Linux distributions from a single PKGBUILD specification. The project is written in Go and uses OCI containers (Docker/Podman) for isolated, reproducible builds across 16+ supported distributions.
+**YAP (Yet Another Packager)** is a modern, cross-distribution package building tool that creates native packages for multiple GNU/Linux distributions from a single PKGBUILD specification. The project is written in Go and uses OCI containers (Docker/Podman) for isolated, reproducible builds across 15 supported distributions.
 
 ### Key Components
 - **CLI Interface** (`cmd/yap/`) - Cobra-based command-line interface
-- **Package Building** (`pkg/builders/`) - Distribution-specific package builders (APK, DEB, RPM, Pacman)
+- **Project Orchestration** (`pkg/project/`) - `MultipleProject`, `BuildAll`, multi-package coordination
+- **Project Configuration** (`pkg/core/`) - Project config struct (`yap.json`)
+- **Package Building** (`pkg/builders/`, `pkg/builders/common`) - Distribution-specific builders (APK, DEB, RPM, Pacman) and shared builder helpers
+- **Packer Dispatch** (`pkg/packer/`) - Selects the right builder per distro/package manager
 - **Container Management** - OCI container orchestration for isolated builds
 - **Dependency Resolution** (`pkg/graph/`) - Build order calculation and dependency management
 - **Source Handling** (`pkg/source/`) - Download and validation of source files
 - **PKGBUILD Parsing** (`pkg/pkgbuild/`, `pkg/parser/`) - Extended PKGBUILD format support
-- **Custom Libraries** - Fork of archives library with APK-specific enhancements
 
 ### Architecture
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   CLI Layer     │───▶│  Core Engine     │───▶│  Builders       │
-│   (cmd/yap)     │    │  (pkg/core)      │    │  (pkg/builders) │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                              │
-                              ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Containers    │◀───│  Graph/Deps      │───▶│  Source Mgmt    │
-│   (Docker/Pod)  │    │  (pkg/graph)     │    │  (pkg/source)   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+┌─────────────────┐    ┌────────────────────────┐    ┌─────────────────┐
+│   CLI Layer     │───▶│  Project Orchestration │───▶│  Builders       │
+│   (cmd/yap)     │    │  (pkg/project,         │    │  (pkg/builders, │
+│                 │    │   pkg/core,            │    │   pkg/packer)   │
+│                 │    │   pkg/builder)         │    │                 │
+└─────────────────┘    └────────────────────────┘    └─────────────────┘
+                                  │
+                                  ▼
+┌─────────────────┐    ┌────────────────────────┐    ┌─────────────────┐
+│   Containers    │◀───│  Graph / Deps          │───▶│  Source Mgmt    │
+│   (Docker/Pod)  │    │  (pkg/graph)           │    │  (pkg/source)   │
+└─────────────────┘    └────────────────────────┘    └─────────────────┘
 ```
 
 ## Build/Test Commands
@@ -47,14 +51,18 @@
 ```bash
 # Build packages
 yap build <distro> <project-path>              # Build for specific distribution
-yap build <project-path>                       # Build for all distributions
+yap build <project-path>                       # Auto-detect host distro from /etc/os-release
 
 # Project management
-yap zap <project-path>                         # Clean build environment
+yap zap [distro] <project-path>                # Clean build environment (distro optional)
+yap prepare [distro[-release]]                 # Prepare host build env (distro optional)
+yap pull <distro>                              # Pull pre-built container images
+yap install <artifact-file>                    # Install a built artifact (.deb/.rpm/.apk/.pkg.tar.*)
 yap list-distros                               # List supported distributions
+yap status                                     # Show host status and runtime detection
 yap graph <project-path>                       # Show dependency graph
 
-# Package operations  
+# Package operations
 yap build --skip-sync <project-path>           # Skip dependency sync (faster)
 yap build --cleanbuild <project-path>          # Clean source before build
 yap build --parallel <project-path>            # Enable parallel dep-aware topo-sort (opt-in)
@@ -80,7 +88,7 @@ go test -timeout 30s ./pkg/download/...
 - `make doc` - View all package documentation
 - `make doc-deps` - Install documentation dependencies (pkgsite)
 - `make doc-generate` - Generate static documentation files in docs/api/
-- `make doc-package PKG=./pkg/specific` - View specific package documentation
+- `make doc-package PKG=./pkg/builders/apk` - View specific package documentation
 - `make doc-serve` - Start documentation server on localhost:8080
 - `make doc-serve-static` - Serve static documentation files on localhost:8081
 
@@ -148,13 +156,19 @@ logger.Info("Building package").
 - Test on multiple platforms when possible
 
 ### Package Builder Interface
+Each format (APK, DEB, RPM, Pacman) exposes the same two-method surface invoked by `pkg/packer`:
+
 ```go
-type Builder interface {
-    Build(ctx context.Context, pkg *pkgbuild.Package) (*BuildResult, error)
-    Prepare(ctx context.Context, distro string) error
-    Clean(ctx context.Context) error
+// Implemented by pkg/builders/{apk,deb,rpm,pacman}
+type Packer interface {
+    PrepareFakeroot(artifactsPath, targetArch string) error
+    BuildPackage(artifactsPath, targetArch string) error
 }
 ```
+
+Shared helpers live in `pkg/builders/common` (`BaseBuilder`, metadata/scriptlet helpers).
+See `pkg/builders/apk/apk.go`, `pkg/builders/deb/deb.go`, `pkg/builders/rpm/rpm.go`,
+`pkg/builders/pacman/pacman.go` for the concrete implementations.
 
 ### Container Patterns
 - Use OCI-compliant containers for all builds
@@ -266,12 +280,11 @@ docker build --progress=plain --no-cache -f build/deploy/alpine/Dockerfile .
 ### Format Validation Testing
 ```bash
 # APK Format Testing
-cd test-apk/
-go run tar_format.go                           # Generate test packages
-../scripts/test_apk_format.sh yap-auto.apk     # Quick format check
-../scripts/compare_apk.sh official.apk yap.apk # Detailed comparison
+yap build alpine examples/yap                  # Build a YAP-produced APK
+gunzip -c package.apk | dd bs=1 skip=257 count=8 2>/dev/null | od -A n -t x1z
+                                               # Expect: 75 73 74 61 72 00 30 30 (PAX/ustar)
 
-# DEB Format Testing  
+# DEB Format Testing
 dpkg-deb --info package.deb                    # Validate metadata
 dpkg-deb --contents package.deb                # Check file structure
 
@@ -285,7 +298,7 @@ pacman -Qip package.pkg.tar.zst                # Query package
 ```
 
 ### Continuous Integration
-- Tests run on Go 1.24.6 (as specified in go.mod)
+- Tests run on Go 1.26.1 (per `go.mod` — `go 1.26.0` directive, `toolchain go1.26.1`)
 - Multi-architecture builds (amd64, arm64) on Ubuntu runners
 - Integration with GitHub Actions
 - Format compliance checks for all package types
@@ -310,72 +323,47 @@ pacman -Qip package.pkg.tar.zst                # Query package
 
 ### APK Builder Compliance Status
 
-The APK builder (`pkg/builders/apk/`) is under active development for full Alpine Linux compliance. Current status:
+The APK builder (`pkg/builders/apk/`) targets Alpine Linux APK compatibility. Current status reflects the actual code in `pkg/builders/apk/apk.go`:
 
 #### ✅ Completed Features
-- **Tar Format**: Uses PAX format (POSIX.1-2001) matching Alpine's `abuild-tar`
-- **Basic Package Structure**: `.PKGINFO`, `data.tar.gz` generation
-- **Dependency Handling**: Package dependencies and conflicts
-- **Metadata**: Basic package information (name, version, arch, description)
+- **Tar Format**: PAX format (POSIX.1-2001) matching Alpine's `abuild-tar`
+- **Two-Stream Concatenated Gzip**: `control.tar.gz` + `data.tar.gz` produced by `createTarGzWithChecksums` — installable with `apk add --allow-untrusted`
+- **PAX Extended Headers**: `APK-TOOLS.checksum.SHA1` per-file headers (`writeFileWithChecksum`) consumed by `apk audit`
+- **`.PKGINFO` Metadata**: name, version, arch, description, license, url, dependencies, conflicts, `size`, `origin`, `builddate`, `datahash` (SHA-256 of `data.tar.gz`)
+- **Dependency Handling**: depends, makedepends, conflicts, provides
 
 #### 🚧 In Progress / Planned Features
-1. **3-Stream Gzip Format** (Critical)
-   - Alpine APK uses concatenated gzip streams: `.SIGN` + `.CONTROL` + `data.tar.gz`
-   - Current YAP: Single-stream gzip
-   - Required for `apk add` compatibility
-   
-2. **Package Signing** (High Priority)
-   - RSA signature support (`.SIGN.RSA.*` entries)
-   - Integration with Alpine signing keys
-   - Optional for development, required for production
-
-3. **PAX Extended Headers** (Medium Priority)
-   - `APK-TOOLS.checksum.SHA1` headers for file integrity
-   - Used by `apk audit` and verification tools
-   - Currently missing in YAP output
-
-4. **Extended Metadata** (Low Priority)
-   - `origin`: Source package name
-   - `commit`: Git commit hash
-   - `builddate`: Build timestamp  
-   - `datahash`: Additional integrity check
-
-#### Investigation Tools & Scripts
-- `test-apk/tar_format.go` - Test different tar format outputs
-- `scripts/test_apk_format.sh` - Quick tar format verification
-- `scripts/compare_apk.sh` - Detailed APK comparison tool
-- `test-apk/manual/.PKGINFO` - Manual APK structure reference
-
-#### Key Findings Documentation
-- `APK_TAR_FORMAT_FINAL_ANALYSIS.md` - Authoritative tar format analysis
-- `APK_COMPLIANCE_SUMMARY.md` - Overall compliance status
-- `APK_TAR_FORMAT_TEST_RESULTS.md` - Test results and comparisons
+1. **RSA Signature Stream** (`.SIGN.RSA.*`) — High Priority
+   - Adds the third concatenated gzip stream required for trusted (non-`--allow-untrusted`) installs
+   - Integration with Alpine signing keys / abuild-keygen
+2. **Optional Extended Metadata** — Low Priority
+   - `commit` (Git commit hash) — currently not emitted
+   - Per-file ACL / xattr headers (rare in practice)
+3. **Test Coverage Expansion** — Ongoing
+   - Current: ~70%, target: 85%
 
 #### Testing APK Packages
 ```bash
-# Download official Alpine package for comparison
+# Download an official Alpine package for byte-level comparison
 wget http://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/busybox-1.37.0-r19.apk
 
 # Build YAP APK package
 yap build alpine examples/yap
 
-# Compare tar formats
+# Verify PAX tar format magic bytes
 gunzip -c package.apk | dd bs=1 skip=257 count=8 2>/dev/null | od -A n -t x1z
-# Expected: 75 73 74 61 72 00 30 30 (PAX format)
+# Expected: 75 73 74 61 72 00 30 30 ("ustar\0" + "00")
 
-# Inspect APK structure
+# Inspect APK structure (control + data streams)
 tar -tzf <(gunzip -c package.apk)
 
-# Test with Alpine tools (in Alpine container)
+# Test with Alpine tools (in an Alpine container)
 apk add --allow-untrusted ./package.apk
 apk info -L package-name
 ```
 
 #### Dependencies
-- **Custom Archive Library**: `github.com/M0Rf30/archives` (morfeo branch)
-  - Fork of go-libpack/archives with APK-specific enhancements
-  - PAX format support for extended attributes
-  - Replace in `go.mod` before APK development work
+- **Archive Library**: `github.com/mholt/archives` (pinned in `go.mod`, see `pkg/builders/apk/apk.go` imports). No `replace` directive is currently required.
 
 ## Release and Deployment
 
@@ -446,6 +434,7 @@ yap build arch examples/yap           # Arch Linux
 - ✅ **Consolidated architecture handling and cross-compilation logging (2025-11-14)**
 - ✅ **Sequential build as default; `--parallel` / `-P` flag for opt-in parallel dep resolution (2026-02-18)**
 - ✅ **Code quality pass 2: fixed malformed nolint, migrated ~30 fmt.Errorf to pkg/errors, threaded context.Context through archive/shell/download APIs (2026-02-19)**
+- ✅ **Unified `/etc/os-release` auto-detection across `build`, `zap`, and `prepare` (`prepare` distro arg now optional, supports `distro-release` form) — `ResolveDistroRelease` helper (2026-05-04)**
 
 ### Architectural Decisions
 
@@ -478,15 +467,12 @@ The following methods **cannot** be consolidated into BaseBuilder:
 These differences reflect **genuine format requirements**, not duplication.
 
 ### Known Limitations
-- **APK Packages**: Not yet installable with `apk add` (3-stream format required)
+- **APK Trusted Installs**: No `.SIGN.RSA.*` stream yet — installable only via `apk add --allow-untrusted`
 - **APK Signing**: No signature support (development builds only)
-- **PAX Checksums**: Missing APK-TOOLS.checksum.SHA1 headers
 
 ### Development Priorities
-1. Implement 3-stream gzip format for APK
-2. Add RSA signing support
-3. Integrate PAX extended attributes for checksums
-4. Expand test coverage for APK builder (current: ~70%, target: 85%)
+1. Add RSA signing support and emit the third concatenated gzip stream
+2. Expand test coverage for APK builder (current: ~70%, target: 85%)
 
 ## Agent-Specific Context
 
@@ -507,7 +493,6 @@ These differences reflect **genuine format requirements**, not duplication.
 - Use real Alpine packages as reference (`dl-cdn.alpinelinux.org`)
 - Test APK changes in Alpine containers
 - Compare YAP output with official packages byte-by-byte
-- Document test procedures in `test-apk/` directory
 
 ### For Debugging
 - Enable verbose logging for build issues

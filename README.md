@@ -68,8 +68,8 @@ yap version
 git clone https://github.com/M0Rf30/yap.git
 cd yap
 
-# Build YAP
-go build -o yap cmd/yap/yap.go
+# Build YAP (uses ldflags + version info)
+make build
 
 # Install
 sudo mv yap /usr/local/bin/
@@ -151,7 +151,7 @@ package() {
 ### 3. Build Your Package
 
 ```bash
-# Build for current system distribution
+# Build for current system distribution (requires /etc/os-release; not available on macOS/Windows)
 yap build .
 
 # Build for specific distribution
@@ -439,7 +439,6 @@ cksums_x86_64=('9876543210 2097152')
 - `cksums` format is `checksum filesize` (space-separated, as per UNIX cksum)
 - Multiple checksum types can be used simultaneously for different verification needs
 - BLAKE2b offers superior performance and security compared to SHA variants
-```
 
 #### Package Manager Specific Sections
 
@@ -484,18 +483,19 @@ YAP supports building packages for the following distributions:
 
 ```bash
 # Build Commands
-yap build [distro] <path>        # Build packages from yap.json project
-yap zap <distro> <path>          # Deeply clean build environment
+yap build [distro] <path>        # Build packages from yap.json project (distro auto-detected from /etc/os-release if omitted)
+yap zap [distro] <path>          # Deeply clean build environment (distro optional)
 
 # Environment Commands
-yap prepare <distro>             # Prepare build environment
-yap pull <distro>                # Pull container images
+yap prepare [distro[-release]]   # Prepare host build environment (auto-detects host distro if omitted)
+yap pull <distro>                # Pull pre-built container images
 
 # Utility Commands
 yap graph [path]                 # Generate dependency graph visualization
 yap completion <shell>           # Generate shell completion
+yap install <artifact-file>      # Install a built artifact (.deb / .rpm / .apk / .pkg.tar.*)
 yap list-distros                 # List supported distributions
-yap status                       # Show system status
+yap status                       # Show host status and runtime detection
 yap version                      # Show version information
 ```
 
@@ -519,9 +519,17 @@ yap build --pkgrel 2             # Override release number
 # Build range
 yap build --from package1        # Start from specific package
 yap build --to package5          # Stop at specific package
+yap build --only pkg1,pkg2       # Build only the comma-separated packages
 
 # Source access
 yap build --ssh-password pass    # SSH password for private repos
+
+# Cross-compilation & toolchain
+yap build --target-arch arm64    # Cross-compile for a specific architecture
+yap build --skip-toolchain-validation  # Skip Go toolchain validation
+
+# Debugging
+yap build --debug-dir /path/to/debug    # Emit split debug info to a directory
 
 # Global options
 yap build --verbose              # Enable verbose logging
@@ -542,7 +550,7 @@ yap completion zsh > /usr/share/zsh/site-functions/_yap
 # Fish
 yap completion fish > ~/.config/fish/completions/yap.fish
 
-# PowerShell
+# PowerShell (writes yap.ps1 in the current directory; move it into your PowerShell profile path as needed)
 yap completion powershell > yap.ps1
 ```
 
@@ -578,7 +586,6 @@ yap graph --show-external --output complete-graph.svg .
 - **Arrows**: Show dependency direction (runtime vs make dependencies)
 - **Levels**: Indicate build order and dependency hierarchy
 - **Tooltips**: Display detailed package information on hover
-```
 
 ## 🔧 Advanced Usage
 
@@ -641,7 +648,10 @@ yap build --parallel .
 ### Build Environment Preparation
 
 ```bash
-# Prepare basic build environment
+# Auto-detect host distribution from /etc/os-release
+yap prepare
+
+# Prepare basic build environment for a specific distro / distro-release
 yap prepare ubuntu-jammy
 yap prepare fedora-38
 
@@ -664,7 +674,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install YAP
         run: |
@@ -676,7 +686,7 @@ jobs:
         run: yap build
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: packages
           path: artifacts/
@@ -1069,6 +1079,7 @@ We welcome translations to additional languages! To contribute:
 3. Translate all messages in the file
 4. Add your language code to the `SupportedLanguages` slice in `pkg/i18n/i18n.go`
 5. Submit a pull request
+
 ## 📄 License
 
 YAP is licensed under the **GNU General Public License v3.0**. See the [LICENSE](LICENSE.md) file for details.

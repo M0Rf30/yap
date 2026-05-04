@@ -1,8 +1,6 @@
 package command
 
 import (
-	"strings"
-
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
@@ -10,7 +8,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/project"
 )
 
@@ -32,21 +29,19 @@ var (
 		Args:    cobra.RangeArgs(0, 1),
 		PreRun:  PreRunValidation,
 		Run: func(_ *cobra.Command, args []string) {
-			var distro string
-
 			// Set the skip toolchain validation flag
 			common.SkipToolchainValidation = project.SkipToolchainValidation
 
-			// Use the default distro if none is provided
-			if len(args) == 0 {
-				osRelease, _ := platform.ParseOSRelease()
-				distro = osRelease.ID
-				logger.Warn(i18n.T("logger.prepare.no_distribution_specified"),
-					"distro", distro)
-			} else {
-				split := strings.Split(args[0], "-")
-				distro = split[0]
+			// Parse optional distro arg (supports "distro" or "distro-release"),
+			// then auto-detect from /etc/os-release when missing — matching
+			// the behavior of the `build` command.
+			var distro, release string
+			if len(args) > 0 {
+				distro, release = parseDistroAndRelease(args[0])
 			}
+
+			distro, _ = ResolveDistroRelease(distro, release,
+				"logger.prepare.no_distribution_specified")
 
 			packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
 			if !project.SkipSyncDeps {

@@ -12,6 +12,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
@@ -279,4 +280,43 @@ func parseSingleArg(firstArg string) (distro, release, fullJSONPath string, err 
 // isPathArgument checks if the argument looks like a path.
 func isPathArgument(arg string) bool {
 	return strings.Contains(arg, "/") || arg == "." || arg == ".."
+}
+
+// ResolveDistroRelease auto-detects the distribution and codename from
+// /etc/os-release when not explicitly provided.
+//
+// Behavior:
+//   - If distro is empty: the host distro and codename are used; a warning
+//     is logged using noDistroKey (an i18n key for "no distribution specified").
+//   - If distro is set but release is empty: the codename is auto-detected
+//     only when the host distro matches; a debug log is emitted on success.
+//
+// This keeps `build`, `zap`, and `prepare` consistent so distro+codename
+// PKGBUILD directives (e.g. depends__ubuntu_jammy) resolve correctly.
+func ResolveDistroRelease(distro, release, noDistroKey string) (
+	resolvedDistro, resolvedRelease string,
+) {
+	if distro == "" {
+		osRelease, _ := platform.ParseOSRelease()
+		distro = osRelease.ID
+
+		if release == "" {
+			release = osRelease.Codename
+		}
+
+		logger.Warn(i18n.T(noDistroKey), "distro", distro)
+
+		return distro, release
+	}
+
+	if release == "" {
+		osRelease, err := platform.ParseOSRelease()
+		if err == nil && osRelease.ID == distro && osRelease.Codename != "" {
+			release = osRelease.Codename
+			logger.Debug(i18n.T("logger.build.auto_detected_codename"),
+				"distro", distro, "codename", release)
+		}
+	}
+
+	return distro, release
 }
