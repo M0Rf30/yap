@@ -7,7 +7,6 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/project"
 )
 
@@ -28,30 +27,12 @@ var zapCmd = &cobra.Command{
 			return err
 		}
 
-		// Use the default distro if none is provided.
-		if distro == "" {
-			osRelease, _ := platform.ParseOSRelease()
-			distro = osRelease.ID
-			// Also auto-detect codename so that distro+codename PKGBUILD
-			// directives are resolved correctly.
-			if release == "" {
-				release = osRelease.Codename
-			}
+		// Auto-detect distro and codename from /etc/os-release when missing.
+		userProvidedDistro := distro != ""
+		distro, release = ResolveDistroRelease(distro, release,
+			"logger.zap.no_distribution_specified")
 
-			logger.Warn(i18n.T("logger.zap.no_distribution_specified"),
-				"distro", distro)
-		} else {
-			// If the user specified a distro but no codename, auto-detect the
-			// codename from /etc/os-release when building for the host distro.
-			if release == "" {
-				osRelease, err := platform.ParseOSRelease()
-				if err == nil && osRelease.ID == distro && osRelease.Codename != "" {
-					release = osRelease.Codename
-					logger.Debug(i18n.T("logger.build.auto_detected_codename"),
-						"distro", distro, "codename", release)
-				}
-			}
-
+		if userProvidedDistro {
 			logger.Info(i18n.T("logger.zap.cleaning_for_distribution"),
 				"distro", distro, "release", release)
 		}
