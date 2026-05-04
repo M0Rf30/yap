@@ -56,7 +56,7 @@ func provideSimilarCommands(cmd *cobra.Command, errorStr string) {
 	var suggestions []string
 
 	for _, subCmd := range cmd.Root().Commands() {
-		if !subCmd.Hidden && subCmd.Name() != "help" {
+		if !subCmd.Hidden && subCmd.Name() != aliasHelp {
 			// Calculate simple similarity (starts with same letter, contains similar chars)
 			if calculateSimilarity(unknown, subCmd.Name()) > 0.3 {
 				suggestions = append(suggestions, subCmd.Name())
@@ -154,18 +154,18 @@ func provideArgumentHelp(cmd *cobra.Command) {
 		pterm.Info.Println("  • yap build .                    (current directory, auto-detect distro)")
 		pterm.Info.Println("  • yap build ubuntu-jammy .       (specific distro and path)")
 		pterm.Info.Println("  • yap build fedora-38 /path/to/project")
-	case "prepare":
+	case prepareCommand:
 		pterm.Info.Println("💡 Prepare command format:")
-		pterm.Info.Println("  • yap prepare <distribution>")
-		pterm.Info.Println("  • Example: yap prepare ubuntu-jammy")
-	case "pull":
+		pterm.Info.Println("  • yap " + prepareCommand + " <distribution>")
+		pterm.Info.Println("  • Example: yap " + prepareCommand + " ubuntu-jammy")
+	case commandPull:
 		pterm.Info.Println("💡 Pull command format:")
-		pterm.Info.Println("  • yap pull <distribution>")
-		pterm.Info.Println("  • Example: yap pull alpine")
-	case "zap":
+		pterm.Info.Println("  • yap " + commandPull + " <distribution>")
+		pterm.Info.Println("  • Example: yap " + commandPull + " alpine")
+	case commandZap:
 		pterm.Info.Println("💡 Zap command format:")
-		pterm.Info.Println("  • yap zap <distribution> <path>")
-		pterm.Info.Println("  • Example: yap zap ubuntu-jammy /path/to/project")
+		pterm.Info.Println("  • yap " + commandZap + " <distribution> <path>")
+		pterm.Info.Println("  • Example: yap " + commandZap + " ubuntu-jammy /path/to/project")
 	}
 }
 
@@ -175,7 +175,7 @@ func showCommandGroups(rootCmd *cobra.Command) {
 	ungrouped := []string{}
 
 	for _, cmd := range rootCmd.Commands() {
-		if cmd.Hidden || cmd.Name() == "help" {
+		if cmd.Hidden || cmd.Name() == aliasHelp {
 			continue
 		}
 
@@ -275,9 +275,9 @@ func ShowCommandTips(cmd *cobra.Command) {
 		if !verbose {
 			logger.Tips("💡 Use --verbose (-v) for detailed build output")
 		}
-	case "prepare":
+	case prepareCommand:
 		logger.Tips("💡 Use --golang (-g) to also install Go development tools")
-	case "list-distros":
+	case commandListDistro:
 		logger.Tips("💡 Use these identifiers with other YAP commands")
 	}
 }

@@ -23,8 +23,8 @@ var sshPassword string
 
 // buildCmd represents the command to build the entire project.
 var buildCmd = &cobra.Command{
-	Use:     "build [distro] <path>",
-	GroupID: "build",
+	Use:     buildCommand + " [distro] <path>",
+	GroupID: buildGroup,
 	Aliases: []string{"b"},
 	Short:   "🔨 Build packages from yap.json project definition", // Will be set in init()
 	Long:    "",                                                  // Will be set in init()

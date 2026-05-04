@@ -19,6 +19,8 @@ import (
 	rpmpack "github.com/google/rpmpack"
 )
 
+const rootOwner = "root"
+
 // RPM represents a RPM package.
 //
 // It contains the directory path of the package and the PKGBUILD struct, which
@@ -250,9 +252,9 @@ func asRPMDirectory(entry *files.Entry) (*rpmpack.RPMFile, error) {
 		Name: entry.Destination, // Set the destination name.
 		// Set the mode to indicate it's a directory.
 		Mode:  uint(fileInfo.Mode()) | files.TagDirectory,
-		MTime: mTime,  // Set the modification time.
-		Owner: "root", // Set the owner to "root".
-		Group: "root", // Set the group to "root".
+		MTime: mTime,     // Set the modification time.
+		Owner: rootOwner, // Set the owner to "root".
+		Group: rootOwner, // Set the group to "root".
 	}, nil
 }
 
@@ -285,8 +287,8 @@ func asRPMFile(
 		Body:  data,                  // Set the file data.
 		Mode:  uint(fileInfo.Mode()), // Set the file mode.
 		MTime: mTime,                 // Set the modification time.
-		Owner: "root",                // Set the owner to "root".
-		Group: "root",                // Set the group to "root".
+		Owner: rootOwner,             // Set the owner to "root".
+		Group: rootOwner,             // Set the group to "root".
 		Type:  fileType,              // Set the file type.
 	}, nil
 }
@@ -319,8 +321,8 @@ func asRPMSymlink(entry *files.Entry) (*rpmpack.RPMFile, error) {
 		Body:  []byte(body),        // Set the target of the symlink as the body.
 		Mode:  uint(files.TagLink), // Set the mode to indicate it's a symlink.
 		MTime: mTime,               // Set the modification time.
-		Owner: "root",              // Set the owner to "root".
-		Group: "root",              // Set the group to "root".
+		Owner: rootOwner,           // Set the owner to "root".
+		Group: rootOwner,           // Set the group to "root".
 	}, nil
 }
 

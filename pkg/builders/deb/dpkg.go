@@ -194,11 +194,16 @@ func addArFileFromPath(writer *ar.Writer, name string, filePath string, modtime 
 // It takes no parameters and returns an error if there was an issue
 // generating or writing the scripts.
 func (d *Package) addScriptlets() error {
+	const (
+		prermScript  = "prerm"
+		postrmScript = "postrm"
+	)
+
 	scripts := map[string]string{
-		"preinst":  d.PKGBUILD.PreInst,
-		"postinst": d.PKGBUILD.PostInst,
-		"prerm":    d.PKGBUILD.PreRm,
-		"postrm":   d.PKGBUILD.PostRm,
+		"preinst":    d.PKGBUILD.PreInst,
+		"postinst":   d.PKGBUILD.PostInst,
+		prermScript:  d.PKGBUILD.PreRm,
+		postrmScript: d.PKGBUILD.PostRm,
 	}
 
 	for name, script := range scripts {
@@ -214,7 +219,7 @@ func (d *Package) addScriptlets() error {
 			script = helperPreamble + script
 		}
 
-		if name == "prerm" || name == "postrm" {
+		if name == prermScript || name == postrmScript {
 			script = removeHeader + script
 		}
 

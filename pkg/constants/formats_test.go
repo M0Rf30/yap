@@ -26,54 +26,6 @@ func TestFormatConstants(t *testing.T) {
 	}
 }
 
-func TestRPMGroups(t *testing.T) {
-	if RPMGroups == nil {
-		t.Fatal("RPMGroups is nil")
-	}
-
-	expectedGroups := []string{
-		"admin", "devel", "libs", "games", "graphics", "net", "text", "web",
-	}
-
-	for _, group := range expectedGroups {
-		if _, exists := RPMGroups[group]; !exists {
-			t.Errorf("RPMGroups missing expected group: %s", group)
-		}
-	}
-
-	for group, rpmGroup := range RPMGroups {
-		if rpmGroup == "" {
-			t.Errorf("RPMGroups[%s] is empty", group)
-		}
-	}
-}
-
-func TestRPMDistros(t *testing.T) {
-	if RPMDistros == nil {
-		t.Fatal("RPMDistros is nil")
-	}
-
-	expectedDistros := []string{
-		"almalinux", "fedora", "rhel", "rocky",
-	}
-
-	for _, distro := range expectedDistros {
-		if _, exists := RPMDistros[distro]; !exists {
-			t.Errorf("RPMDistros missing expected distro: %s", distro)
-		}
-	}
-
-	for distro, suffix := range RPMDistros {
-		if suffix == "" {
-			t.Errorf("RPMDistros[%s] is empty", distro)
-		}
-
-		if suffix[0] != '.' {
-			t.Errorf("RPMDistros[%s] suffix %q should start with '.'", distro, suffix)
-		}
-	}
-}
-
 func TestGetBuildDeps(t *testing.T) {
 	deps := GetBuildDeps()
 

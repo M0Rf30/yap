@@ -28,6 +28,9 @@ import (
 
 const (
 	fileProtocol = "file"
+	branchKey    = "branch"
+	tagKey       = "tag"
+	skipValue    = "SKIP"
 )
 
 // Global variables for source handling
@@ -147,9 +150,9 @@ func (src *Source) Get() error {
 // It returns a plumbing.ReferenceName.
 func (src *Source) getReferenceType() plumbing.ReferenceName {
 	switch src.RefKey {
-	case "branch":
+	case branchKey:
 		return plumbing.NewBranchReferenceName(src.RefValue)
-	case "tag":
+	case tagKey:
 		return plumbing.NewTagReferenceName(src.RefValue)
 	}
 
@@ -279,7 +282,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return fmt.Errorf(i18n.T("errors.source.directory_not_supported"), sourceFilePath)
 	}
 
-	if src.Hash == "SKIP" {
+	if src.Hash == skipValue {
 		logger.Info(i18n.T("logger.skip_integrity_check_for"),
 			"source", src.SourceItemURI)
 

@@ -232,18 +232,20 @@ func determinePackageName(packageName string) string {
 
 // determineSourceName resolves the source name for progress display.
 func determineSourceName(sourceName, uri string) string {
+	const downloadDefault = "download"
+
 	if sourceName != "" {
 		return sourceName
 	}
 
 	if uri == "" {
-		return "download"
+		return downloadDefault
 	}
 
 	filename := filepath.Base(uri)
 	// Handle special cases where filepath.Base doesn't return what we want
 	if filename == "." || filename == "/" || strings.HasSuffix(uri, "/") {
-		return "download"
+		return downloadDefault
 	}
 
 	return filename

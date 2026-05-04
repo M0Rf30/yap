@@ -119,9 +119,11 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 //
 // Returns strip flags and whether the binary is a shared library.
 func determineStripFlags(fileType, binary string) (string, bool) {
-	stripBinaries := "--strip-all"
-	stripShared := "--strip-unneeded"
-	stripStatic := "--strip-debug"
+	const (
+		stripBinaries = "--strip-all"
+		stripShared   = "--strip-unneeded"
+		stripStatic   = "--strip-debug"
+	)
 
 	switch {
 	case strings.Contains(fileType, "ET_DYN"):

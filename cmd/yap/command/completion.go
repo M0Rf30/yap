@@ -11,7 +11,7 @@ import (
 // completionCmd represents the completion command.
 var completionCmd = &cobra.Command{
 	Use:     "completion <shell>",
-	GroupID: "utility",
+	GroupID: commandUtility,
 	Short:   "🔧 Generate shell completion scripts",
 	Long: `Generate completion scripts for yap commands, flags, and arguments.
 
