@@ -66,6 +66,22 @@ yap graph <project-path>                       # Show dependency graph
 yap build --skip-sync <project-path>           # Skip dependency sync (faster)
 yap build --cleanbuild <project-path>          # Clean source before build
 yap build --parallel <project-path>            # Enable parallel dep-aware topo-sort (opt-in)
+
+# Signing
+yap build --sign <project>                     # Enable artifact signing (key resolved from flags/env/config/default)
+yap build --sign-key /path/to/private.key # Specify private key path
+yap build --sign-passphrase pass          # Passphrase (use env vars in CI: YAP_SIGN_PASSPHRASE)
+yap build --sign-key-name mykey           # APK key name (.SIGN.RSA.<keyname>.rsa.pub)
+
+# SBOM (Software Bill of Materials)
+yap build --sbom                          # Generate SBOM sidecars next to artifacts
+yap build --sbom-format cyclonedx         # Only CycloneDX 1.5 (default: both)
+yap build --sbom-format spdx              # Only SPDX 2.3
+yap build --sbom-format both              # Both formats (default)
+
+# Compression overrides
+yap build --compression-deb gzip          # DEB compression: zstd|gzip|xz (default: zstd)
+yap build --compression-rpm xz            # RPM compression: zstd|gzip|xz (default: zstd)
 ```
 
 
@@ -331,15 +347,13 @@ The APK builder (`pkg/builders/apk/`) targets Alpine Linux APK compatibility. Cu
 - **PAX Extended Headers**: `APK-TOOLS.checksum.SHA1` per-file headers (`writeFileWithChecksum`) consumed by `apk audit`
 - **`.PKGINFO` Metadata**: name, version, arch, description, license, url, dependencies, conflicts, `size`, `origin`, `builddate`, `datahash` (SHA-256 of `data.tar.gz`)
 - **Dependency Handling**: depends, makedepends, conflicts, provides
+- **RSA Signature Stream** (`.SIGN.RSA.<keyname>.rsa.pub`): PKCS#1 v1.5 SHA1 signature over control.tar.gz, prepended as third concatenated gzip stream — enables `apk add` without `--allow-untrusted`. Implementation: `pkg/signing/rsa.go`.
 
 #### 🚧 In Progress / Planned Features
-1. **RSA Signature Stream** (`.SIGN.RSA.*`) — High Priority
-   - Adds the third concatenated gzip stream required for trusted (non-`--allow-untrusted`) installs
-   - Integration with Alpine signing keys / abuild-keygen
-2. **Optional Extended Metadata** — Low Priority
+1. **Optional Extended Metadata** — Low Priority
    - `commit` (Git commit hash) — currently not emitted
    - Per-file ACL / xattr headers (rare in practice)
-3. **Test Coverage Expansion** — Ongoing
+2. **Test Coverage Expansion** — Ongoing
    - Current: ~70%, target: 85%
 
 #### Testing APK Packages
@@ -427,6 +441,12 @@ yap build arch examples/yap           # Arch Linux
 3. **Package Signing Infrastructure** - RSA signature integration
 
 ### Recent Achievements
+- ✅ **Package signing infrastructure: APK RSA + DEB/RPM/Pacman GPG (2026-05-04)** — Pure-Go via ProtonMail/go-crypto. APK packages now installable without --allow-untrusted; DEB/RPM/Pacman emit detached signature sidecars (.deb.asc/.rpm.asc/.pkg.tar.zst.sig). RPM also supports in-package signatures via rpmpack.SetPGPSigner. Priority: CLI > format env > global env > yap.json > ~/.config/yap/keys/.
+- ✅ **SBOM generation: CycloneDX 1.5 + SPDX 2.3 (2026-05-04)** — Opt-in via --sbom; emits .cdx.json and/or .spdx.json sidecars next to each built artifact. Hand-rolled, no external SBOM library.
+- ✅ **Per-format compression for DEB/RPM (2026-05-04)** — --compression-deb and --compression-rpm flags accept zstd/gzip/xz. APK and Pacman remain format-locked.
+- ✅ **Pacman .INSTALL scriptlets (2026-05-04)** — Full 6-hook parity with DEB/RPM (pre_install, post_install, pre_upgrade, post_upgrade, pre_remove, post_remove). .install file conditionally emitted only when scriptlets are present.
+- ✅ **Changelog support (2026-05-04)** — New PKGBUILD `changelog` field. DEB emits Lintian-compliant `usr/share/doc/<pkg>/changelog.Debian.gz`; Pacman emits `.CHANGELOG`. RPM deferred (rpmpack API gap).
+- ✅ **Builder interface unification (2026-05-04)** — BuildPackage now returns (string, error) across all four builders, enabling post-build pipeline hooks for signing and SBOM.
 - ✅ Verified tar format compliance (PAX matches Alpine)
 - ✅ Created comprehensive APK testing infrastructure
 - ✅ Integrated custom archives library for APK support
@@ -467,12 +487,74 @@ The following methods **cannot** be consolidated into BaseBuilder:
 These differences reflect **genuine format requirements**, not duplication.
 
 ### Known Limitations
-- **APK Trusted Installs**: No `.SIGN.RSA.*` stream yet — installable only via `apk add --allow-untrusted`
-- **APK Signing**: No signature support (development builds only)
+- **APK Trusted Installs**: Now supported via `pkg/signing/rsa.go` — packages can be signed with `--sign` for trusted installation
+- **RPM Changelog**: Currently a no-op due to rpmpack v0.7.1 API gap. Tracked for future implementation when rpmpack adds changelog support
 
 ### Development Priorities
-1. Add RSA signing support and emit the third concatenated gzip stream
-2. Expand test coverage for APK builder (current: ~70%, target: 85%)
+1. Wire RPM changelog when rpmpack adds the API
+2. Expand test coverage for new packages (pkg/signing target 85%, pkg/sbom target 85%)
+3. Add `yap keygen` CLI subcommand for generating signing keys
+4. Add public-key extraction CLI (`yap pubkey`)
+5. Repository signing (Release.gpg, repodata signing) — separate concern from package signing
+
+## Signing & SBOM Subsystems
+
+### Signing (`pkg/signing/`)
+
+YAP supports cryptographic signing of built artifacts. The signing subsystem is format-aware and pluggable.
+
+**Format → Algorithm matrix:**
+
+| Format | Algorithm | Output | Notes |
+| ------ | --------- | ------ | ----- |
+| APK | RSA PKCS#1 v1.5 SHA1 | `.SIGN.RSA.<keyname>.rsa.pub` prepended as third gzip stream | Enables `apk add` without `--allow-untrusted` |
+| DEB | OpenPGP (GPG) | `<package>.deb.asc` ASCII-armored detached | Verify with `gpg --verify package.deb.asc package.deb` |
+| RPM | OpenPGP (GPG) | `<package>.rpm.asc` + optional in-RPM via `rpmpack.SetPGPSigner` | In-RPM preferred when supported |
+| Pacman | OpenPGP (GPG) | `<package>.pkg.tar.zst.sig` binary detached | Matches `makepkg --sign` convention |
+
+**Key resolution priority (highest to lowest):**
+1. CLI flag: `--sign-key /path/to/key`
+2. Format-specific env: `YAP_DEB_KEY`, `YAP_APK_KEY`, `YAP_RPM_KEY`, `YAP_PACMAN_KEY`
+3. Global env: `YAP_SIGN_KEY`
+4. yap.json: `signing.keyPath`
+5. Default search: `~/.config/yap/keys/<format>.{rsa,gpg}` then `~/.config/yap/keys/default.{rsa,gpg}`
+
+Passphrase resolution mirrors key resolution with `_PASSPHRASE` suffix.
+
+**Implementation:**
+- `pkg/signing/signing.go` — Format/Algorithm enums, Config, Signer interface
+- `pkg/signing/resolve.go` — Priority-based config resolution
+- `pkg/signing/factory.go` — `NewSigner(format, cfg) Signer`
+- `pkg/signing/rsa.go` — APK RSA signer (RSASigner)
+- `pkg/signing/gpg.go` — DEB/RPM/Pacman GPG signer (GPGSigner)
+
+**Pure-Go**: Uses `github.com/ProtonMail/go-crypto/openpgp` and stdlib `crypto/rsa`. No external `gpg` binary required — container-friendly.
+
+### SBOM (`pkg/sbom/`)
+
+Software Bill of Materials generation, opt-in via `--sbom`.
+
+**Formats:**
+- **CycloneDX 1.5** (`<artifact>.cdx.json`) — components with hashes, licenses, external refs
+- **SPDX 2.3** (`<artifact>.spdx.json`) — packages with DESCRIBES + DEPENDS_ON relationships
+
+**Selection:** `--sbom-format cyclonedx`, `--sbom-format spdx`, or `--sbom-format both` (default).
+
+**Data source:** PKGBUILD fields (name, version, license, depends, makedepends, sources, sha256/sha512 sums).
+
+**Implementation:** Hand-rolled to specification, no external SBOM library — keeps dependency surface minimal.
+
+### Build pipeline integration (`pkg/project/project.go`)
+
+```
+PrepareFakeroot → BuildPackage (returns artifactPath)
+                       ↓
+                  signArtifact (if proj.Signing.Enabled)
+                       ↓
+                  generateSBOM (if mpc.SBOM)
+```
+
+The `Builder.BuildPackage` interface returns `(string, error)` so the pipeline can address the resulting artifact for post-build hooks.
 
 ## Agent-Specific Context
 

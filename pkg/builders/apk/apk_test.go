@@ -63,7 +63,7 @@ func TestBuildPackage(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	err = builder.BuildPackage(tempDir, "")
+	_, err = builder.BuildPackage(tempDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}

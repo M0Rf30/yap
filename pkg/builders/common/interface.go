@@ -58,7 +58,7 @@ var depVersionRegex = regexp.MustCompile(`(<=|>=|=|>|<)`)
 // This unifies the behavior across different package formats (APK, DEB, RPM, Pacman).
 type Builder interface {
 	// BuildPackage creates the package file at the specified artifacts path
-	BuildPackage(artifactsPath string, targetArch string) error
+	BuildPackage(artifactsPath string, targetArch string) (string, error)
 
 	// PrepareFakeroot sets up the package metadata and prepares the build environment
 	PrepareFakeroot(artifactsPath string, targetArch string) error

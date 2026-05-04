@@ -2,6 +2,7 @@
 package project
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
+	"github.com/M0Rf30/yap/v2/pkg/core"
 	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -25,6 +27,8 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/sbom"
+	"github.com/M0Rf30/yap/v2/pkg/signing"
 )
 
 var (
@@ -68,6 +72,12 @@ var (
 	// When set, debug info is extracted from ELF binaries before stripping
 	// and saved in a .build-id directory structure suitable for debuginfod.
 	DebugDir string
+	// SBOM enables Software Bill of Materials generation.
+	// When true, SBOM files are generated for each built package.
+	SBOM bool
+	// SBOMFormat specifies the SBOM format(s) to generate.
+	// Valid values: "cyclonedx", "spdx", "both" (default: "both").
+	SBOMFormat string
 
 	// Global state variables
 	singleProject  bool
@@ -134,11 +144,14 @@ type DistroProject interface {
 // packages and the ToPkgName field, which can be used to stop the build
 // process after a specific package.
 type MultipleProject struct {
-	BuildDir    string     `json:"buildDir"    validate:"required"`
-	Description string     `json:"description" validate:"required"`
-	Name        string     `json:"name"        validate:"required"`
-	Output      string     `json:"output"      validate:"required"`
-	Projects    []*Project `json:"projects"    validate:"required,dive,required"`
+	BuildDir       string              `json:"buildDir"       validate:"required"`
+	Description    string              `json:"description"    validate:"required"`
+	Name           string              `json:"name"           validate:"required"`
+	Output         string              `json:"output"         validate:"required"`
+	Projects       []*Project          `json:"projects"       validate:"required,dive,required"`
+	CompressionDeb string              `json:"compressionDeb" validate:""`
+	CompressionRpm string              `json:"compressionRpm" validate:""`
+	Signing        *core.SigningConfig `json:"signing,omitempty"`
 }
 
 // Project represents a single project.
@@ -157,6 +170,9 @@ type Project struct {
 	Root           string
 	Name           string `json:"name"    validate:"required,startsnotwith=.,startsnotwith=./"`
 	HasToInstall   bool   `json:"install" validate:""`
+	CompressionDeb string
+	CompressionRpm string
+	Signing        *core.SigningConfig
 }
 
 // BuildAll builds all projects in the correct order.
@@ -238,7 +254,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	packageManager = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
+	packageManager = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
 	if !SkipSyncDeps {
 		err := packageManager.Update()
 		if err != nil {
@@ -620,9 +636,29 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		"version", proj.Builder.PKGBUILD.PkgVer,
 		"release", proj.Builder.PKGBUILD.PkgRel)
 
-	err = proj.PackageManager.BuildPackage(mpc.Output, TargetArch)
+	artifactPath, err := proj.PackageManager.BuildPackage(mpc.Output, TargetArch)
 	if err != nil {
 		return err
+	}
+
+	return mpc.runPostBuildHooks(proj, artifactPath)
+}
+
+// runPostBuildHooks executes signing and SBOM generation after a successful
+// package build. Signing failures abort the build; SBOM failures only warn.
+func (mpc *MultipleProject) runPostBuildHooks(proj *Project, artifactPath string) error {
+	if proj.Signing != nil && proj.Signing.Enabled && artifactPath != "" {
+		if err := mpc.signArtifact(proj, artifactPath); err != nil {
+			return err
+		}
+	}
+
+	if SBOM {
+		if err := mpc.generateSBOM(proj, mpc.Output); err != nil {
+			logger.Warn(i18n.T("logger.sbom_generation_failed"),
+				"package", proj.Builder.PKGBUILD.PkgName,
+				"error", err)
+		}
 	}
 
 	return nil
@@ -775,13 +811,16 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
-		packageManager = packer.GetPackageManager(pkgbuildFile, distro)
+		packageManager = packer.GetPackageManager(pkgbuildFile, distro,
+			mpc.CompressionDeb, mpc.CompressionRpm)
 
 		proj := &Project{
 			Name:           child.Name,
 			Builder:        &builder.Builder{PKGBUILD: pkgbuildFile},
 			PackageManager: packageManager,
 			HasToInstall:   child.HasToInstall,
+			CompressionDeb: mpc.CompressionDeb,
+			CompressionRpm: mpc.CompressionRpm,
 		}
 
 		projects = append(projects, proj)
@@ -1609,4 +1648,164 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 	}
 
 	return nil
+}
+
+// signArtifact signs a built package artifact based on its file extension
+// and the project's signing configuration.
+func (mpc *MultipleProject) signArtifact(proj *Project, artifactPath string) error {
+	format, ok := signingFormatForArtifact(artifactPath)
+	if !ok {
+		// Unknown extension; nothing to sign
+		return nil
+	}
+
+	cfg := signing.Config{
+		Enabled:    proj.Signing.Enabled,
+		KeyPath:    proj.Signing.KeyPath,
+		Passphrase: proj.Signing.Passphrase,
+		KeyName:    proj.Signing.KeyName,
+	}
+
+	signer, err := signing.NewSigner(format, cfg)
+	if err != nil {
+		return yerrors.Wrap(err, yerrors.ErrTypeBuild, "failed to create signer").
+			WithOperation("signArtifact").
+			WithContext("artifact", artifactPath).
+			WithContext("format", string(format))
+	}
+
+	logger.Info(i18n.T("logger.signing_artifact"),
+		"package", proj.Builder.PKGBUILD.PkgName,
+		"artifact", artifactPath,
+		"format", string(format))
+
+	if err := signer.Sign(context.Background(), artifactPath); err != nil {
+		return yerrors.Wrap(err, yerrors.ErrTypeBuild, "failed to sign artifact").
+			WithOperation("signArtifact").
+			WithContext("artifact", artifactPath).
+			WithContext("format", string(format))
+	}
+
+	return nil
+}
+
+// signingFormatForArtifact maps a file extension to a signing.Format.
+func signingFormatForArtifact(artifactPath string) (signing.Format, bool) {
+	lower := strings.ToLower(artifactPath)
+	switch {
+	case strings.HasSuffix(lower, ".apk"):
+		return signing.FormatAPK, true
+	case strings.HasSuffix(lower, ".deb"):
+		return signing.FormatDEB, true
+	case strings.HasSuffix(lower, ".rpm"):
+		return signing.FormatRPM, true
+	case strings.HasSuffix(lower, ".pkg.tar.zst"),
+		strings.HasSuffix(lower, ".pkg.tar.xz"),
+		strings.HasSuffix(lower, ".pkg.tar.gz"):
+		return signing.FormatPacman, true
+	}
+
+	return "", false
+}
+
+// generateSBOM generates Software Bill of Materials for a built package.
+// It finds the artifact file in the output directory and generates SBOM
+// sidecars in the requested format(s).
+func (mpc *MultipleProject) generateSBOM(proj *Project, outputDir string) error {
+	// Parse SBOM format flag
+	var formats []sbom.Format
+
+	switch strings.ToLower(SBOMFormat) {
+	case "cyclonedx":
+		formats = []sbom.Format{sbom.FormatCycloneDX}
+	case "spdx":
+		formats = []sbom.Format{sbom.FormatSPDX}
+	case "both", "":
+		formats = []sbom.Format{sbom.FormatCycloneDX, sbom.FormatSPDX}
+	default:
+		return yerrors.New(yerrors.ErrTypeConfiguration,
+			fmt.Sprintf("invalid SBOM format: %s", SBOMFormat)).
+			WithOperation("generateSBOM").
+			WithContext("format", SBOMFormat)
+	}
+
+	// Find the artifact file(s) in the output directory
+	// The artifact naming convention depends on the package format
+	entries, err := os.ReadDir(outputDir)
+	if err != nil {
+		return yerrors.Wrap(err, yerrors.ErrTypeBuild,
+			"failed to read output directory").
+			WithOperation("generateSBOM").
+			WithContext("output_dir", outputDir)
+	}
+
+	// Look for recently created artifact files matching the package
+	pkgName := proj.Builder.PKGBUILD.PkgName
+	pkgVer := proj.Builder.PKGBUILD.PkgVer
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		fileName := entry.Name()
+
+		// Check if this is an artifact for our package
+		// Artifacts typically follow pattern: pkgname-version-release-arch.ext
+		if !strings.Contains(fileName, pkgName) ||
+			!strings.Contains(fileName, pkgVer) {
+			continue
+		}
+
+		// Skip SBOM files themselves
+		if strings.HasSuffix(fileName, ".cdx.json") ||
+			strings.HasSuffix(fileName, ".spdx.json") {
+			continue
+		}
+
+		// Check if it's a package artifact (deb, rpm, apk, pkg.tar.*)
+		if !isPackageArtifact(fileName) {
+			continue
+		}
+
+		artifactPath := filepath.Join(outputDir, fileName)
+
+		// Generate SBOM
+		opts := sbom.Options{Formats: formats}
+
+		_, err := sbom.Generate(proj.Builder.PKGBUILD, artifactPath, opts)
+		if err != nil {
+			return yerrors.Wrap(err, yerrors.ErrTypeBuild,
+				"failed to generate SBOM").
+				WithOperation("generateSBOM").
+				WithContext("artifact", fileName)
+		}
+
+		logger.Debug(i18n.T("logger.sbom_generated"),
+			"package", pkgName,
+			"artifact", fileName)
+	}
+
+	return nil
+}
+
+// isPackageArtifact checks if a filename is a package artifact.
+func isPackageArtifact(fileName string) bool {
+	packageExtensions := []string{
+		".deb",
+		".rpm",
+		".apk",
+		".pkg.tar.zst",
+		".pkg.tar.xz",
+		".pkg.tar.gz",
+		".pkg.tar",
+	}
+
+	for _, ext := range packageExtensions {
+		if strings.HasSuffix(fileName, ext) {
+			return true
+		}
+	}
+
+	return false
 }

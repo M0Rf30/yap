@@ -10,20 +10,50 @@ import (
 
 	"github.com/mholt/archives"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
-// CreateTarZst creates a compressed tar.zst archive from the specified source
-// directory. This consolidates the archive creation logic for YAP packages.
-func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU bool) error {
+// CreateTarCompressed creates a compressed tar archive with the specified
+// compression algorithm from the source directory. Supported compression
+// algorithms are "zstd", "gzip", and "xz". If compression is empty, defaults
+// to "zstd". Returns an error if the compression algorithm is unsupported.
+func CreateTarCompressed(
+	ctx context.Context,
+	sourceDir,
+	outputFile,
+	compression string,
+	formatGNU bool,
+) error {
+	// Default to zstd if not specified
+	if compression == "" {
+		compression = "zstd"
+	}
+
+	// Map compression string to archives.Compression
+	var compressor archives.Compression
+
+	switch compression {
+	case "zstd":
+		compressor = archives.Zstd{}
+	case "gzip":
+		compressor = archives.Gz{}
+	case "xz":
+		compressor = archives.Xz{}
+	default:
+		return errors.New(
+			errors.ErrTypeConfiguration,
+			"unsupported compression algorithm",
+		).WithContext("compression", compression).
+			WithOperation("CreateTarCompressed")
+	}
+
 	options := &archives.FromDiskOptions{
 		FollowSymlinks: false,
 	}
 
 	// Retrieve the list of files from the source directory on disk.
-	// The map specifies that the files should be read from the sourceDir
-	// and the output path in the archive should be empty.
 	files, err := archives.FilesFromDisk(ctx, options, map[string]string{
 		sourceDir + string(os.PathSeparator): "",
 	})
@@ -54,7 +84,7 @@ func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU b
 	}()
 
 	format := archives.CompressedArchive{
-		Compression: archives.Zstd{},
+		Compression: compressor,
 		Archival: archives.Tar{
 			FormatGNU: formatGNU,
 			Uid:       0,
@@ -65,6 +95,13 @@ func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU b
 	}
 
 	return format.Archive(ctx, out, files)
+}
+
+// CreateTarZst creates a compressed tar.zst archive from the specified source
+// directory. This is a convenience wrapper around CreateTarCompressed that
+// defaults to zstd compression.
+func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU bool) error {
+	return CreateTarCompressed(ctx, sourceDir, outputFile, "zstd", formatGNU)
 }
 
 // Extract extracts an archive file to the specified destination directory.

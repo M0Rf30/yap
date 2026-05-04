@@ -27,17 +27,25 @@ const rootOwner = "root"
 // contains the metadata and build instructions for the package.
 type RPM struct {
 	*common.BaseBuilder
+	compression string
 }
 
-// NewBuilder creates a new RPM package builder.
-func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *RPM {
+// NewBuilder creates a new RPM package builder with optional compression setting.
+// If compression is empty, defaults to "zstd".
+func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string) *RPM {
+	if compression == "" {
+		compression = "zstd"
+	}
+
 	return &RPM{
 		BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm"),
+		compression: compression,
 	}
 }
 
 // BuildPackage creates an RPM package based on the provided PKGBUILD information.
-func (r *RPM) BuildPackage(artifactsPath string, targetArch string) error {
+// Returns the path to the created RPM file.
+func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, error) {
 	r.LogCrossCompilation(targetArch)
 
 	// Use target architecture for cross-compilation if specified
@@ -75,7 +83,7 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) error {
 		URL:         r.PKGBUILD.URL,
 		Packager:    r.PKGBUILD.Maintainer,
 		Group:       r.PKGBUILD.Section,
-		Compressor:  "zstd",
+		Compressor:  r.compression,
 		Licence:     license,
 		Obsoletes:   r.processDepends(r.PKGBUILD.Replaces),
 		Provides:    r.processDepends(r.PKGBUILD.Provides),
@@ -85,22 +93,24 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) error {
 		BuildTime:   files.SourceDateEpochFromEnv(),
 	})
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypePackaging, "failed to create RPM metadata").
+		return "", errors.Wrap(err, errors.ErrTypePackaging, "failed to create RPM metadata").
 			WithOperation("BuildPackage")
 	}
 
 	err = r.createFilesInsideRPM(rpm)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	r.addScriptlets(rpm)
+
+	r.addChangelog(rpm)
 
 	cleanFilePath := filepath.Clean(pkgFilePath)
 
 	rpmFile, err := os.Create(cleanFilePath)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	defer func() {
@@ -113,13 +123,13 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) error {
 
 	err = rpm.Write(rpmFile)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Log package creation using common functionality
 	r.LogPackageCreated(cleanFilePath)
 
-	return nil
+	return cleanFilePath, nil
 }
 
 // PrepareFakeroot sets up the environment for building an RPM package in a fakeroot context.
@@ -231,6 +241,33 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 	if r.PKGBUILD.PostTrans != "" {
 		rpm.AddPosttrans(withHelpers(r.PKGBUILD.PostTrans))
 	}
+}
+
+// addChangelog adds changelog entries to the RPM package if a changelog is
+// specified in the PKGBUILD. Currently, rpmpack does not expose a direct
+// changelog API, so this is a no-op with a warning log. Future versions may
+// use AddCustomTag to inject changelog entries via RPM tags.
+//
+// The rpm parameter is reserved for future use when rpmpack adds changelog API.
+func (r *RPM) addChangelog(_ *rpmpack.RPM) {
+	changelogData, err := r.PKGBUILD.ReadChangelog()
+	if err != nil {
+		logger.Warn("failed to read changelog for RPM package",
+			"error", err)
+
+		return
+	}
+
+	if changelogData == nil {
+		return
+	}
+
+	// Note: rpmpack v0.7.1 does not expose a direct changelog API.
+	// RPM changelog entries require specific formatting and tag injection.
+	// This is a limitation of the current rpmpack library.
+	// TODO: Implement changelog support when rpmpack adds the necessary API.
+	logger.Info("changelog specified but RPM changelog support not yet available",
+		"package", r.PKGBUILD.PkgName)
 }
 
 // asRPMDirectory creates an RPMFile object for a directory based on the provided Entry.

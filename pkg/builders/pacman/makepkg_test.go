@@ -68,7 +68,7 @@ func TestBuildPackage(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = pkg.BuildPackage(artifactsDir, "")
+	_, err = pkg.BuildPackage(artifactsDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestBuildPackageWithoutEpoch(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = pkg.BuildPackage(artifactsDir, "")
+	_, err = pkg.BuildPackage(artifactsDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}
@@ -216,10 +216,10 @@ arch=('x86_64')
 		t.Error(".MTREE file was not created")
 	}
 
-	// Check that install script was created
+	// Check that install script was NOT created (no scriptlets in this test)
 	installPath := filepath.Join(startDir, "test-package.install")
-	if _, err := os.Stat(installPath); os.IsNotExist(err) {
-		t.Error("Install script was not created")
+	if _, err := os.Stat(installPath); err == nil {
+		t.Error("Install script should not be created when no scriptlets are present")
 	}
 }
 
@@ -426,5 +426,255 @@ func TestCreateMTREEGzip(t *testing.T) {
 
 	if info.Size() == 0 {
 		t.Error("MTREE file is empty")
+	}
+}
+
+func TestPrepareFakeroot_WithScriptlets(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkgBuild.PreInst = "echo 'pre-install'"
+	pkgBuild.PostInst = "echo 'post-install'"
+	pkgBuild.PreUpgrade = "echo 'pre-upgrade'"
+	pkgBuild.PostUpgrade = "echo 'post-upgrade'"
+	pkgBuild.PreRm = "echo 'pre-remove'"
+	pkgBuild.PostRm = "echo 'post-remove'"
+
+	pkg := NewBuilder(pkgBuild)
+
+	tempDir, err := os.MkdirTemp("", "pacman-scriptlet-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	// Create directories
+	startDir := filepath.Join(tempDir, "start")
+	packageDir := filepath.Join(tempDir, "package")
+
+	if err := os.MkdirAll(startDir, 0o755); err != nil {
+		t.Fatalf("Failed to create start dir: %v", err)
+	}
+
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatalf("Failed to create package dir: %v", err)
+	}
+
+	// Create a PKGBUILD file for checksum calculation
+	pkgbuildPath := filepath.Join(startDir, "PKGBUILD")
+	pkgbuildContent := `pkgname=test-package
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Test package"
+arch=('x86_64')
+`
+
+	if err := os.WriteFile(pkgbuildPath, []byte(pkgbuildContent), 0o644); err != nil {
+		t.Fatalf("Failed to create PKGBUILD file: %v", err)
+	}
+
+	pkg.PKGBUILD.PackageDir = packageDir
+	pkg.PKGBUILD.StartDir = startDir
+	pkg.PKGBUILD.Home = startDir
+
+	artifactsDir := filepath.Join(tempDir, "artifacts")
+
+	if err := os.MkdirAll(artifactsDir, 0o755); err != nil {
+		t.Fatalf("Failed to create artifacts dir: %v", err)
+	}
+
+	err = pkg.PrepareFakeroot(artifactsDir, "x86_64")
+	if err != nil {
+		t.Errorf("PrepareFakeroot failed: %v", err)
+	}
+
+	// Check that .install file was created
+	installFile := filepath.Join(startDir, "test-package.install")
+	if _, err := os.Stat(installFile); os.IsNotExist(err) {
+		t.Errorf(".install file was not created: %s", installFile)
+	}
+
+	// Read and verify content
+	content, err := os.ReadFile(installFile)
+	if err != nil {
+		t.Errorf("Failed to read .install file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify all scriptlet functions are present
+	if !strings.Contains(contentStr, "pre_install()") {
+		t.Error(".install file missing pre_install function")
+	}
+
+	if !strings.Contains(contentStr, "post_install()") {
+		t.Error(".install file missing post_install function")
+	}
+
+	if !strings.Contains(contentStr, "pre_upgrade()") {
+		t.Error(".install file missing pre_upgrade function")
+	}
+
+	if !strings.Contains(contentStr, "post_upgrade()") {
+		t.Error(".install file missing post_upgrade function")
+	}
+
+	if !strings.Contains(contentStr, "pre_remove()") {
+		t.Error(".install file missing pre_remove function")
+	}
+
+	if !strings.Contains(contentStr, "post_remove()") {
+		t.Error(".install file missing post_remove function")
+	}
+
+	// Verify scriptlet content
+	if !strings.Contains(contentStr, "echo 'pre-install'") {
+		t.Error(".install file missing pre_install content")
+	}
+
+	if !strings.Contains(contentStr, "echo 'post-install'") {
+		t.Error(".install file missing post_install content")
+	}
+
+	if !strings.Contains(contentStr, "echo 'pre-upgrade'") {
+		t.Error(".install file missing pre_upgrade content")
+	}
+
+	if !strings.Contains(contentStr, "echo 'post-upgrade'") {
+		t.Error(".install file missing post_upgrade content")
+	}
+}
+
+func TestPrepareFakeroot_WithoutScriptlets(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	// No scriptlets set
+
+	pkg := NewBuilder(pkgBuild)
+
+	tempDir, err := os.MkdirTemp("", "pacman-no-scriptlet-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	// Create directories
+	startDir := filepath.Join(tempDir, "start")
+	packageDir := filepath.Join(tempDir, "package")
+
+	if err := os.MkdirAll(startDir, 0o755); err != nil {
+		t.Fatalf("Failed to create start dir: %v", err)
+	}
+
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatalf("Failed to create package dir: %v", err)
+	}
+
+	// Create a PKGBUILD file for checksum calculation
+	pkgbuildPath := filepath.Join(startDir, "PKGBUILD")
+	pkgbuildContent := `pkgname=test-package
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Test package"
+arch=('x86_64')
+`
+
+	if err := os.WriteFile(pkgbuildPath, []byte(pkgbuildContent), 0o644); err != nil {
+		t.Fatalf("Failed to create PKGBUILD file: %v", err)
+	}
+
+	pkg.PKGBUILD.PackageDir = packageDir
+	pkg.PKGBUILD.StartDir = startDir
+	pkg.PKGBUILD.Home = startDir
+
+	artifactsDir := filepath.Join(tempDir, "artifacts")
+
+	if err := os.MkdirAll(artifactsDir, 0o755); err != nil {
+		t.Fatalf("Failed to create artifacts dir: %v", err)
+	}
+
+	err = pkg.PrepareFakeroot(artifactsDir, "x86_64")
+	if err != nil {
+		t.Errorf("PrepareFakeroot failed: %v", err)
+	}
+
+	// Check that .install file was NOT created
+	installFile := filepath.Join(startDir, "test-package.install")
+	if _, err := os.Stat(installFile); err == nil {
+		t.Errorf(".install file should not be created when no scriptlets are present: %s", installFile)
+	}
+}
+
+func TestPrepareFakeroot_WithChangelog(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+
+	tempDir, err := os.MkdirTemp("", "pacman-changelog-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	startDir := filepath.Join(tempDir, "start")
+	packageDir := filepath.Join(tempDir, "package")
+
+	err = os.MkdirAll(startDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create start dir: %v", err)
+	}
+
+	err = os.MkdirAll(packageDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create package dir: %v", err)
+	}
+
+	// Create a changelog file in the start directory
+	changelogPath := filepath.Join(startDir, "CHANGELOG.md")
+	changelogContent := "# Changelog\n\n## Version 1.0\n- Initial release\n"
+
+	err = os.WriteFile(changelogPath, []byte(changelogContent), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create changelog file: %v", err)
+	}
+
+	// Create a dummy PKGBUILD file
+	pkgbuildPath := filepath.Join(startDir, "PKGBUILD")
+
+	err = os.WriteFile(pkgbuildPath, []byte("# PKGBUILD\n"), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create PKGBUILD file: %v", err)
+	}
+
+	pkgBuild.StartDir = startDir
+	pkgBuild.Home = startDir // Same as StartDir to avoid PKGBUILD creation
+	pkgBuild.PackageDir = packageDir
+	pkgBuild.Changelog = "CHANGELOG.md"
+
+	pkg := NewBuilder(pkgBuild)
+
+	artifactsDir := filepath.Join(tempDir, "artifacts")
+
+	if err := os.MkdirAll(artifactsDir, 0o755); err != nil {
+		t.Fatalf("Failed to create artifacts dir: %v", err)
+	}
+
+	err = pkg.PrepareFakeroot(artifactsDir, "x86_64")
+	if err != nil {
+		t.Errorf("PrepareFakeroot failed: %v", err)
+	}
+
+	// Check that .CHANGELOG file was created
+	changelogFile := filepath.Join(packageDir, ".CHANGELOG")
+	if _, err := os.Stat(changelogFile); os.IsNotExist(err) {
+		t.Errorf(".CHANGELOG file was not created: %s", changelogFile)
+	}
+
+	// Verify the content
+	content, err := os.ReadFile(changelogFile)
+	if err != nil {
+		t.Errorf("Failed to read .CHANGELOG file: %v", err)
+	}
+
+	if string(content) != changelogContent {
+		t.Errorf("Changelog content mismatch. Expected %q, got %q", changelogContent, string(content))
 	}
 }

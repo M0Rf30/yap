@@ -83,7 +83,7 @@ func TestBuildPackage(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = rpm.BuildPackage(artifactsDir, "")
+	_, err = rpm.BuildPackage(artifactsDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestBuildPackageWithoutEpoch(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = rpm.BuildPackage(artifactsDir, "")
+	_, err = rpm.BuildPackage(artifactsDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}

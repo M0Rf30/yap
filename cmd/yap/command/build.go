@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
+	"github.com/M0Rf30/yap/v2/pkg/core"
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -19,6 +20,24 @@ import (
 
 // sshPassword is the local holder for the --ssh-password flag value.
 var sshPassword string
+
+// compressionDeb is the local holder for the --compression-deb flag value.
+var compressionDeb string
+
+// compressionRpm is the local holder for the --compression-rpm flag value.
+var compressionRpm string
+
+// signKey is the local holder for the --sign-key flag value.
+var signKey string
+
+// signPassphrase is the local holder for the --sign-passphrase flag value.
+var signPassphrase string
+
+// signKeyName is the local holder for the --sign-key-name flag value.
+var signKeyName string
+
+// sign is the local holder for the --sign flag value.
+var sign bool
 
 // buildCmd represents the command to build the entire project.
 var buildCmd = &cobra.Command{
@@ -82,6 +101,40 @@ var buildCmd = &cobra.Command{
 			return err
 		}
 
+		// Apply CLI compression flags if provided
+		if compressionDeb != "" {
+			if err := validateCompression(compressionDeb); err != nil {
+				return err
+			}
+
+			mpc.CompressionDeb = compressionDeb
+		}
+
+		if compressionRpm != "" {
+			if err := validateCompression(compressionRpm); err != nil {
+				return err
+			}
+
+			mpc.CompressionRpm = compressionRpm
+		}
+
+		// Propagate compression settings to all projects
+		for _, proj := range mpc.Projects {
+			proj.CompressionDeb = mpc.CompressionDeb
+			proj.CompressionRpm = mpc.CompressionRpm
+		}
+
+		// Apply CLI signing flags if provided
+		if sign {
+			// Resolve signing configuration from CLI flags, env vars, and project config
+			signingCfg := resolveSigning(&mpc)
+
+			// Propagate signing config to all projects
+			for _, proj := range mpc.Projects {
+				proj.Signing = signingCfg
+			}
+		}
+
 		logger.Info(i18n.T("logger.build.project_init_success"))
 
 		// Build packages with timestamp logging
@@ -103,6 +156,54 @@ var buildCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// validateCompression validates that the compression algorithm is supported.
+func validateCompression(compression string) error {
+	switch compression {
+	case "zstd", "gzip", "xz":
+		return nil
+	default:
+		return yapErrors.New(
+			yapErrors.ErrTypeConfiguration,
+			"unsupported compression algorithm",
+		).WithContext("compression", compression).
+			WithOperation("validateCompression")
+	}
+}
+
+// resolveSigning resolves the signing configuration from CLI flags,
+// environment variables, and project config.
+func resolveSigning(mpc *project.MultipleProject) *core.SigningConfig {
+	// Get config from project if available
+	configKey := ""
+	configPass := ""
+
+	if mpc.Signing != nil {
+		configKey = mpc.Signing.KeyPath
+		configPass = mpc.Signing.Passphrase
+	}
+
+	// For now, we'll use a simple signing config that just stores the values
+	// Phase 3/4 will integrate with the actual signing.Resolve() function
+	cfg := &core.SigningConfig{
+		Enabled:    sign,
+		KeyPath:    signKey,
+		Passphrase: signPassphrase,
+		KeyName:    signKeyName,
+	}
+
+	// If no CLI key provided, try config
+	if cfg.KeyPath == "" && configKey != "" {
+		cfg.KeyPath = configKey
+	}
+
+	// If no CLI passphrase provided, try config
+	if cfg.Passphrase == "" && configPass != "" {
+		cfg.Passphrase = configPass
+	}
+
+	return cfg
 }
 
 // logStructuredError logs a concise fatal build error.
@@ -163,6 +264,14 @@ func InitializeBuildDescriptions() {
 	buildCmd.Flag("to").Usage = i18n.T("flags.build.to")
 	buildCmd.Flag("only").Usage = i18n.T("flags.build.only")
 	buildCmd.Flag("target-arch").Usage = i18n.T("flags.build.target_arch")
+	buildCmd.Flag("sbom").Usage = i18n.T("flags.build.sbom")
+	buildCmd.Flag("sbom-format").Usage = i18n.T("flags.build.sbom_format")
+	buildCmd.Flag("compression-deb").Usage = i18n.T("flags.build.compression_deb")
+	buildCmd.Flag("compression-rpm").Usage = i18n.T("flags.build.compression_rpm")
+	buildCmd.Flag("sign").Usage = i18n.T("flags.build.sign")
+	buildCmd.Flag("sign-key").Usage = i18n.T("flags.build.sign_key")
+	buildCmd.Flag("sign-passphrase").Usage = i18n.T("flags.build.sign_passphrase")
+	buildCmd.Flag("sign-key-name").Usage = i18n.T("flags.build.sign_key_name")
 }
 
 //nolint:gochecknoinits // Required for cobra command registration
@@ -237,4 +346,26 @@ func init() {
 	// DEBUG SYMBOL FLAGS
 	buildCmd.Flags().StringVarP(&project.DebugDir,
 		"debug-dir", "", "", "Output directory for separated debug symbols (.build-id structure for debuginfod)")
+
+	// SBOM GENERATION FLAGS
+	buildCmd.Flags().BoolVarP(&project.SBOM,
+		"sbom", "", false, "")
+	buildCmd.Flags().StringVarP(&project.SBOMFormat,
+		"sbom-format", "", "both", "")
+
+	// COMPRESSION FLAGS
+	buildCmd.Flags().StringVarP(&compressionDeb,
+		"compression-deb", "", "zstd", "Compression algorithm for DEB packages (zstd, gzip, xz)")
+	buildCmd.Flags().StringVarP(&compressionRpm,
+		"compression-rpm", "", "zstd", "Compression algorithm for RPM packages (zstd, gzip, xz)")
+
+	// SIGNING FLAGS
+	buildCmd.Flags().BoolVarP(&sign,
+		"sign", "", false, "Enable package signing")
+	buildCmd.Flags().StringVarP(&signKey,
+		"sign-key", "", "", "Path to private key for signing (PEM for RSA, ASCII-armored for GPG)")
+	buildCmd.Flags().StringVarP(&signPassphrase,
+		"sign-passphrase", "", "", "Passphrase for private key (prefer env var YAP_SIGN_PASSPHRASE)")
+	buildCmd.Flags().StringVarP(&signKeyName,
+		"sign-key-name", "", "", "Key name for APK signing (e.g., 'mykey')")
 }
