@@ -98,9 +98,11 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 		return err
 	}
 
+	const pkgTypeDefault = "pkg"
+
 	m.PKGBUILD.BuildDate = sourceDateEpoch.Unix()
 	m.PKGBUILD.PkgDest, _ = filepath.Abs(artifactsPath)
-	m.PKGBUILD.PkgType = "pkg" // can be pkg, split, debug, src
+	m.PKGBUILD.PkgType = pkgTypeDefault // can be pkg, split, debug, src
 	m.PKGBUILD.YAPVersion = constants.YAPVersion
 
 	tmpl := m.PKGBUILD.RenderSpec(specFile)

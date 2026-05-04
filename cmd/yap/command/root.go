@@ -17,7 +17,7 @@ var (
 
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
-	Use:     "yap",
+	Use:     commandYap,
 	Short:   "🚀 Yet Another Packager - Multi-distribution package builder", // Will be set in init()
 	Long:    "",                                                            // Will be set in init()
 	Example: "",                                                            // Will be set in init()
@@ -47,7 +47,7 @@ var rootCmd = &cobra.Command{
 		logger.SetColorDisabled(shouldDisableColor)
 
 		// Show welcome message for first-time users
-		if cmd.Name() == "yap" && len(cmd.Flags().Args()) == 0 {
+		if cmd.Name() == commandYap && len(cmd.Flags().Args()) == 0 {
 			ShowWelcomeMessage()
 		}
 	}, PersistentPostRun: func(cmd *cobra.Command, _ []string) {
@@ -73,11 +73,11 @@ func InitializeLocalizedDescriptions() {
 	// Update command groups
 	for _, group := range rootCmd.Groups() {
 		switch group.ID {
-		case "build":
+		case buildGroup:
 			group.Title = i18n.T("groups.build")
-		case "environment":
+		case commandEnvironment:
 			group.Title = i18n.T("groups.environment")
-		case "utility":
+		case commandUtility:
 			group.Title = i18n.T("groups.utility")
 		}
 	}
@@ -123,21 +123,21 @@ func updateSubCommandDescriptions(cmd *cobra.Command) {
 		switch subCmd.Name() {
 		case "graph":
 			subCmd.Short = i18n.T("commands.graph.short")
-		case "install":
+		case commandInstall:
 			subCmd.Short = i18n.T("commands.install.short")
-		case "list-distros":
+		case commandListDistro:
 			subCmd.Short = i18n.T("commands.list_distros.short")
 		case prepareCommand:
 			subCmd.Short = i18n.T("commands.prepare.short")
-		case "pull":
+		case commandPull:
 			subCmd.Short = i18n.T("commands.pull.short")
-		case "status":
+		case commandStatus:
 			subCmd.Short = i18n.T("commands.status.short")
-		case "version":
+		case commandVersion:
 			subCmd.Short = i18n.T("commands.version.short")
-		case "zap":
+		case commandZap:
 			subCmd.Short = i18n.T("commands.zap.short")
-		case "completion":
+		case commandHelp:
 			subCmd.Short = i18n.T("commands.completion.short")
 		}
 	}
@@ -157,9 +157,9 @@ func init() {
 	SetupEnhancedHelp()
 
 	// Add command groups for better organization
-	rootCmd.AddGroup(&cobra.Group{ID: "build", Title: "Build Commands"})
-	rootCmd.AddGroup(&cobra.Group{ID: "environment", Title: "Environment Commands"})
-	rootCmd.AddGroup(&cobra.Group{ID: "utility", Title: "Utility Commands"})
+	rootCmd.AddGroup(&cobra.Group{ID: buildGroup, Title: "Build Commands"})
+	rootCmd.AddGroup(&cobra.Group{ID: commandEnvironment, Title: "Environment Commands"})
+	rootCmd.AddGroup(&cobra.Group{ID: commandUtility, Title: utilityCommandsGroup})
 
 	// Global flags
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false,

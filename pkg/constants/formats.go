@@ -11,52 +11,22 @@ const (
 	FormatPacman = "pacman"
 )
 
-// RPMGroups maps common group names to RPM group categories.
-// This consolidates the group mapping logic from the RPM package.
-var RPMGroups = map[string]string{
-	"admin":        "Applications/System",
-	"any":          "noarch",
-	"comm":         "Applications/Communications",
-	"database":     "Applications/Databases",
-	"debug":        "Development/Debuggers",
-	"devel":        "Development/Tools",
-	"doc":          "Documentation",
-	"editors":      "Applications/Editors",
-	"electronics":  "Applications/Engineering",
-	"embedded":     "Applications/Engineering",
-	"fonts":        "Interface/Desktops",
-	"games":        "Amusements/Games",
-	"graphics":     "Applications/Multimedia",
-	"httpd":        "Applications/Internet",
-	"interpreters": "Development/Tools",
-	"kernel":       "System Environment/Kernel",
-	"libdevel":     "Development/Libraries",
-	"libs":         "System Environment/Libraries",
-	"localization": "Development/Languages",
-	"mail":         "Applications/Communications",
-	"math":         "Applications/Productivity",
-	"misc":         "Applications/System",
-	"net":          "Applications/Internet",
-	"news":         "Applications/Publishing",
-	"science":      "Applications/Engineering",
-	"shells":       "System Environment/Shells",
-	"sound":        "Applications/Multimedia",
-	"text":         "Applications/Text",
-	"vcs":          "Development/Tools",
-	"video":        "Applications/Multimedia",
-	"web":          "Applications/Internet",
-	"x11":          "User Interface/X",
-}
+const (
+	pkgCcache  = "ccache"
+	installArg = "install"
+)
 
-// RPMDistros maps distribution names to their RPM suffix.
-var RPMDistros = map[string]string{
-	"almalinux": ".el",
-	"amzn":      ".amzn",
-	"fedora":    ".fc",
-	"ol":        ".ol",
-	"rhel":      ".el",
-	"rocky":     ".el",
-}
+// Package file extension constants.
+const (
+	// ExtAPK is the Alpine package file extension.
+	ExtAPK = ".apk"
+	// ExtDEB is the Debian package file extension.
+	ExtDEB = ".deb"
+	// ExtRPM is the RPM package file extension.
+	ExtRPM = ".rpm"
+	// ExtPacmanZst is the Arch Linux zstd-compressed package file extension.
+	ExtPacmanZst = ".pkg.tar.zst"
+)
 
 // BuildEnvironmentDeps provides build environment dependencies for each package manager.
 type BuildEnvironmentDeps struct {
@@ -71,17 +41,17 @@ func GetBuildDeps() *BuildEnvironmentDeps {
 	return &BuildEnvironmentDeps{
 		APK: []string{
 			"alpine-sdk",
-			"ccache",
+			pkgCcache,
 		},
 		DEB: []string{
 			"build-essential",
-			"ccache",
+			pkgCcache,
 			"fakeroot",
 		},
 		RPM: []string{
 			"autoconf",
 			"automake",
-			"ccache",
+			pkgCcache,
 			"diffutils",
 			"expect",
 			"gcc",
@@ -96,7 +66,7 @@ func GetBuildDeps() *BuildEnvironmentDeps {
 		},
 		Pacman: []string{
 			"base-devel",
-			"ccache",
+			pkgCcache,
 		},
 	}
 }
@@ -104,21 +74,21 @@ func GetBuildDeps() *BuildEnvironmentDeps {
 // distroFormatMap maps distribution names (lowercase) to their package format.
 // Legacy aliases (alma, opensuse, suse) are kept for backward compatibility.
 var distroFormatMap = map[string]string{
-	"almalinux":           FormatRPM,
-	"alpine":              FormatAPK,
-	"amzn":                FormatRPM,
-	"arch":                FormatPacman,
-	"centos":              FormatRPM,
-	"debian":              FormatDEB,
-	"fedora":              FormatRPM,
-	"linuxmint":           FormatDEB,
-	"ol":                  FormatRPM,
-	"opensuse-leap":       FormatRPM, // zypper-based; format is still RPM
-	"opensuse-tumbleweed": FormatRPM, // zypper-based; format is still RPM
-	"pop":                 FormatDEB,
-	"rhel":                FormatRPM,
-	"rocky":               FormatRPM,
-	"ubuntu":              FormatDEB,
+	DistroAlmalinux:          FormatRPM,
+	DistroAlpine:             FormatAPK,
+	DistroAmzn:               FormatRPM,
+	DistroArch:               FormatPacman,
+	DistroCentos:             FormatRPM,
+	DistroDebian:             FormatDEB,
+	DistroFedora:             FormatRPM,
+	DistroLinuxmint:          FormatDEB,
+	DistroOl:                 FormatRPM,
+	DistroOpenSUSELeap:       FormatRPM, // zypper-based; format is still RPM
+	DistroOpenSUSETumbleweed: FormatRPM, // zypper-based; format is still RPM
+	DistroPop:                FormatDEB,
+	DistroRhel:               FormatRPM,
+	DistroRocky:              FormatRPM,
+	DistroUbuntu:             FormatDEB,
 	// Legacy aliases kept for backward compatibility
 	"alma":     FormatRPM,
 	"opensuse": FormatRPM,
@@ -137,9 +107,9 @@ func GetInstallArgs(format string) []string {
 	case FormatAPK:
 		return []string{"add", "--allow-untrusted"}
 	case FormatDEB:
-		return []string{"--allow-downgrades", "--assume-yes", "install"}
+		return []string{"--allow-downgrades", "--assume-yes", installArg}
 	case FormatRPM:
-		return []string{"-y", "install"}
+		return []string{"-y", installArg}
 	case FormatPacman:
 		return []string{"-S", "--noconfirm", "--needed"}
 	default:

@@ -14,8 +14,8 @@ import (
 )
 
 var versionCmd = &cobra.Command{
-	Use:     "version",
-	GroupID: "utility",
+	Use:     commandVersion,
+	GroupID: commandUtility,
 	Short:   "📊 Display YAP version and system information",
 	Long: `Show detailed version information for YAP including build details,
 runtime environment, and key features.

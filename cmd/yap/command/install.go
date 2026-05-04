@@ -18,15 +18,15 @@ const (
 	// Package type constants.
 	packageTypeDeb = "deb"
 	packageTypeRPM = "rpm"
-	packageTypeApk = "apk"
+	packageTypeApk = "apk" // Also defined in constants.go for reuse
 	packageTypePkg = "pkg"
 )
 
 // installCmd represents the install command.
 var installCmd = &cobra.Command{
-	Use:     "install <artifact-file>",
+	Use:     commandInstall + " <artifact-file>",
 	Short:   "📦 Install a package artifact using the appropriate package manager", // Set in init()
-	GroupID: "utility",
+	GroupID: commandUtility,
 	Long:    "", // Will be set in init()
 	Example: "", // Will be set in init()
 	Args:    cobra.ExactArgs(1),
@@ -99,7 +99,7 @@ func installPackage(packageType, artifactPath string) error {
 		args = []string{"-y", "install", artifactPath}
 	case packageTypeApk:
 		// Use same args as pkg/abuild/constants.go
-		cmd = "apk"
+		cmd = pmApk
 		args = []string{"add", "--allow-untrusted", artifactPath}
 	case packageTypePkg:
 		// Use same args as used in pkg/makepkg/makepkg.go Install function

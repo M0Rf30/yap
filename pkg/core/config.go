@@ -1,6 +1,34 @@
 // Package core provides package manager configurations and metadata.
 package core
 
+import "github.com/M0Rf30/yap/v2/pkg/constants"
+
+const (
+	armKey                = "arm"
+	armv6hKey             = "armv6h"
+	armv7hKey             = "armv7h"
+	armhfArch             = "armhf"
+	armv7Arch             = "armv7"
+	x86Arch               = "x86"
+	amd64Arch             = "amd64"
+	i386Arch              = "i386"
+	arm64Arch             = "arm64"
+	armelArch             = "armel"
+	armhfDebArch          = "armhf"
+	armv6hlArch           = "armv6hl"
+	armv7hlArch           = "armv7hl"
+	fakeroot              = "fakeroot"
+	installCmd            = "install"
+	dnfCmd                = "dnf"
+	systemEnvironmentBase = "System Environment/Base"
+	systemEnvironmentLibs = "System Environment/Libraries"
+	developmentTools      = "Development/Tools"
+	applicationsSystem    = "Applications/System"
+	devel                 = "devel"
+	libs                  = "libs"
+	groupAdmin            = "admin"
+)
+
 // Config holds common configuration for all package managers.
 type Config struct {
 	Name         string
@@ -15,89 +43,89 @@ type Config struct {
 
 // PackageManagerConfigs holds all package manager configurations.
 var PackageManagerConfigs = map[string]*Config{
-	"apk": {
-		Name:        "apk",
-		InstallCmd:  "apk",
+	constants.FormatAPK: {
+		Name:        constants.FormatAPK,
+		InstallCmd:  constants.FormatAPK,
 		InstallArgs: []string{"add", "--allow-untrusted"},
 		UpdateArgs:  []string{"update"},
 		ArchMap: map[string]string{
-			"x86_64":  "x86_64",
-			"i686":    "x86",
-			"aarch64": "aarch64",
-			"arm":     "armhf",
-			"armv6h":  "armhf",
-			"armv7h":  "armv7",
+			constants.ArchX86_64:  constants.ArchX86_64,
+			constants.ArchI686:    x86Arch,
+			constants.ArchAarch64: constants.ArchAarch64,
+			armKey:                armhfArch,
+			armv6hKey:             armhfArch,
+			armv7hKey:             armv7Arch,
 		},
-		BuildEnvDeps: []string{"bash", "build-base", "fakeroot"},
+		BuildEnvDeps: []string{"bash", "build-base", fakeroot},
 	},
-	"apt": {
-		Name:        "apt",
+	constants.PMApt: {
+		Name:        constants.PMApt,
 		InstallCmd:  "apt-get",
-		InstallArgs: []string{"--allow-downgrades", "--assume-yes", "install"},
+		InstallArgs: []string{"--allow-downgrades", "--assume-yes", installCmd},
 		UpdateArgs:  []string{"update"},
 		ArchMap: map[string]string{
-			"x86_64":  "amd64",
-			"i686":    "i386",
-			"aarch64": "arm64",
-			"arm":     "armel",
-			"armv6h":  "armel",
-			"armv7h":  "armhf",
+			constants.ArchX86_64:  amd64Arch,
+			constants.ArchI686:    i386Arch,
+			constants.ArchAarch64: arm64Arch,
+			armKey:                armelArch,
+			armv6hKey:             armelArch,
+			armv7hKey:             armhfDebArch,
 		},
-		BuildEnvDeps: []string{"build-essential", "fakeroot"},
+		BuildEnvDeps: []string{"build-essential", fakeroot},
 	},
-	"pacman": {
-		Name:        "pacman",
-		InstallCmd:  "pacman",
+	constants.FormatPacman: {
+		Name:        constants.FormatPacman,
+		InstallCmd:  constants.FormatPacman,
 		InstallArgs: []string{"-U", "--noconfirm"},
 		UpdateArgs:  []string{"-Sy"},
 		ArchMap: map[string]string{
-			"x86_64":  "x86_64",
-			"i686":    "i686",
-			"aarch64": "aarch64",
-			"arm":     "arm",
-			"armv6h":  "armv6h",
-			"armv7h":  "armv7h",
+			constants.ArchX86_64:  constants.ArchX86_64,
+			constants.ArchI686:    constants.ArchI686,
+			constants.ArchAarch64: constants.ArchAarch64,
+			armKey:                armKey,
+			armv6hKey:             armv6hKey,
+			armv7hKey:             armv7hKey,
 		},
-		BuildEnvDeps: []string{"base-devel", "fakeroot"},
+		BuildEnvDeps: []string{"base-devel", fakeroot},
 	},
-	"yum": {
-		Name:        "dnf",
-		InstallCmd:  "dnf",
-		InstallArgs: []string{"-y", "install"},
+	constants.PMYum: {
+		Name:        dnfCmd,
+		InstallCmd:  dnfCmd,
+		InstallArgs: []string{"-y", installCmd},
 		UpdateArgs:  []string{}, // RPM doesn't need explicit update
 		ArchMap: map[string]string{
-			"x86_64":  "x86_64",
-			"i686":    "i686",
-			"aarch64": "aarch64",
-			"arm":     "arm",
-			"armv6h":  "armv6hl",
-			"armv7h":  "armv7hl",
+			constants.ArchX86_64:  constants.ArchX86_64,
+			constants.ArchI686:    constants.ArchI686,
+			constants.ArchAarch64: constants.ArchAarch64,
+			armKey:                armKey,
+			armv6hKey:             armv6hlArch,
+			armv7hKey:             armv7hlArch,
 		},
 		GroupMap: map[string]string{
-			"admin": "System Environment/Base",
-			"base":  "System Environment/Base",
-			"devel": "Development/Tools",
-			"libs":  "System Environment/Libraries",
-			"utils": "Applications/System",
+			groupAdmin: systemEnvironmentBase,
+			"base":     systemEnvironmentBase,
+			devel:      developmentTools,
+			libs:       systemEnvironmentLibs,
+			"utils":    applicationsSystem,
 		},
-		BuildEnvDeps: []string{"rpm-build", "fakeroot"},
+		BuildEnvDeps: []string{"rpm-build", fakeroot},
 	},
-	"zypper": {
-		Name:        "dnf",
-		InstallCmd:  "dnf",
-		InstallArgs: []string{"-y", "install"},
+	constants.PMZypper: {
+		Name:        dnfCmd,
+		InstallCmd:  dnfCmd,
+		InstallArgs: []string{"-y", installCmd},
 		UpdateArgs:  []string{},
 		ArchMap: map[string]string{
-			"x86_64":  "x86_64",
-			"i686":    "i686",
-			"aarch64": "aarch64",
+			constants.ArchX86_64:  constants.ArchX86_64,
+			constants.ArchI686:    constants.ArchI686,
+			constants.ArchAarch64: constants.ArchAarch64,
 		},
 		GroupMap: map[string]string{
-			"admin": "System Environment/Base",
-			"devel": "Development/Tools",
-			"libs":  "System Environment/Libraries",
+			groupAdmin: systemEnvironmentBase,
+			devel:      developmentTools,
+			libs:       systemEnvironmentLibs,
 		},
-		BuildEnvDeps: []string{"rpm-build", "fakeroot"},
+		BuildEnvDeps: []string{"rpm-build", fakeroot},
 	},
 }
 

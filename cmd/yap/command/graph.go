@@ -26,7 +26,7 @@ var graphCmd = &cobra.Command{
 	Short:   "🎨 Generate beautiful dependency graphs", // Will be set in init()
 	Long:    "",                                       // Will be set in init()
 	Example: "",                                       // Will be set in init()
-	GroupID: "utility",
+	GroupID: commandUtility,
 	Args:    cobra.MaximumNArgs(1),
 	RunE:    runGraphCommand,
 }
