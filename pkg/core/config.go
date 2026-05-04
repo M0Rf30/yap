@@ -133,3 +133,15 @@ var PackageManagerConfigs = map[string]*Config{
 func GetConfig(packageManager string) *Config {
 	return PackageManagerConfigs[packageManager]
 }
+
+// SigningConfig holds signing configuration for a project.
+type SigningConfig struct {
+	// Enabled indicates whether signing is active for this project.
+	Enabled bool `json:"enabled,omitempty"`
+	// KeyPath is the path to the private key file (PEM for RSA, ASCII-armored for GPG).
+	KeyPath string `json:"keyPath,omitempty"`
+	// Passphrase is the passphrase for the private key (discouraged in config; prefer env vars).
+	Passphrase string `json:"passphrase,omitempty"`
+	// KeyName is optional, used for APK key naming (e.g., "mykey").
+	KeyName string `json:"keyName,omitempty"`
+}

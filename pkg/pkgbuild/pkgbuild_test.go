@@ -66,6 +66,26 @@ func TestPKGBUILD_AddItem(t *testing.T) {
 	if pb.Build != "make && make install" {
 		t.Errorf("Expected Build 'make && make install', got '%s'", pb.Build)
 	}
+
+	// Test adding pre_upgrade function
+	err = pb.AddItem("pre_upgrade", FuncBody("echo 'pre-upgrade'"))
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	if pb.PreUpgrade != "echo 'pre-upgrade'" {
+		t.Errorf("Expected PreUpgrade 'echo 'pre-upgrade'', got '%s'", pb.PreUpgrade)
+	}
+
+	// Test adding post_upgrade function
+	err = pb.AddItem("post_upgrade", FuncBody("echo 'post-upgrade'"))
+	if err != nil {
+		t.Errorf("AddItem() returned error: %v", err)
+	}
+
+	if pb.PostUpgrade != "echo 'post-upgrade'" {
+		t.Errorf("Expected PostUpgrade 'echo 'post-upgrade'', got '%s'", pb.PostUpgrade)
+	}
 }
 
 func TestPKGBUILD_ComputeArchitecture(t *testing.T) {

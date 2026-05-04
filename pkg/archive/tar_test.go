@@ -154,3 +154,193 @@ func TestExtractInvalidArchive(t *testing.T) {
 		t.Fatal("Expected error for invalid archive file, got nil")
 	}
 }
+
+func TestCreateTarCompressedWithGzip(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	sourceDir := filepath.Join(tempDir, "source")
+	outputFile := filepath.Join(tempDir, "test.tar.gz")
+
+	// Create source directory with a test file
+	err := os.MkdirAll(sourceDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create source directory: %v", err)
+	}
+
+	testFile := filepath.Join(sourceDir, "test.txt")
+
+	err = os.WriteFile(testFile, []byte("test content"), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Test creating tar.gz archive
+	err = archive.CreateTarCompressed(context.Background(), sourceDir, outputFile,
+		"gzip", false)
+	if err != nil {
+		t.Fatalf("CreateTarCompressed with gzip failed: %v", err)
+	}
+
+	// Verify the output file exists
+	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+		t.Fatalf("Output file was not created")
+	}
+
+	// Verify gzip magic bytes (1f 8b)
+	file, err := os.Open(outputFile)
+	if err != nil {
+		t.Fatalf("Failed to open output file: %v", err)
+	}
+
+	defer func() { _ = file.Close() }()
+
+	magic := make([]byte, 2)
+
+	_, err = file.Read(magic)
+	if err != nil {
+		t.Fatalf("Failed to read magic bytes: %v", err)
+	}
+
+	if magic[0] != 0x1f || magic[1] != 0x8b {
+		t.Fatalf("Invalid gzip magic bytes: got %x %x, expected 1f 8b",
+			magic[0], magic[1])
+	}
+}
+
+func TestCreateTarCompressedWithXz(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	sourceDir := filepath.Join(tempDir, "source")
+	outputFile := filepath.Join(tempDir, "test.tar.xz")
+
+	// Create source directory with a test file
+	err := os.MkdirAll(sourceDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create source directory: %v", err)
+	}
+
+	testFile := filepath.Join(sourceDir, "test.txt")
+
+	err = os.WriteFile(testFile, []byte("test content"), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Test creating tar.xz archive
+	err = archive.CreateTarCompressed(context.Background(), sourceDir, outputFile,
+		"xz", false)
+	if err != nil {
+		t.Fatalf("CreateTarCompressed with xz failed: %v", err)
+	}
+
+	// Verify the output file exists
+	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+		t.Fatalf("Output file was not created")
+	}
+
+	// Verify xz magic bytes (fd 37 7a 58 5a 00)
+	file, err := os.Open(outputFile)
+	if err != nil {
+		t.Fatalf("Failed to open output file: %v", err)
+	}
+
+	defer func() { _ = file.Close() }()
+
+	magic := make([]byte, 6)
+
+	_, err = file.Read(magic)
+	if err != nil {
+		t.Fatalf("Failed to read magic bytes: %v", err)
+	}
+
+	expectedMagic := []byte{0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00}
+
+	for i, b := range magic {
+		if b != expectedMagic[i] {
+			t.Fatalf("Invalid xz magic bytes at position %d: got %x, expected %x",
+				i, b, expectedMagic[i])
+		}
+	}
+}
+
+func TestCreateTarCompressedWithZstd(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	sourceDir := filepath.Join(tempDir, "source")
+	outputFile := filepath.Join(tempDir, "test.tar.zst")
+
+	// Create source directory with a test file
+	err := os.MkdirAll(sourceDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create source directory: %v", err)
+	}
+
+	testFile := filepath.Join(sourceDir, "test.txt")
+
+	err = os.WriteFile(testFile, []byte("test content"), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Test creating tar.zst archive
+	err = archive.CreateTarCompressed(context.Background(), sourceDir, outputFile,
+		"zstd", false)
+	if err != nil {
+		t.Fatalf("CreateTarCompressed with zstd failed: %v", err)
+	}
+
+	// Verify the output file exists
+	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+		t.Fatalf("Output file was not created")
+	}
+}
+
+func TestCreateTarCompressedInvalidCompression(t *testing.T) {
+	tempDir := t.TempDir()
+	sourceDir := filepath.Join(tempDir, "source")
+	outputFile := filepath.Join(tempDir, "test.tar")
+
+	err := os.MkdirAll(sourceDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create source directory: %v", err)
+	}
+
+	// Test with invalid compression algorithm
+	err = archive.CreateTarCompressed(context.Background(), sourceDir, outputFile,
+		"invalid", false)
+	if err == nil {
+		t.Fatal("Expected error for invalid compression algorithm, got nil")
+	}
+}
+
+func TestCreateTarCompressedDefaultCompression(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	sourceDir := filepath.Join(tempDir, "source")
+	outputFile := filepath.Join(tempDir, "test.tar.zst")
+
+	// Create source directory with a test file
+	err := os.MkdirAll(sourceDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create source directory: %v", err)
+	}
+
+	testFile := filepath.Join(sourceDir, "test.txt")
+
+	err = os.WriteFile(testFile, []byte("test content"), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Test creating tar archive with empty compression (should default to zstd)
+	err = archive.CreateTarCompressed(context.Background(), sourceDir, outputFile,
+		"", false)
+	if err != nil {
+		t.Fatalf("CreateTarCompressed with empty compression failed: %v", err)
+	}
+
+	// Verify the output file exists
+	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+		t.Fatalf("Output file was not created")
+	}
+}

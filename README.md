@@ -37,6 +37,11 @@ YAP eliminates the need to learn multiple packaging formats and build systems by
 - **Enhanced PKGBUILD Support**: Extended syntax with custom variables and arrays
 - **Cross-Distribution Variables**: Distribution-specific configurations in single file
 - **Cross-Compilation Support**: Build packages for different architectures than your build environment
+- **Package Signing**: APK RSA + DEB/RPM/Pacman GPG signing via pure-Go ProtonMail/go-crypto
+- **SBOM Generation**: CycloneDX 1.5 and SPDX 2.3 sidecars for supply-chain transparency
+- **Per-Format Compression**: Choose `zstd`/`gzip`/`xz` for DEB and RPM packages
+- **Pacman .INSTALL Scriptlets**: Full 6-hook support (pre_install, post_install, pre_upgrade, post_upgrade, pre_remove, post_remove)
+- **Changelog Support**: PKGBUILD `changelog` field renders to native format per distro
 
 ### 🎯 **Developer Experience**
 - **Simple Configuration**: JSON project files with minimal setup
@@ -455,6 +460,57 @@ requires_pre=('shadow-utils')
 maintainer="John Doe <john@example.com>"
 ```
 
+#### Changelog Field
+
+YAP supports a top-level `changelog` field pointing to a changelog file in the package directory:
+
+```bash
+pkgname=my-package
+pkgver=1.0.0
+pkgrel=1
+changelog=CHANGELOG.md
+```
+
+The file is processed per format:
+- **DEB**: Compressed and installed at `usr/share/doc/<pkgname>/changelog.Debian.gz` (Lintian-compliant)
+- **Pacman**: Stored as `.CHANGELOG` in the package archive
+- **APK**: No native convention — field is ignored
+- **RPM**: Currently deferred pending rpmpack changelog API support
+
+#### Pacman Install Scriptlets
+
+For Pacman packages, YAP supports the full 6-hook lifecycle:
+
+```bash
+pre_install() {
+    echo "Before install"
+}
+
+post_install() {
+    systemctl daemon-reload
+}
+
+pre_upgrade() {
+    systemctl stop myservice
+}
+
+post_upgrade() {
+    systemctl start myservice
+}
+
+pre_remove() {
+    systemctl disable myservice
+}
+
+post_remove() {
+    systemctl daemon-reload
+}
+```
+
+These are emitted to `<pkgname>.install` and referenced by `install=` in the generated PKGBUILD. The `.install` file is only created when at least one hook is defined.
+
+When `pre_upgrade` / `post_upgrade` are absent, they fall back to `pre_install` / `post_install` for backward compatibility.
+
 ### Supported Distributions
 
 YAP supports building packages for the following distributions:
@@ -528,6 +584,22 @@ yap build --ssh-password pass    # SSH password for private repos
 yap build --target-arch arm64    # Cross-compile for a specific architecture
 yap build --skip-toolchain-validation  # Skip Go toolchain validation
 
+# Signing
+yap build --sign                          # Enable artifact signing (key resolved from flags/env/config/default)
+yap build --sign-key /path/to/private.key # Specify private key path
+yap build --sign-passphrase pass          # Passphrase (use env vars in CI: YAP_SIGN_PASSPHRASE)
+yap build --sign-key-name mykey           # APK key name (.SIGN.RSA.<keyname>.rsa.pub)
+
+# SBOM (Software Bill of Materials)
+yap build --sbom                          # Generate SBOM sidecars next to artifacts
+yap build --sbom-format cyclonedx         # Only CycloneDX 1.5 (default: both)
+yap build --sbom-format spdx              # Only SPDX 2.3
+yap build --sbom-format both              # Both formats (default)
+
+# Compression overrides
+yap build --compression-deb gzip          # DEB compression: zstd|gzip|xz (default: zstd)
+yap build --compression-rpm xz            # RPM compression: zstd|gzip|xz (default: zstd)
+
 # Debugging
 yap build --debug-dir /path/to/debug    # Emit split debug info to a directory
 
@@ -586,6 +658,108 @@ yap graph --show-external --output complete-graph.svg .
 - **Arrows**: Show dependency direction (runtime vs make dependencies)
 - **Levels**: Indicate build order and dependency hierarchy
 - **Tooltips**: Display detailed package information on hover
+
+## 🔐 Package Signing
+
+YAP can cryptographically sign built artifacts so end users can verify package authenticity.
+
+### Format support
+
+| Format | Algorithm | Output |
+| ------ | --------- | ------ |
+| APK | RSA PKCS#1 v1.5 SHA1 | Embedded `.SIGN.RSA.<keyname>.rsa.pub` stream — enables `apk add` without `--allow-untrusted` |
+| DEB | OpenPGP (GPG) | `<package>.deb.asc` (ASCII-armored detached) |
+| RPM | OpenPGP (GPG) | `<package>.rpm.asc` (detached) + in-RPM signature via rpmpack |
+| Pacman | OpenPGP (GPG) | `<package>.pkg.tar.zst.sig` (binary detached) |
+
+### Quick start
+
+```bash
+# Generate an APK RSA key (Alpine standard)
+abuild-keygen -a -i
+
+# Sign an APK build
+yap build --sign --sign-key ~/.abuild/your-key.rsa --sign-key-name your-key alpine examples/yap
+
+# Sign a DEB build with GPG
+yap build --sign --sign-key ~/.gnupg/private.asc ubuntu examples/yap
+```
+
+### Key resolution priority
+
+1. `--sign-key <path>` CLI flag
+2. Format-specific env: `YAP_APK_KEY`, `YAP_DEB_KEY`, `YAP_RPM_KEY`, `YAP_PACMAN_KEY`
+3. Global env: `YAP_SIGN_KEY`
+4. `yap.json` field `signing.keyPath`
+5. Default search: `~/.config/yap/keys/<format>.{rsa,gpg}` then `~/.config/yap/keys/default.{rsa,gpg}`
+
+Passphrase resolution mirrors key resolution with `_PASSPHRASE` suffix (`YAP_DEB_PASSPHRASE`, etc.).
+
+### yap.json signing config
+
+```json
+{
+  "name": "my-project",
+  "signing": {
+    "enabled": true,
+    "keyPath": "~/.config/yap/keys/release.gpg",
+    "keyName": "release"
+  },
+  "projects": [...]
+}
+```
+
+### Verifying signed packages
+
+```bash
+# APK (after distributing the public key to /etc/apk/keys/)
+apk add my-package.apk
+
+# DEB
+gpg --verify my-package_1.0.0_amd64.deb.asc my-package_1.0.0_amd64.deb
+
+# RPM
+rpm -K my-package-1.0.0-1.x86_64.rpm
+
+# Pacman
+pacman-key --verify my-package-1.0.0-1-x86_64.pkg.tar.zst.sig
+```
+
+## 📦 SBOM Generation
+
+YAP can emit Software Bill of Materials (SBOM) sidecars next to built artifacts in CycloneDX 1.5 and SPDX 2.3 formats.
+
+### Quick start
+
+```bash
+# Generate both formats (default)
+yap build --sbom .
+
+# Only CycloneDX
+yap build --sbom --sbom-format cyclonedx .
+
+# Only SPDX
+yap build --sbom --sbom-format spdx .
+```
+
+### Output
+
+Each artifact gets sidecar files:
+```
+artifacts/
+├── ubuntu/
+│   ├── my-package_1.0.0-1_amd64.deb
+│   ├── my-package_1.0.0-1_amd64.deb.cdx.json    ← CycloneDX 1.5
+│   └── my-package_1.0.0-1_amd64.deb.spdx.json   ← SPDX 2.3
+```
+
+### Captured metadata
+
+- Package name, version, license
+- Runtime and build dependencies
+- Source URLs and checksums
+- File hashes
+- DESCRIBES / DEPENDS_ON relationships (SPDX)
 
 ## 🔧 Advanced Usage
 

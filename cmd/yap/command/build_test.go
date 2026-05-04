@@ -62,3 +62,52 @@ func TestBuildCommandDefinition(t *testing.T) {
 		t.Error("Build command should have a RunE function")
 	}
 }
+
+func TestValidateCompression(t *testing.T) {
+	tests := []struct {
+		name        string
+		compression string
+		shouldError bool
+	}{
+		{
+			name:        "valid zstd",
+			compression: "zstd",
+			shouldError: false,
+		},
+		{
+			name:        "valid gzip",
+			compression: "gzip",
+			shouldError: false,
+		},
+		{
+			name:        "valid xz",
+			compression: "xz",
+			shouldError: false,
+		},
+		{
+			name:        "invalid compression",
+			compression: "invalid",
+			shouldError: true,
+		},
+		{
+			name:        "empty compression",
+			compression: "",
+			shouldError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateCompression(tt.compression)
+			if (err != nil) != tt.shouldError {
+				t.Errorf("validateCompression(%q) error = %v, shouldError = %v",
+					tt.compression, err, tt.shouldError)
+			}
+
+			if tt.shouldError && err == nil {
+				t.Errorf("validateCompression(%q) should have returned an error",
+					tt.compression)
+			}
+		})
+	}
+}

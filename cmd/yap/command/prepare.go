@@ -43,7 +43,7 @@ var (
 			distro, _ = ResolveDistroRelease(distro, release,
 				"logger.prepare.no_distribution_specified")
 
-			packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro)
+			packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
 			if !project.SkipSyncDeps {
 				err := packageManager.Update()
 				if err != nil {

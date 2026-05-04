@@ -16,7 +16,7 @@ func TestGetPackageManager_APK(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	packer := GetPackageManager(pkgBuild, "alpine")
+	packer := GetPackageManager(pkgBuild, "alpine", "", "")
 
 	if packer == nil {
 		t.Fatal("GetPackageManager returned nil for alpine")
@@ -38,7 +38,7 @@ func TestGetPackageManager_DEB(t *testing.T) {
 
 	for _, distro := range debDistros {
 		t.Run(distro, func(t *testing.T) {
-			packer := GetPackageManager(pkgBuild, distro)
+			packer := GetPackageManager(pkgBuild, distro, "", "")
 
 			if packer == nil {
 				t.Fatalf("GetPackageManager returned nil for %s", distro)
@@ -58,7 +58,7 @@ func TestGetPackageManager_PKG(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	packer := GetPackageManager(pkgBuild, "arch")
+	packer := GetPackageManager(pkgBuild, "arch", "", "")
 
 	if packer == nil {
 		t.Fatal("GetPackageManager returned nil for arch")
@@ -80,7 +80,7 @@ func TestGetPackageManager_RPM_YUM(t *testing.T) {
 
 	for _, distro := range yumDistros {
 		t.Run(distro, func(t *testing.T) {
-			packer := GetPackageManager(pkgBuild, distro)
+			packer := GetPackageManager(pkgBuild, distro, "", "")
 
 			if packer == nil {
 				t.Fatalf("GetPackageManager returned nil for %s", distro)
@@ -100,7 +100,7 @@ func TestGetPackageManager_RPM_Zypper(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	packer := GetPackageManager(pkgBuild, "opensuse-leap")
+	packer := GetPackageManager(pkgBuild, "opensuse-leap", "", "")
 
 	if packer == nil {
 		t.Fatal("GetPackageManager returned nil for opensuse-leap")
@@ -134,7 +134,7 @@ func TestGetPackageManager_Integration(t *testing.T) {
 
 	for distro, expectedType := range testCases {
 		t.Run(distro, func(t *testing.T) {
-			packer := GetPackageManager(pkgBuild, distro)
+			packer := GetPackageManager(pkgBuild, distro, "", "")
 
 			if packer == nil {
 				t.Fatalf("GetPackageManager returned nil for %s", distro)
@@ -191,7 +191,7 @@ func TestGetPackageManager_ValidatesInterface(t *testing.T) {
 
 	for _, distro := range distros {
 		t.Run(distro, func(t *testing.T) {
-			packer := GetPackageManager(pkgBuild, distro)
+			packer := GetPackageManager(pkgBuild, distro, "", "")
 
 			if packer == nil {
 				t.Fatalf("GetPackageManager returned nil for %s", distro)
