@@ -795,6 +795,11 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
+		// RepoDir is the directory containing yap.json — the repo root.
+		// Exposed as $repodir in build/package scripts so PKGBUILDs can
+		// reference sibling directories without hardcoding /project.
+		pkgbuildFile.RepoDir = path
+
 		// Set target architecture for cross-compilation if specified
 		if TargetArch != "" {
 			// Keep the native architecture for ArchComputed, set TargetArch for cross-compilation
