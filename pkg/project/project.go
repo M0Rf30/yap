@@ -1826,8 +1826,10 @@ func isPackageArtifact(fileName string) bool {
 
 // findGitRoot walks up the directory tree from dir until it finds a .git
 // directory (not a file — .git files are submodule markers and are skipped so
-// that the top-level repository root is always returned). Returns an empty
-// string if no .git directory is found before reaching the filesystem root.
+// that the top-level repository root is always returned). Falls back to the
+// parent of dir when no .git directory is found — this covers CI workspaces
+// where sources are copied into a staging directory without .git metadata,
+// and the yap.json directory is one level below the effective repo root.
 func findGitRoot(dir string) string {
 	current := dir
 
@@ -1839,7 +1841,9 @@ func findGitRoot(dir string) string {
 
 		parent := filepath.Dir(current)
 		if parent == current {
-			return ""
+			// Reached filesystem root without finding .git.
+			// Fall back to the parent of the starting directory.
+			return filepath.Dir(dir)
 		}
 
 		current = parent

@@ -54,46 +54,26 @@ func TestFindGitRoot(t *testing.T) {
 		}
 	})
 
-	t.Run("returns empty string when no .git directory found", func(t *testing.T) {
-		// Use a temp dir with no .git anywhere in its ancestry up to the fs root.
-		// We can't guarantee the real temp dir has no .git above it, so we
-		// create a deep path inside a known-clean temp root and test the helper
-		// directly with a path that has no .git dir in the tree we control.
-		// Instead, mock by starting from a path that is the fs root's parent
-		// (impossible), so we test the loop-termination branch by passing root "/".
-		// Simplest reliable approach: create a temp dir, verify no .git exists,
-		// then call findGitRoot on a subdir and accept empty or a real git root
-		// if the temp dir happens to be inside one.
-		//
-		// To test the "not found" branch deterministically, we call findGitRoot
-		// on "/" itself — the filesystem root has no parent to walk to.
-		got := findGitRoot("/")
-		if got != "" {
-			// "/" could theoretically have a .git dir, but that's pathological.
-			// Only fail if it returned something other than "" or "/".
-			if got != "/" {
-				t.Errorf("findGitRoot(%q) = %q, want empty string", "/", got)
-			}
-		}
-	})
-
-	t.Run("returns empty string for isolated temp dir with no git", func(t *testing.T) {
-		// Build a path guaranteed to have no .git: use a subdir of /tmp/
-		// that we fully control and verify has no .git in its ancestry
-		// up to /tmp (which is almost certainly not a git repo).
+	t.Run("falls back to parent of dir when no .git directory found", func(t *testing.T) {
+		// Simulate a CI staging layout: staging/packages/ with no .git anywhere.
+		// findGitRoot should return staging/ (parent of packages/).
 		isolated := t.TempDir()
+		packages := filepath.Join(isolated, "staging", "packages")
 
-		sub := filepath.Join(isolated, "a", "b", "c")
-		if err := os.MkdirAll(sub, 0o755); err != nil {
+		if err := os.MkdirAll(packages, 0o755); err != nil {
 			t.Fatal(err)
 		}
 
-		got := findGitRoot(sub)
-		// If the result is non-empty it means /tmp or an ancestor has a .git dir,
-		// which is extremely unlikely in any CI or dev environment.
-		// We accept that edge case rather than making the test fragile.
-		if got != "" {
-			t.Logf("findGitRoot(%q) = %q (non-empty; ancestor has .git — skipping assertion)", sub, got)
+		got := findGitRoot(packages)
+
+		// If an ancestor of isolated has a real .git dir, accept that result.
+		// Otherwise expect the parent of packages: isolated/staging.
+		want := filepath.Join(isolated, "staging")
+		if got != want {
+			info, err := os.Stat(filepath.Join(got, ".git"))
+			if err != nil || !info.IsDir() {
+				t.Errorf("findGitRoot(%q) = %q, want %q", packages, got, want)
+			}
 		}
 	})
 }
