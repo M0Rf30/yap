@@ -114,6 +114,7 @@ type PKGBUILD struct {
 	HelperFunctions map[string]string
 	Home            string
 	HostArch        string // Host architecture for cross-compilation (where package will run)
+	RepoDir         string // Root of the repository (directory containing yap.json)
 	Install         string
 	InstalledSize   int64
 	License         []string
@@ -558,7 +559,7 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 // it safe to call from multiple goroutines simultaneously (parallel builds).
 //
 // The returned slice includes:
-//   - pkgdir, srcdir, startdir — per-package directory paths
+//   - pkgdir, srcdir, startdir, repodir — per-package directory paths
 //   - pkgname, pkgver, pkgrel — per-package identity fields
 //   - CPATH, LIBRARY_PATH, PKG_CONFIG_PATH — sysroot search paths (including
 //     Debian multiarch and RPM lib64 directories) prepended to their current
@@ -602,6 +603,7 @@ func (pkgBuild *PKGBUILD) BuildEnvironmentSlice() []string {
 		"pkgdir=" + pkgBuild.PackageDir,
 		"srcdir=" + pkgBuild.SourceDir,
 		"startdir=" + pkgBuild.StartDir,
+		"repodir=" + pkgBuild.RepoDir,
 		"pkgname=" + pkgBuild.PkgName,
 		"pkgver=" + pkgBuild.PkgVer,
 		"pkgrel=" + pkgBuild.PkgRel,
