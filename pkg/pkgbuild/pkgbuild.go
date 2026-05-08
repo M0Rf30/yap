@@ -114,46 +114,48 @@ type PKGBUILD struct {
 	HelperFunctions map[string]string
 	Home            string
 	HostArch        string // Host architecture for cross-compilation (where package will run)
-	RepoDir         string // Git repository root (walks up from yap.json dir to find .git; empty if not found)
-	Install         string
-	InstalledSize   int64
-	License         []string
-	Maintainer      string
-	MakeDepends     []string
-	OptDepends      []string
-	Options         []string
-	Origin          string
-	Package         string
-	PackageDir      string
-	PkgDesc         string
-	PkgDest         string
-	PkgName         string
-	PkgRel          string
-	PkgType         string
-	PkgVer          string
-	PostInst        string
-	PostRm          string
-	PostTrans       string
-	PostUpgrade     string
-	PreInst         string
-	Prepare         string
-	PreRelease      string
-	PreRm           string
-	PreTrans        string
-	PreUpgrade      string
-	priorities      map[string]int
-	Priority        string
-	Provides        []string
-	Replaces        []string
-	Section         string
-	SourceDir       string
-	SourceURI       []string
-	StartDir        string
-	TargetArch      string // Target architecture for cross-compilation (what we're building for)
-	URL             string
-	StaticEnabled   bool
-	StripEnabled    bool
-	YAPVersion      string
+	// RepoDir is the git repository root. Walks up from the yap.json directory
+	// to find a .git dir; falls back to the parent of the yap.json directory.
+	RepoDir       string
+	Install       string
+	InstalledSize int64
+	License       []string
+	Maintainer    string
+	MakeDepends   []string
+	OptDepends    []string
+	Options       []string
+	Origin        string
+	Package       string
+	PackageDir    string
+	PkgDesc       string
+	PkgDest       string
+	PkgName       string
+	PkgRel        string
+	PkgType       string
+	PkgVer        string
+	PostInst      string
+	PostRm        string
+	PostTrans     string
+	PostUpgrade   string
+	PreInst       string
+	Prepare       string
+	PreRelease    string
+	PreRm         string
+	PreTrans      string
+	PreUpgrade    string
+	priorities    map[string]int
+	Priority      string
+	Provides      []string
+	Replaces      []string
+	Section       string
+	SourceDir     string
+	SourceURI     []string
+	StartDir      string
+	TargetArch    string // Target architecture for cross-compilation (what we're building for)
+	URL           string
+	StaticEnabled bool
+	StripEnabled  bool
+	YAPVersion    string
 }
 
 // AddItem adds an item to the PKGBUILD.
