@@ -43,7 +43,13 @@ var (
 			distro, _ = ResolveDistroRelease(distro, release,
 				"logger.prepare.no_distribution_specified")
 
-			packageManager := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
+			packageManager, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
+			if err != nil {
+				logger.Error(err.Error(), "error", err)
+
+				return
+			}
+
 			if !project.SkipSyncDeps {
 				err := packageManager.Update()
 				if err != nil {
@@ -52,7 +58,7 @@ var (
 				}
 			}
 
-			err := packageManager.PrepareEnvironment(GoLang, TargetArch)
+			err = packageManager.PrepareEnvironment(GoLang, TargetArch)
 			if err != nil {
 				logger.Error(err.Error())
 			}

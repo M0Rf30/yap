@@ -71,6 +71,32 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, err
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
+	// Pre-compute all dependency relations before creating RPM metadata
+	obsoletes, err := r.processDepends(r.PKGBUILD.Replaces)
+	if err != nil {
+		return "", err
+	}
+
+	provides, err := r.processDepends(r.PKGBUILD.Provides)
+	if err != nil {
+		return "", err
+	}
+
+	requires, err := r.processDepends(r.PKGBUILD.Depends)
+	if err != nil {
+		return "", err
+	}
+
+	conflicts, err := r.processDepends(r.PKGBUILD.Conflicts)
+	if err != nil {
+		return "", err
+	}
+
+	recommends, err := r.processDepends(r.PKGBUILD.OptDepends)
+	if err != nil {
+		return "", err
+	}
+
 	rpm, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
 		Name:        r.PKGBUILD.PkgName,
 		Summary:     r.PKGBUILD.PkgDesc,
@@ -85,11 +111,11 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, err
 		Group:       r.PKGBUILD.Section,
 		Compressor:  r.compression,
 		Licence:     license,
-		Obsoletes:   r.processDepends(r.PKGBUILD.Replaces),
-		Provides:    r.processDepends(r.PKGBUILD.Provides),
-		Requires:    r.processDepends(r.PKGBUILD.Depends),
-		Conflicts:   r.processDepends(r.PKGBUILD.Conflicts),
-		Recommends:  r.processDepends(r.PKGBUILD.OptDepends),
+		Obsoletes:   obsoletes,
+		Provides:    provides,
+		Requires:    requires,
+		Conflicts:   conflicts,
+		Recommends:  recommends,
 		BuildTime:   files.SourceDateEpochFromEnv(),
 	})
 	if err != nil {
@@ -282,7 +308,10 @@ func asRPMDirectory(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	}
 
 	// Retrieve the modification time of the directory.
-	mTime := extractFileModTimeUint32(fileInfo)
+	mTime, err := extractFileModTimeUint32(fileInfo)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create and return an RPMFile object for the directory.
 	return &rpmpack.RPMFile{
@@ -316,7 +345,10 @@ func asRPMFile(
 	}
 
 	// Retrieve the modification time of the file.
-	mTime := extractFileModTimeUint32(fileInfo)
+	mTime, err := extractFileModTimeUint32(fileInfo)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create and return an RPMFile object for the regular file.
 	return &rpmpack.RPMFile{
@@ -350,7 +382,10 @@ func asRPMSymlink(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	}
 
 	// Retrieve the modification time of the symlink.
-	mTime := extractFileModTimeUint32(fileInfo)
+	mTime, err := extractFileModTimeUint32(fileInfo)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create and return an RPMFile object for the symlink.
 	return &rpmpack.RPMFile{
@@ -394,15 +429,17 @@ func (r *RPM) getGroup() {
 }
 
 // extractFileModTimeUint32 retrieves the modification time of a file and converts it to uint32.
-// It checks for overflow and fatally logs if the time is out of range for uint32.
-func extractFileModTimeUint32(fileInfo os.FileInfo) uint32 {
+// It checks for overflow and returns an error if the time is out of range for uint32.
+func extractFileModTimeUint32(fileInfo os.FileInfo) (uint32, error) {
 	mTime := fileInfo.ModTime().Unix()
 	if mTime < 0 || mTime > int64(^uint32(0)) {
-		logger.Fatal(i18n.T("errors.rpm.modification_time_out_of_range"),
-			"time", mTime)
+		return 0, errors.New(errors.ErrTypePackaging,
+			i18n.T("errors.rpm.modification_time_out_of_range")).
+			WithOperation("extractFileModTimeUint32").
+			WithContext("time", mTime)
 	}
 
-	return uint32(mTime) // #nosec G115 //nolint:gosec -- range validated above
+	return uint32(mTime), nil // #nosec G115 //nolint:gosec -- range validated above
 }
 
 // getRelease updates the release information with RPM distribution suffix.
@@ -414,16 +451,19 @@ func (r *RPM) getRelease() {
 // processDepends converts dependency strings to rpmpack.Relations format.
 // It uses the common BaseBuilder.ProcessDependencies for consistent version
 // operator handling, then converts the result to RPM-specific Relations type.
-func (r *RPM) processDepends(depends []string) rpmpack.Relations {
+// Returns an error if any dependency string is invalid.
+func (r *RPM) processDepends(depends []string) (rpmpack.Relations, error) {
 	processed := r.ProcessDependencies(depends)
 	relations := make(rpmpack.Relations, 0)
 
 	for _, dep := range processed {
-		err := relations.Set(dep)
-		if err != nil {
-			return nil
+		if err := relations.Set(dep); err != nil {
+			return nil, errors.Wrap(err, errors.ErrTypePackaging,
+				"invalid dependency string").
+				WithOperation("processDepends").
+				WithContext("dependency", dep)
 		}
 	}
 
-	return relations
+	return relations, nil
 }

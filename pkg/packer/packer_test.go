@@ -16,7 +16,10 @@ func TestGetPackageManager_APK(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	packer := GetPackageManager(pkgBuild, "alpine", "", "")
+	packer, err := GetPackageManager(pkgBuild, "alpine", "", "")
+	if err != nil {
+		t.Fatalf("GetPackageManager returned error for alpine: %v", err)
+	}
 
 	if packer == nil {
 		t.Fatal("GetPackageManager returned nil for alpine")
@@ -38,7 +41,10 @@ func TestGetPackageManager_DEB(t *testing.T) {
 
 	for _, distro := range debDistros {
 		t.Run(distro, func(t *testing.T) {
-			packer := GetPackageManager(pkgBuild, distro, "", "")
+			packer, err := GetPackageManager(pkgBuild, distro, "", "")
+			if err != nil {
+				t.Fatalf("GetPackageManager returned error for %s: %v", distro, err)
+			}
 
 			if packer == nil {
 				t.Fatalf("GetPackageManager returned nil for %s", distro)
@@ -58,7 +64,10 @@ func TestGetPackageManager_PKG(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	packer := GetPackageManager(pkgBuild, "arch", "", "")
+	packer, err := GetPackageManager(pkgBuild, "arch", "", "")
+	if err != nil {
+		t.Fatalf("GetPackageManager returned error for arch: %v", err)
+	}
 
 	if packer == nil {
 		t.Fatal("GetPackageManager returned nil for arch")
@@ -80,7 +89,10 @@ func TestGetPackageManager_RPM_YUM(t *testing.T) {
 
 	for _, distro := range yumDistros {
 		t.Run(distro, func(t *testing.T) {
-			packer := GetPackageManager(pkgBuild, distro, "", "")
+			packer, err := GetPackageManager(pkgBuild, distro, "", "")
+			if err != nil {
+				t.Fatalf("GetPackageManager returned error for %s: %v", distro, err)
+			}
 
 			if packer == nil {
 				t.Fatalf("GetPackageManager returned nil for %s", distro)
@@ -100,7 +112,10 @@ func TestGetPackageManager_RPM_Zypper(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	packer := GetPackageManager(pkgBuild, "opensuse-leap", "", "")
+	packer, err := GetPackageManager(pkgBuild, "opensuse-leap", "", "")
+	if err != nil {
+		t.Fatalf("GetPackageManager returned error for opensuse-leap: %v", err)
+	}
 
 	if packer == nil {
 		t.Fatal("GetPackageManager returned nil for opensuse-leap")
@@ -134,7 +149,10 @@ func TestGetPackageManager_Integration(t *testing.T) {
 
 	for distro, expectedType := range testCases {
 		t.Run(distro, func(t *testing.T) {
-			packer := GetPackageManager(pkgBuild, distro, "", "")
+			packer, err := GetPackageManager(pkgBuild, distro, "", "")
+			if err != nil {
+				t.Fatalf("GetPackageManager returned error for %s: %v", distro, err)
+			}
 
 			if packer == nil {
 				t.Fatalf("GetPackageManager returned nil for %s", distro)
@@ -191,7 +209,10 @@ func TestGetPackageManager_ValidatesInterface(t *testing.T) {
 
 	for _, distro := range distros {
 		t.Run(distro, func(t *testing.T) {
-			packer := GetPackageManager(pkgBuild, distro, "", "")
+			packer, err := GetPackageManager(pkgBuild, distro, "", "")
+			if err != nil {
+				t.Fatalf("GetPackageManager returned error for %s: %v", distro, err)
+			}
 
 			if packer == nil {
 				t.Fatalf("GetPackageManager returned nil for %s", distro)

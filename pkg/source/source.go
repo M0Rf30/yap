@@ -12,9 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/go-git/go-git/v5/plumbing"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -37,9 +37,8 @@ const (
 var (
 	// sshPassword contains the SSH password for authentication.
 	sshPassword string
-	// downloadMutexes tracks ongoing downloads to prevent duplicate downloads.
-	downloadMutexes  = make(map[string]*sync.Mutex)
-	downloadMapMutex = sync.Mutex{}
+	// downloadGroup deduplicates concurrent downloads of the same file.
+	downloadGroup singleflight.Group
 )
 
 // SetSSHPassword sets the SSH password used for authenticated git clone operations.
@@ -96,30 +95,20 @@ func (src *Source) Get() error {
 
 	switch sourceType {
 	case "http", "https", "ftp", constants.Git:
-		var err error
-
-		// Use mutex to prevent duplicate downloads of the same file
-		downloadMapMutex.Lock()
-
-		mutex, exists := downloadMutexes[sourceFilePath]
-		if !exists {
-			mutex = &sync.Mutex{}
-			downloadMutexes[sourceFilePath] = mutex
-		}
-
-		downloadMapMutex.Unlock()
-
-		// Lock this specific file's download
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		// Check again after acquiring the lock (double-checked locking pattern)
+		// Use singleflight to prevent duplicate downloads of the same file
 		if !files.Exists(sourceFilePath) {
-			err = src.getURL(sourceType, sourceFilePath, sshPassword)
-		}
+			_, err, _ := downloadGroup.Do(sourceFilePath, func() (any, error) {
+				// Double-check after acquiring the group slot
+				if files.Exists(sourceFilePath) {
+					//nolint:nilnil // Returning (nil, nil) is valid when file exists
+					return nil, nil
+				}
 
-		if err != nil {
-			return err
+				return nil, src.getURL(sourceType, sourceFilePath, sshPassword)
+			})
+			if err != nil {
+				return err
+			}
 		}
 	case fileProtocol:
 	default:
