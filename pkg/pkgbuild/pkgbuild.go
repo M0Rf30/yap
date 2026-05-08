@@ -718,6 +718,7 @@ func (pkgBuild *PKGBUILD) SetupSysrootEnvironment() error {
 func (pkgBuild *PKGBUILD) sysrootPaths() (includeDirs, libDirs, pkgConfigDirs []string) {
 	sysrootDir := filepath.Join(filepath.Dir(pkgBuild.StartDir), "yap-sysroot")
 
+	// Static baseline: standard FHS paths always included (even before sysroot is populated).
 	includeDirs = []string{
 		filepath.Join(sysrootDir, "usr", "include"),
 		filepath.Join(sysrootDir, "usr", "local", "include"),
@@ -747,7 +748,58 @@ func (pkgBuild *PKGBUILD) sysrootPaths() (includeDirs, libDirs, pkgConfigDirs []
 			filepath.Join(sysrootDir, "usr", "lib", triplet, "pkgconfig"))
 	}
 
+	// Dynamic discovery: walk the sysroot and add any pkgconfig / include / lib
+	// directories not already covered by the static list above.  This handles
+	// packages that install to non-standard prefixes (e.g. /opt/zextras/common/).
+	includeDirs = appendDiscoveredDirs(sysrootDir, includeDirs, isIncludeDir)
+	libDirs = appendDiscoveredDirs(sysrootDir, libDirs, isLibDir)
+	pkgConfigDirs = appendDiscoveredDirs(sysrootDir, pkgConfigDirs, isPkgConfigDir)
+
 	return includeDirs, libDirs, pkgConfigDirs
+}
+
+// isIncludeDir reports whether a directory name is a C/C++ include directory.
+func isIncludeDir(name string) bool { return name == "include" }
+
+// isLibDir reports whether a directory name is a library directory.
+func isLibDir(name string) bool {
+	return name == "lib" || name == "lib64" || name == "lib32"
+}
+
+// isPkgConfigDir reports whether a directory name is a pkg-config directory.
+func isPkgConfigDir(name string) bool { return name == "pkgconfig" }
+
+// appendDiscoveredDirs walks sysrootDir and appends any directories whose base
+// name satisfies match to existing, deduplicating against the existing slice.
+// Directories that do not exist on disk are silently skipped.
+func appendDiscoveredDirs(sysrootDir string, existing []string, match func(string) bool) []string {
+	seen := make(map[string]struct{}, len(existing))
+	for _, d := range existing {
+		seen[d] = struct{}{}
+	}
+
+	result := existing
+
+	_ = filepath.WalkDir(sysrootDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !d.IsDir() {
+			return nil
+		}
+
+		if match(d.Name()) {
+			if _, already := seen[path]; !already {
+				seen[path] = struct{}{}
+				result = append(result, path)
+			}
+		}
+
+		return nil
+	})
+
+	return result
 }
 
 // gnuTriplet returns the Debian multiarch GNU triplet for the given

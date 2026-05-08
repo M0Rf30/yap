@@ -1,69 +1,133 @@
 package common
 
 import (
-	"context"
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/blakesmith/ar"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
-// createTestDEB creates a test DEB package with actual content
+// createTestDEB creates a minimal but valid DEB package in pure Go.
+// A DEB is an AR archive with three members:
+//
+//	debian-binary   — "2.0\n"
+//	control.tar.gz  — gzipped tar containing ./control
+//	data.tar.gz     — gzipped tar containing the payload files
 func createTestDEB(t *testing.T, tmpDir string) string {
 	t.Helper()
 
-	// Create package structure
-	pkgDir := filepath.Join(tmpDir, "test-pkg")
-	debianDir := filepath.Join(pkgDir, "DEBIAN")
-	contentDir := filepath.Join(pkgDir, "opt", "test")
-
-	if err := os.MkdirAll(debianDir, 0o755); err != nil {
-		t.Fatalf("Failed to create DEBIAN dir: %v", err)
-	}
-
-	if err := os.MkdirAll(filepath.Join(contentDir, "lib"), 0o755); err != nil {
-		t.Fatalf("Failed to create lib dir: %v", err)
-	}
-
-	if err := os.MkdirAll(filepath.Join(contentDir, "include"), 0o755); err != nil {
-		t.Fatalf("Failed to create include dir: %v", err)
-	}
-
-	// Create control file
-	control := `Package: test-package
+	const control = `Package: test-package
 Version: 1.0.0
 Architecture: amd64
 Maintainer: Test <test@test.com>
 Description: Test package for extraction
 `
 
-	if err := os.WriteFile(filepath.Join(debianDir, "control"), []byte(control), 0o644); err != nil {
-		t.Fatalf("Failed to write control file: %v", err)
-	}
+	// --- build control.tar.gz ---
+	controlTar := buildTarGz(t, map[string]string{
+		"./control": control,
+	})
 
-	// Create test files
-	libPath := filepath.Join(contentDir, "lib", "libtest.so")
-	if err := os.WriteFile(libPath, []byte("test library"), 0o644); err != nil {
-		t.Fatalf("Failed to write library file: %v", err)
-	}
+	// --- build data.tar.gz ---
+	dataTar := buildTarGz(t, map[string]string{
+		"./opt/test/lib/libtest.so": "test library",
+		"./opt/test/include/test.h": "test header",
+	})
 
-	includePath := filepath.Join(contentDir, "include", "test.h")
-	if err := os.WriteFile(includePath, []byte("test header"), 0o644); err != nil {
-		t.Fatalf("Failed to write header file: %v", err)
-	}
-
-	// Build DEB package
+	// --- assemble AR archive ---
 	debPath := filepath.Join(tmpDir, "test-package_1.0.0_amd64.deb")
-	cmd := exec.CommandContext(context.Background(), "dpkg-deb", "--build", pkgDir, debPath)
 
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("Failed to build DEB: %v\nOutput: %s", err, output)
+	f, err := os.Create(debPath)
+	if err != nil {
+		t.Fatalf("create deb: %v", err)
 	}
+
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Errorf("close deb: %v", err)
+		}
+	}()
+
+	w := ar.NewWriter(f)
+	if err := w.WriteGlobalHeader(); err != nil {
+		t.Fatalf("ar global header: %v", err)
+	}
+
+	writeARMember(t, w, "debian-binary", []byte("2.0\n"))
+	writeARMember(t, w, "control.tar.gz", controlTar)
+	writeARMember(t, w, "data.tar.gz", dataTar)
 
 	return debPath
+}
+
+// buildTarGz returns a gzip-compressed tar archive containing the given files
+// (path → content).
+func buildTarGz(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+
+	now := time.Now()
+
+	for name, content := range files {
+		body := []byte(content)
+		hdr := &tar.Header{
+			Name:     name,
+			Mode:     0o644,
+			Size:     int64(len(body)),
+			ModTime:  now,
+			Typeflag: tar.TypeReg,
+		}
+
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatalf("tar header %s: %v", name, err)
+		}
+
+		if _, err := tw.Write(body); err != nil {
+			t.Fatalf("tar write %s: %v", name, err)
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		t.Fatalf("tar close: %v", err)
+	}
+
+	if err := gz.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+
+	return buf.Bytes()
+}
+
+// writeARMember appends a single member to an AR archive.
+func writeARMember(t *testing.T, w *ar.Writer, name string, data []byte) {
+	t.Helper()
+
+	hdr := ar.Header{
+		Name:    name,
+		Size:    int64(len(data)),
+		Mode:    0o644,
+		ModTime: time.Now(),
+	}
+
+	if err := w.WriteHeader(&hdr); err != nil {
+		t.Fatalf("ar header %s: %v", name, err)
+	}
+
+	if _, err := w.Write(data); err != nil {
+		t.Fatalf("ar write %s: %v", name, err)
+	}
 }
 
 func TestExtractToSysroot(t *testing.T) {
