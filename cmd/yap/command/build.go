@@ -8,13 +8,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
-	"github.com/M0Rf30/yap/v2/pkg/core"
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/project"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
+	"github.com/M0Rf30/yap/v2/pkg/signing"
 	"github.com/M0Rf30/yap/v2/pkg/source"
 )
 
@@ -39,6 +39,9 @@ var signKeyName string
 // sign is the local holder for the --sign flag value.
 var sign bool
 
+// buildOpts holds all build configuration options from CLI flags.
+var buildOpts project.BuildOptions
+
 // buildCmd represents the command to build the entire project.
 var buildCmd = &cobra.Command{
 	Use:     buildCommand + " [distro] <path>",
@@ -50,6 +53,10 @@ var buildCmd = &cobra.Command{
 	Args:    cobra.RangeArgs(1, 2),                               // Allow 1-2 arguments
 	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
+		// Apply build options from CLI flags to package-level globals
+		buildOpts.Verbose = verbose
+		buildOpts.Apply()
+
 		// Propagate ssh-password flag value to the source package.
 		source.SetSSHPassword(sshPassword)
 
@@ -57,7 +64,6 @@ var buildCmd = &cobra.Command{
 		common.SkipToolchainValidation = project.SkipToolchainValidation
 
 		// Set verbose flag from global flag
-		project.Verbose = verbose
 		shell.SetVerbose(verbose)
 
 		// Enhanced user feedback with progress
@@ -127,7 +133,10 @@ var buildCmd = &cobra.Command{
 		// Apply CLI signing flags if provided
 		if sign {
 			// Resolve signing configuration from CLI flags, env vars, and project config
-			signingCfg := resolveSigning(&mpc)
+			signingCfg, err := resolveSigning(&mpc)
+			if err != nil {
+				return err
+			}
 
 			// Propagate signing config to all projects
 			for _, proj := range mpc.Projects {
@@ -173,8 +182,8 @@ func validateCompression(compression string) error {
 }
 
 // resolveSigning resolves the signing configuration from CLI flags,
-// environment variables, and project config.
-func resolveSigning(mpc *project.MultipleProject) *core.SigningConfig {
+// environment variables, and project config using the full priority chain.
+func resolveSigning(mpc *project.MultipleProject) (*signing.Config, error) {
 	// Get config from project if available
 	configKey := ""
 	configPass := ""
@@ -184,26 +193,27 @@ func resolveSigning(mpc *project.MultipleProject) *core.SigningConfig {
 		configPass = mpc.Signing.Passphrase
 	}
 
-	// For now, we'll use a simple signing config that just stores the values
-	// Phase 3/4 will integrate with the actual signing.Resolve() function
-	cfg := &core.SigningConfig{
+	// Use signing.Resolve() for full priority chain resolution.
+	// We use FormatDEB as a generic format here; format-specific resolution
+	// happens in signArtifact() which knows the actual artifact format.
+	resolved, err := signing.Resolve(signing.FormatDEB, signKey,
+		signPassphrase, configKey, configPass)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply KeyName from CLI flag (not handled by Resolve)
+	keyName := signKeyName
+	if keyName == "" && mpc.Signing != nil {
+		keyName = mpc.Signing.KeyName
+	}
+
+	return &signing.Config{
 		Enabled:    sign,
-		KeyPath:    signKey,
-		Passphrase: signPassphrase,
-		KeyName:    signKeyName,
-	}
-
-	// If no CLI key provided, try config
-	if cfg.KeyPath == "" && configKey != "" {
-		cfg.KeyPath = configKey
-	}
-
-	// If no CLI passphrase provided, try config
-	if cfg.Passphrase == "" && configPass != "" {
-		cfg.Passphrase = configPass
-	}
-
-	return cfg
+		KeyPath:    resolved.KeyPath,
+		Passphrase: resolved.Passphrase,
+		KeyName:    keyName,
+	}, nil
 }
 
 // logStructuredError logs a concise fatal build error.
@@ -302,21 +312,21 @@ func init() {
 	}
 
 	// BUILD BEHAVIOR FLAGS
-	buildCmd.Flags().BoolVarP(&project.CleanBuild,
+	buildCmd.Flags().BoolVarP(&buildOpts.CleanBuild,
 		"cleanbuild", "c", false, "")
-	buildCmd.Flags().BoolVarP(&project.NoBuild,
+	buildCmd.Flags().BoolVarP(&buildOpts.NoBuild,
 		"nobuild", "o", false, "")
-	buildCmd.Flags().BoolVarP(&project.Zap,
+	buildCmd.Flags().BoolVarP(&buildOpts.Zap,
 		"zap", "z", false, "")
 
 	// DEPENDENCY MANAGEMENT FLAGS
-	buildCmd.Flags().BoolVarP(&project.NoMakeDeps,
+	buildCmd.Flags().BoolVarP(&buildOpts.NoMakeDeps,
 		"nomakedeps", "d", false, "")
-	buildCmd.Flags().BoolVarP(&project.SkipSyncDeps,
+	buildCmd.Flags().BoolVarP(&buildOpts.SkipSyncDeps,
 		"skip-sync", "s", false, "")
-	buildCmd.Flags().BoolVarP(&project.SkipToolchainValidation,
+	buildCmd.Flags().BoolVarP(&buildOpts.SkipToolchainValidation,
 		"skip-toolchain-validation", "", false, "")
-	buildCmd.Flags().BoolVarP(&project.Parallel,
+	buildCmd.Flags().BoolVarP(&buildOpts.Parallel,
 		"parallel", "P", false, "")
 
 	// VERSION CONTROL FLAGS
@@ -330,27 +340,27 @@ func init() {
 		"ssh-password", "p", "", "")
 
 	// BUILD RANGE CONTROL FLAGS
-	buildCmd.Flags().StringVarP(&project.FromPkgName,
+	buildCmd.Flags().StringVarP(&buildOpts.FromPkgName,
 		"from", "", "", "")
-	buildCmd.Flags().StringVarP(&project.ToPkgName,
+	buildCmd.Flags().StringVarP(&buildOpts.ToPkgName,
 		"to", "", "", "")
 
 	// PROJECT FILTER FLAGS
-	buildCmd.Flags().StringVarP(&project.OnlyPkgNames,
+	buildCmd.Flags().StringVarP(&buildOpts.OnlyPkgNames,
 		"only", "", "", "Comma-separated list of project names to build (filters yap.json)")
 
 	// CROSS-COMPILATION FLAGS
-	buildCmd.Flags().StringVarP(&project.TargetArch,
+	buildCmd.Flags().StringVarP(&buildOpts.TargetArch,
 		"target-arch", "t", "", "Target architecture for cross-compilation (e.g., arm64, armv7, x86_64)")
 
 	// DEBUG SYMBOL FLAGS
-	buildCmd.Flags().StringVarP(&project.DebugDir,
+	buildCmd.Flags().StringVarP(&buildOpts.DebugDir,
 		"debug-dir", "", "", "Output directory for separated debug symbols (.build-id structure for debuginfod)")
 
 	// SBOM GENERATION FLAGS
-	buildCmd.Flags().BoolVarP(&project.SBOM,
+	buildCmd.Flags().BoolVarP(&buildOpts.SBOM,
 		"sbom", "", false, "")
-	buildCmd.Flags().StringVarP(&project.SBOMFormat,
+	buildCmd.Flags().StringVarP(&buildOpts.SBOMFormat,
 		"sbom-format", "", "both", "")
 
 	// COMPRESSION FLAGS

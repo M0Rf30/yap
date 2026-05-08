@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -37,6 +38,12 @@ const (
 	distroArch   = "arch"
 	distroUbuntu = "ubuntu"
 )
+
+// envMutex serializes access to os.Setenv calls in SetupCcache and
+// SetupCrossCompilationEnvironment to prevent race conditions in parallel builds.
+// When multiple packages targeting different architectures are built concurrently,
+// they would otherwise stomp on each other's environment variables.
+var envMutex sync.Mutex
 
 // SkipToolchainValidation controls whether cross-compilation toolchain validation is performed.
 // This is set by command-line flags and used by PrepareEnvironment.
@@ -456,6 +463,7 @@ func (bb *BaseBuilder) Update() error {
 
 // SetupCcache checks if ccache is available and configures the build environment to use it.
 // This function sets up environment variables to enable ccache for faster compilation.
+// It uses a mutex to serialize access to os.Setenv to prevent race conditions in parallel builds.
 func (bb *BaseBuilder) SetupCcache() error {
 	// Check if ccache is available in the system using Go's exec.LookPath
 	_, err := exec.LookPath("ccache")
@@ -468,6 +476,10 @@ func (bb *BaseBuilder) SetupCcache() error {
 
 		return nil
 	}
+
+	// Serialize access to os.Setenv to prevent race conditions in parallel builds
+	envMutex.Lock()
+	defer envMutex.Unlock()
 
 	// Set up ccache environment variables
 	// These variables will be used by the build process to enable ccache
@@ -499,6 +511,7 @@ func (bb *BaseBuilder) SetupCcache() error {
 
 // SetupCrossCompilationEnvironment configures environment variables for cross-compilation.
 // This function sets up environment variables for C/C++, Rust, and Go cross-compilation.
+// It uses a mutex to serialize access to os.Setenv to prevent race conditions in parallel builds.
 //
 //nolint:gocyclo,cyclop // SetupCrossCompilationEnvironment is inherently complex; splitting would harm readability
 func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error {
@@ -560,14 +573,6 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	gccExecutable := toolchainPackages.GetExecutableName(toolchainPackages.GCCPackage)
 	gppExecutable := toolchainPackages.GetExecutableName(toolchainPackages.GPlusPlusPackage)
 
-	if ccacheAvailable {
-		_ = os.Setenv("CC", "ccache "+gccExecutable)
-		_ = os.Setenv("CXX", "ccache "+gppExecutable)
-	} else {
-		_ = os.Setenv("CC", gccExecutable)
-		_ = os.Setenv("CXX", gppExecutable)
-	}
-
 	// Extract binutils prefix for tool names
 	// BinutilsPackage is like "binutils-aarch64-linux-gnu", we need "aarch64-linux-gnu-ar", etc.
 	binutilsPrefix := strings.TrimPrefix(toolchainPackages.BinutilsPackage, "binutils-")
@@ -576,14 +581,6 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 		// For packages like "aarch64-linux-gnu-binutils", extract the prefix
 		binutilsPrefix = strings.TrimSuffix(toolchainPackages.BinutilsPackage, "-binutils")
 	}
-
-	_ = os.Setenv("AR", binutilsPrefix+"-ar")
-	_ = os.Setenv("STRIP", binutilsPrefix+"-strip")
-	_ = os.Setenv("RANLIB", binutilsPrefix+"-ranlib")
-	_ = os.Setenv("OBJDUMP", binutilsPrefix+"-objdump")
-	_ = os.Setenv("OBJCOPY", binutilsPrefix+"-objcopy")
-	_ = os.Setenv("LD", binutilsPrefix+"-ld")
-	_ = os.Setenv("NM", binutilsPrefix+"-nm")
 
 	// Calculate CROSS_COMPILE prefix from the executable name
 	ccPrefix := ""
@@ -604,10 +601,65 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 
 	// Set up Rust cross-compilation environment variables
 	rustTarget := bb.getRustTargetArchitecture(targetArch)
+	rustTargetUpper := ""
+	if rustTarget != "" {
+		rustTargetUpper = strings.ToUpper(strings.ReplaceAll(rustTarget, "-", "_"))
+	}
+
+	// Set up Go cross-compilation environment variables
+	goArch := bb.getGoTargetArchitecture(targetArch)
+
+	// Set up autoconf cross-compilation configuration
+	// Get the GNU triplets for the build and host architectures
+	hostTriplet := bb.getGNUTriplet(targetArch)
+	buildTriplet := bb.getGNUTriplet(bb.PKGBUILD.ArchComputed)
+
+	var configureWrapper string
+	if hostTriplet != "" && buildTriplet != "" {
+		// Create configure wrapper function that can be used in PKGBUILDs
+		// This is a bash function that automatically adds --host and --build flags
+		configureWrapper = fmt.Sprintf(`
+# YAP cross-compilation configure wrapper
+configure_cross() {
+  if [ -x ./configure ]; then
+    ./configure --host=%s --build=%s "$@"
+  elif [ -x configure ]; then
+    configure --host=%s --build=%s "$@"
+  else
+    echo "Warning: configure script not found" >&2
+    return 1
+  fi
+}
+
+# Export the function so it's available in build scripts
+export -f configure_cross 2>/dev/null || true
+`, hostTriplet, buildTriplet, hostTriplet, buildTriplet)
+	}
+
+	// Serialize access to os.Setenv to prevent race conditions in parallel builds
+	envMutex.Lock()
+	defer envMutex.Unlock()
+
+	if ccacheAvailable {
+		_ = os.Setenv("CC", "ccache "+gccExecutable)
+		_ = os.Setenv("CXX", "ccache "+gppExecutable)
+	} else {
+		_ = os.Setenv("CC", gccExecutable)
+		_ = os.Setenv("CXX", gppExecutable)
+	}
+
+	_ = os.Setenv("AR", binutilsPrefix+"-ar")
+	_ = os.Setenv("STRIP", binutilsPrefix+"-strip")
+	_ = os.Setenv("RANLIB", binutilsPrefix+"-ranlib")
+	_ = os.Setenv("OBJDUMP", binutilsPrefix+"-objdump")
+	_ = os.Setenv("OBJCOPY", binutilsPrefix+"-objcopy")
+	_ = os.Setenv("LD", binutilsPrefix+"-ld")
+	_ = os.Setenv("NM", binutilsPrefix+"-nm")
+
+	// Set up Rust cross-compilation environment variables
 	if rustTarget != "" {
 		_ = os.Setenv("CARGO_BUILD_TARGET", rustTarget)
 		_ = os.Setenv("RUSTC_TARGET", rustTarget)
-		rustTargetUpper := strings.ToUpper(strings.ReplaceAll(rustTarget, "-", "_"))
 		_ = os.Setenv("CARGO_TARGET_"+rustTargetUpper+"_LINKER",
 			binutilsPrefix+"-ld")
 
@@ -623,15 +675,9 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 
 		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CC", rustCC)
 		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CXX", rustCXX)
-
-		logger.Info(i18n.T("logger.cross_compilation.rust_cross_compilation_configured"),
-			"rust_target", rustTarget,
-			"target_arch", targetArch)
 	}
 
 	// Set up Go cross-compilation environment variables
-	goArch := bb.getGoTargetArchitecture(targetArch)
-
 	goOS := linuxOS // Default to Linux for cross-compilation
 	if goArch != "" {
 		_ = os.Setenv("GOOS", goOS)
@@ -646,11 +692,6 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 			_ = os.Setenv("CC_FOR_TARGET", gccExecutable)
 			_ = os.Setenv("CXX_FOR_TARGET", gppExecutable)
 		}
-
-		logger.Info(i18n.T("logger.cross_compilation.go_cross_compilation_configured"),
-			"goos", goOS,
-			"goarch", goArch,
-			"target_arch", targetArch)
 	}
 
 	// Set common cross-compilation variables
@@ -675,38 +716,32 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	_ = os.Setenv("PKG_CONFIG_LIBDIR", "/usr/lib/"+ccPrefix+"/pkgconfig")
 
 	// Set up autoconf cross-compilation configuration
-	// Get the GNU triplets for the build and host architectures
-	hostTriplet := bb.getGNUTriplet(targetArch)
-	buildTriplet := bb.getGNUTriplet(bb.PKGBUILD.ArchComputed)
-
 	if hostTriplet != "" && buildTriplet != "" {
 		// Configure autoconf for cross-compilation
 		// These environment variables inform autoconf that we're cross-compiling
 		_ = os.Setenv("ac_cv_host", hostTriplet)
 		_ = os.Setenv("ac_cv_build", buildTriplet)
 
-		// Create configure wrapper function that can be used in PKGBUILDs
-		// This is a bash function that automatically adds --host and --build flags
-		configureWrapper := fmt.Sprintf(`
-# YAP cross-compilation configure wrapper
-configure_cross() {
-  if [ -x ./configure ]; then
-    ./configure --host=%s --build=%s "$@"
-  elif [ -x configure ]; then
-    configure --host=%s --build=%s "$@"
-  else
-    echo "Warning: configure script not found" >&2
-    return 1
-  fi
-}
-
-# Export the function so it's available in build scripts
-export -f configure_cross 2>/dev/null || true
-`, hostTriplet, buildTriplet, hostTriplet, buildTriplet)
-
 		// Set the wrapper in the environment (will be available to the build script)
 		_ = os.Setenv("YAP_CONFIGURE_WRAPPER", configureWrapper)
+	}
 
+	// Mutex will be released by defer statement above
+
+	if rustTarget != "" {
+		logger.Info(i18n.T("logger.cross_compilation.rust_cross_compilation_configured"),
+			"rust_target", rustTarget,
+			"target_arch", targetArch)
+	}
+
+	if goArch != "" {
+		logger.Info(i18n.T("logger.cross_compilation.go_cross_compilation_configured"),
+			"goos", goOS,
+			"goarch", goArch,
+			"target_arch", targetArch)
+	}
+
+	if hostTriplet != "" && buildTriplet != "" {
 		logger.Info(i18n.T("logger.cross_compilation.autoconf_cross_compilation_configured"),
 			"host_triplet", hostTriplet,
 			"build_triplet", buildTriplet)

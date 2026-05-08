@@ -505,8 +505,9 @@ func TestGlobalVariables(t *testing.T) {
 	SetSSHPassword(testPassword)
 	assert.Equal(t, testPassword, GetSSHPassword())
 
-	// Test that download mutexes map is initialized
-	assert.NotNil(t, downloadMutexes)
+	// Test that download group is initialized (check by using it)
+	// We can't directly assert on downloadGroup due to mutex copy issues,
+	// but we verify it works through the Get() method tests above
 }
 
 func TestSource_Integration(t *testing.T) {

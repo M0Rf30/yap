@@ -18,7 +18,6 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
-	"github.com/M0Rf30/yap/v2/pkg/core"
 	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -38,7 +37,49 @@ var (
 	// ErrCircularRuntimeDependency indicates a circular runtime dependency was detected.
 	ErrCircularRuntimeDependency = errors.New(
 		i18n.T("errors.project.circular_runtime_dependency_detected"))
+	// jsonValidator is a package-level singleton to avoid repeated reflection setup.
+	jsonValidator = validator.New()
 )
+
+// BuildOptions holds all build configuration options.
+// Use Apply() to propagate these options to the package-level globals.
+type BuildOptions struct {
+	Verbose                 bool
+	CleanBuild              bool
+	NoBuild                 bool
+	NoMakeDeps              bool
+	SkipSyncDeps            bool
+	SkipToolchainValidation bool
+	Zap                     bool
+	Parallel                bool
+	SBOM                    bool
+	FromPkgName             string
+	ToPkgName               string
+	TargetArch              string
+	OnlyPkgNames            string
+	DebugDir                string
+	SBOMFormat              string
+}
+
+// Apply propagates BuildOptions values to the package-level globals.
+// Call this after parsing CLI flags.
+func (o *BuildOptions) Apply() {
+	Verbose = o.Verbose
+	CleanBuild = o.CleanBuild
+	NoBuild = o.NoBuild
+	NoMakeDeps = o.NoMakeDeps
+	SkipSyncDeps = o.SkipSyncDeps
+	SkipToolchainValidation = o.SkipToolchainValidation
+	Zap = o.Zap
+	Parallel = o.Parallel
+	SBOM = o.SBOM
+	FromPkgName = o.FromPkgName
+	ToPkgName = o.ToPkgName
+	TargetArch = o.TargetArch
+	OnlyPkgNames = o.OnlyPkgNames
+	DebugDir = o.DebugDir
+	SBOMFormat = o.SBOMFormat
+}
 
 // Global variables for build configuration
 var (
@@ -145,13 +186,13 @@ type DistroProject interface {
 // process after a specific package.
 type MultipleProject struct {
 	BuildDir       string              `json:"buildDir"       validate:"required"`
-	Description    string              `json:"description"    validate:"required"`
-	Name           string              `json:"name"           validate:"required"`
-	Output         string              `json:"output"         validate:"required"`
-	Projects       []*Project          `json:"projects"       validate:"required,dive,required"`
-	CompressionDeb string              `json:"compressionDeb" validate:""`
-	CompressionRpm string              `json:"compressionRpm" validate:""`
-	Signing        *core.SigningConfig `json:"signing,omitempty"`
+	Description    string          `json:"description"    validate:"required"`
+	Name           string          `json:"name"           validate:"required"`
+	Output         string          `json:"output"         validate:"required"`
+	Projects       []*Project      `json:"projects"       validate:"required,dive,required"`
+	CompressionDeb string          `json:"compressionDeb" validate:""`
+	CompressionRpm string          `json:"compressionRpm" validate:""`
+	Signing        *signing.Config `json:"signing,omitempty"`
 }
 
 // Project represents a single project.
@@ -172,7 +213,7 @@ type Project struct {
 	HasToInstall   bool   `json:"install" validate:""`
 	CompressionDeb string
 	CompressionRpm string
-	Signing        *core.SigningConfig
+	Signing        *signing.Config
 }
 
 // BuildAll builds all projects in the correct order.
@@ -254,7 +295,11 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	packageManager = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
+	packageManager, err = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
+	if err != nil {
+		return err
+	}
+
 	if !SkipSyncDeps {
 		err := packageManager.Update()
 		if err != nil {
@@ -304,14 +349,28 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		}
 	}
 
+	// Resolve output path to absolute once, before any parallel work
+	// This prevents data races in createPackage when called from parallel workers
+	if mpc.Output != "" {
+		absOutput, err := filepath.Abs(mpc.Output)
+		if err != nil {
+			return err
+		}
+		mpc.Output = absOutput
+	}
+
 	return nil
 }
 
 // buildProjectsParallel builds multiple projects in parallel for better performance.
 // If shouldInstall is true, each package is installed immediately after building
 // (Arch Linux style), making it available for other packages building in parallel.
+// Uses context cancellation to stop all workers when an error occurs.
 func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorkers int,
 	shouldInstall bool) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	projectChan := make(chan *Project, len(projects))
 	errorChan := make(chan error, len(projects))
 
@@ -327,6 +386,13 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 			workerIDStr := fmt.Sprintf("worker-%d", workerID)
 
 			for proj := range projectChan {
+				// Check if cancelled before starting work
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
 				pkgName := proj.Builder.PKGBUILD.PkgName
 
 				logger.Debug(i18n.T("logger.creating_package"),
@@ -338,6 +404,7 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 				// Step 1: Build the package
 				err := proj.Builder.Compile(NoBuild)
 				if err != nil {
+					cancel()
 					errorChan <- err
 
 					return
@@ -347,6 +414,7 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 					// Step 2: Create the package file
 					err := mpc.createPackage(proj)
 					if err != nil {
+						cancel()
 						errorChan <- err
 
 						return
@@ -355,6 +423,7 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 					// Step 3: Install immediately (Arch Linux style) or extract for cross-compilation
 					if shouldInstall {
 						if err := mpc.installPackageForWorker(proj, pkgName, workerIDStr); err != nil {
+							cancel()
 							errorChan <- err
 
 							return
@@ -369,12 +438,16 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 		}(workerNum)
 	}
 
-	// Send projects to workers
+	// Send projects to workers (drain channel on cancel)
 	go func() {
 		defer close(projectChan)
 
 		for _, proj := range projects {
-			projectChan <- proj
+			select {
+			case <-ctx.Done():
+				return
+			case projectChan <- proj:
+			}
 		}
 	}()
 
@@ -588,16 +661,9 @@ func (mpc *MultipleProject) copyProjects() error {
 //
 // It takes a pointer to a MultipleProject as a receiver and a pointer to a Project as a parameter.
 // It returns an error.
+// Note: mpc.Output is expected to be an absolute path, resolved once in MultiProject()
+// before any parallel workers are launched.
 func (mpc *MultipleProject) createPackage(proj *Project) error {
-	if mpc.Output != "" {
-		absOutput, err := filepath.Abs(mpc.Output)
-		if err != nil {
-			return err
-		}
-
-		mpc.Output = absOutput
-	}
-
 	defer func() {
 		err := os.RemoveAll(proj.Builder.PKGBUILD.PackageDir)
 		if err != nil {
@@ -653,8 +719,8 @@ func (mpc *MultipleProject) runPostBuildHooks(proj *Project, artifactPath string
 		}
 	}
 
-	if SBOM {
-		if err := mpc.generateSBOM(proj, mpc.Output); err != nil {
+	if SBOM && artifactPath != "" {
+		if err := mpc.generateSBOM(proj, artifactPath); err != nil {
 			logger.Warn(i18n.T("logger.sbom_generation_failed"),
 				"package", proj.Builder.PKGBUILD.PkgName,
 				"error", err)
@@ -825,8 +891,11 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
-		packageManager = packer.GetPackageManager(pkgbuildFile, distro,
+		packageManager, err = packer.GetPackageManager(pkgbuildFile, distro,
 			mpc.CompressionDeb, mpc.CompressionRpm)
+		if err != nil {
+			return err
+		}
 
 		proj := &Project{
 			Name:           child.Name,
@@ -932,9 +1001,7 @@ func (mpc *MultipleProject) ReadProjectOnly(path string) error {
 // It uses the validator package to validate the struct and returns any errors encountered.
 // It returns an error if the validation fails.
 func (mpc *MultipleProject) validateJSON() error {
-	validate := validator.New()
-
-	return validate.Struct(mpc)
+	return jsonValidator.Struct(mpc)
 }
 
 // displayVerboseDependencyInfo shows detailed dependency information for all projects.
@@ -1329,29 +1396,13 @@ func (mpc *MultipleProject) buildBatchWithDependencyInstall(projects []*Project,
 
 	// Phase 1: Build and install runtime dependencies first
 	// Install immediately after building to make them available for dependent packages
-	err := mpc.buildAndInstallRuntimeDeps(runtimeDeps, maxWorkers)
-	if err != nil {
+	if err := mpc.buildRuntimeDependenciesInOrder(runtimeDeps, maxWorkers); err != nil {
 		return err
 	}
 
 	// Phase 2: Build and install regular packages
 	// Regular packages may depend on runtime deps from this batch
 	return mpc.buildAndInstallRegularPackages(regularPackages, maxWorkers)
-}
-
-// buildAndInstallRuntimeDeps handles the building and installation of runtime dependencies.
-func (mpc *MultipleProject) buildAndInstallRuntimeDeps(
-	runtimeDeps []*Project, maxWorkers int) error {
-	if len(runtimeDeps) == 0 {
-		return nil
-	}
-
-	err := mpc.buildRuntimeDependenciesInOrder(runtimeDeps, maxWorkers)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // buildAndInstallRegularPackages handles the building and installation of regular packages.
@@ -1468,7 +1519,7 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 		if _, exists := runtimeProjectMap[depName]; exists {
 			runtimeDependsOn[pkgName] = append(runtimeDependsOn[pkgName], depName)
 			runtimeDependedBy[depName] = append(runtimeDependedBy[depName], pkgName)
-			logger.Info(
+			logger.Debug(
 				i18n.T("logger.project.runtime_dependency_found"),
 				"dependent", pkgName,
 				"dependency", depName)
@@ -1481,7 +1532,7 @@ func (mpc *MultipleProject) addRuntimeDependencies(proj *Project, pkgName string
 		if _, exists := runtimeProjectMap[depName]; exists {
 			runtimeDependsOn[pkgName] = append(runtimeDependsOn[pkgName], depName)
 			runtimeDependedBy[depName] = append(runtimeDependedBy[depName], pkgName)
-			logger.Info(
+			logger.Debug(
 				i18n.T("logger.project.make_dependency_found"),
 				"dependent", pkgName,
 				"dependency", depName)
@@ -1673,14 +1724,7 @@ func (mpc *MultipleProject) signArtifact(proj *Project, artifactPath string) err
 		return nil
 	}
 
-	cfg := signing.Config{
-		Enabled:    proj.Signing.Enabled,
-		KeyPath:    proj.Signing.KeyPath,
-		Passphrase: proj.Signing.Passphrase,
-		KeyName:    proj.Signing.KeyName,
-	}
-
-	signer, err := signing.NewSigner(format, cfg)
+	signer, err := signing.NewSigner(format, *proj.Signing)
 	if err != nil {
 		return yerrors.Wrap(err, yerrors.ErrTypeBuild, "failed to create signer").
 			WithOperation("signArtifact").
@@ -1723,9 +1767,8 @@ func signingFormatForArtifact(artifactPath string) (signing.Format, bool) {
 }
 
 // generateSBOM generates Software Bill of Materials for a built package.
-// It finds the artifact file in the output directory and generates SBOM
-// sidecars in the requested format(s).
-func (mpc *MultipleProject) generateSBOM(proj *Project, outputDir string) error {
+// It generates SBOM sidecars in the requested format(s) for the given artifact.
+func (mpc *MultipleProject) generateSBOM(proj *Project, artifactPath string) error {
 	// Parse SBOM format flag
 	var formats []sbom.Format
 
@@ -1743,85 +1786,20 @@ func (mpc *MultipleProject) generateSBOM(proj *Project, outputDir string) error 
 			WithContext("format", SBOMFormat)
 	}
 
-	// Find the artifact file(s) in the output directory
-	// The artifact naming convention depends on the package format
-	entries, err := os.ReadDir(outputDir)
+	opts := sbom.Options{Formats: formats}
+	_, err := sbom.Generate(proj.Builder.PKGBUILD, artifactPath, opts)
 	if err != nil {
 		return yerrors.Wrap(err, yerrors.ErrTypeBuild,
-			"failed to read output directory").
+			"failed to generate SBOM").
 			WithOperation("generateSBOM").
-			WithContext("output_dir", outputDir)
+			WithContext("artifact", artifactPath)
 	}
 
-	// Look for recently created artifact files matching the package
-	pkgName := proj.Builder.PKGBUILD.PkgName
-	pkgVer := proj.Builder.PKGBUILD.PkgVer
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		fileName := entry.Name()
-
-		// Check if this is an artifact for our package
-		// Artifacts typically follow pattern: pkgname-version-release-arch.ext
-		if !strings.Contains(fileName, pkgName) ||
-			!strings.Contains(fileName, pkgVer) {
-			continue
-		}
-
-		// Skip SBOM files themselves
-		if strings.HasSuffix(fileName, ".cdx.json") ||
-			strings.HasSuffix(fileName, ".spdx.json") {
-			continue
-		}
-
-		// Check if it's a package artifact (deb, rpm, apk, pkg.tar.*)
-		if !isPackageArtifact(fileName) {
-			continue
-		}
-
-		artifactPath := filepath.Join(outputDir, fileName)
-
-		// Generate SBOM
-		opts := sbom.Options{Formats: formats}
-
-		_, err := sbom.Generate(proj.Builder.PKGBUILD, artifactPath, opts)
-		if err != nil {
-			return yerrors.Wrap(err, yerrors.ErrTypeBuild,
-				"failed to generate SBOM").
-				WithOperation("generateSBOM").
-				WithContext("artifact", fileName)
-		}
-
-		logger.Debug(i18n.T("logger.sbom_generated"),
-			"package", pkgName,
-			"artifact", fileName)
-	}
+	logger.Debug(i18n.T("logger.sbom_generated"),
+		"package", proj.Builder.PKGBUILD.PkgName,
+		"artifact", filepath.Base(artifactPath))
 
 	return nil
-}
-
-// isPackageArtifact checks if a filename is a package artifact.
-func isPackageArtifact(fileName string) bool {
-	packageExtensions := []string{
-		".deb",
-		".rpm",
-		".apk",
-		".pkg.tar.zst",
-		".pkg.tar.xz",
-		".pkg.tar.gz",
-		".pkg.tar",
-	}
-
-	for _, ext := range packageExtensions {
-		if strings.HasSuffix(fileName, ext) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // findGitRoot walks up the directory tree from dir until it finds a .git

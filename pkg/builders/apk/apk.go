@@ -330,35 +330,24 @@ func (a *Apk) writeFileWithChecksum(
 
 	// Data files (non-control) get SHA1 checksums
 	if !isControlFile(hdr.Name) && hdr.Typeflag == tar.TypeReg {
-		f, err := file.Open()
+		// Pass 1: compute SHA1 by streaming (no full buffer)
+		// #nosec G401 -- SHA1 required by APK format for checksum headers
+		hasher := sha1.New()
+		f1, err := file.Open()
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypePackaging,
 				fmt.Sprintf("file %s: opening for checksum", file.NameInArchive)).
 				WithOperation("writeFileWithChecksum").
 				WithContext("file", file.NameInArchive)
 		}
-
-		defer func() {
-			_ = f.Close()
-		}()
-
-		// #nosec G401 -- SHA1 required by APK format for checksum headers
-		hasher := sha1.New()
-
-		content, err := io.ReadAll(f)
-		if err != nil {
-			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: reading for checksum", file.NameInArchive)).
-				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.NameInArchive)
-		}
-
-		if _, err := hasher.Write(content); err != nil {
+		if _, err := io.Copy(hasher, f1); err != nil {
+			_ = f1.Close()
 			return errors.Wrap(err, errors.ErrTypePackaging,
 				fmt.Sprintf("file %s: computing checksum", file.NameInArchive)).
 				WithOperation("writeFileWithChecksum").
 				WithContext("file", file.NameInArchive)
 		}
+		_ = f1.Close()
 
 		hdr.PAXRecords["APK-TOOLS.checksum.SHA1"] = hex.EncodeToString(hasher.Sum(nil))
 
@@ -369,7 +358,17 @@ func (a *Apk) writeFileWithChecksum(
 				WithContext("file", file.NameInArchive)
 		}
 
-		if _, err := tw.Write(content); err != nil {
+		// Pass 2: stream file data into tar writer
+		f2, err := file.Open()
+		if err != nil {
+			return errors.Wrap(err, errors.ErrTypePackaging,
+				fmt.Sprintf("file %s: opening for write", file.NameInArchive)).
+				WithOperation("writeFileWithChecksum").
+				WithContext("file", file.NameInArchive)
+		}
+		defer func() { _ = f2.Close() }()
+
+		if _, err := io.Copy(tw, f2); err != nil {
 			return errors.Wrap(err, errors.ErrTypePackaging,
 				fmt.Sprintf("file %s: writing data", file.NameInArchive)).
 				WithOperation("writeFileWithChecksum").

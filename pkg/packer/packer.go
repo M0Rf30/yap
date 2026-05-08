@@ -8,8 +8,8 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/builders/rpm"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/core"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
-	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -47,37 +47,39 @@ type Packer interface {
 // distro: A string representing the distribution.
 // compressionDeb: Compression algorithm for DEB packages (empty string uses default).
 // compressionRpm: Compression algorithm for RPM packages (empty string uses default).
-// Returns a Packer interface.
+// Returns a Packer interface and an error if any issues occur.
 func GetPackageManager(
 	pkgBuild *pkgbuild.PKGBUILD,
 	distro string,
 	compressionDeb string,
 	compressionRpm string,
-) Packer {
+) (Packer, error) {
 	pkgManager := constants.DistroToPackageManager[distro]
 
 	// Get configuration for the package manager
 	config := core.GetConfig(pkgManager)
 	if config == nil {
-		logger.Fatal(i18n.T("errors.packer.unsupported_package_manager"), "distro", distro)
-		return nil
+		return nil, errors.New(errors.ErrTypeConfiguration,
+			i18n.T("errors.packer.unsupported_package_manager")).
+			WithOperation("GetPackageManager").
+			WithContext("distro", distro)
 	}
 
 	switch pkgManager {
 	case "apk":
-		return apk.NewBuilder(pkgBuild)
+		return apk.NewBuilder(pkgBuild), nil
 	case "apt":
-		return deb.NewBuilder(pkgBuild, compressionDeb)
+		return deb.NewBuilder(pkgBuild, compressionDeb), nil
 	case "pacman":
-		return pacman.NewBuilder(pkgBuild)
+		return pacman.NewBuilder(pkgBuild), nil
 	case "yum":
-		return rpm.NewBuilder(pkgBuild, compressionRpm)
+		return rpm.NewBuilder(pkgBuild, compressionRpm), nil
 	case "zypper":
-		return rpm.NewBuilder(pkgBuild, compressionRpm)
+		return rpm.NewBuilder(pkgBuild, compressionRpm), nil
 	default:
-		logger.Fatal(i18n.T("errors.packer.unsupported_linux_distro"),
-			"distro", distro)
+		return nil, errors.New(errors.ErrTypeConfiguration,
+			i18n.T("errors.packer.unsupported_linux_distro")).
+			WithOperation("GetPackageManager").
+			WithContext("distro", distro)
 	}
-
-	return nil
 }

@@ -318,7 +318,12 @@ func TestProcessDepends(t *testing.T) {
 
 	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(createTestPKGBUILD(), "rpm")}
 	for _, tc := range testCases {
-		result := rpm.processDepends(tc.input)
+		result, err := rpm.processDepends(tc.input)
+		if err != nil {
+			t.Errorf("processDepends returned error: %v", err)
+			continue
+		}
+
 		if result == nil {
 			t.Error("processDepends returned nil")
 			continue
@@ -598,7 +603,11 @@ func TestExtractFileModTimeUint32(t *testing.T) {
 		t.Fatalf("Failed to stat test file: %v", err)
 	}
 
-	modTime := extractFileModTimeUint32(fileInfo)
+	modTime, err := extractFileModTimeUint32(fileInfo)
+	if err != nil {
+		t.Fatalf("extractFileModTimeUint32 returned error: %v", err)
+	}
+
 	expectedTime := uint32(fileInfo.ModTime().Unix())
 
 	if modTime != expectedTime {
