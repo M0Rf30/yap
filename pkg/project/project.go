@@ -742,8 +742,9 @@ func (mpc *MultipleProject) getRuntimeDeps() []string {
 	return result
 }
 
-// filterProjects filters mpc.Projects to only include projects whose Name
-// matches one of the comma-separated names in the only parameter.
+// filterProjects filters mpc.Projects to only include projects whose PKGBUILD
+// pkgname matches one of the comma-separated names in the only parameter.
+// This is consistent with --from and --to which also match against pkgname.
 func (mpc *MultipleProject) filterProjects(only string) {
 	nameSet := make(map[string]bool)
 
@@ -761,7 +762,7 @@ func (mpc *MultipleProject) filterProjects(only string) {
 	filtered := make([]*Project, 0)
 
 	for _, proj := range mpc.Projects {
-		if nameSet[proj.Name] {
+		if nameSet[proj.Builder.PKGBUILD.PkgName] {
 			filtered = append(filtered, proj)
 		}
 	}
