@@ -454,6 +454,7 @@ func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error 
 	runner, err := interp.New(
 		interp.Env(expand.ListEnviron(mergedEnv...)),
 		interp.StdIO(nil, teeWriter, teeWriter),
+		interp.ExecHandlers(archiveExecHandler),
 	)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.failed_to_create_script_runner")).
