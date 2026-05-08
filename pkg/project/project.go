@@ -781,6 +781,14 @@ func (mpc *MultipleProject) filterProjects(only string) {
 // path: The path to the projects.
 // error: An error if any occurred during the population process.
 func (mpc *MultipleProject) populateProjects(distro, release, path string) error {
+	// Resolve path to absolute so $repodir is always an absolute path in scripts.
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+
+	path = absPath
+
 	projects := make([]*Project, 0)
 
 	for _, child := range mpc.Projects {
@@ -795,10 +803,10 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
-		// RepoDir is the directory containing yap.json — the repo root.
-		// Exposed as $repodir in build/package scripts so PKGBUILDs can
-		// reference sibling directories without hardcoding /project.
-		pkgbuildFile.RepoDir = path
+		// RepoDir is the git repository root, found by walking up from the
+		// yap.json directory until a .git entry is found. Empty if not in a
+		// git repo. Exposed as $repodir in build/package scripts.
+		pkgbuildFile.RepoDir = findGitRoot(path)
 
 		// Set target architecture for cross-compilation if specified
 		if TargetArch != "" {
@@ -1814,4 +1822,26 @@ func isPackageArtifact(fileName string) bool {
 	}
 
 	return false
+}
+
+// findGitRoot walks up the directory tree from dir until it finds a .git
+// directory (not a file — .git files are submodule markers and are skipped so
+// that the top-level repository root is always returned). Returns an empty
+// string if no .git directory is found before reaching the filesystem root.
+func findGitRoot(dir string) string {
+	current := dir
+
+	for {
+		info, err := os.Stat(filepath.Join(current, ".git"))
+		if err == nil && info.IsDir() {
+			return current
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			return ""
+		}
+
+		current = parent
+	}
 }

@@ -114,7 +114,7 @@ type PKGBUILD struct {
 	HelperFunctions map[string]string
 	Home            string
 	HostArch        string // Host architecture for cross-compilation (where package will run)
-	RepoDir         string // Root of the repository (directory containing yap.json)
+	RepoDir         string // Git repository root (walks up from yap.json dir to find .git; empty if not found)
 	Install         string
 	InstalledSize   int64
 	License         []string
@@ -560,6 +560,7 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 //
 // The returned slice includes:
 //   - pkgdir, srcdir, startdir, repodir — per-package directory paths
+//     (repodir = git repository root; empty string if not in a git repo)
 //   - pkgname, pkgver, pkgrel — per-package identity fields
 //   - CPATH, LIBRARY_PATH, PKG_CONFIG_PATH — sysroot search paths (including
 //     Debian multiarch and RPM lib64 directories) prepended to their current
