@@ -104,6 +104,113 @@ func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU b
 	return CreateTarCompressed(ctx, sourceDir, outputFile, "zstd", formatGNU)
 }
 
+// ExtractFiltered extracts an archive file to the destination directory,
+// only including entries whose NameInArchive matches at least one of the
+// provided glob patterns (using filepath.Match semantics).  If patterns is
+// empty every entry is extracted (equivalent to Extract).
+func ExtractFiltered(ctx context.Context, source, destination string, patterns []string) error {
+	if len(patterns) == 0 {
+		return Extract(ctx, source, destination)
+	}
+
+	sourceFile, err := os.Open(filepath.Clean(source))
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if closeErr := sourceFile.Close(); closeErr != nil {
+			logger.Warn(i18n.T("logger.archive.warn.close_failed"), "path", source, "error", closeErr)
+		}
+	}()
+
+	format, archiveReader, _ := archives.Identify(ctx, "", sourceFile)
+
+	extractor, ok := format.(archives.Extractor)
+	if !ok {
+		return nil
+	}
+
+	dirMap := make(map[string]bool)
+
+	return extractor.Extract(
+		ctx,
+		archiveReader,
+		func(_ context.Context, archiveFile archives.FileInfo) error {
+			name := archiveFile.NameInArchive
+
+			// Check whether this entry matches any of the caller's patterns.
+			matched := false
+
+			for _, pat := range patterns {
+				// filepath.Match handles "conf/*" style globs.
+				if ok, _ := filepath.Match(pat, name); ok {
+					matched = true
+
+					break
+				}
+
+				// Also match if the entry is inside a directory that matches.
+				if ok, _ := filepath.Match(pat, filepath.Dir(name)); ok {
+					matched = true
+
+					break
+				}
+			}
+
+			if !matched {
+				return nil
+			}
+
+			newPath := filepath.Join(destination, name)
+
+			if archiveFile.IsDir() {
+				dirMap[newPath] = true
+
+				return os.MkdirAll(newPath, 0o755) // #nosec
+			}
+
+			fileDir := filepath.Dir(newPath)
+			if _, seen := dirMap[fileDir]; !seen {
+				dirMap[fileDir] = true
+
+				_ = os.MkdirAll(fileDir, 0o755) // #nosec
+			}
+
+			cleanNewPath := filepath.Clean(newPath)
+
+			newFile, err := os.OpenFile(cleanNewPath,
+				os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+				archiveFile.Mode())
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				if closeErr := newFile.Close(); closeErr != nil {
+					logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_new_1"),
+						"path", cleanNewPath,
+						"error", closeErr)
+				}
+			}()
+
+			archiveFileTemp, err := archiveFile.Open()
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				if closeErr := archiveFileTemp.Close(); closeErr != nil {
+					logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_archive_1"), "error", closeErr)
+				}
+			}()
+
+			_, err = io.CopyBuffer(newFile, archiveFileTemp, make([]byte, 32*1024))
+
+			return err
+		})
+}
+
 // Extract extracts an archive file to the specified destination directory.
 // It opens the source archive file, identifies its format, and extracts it to the destination.
 //
