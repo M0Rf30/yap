@@ -1955,6 +1955,46 @@ func TestSetupSysrootEnvironment_PrependsToExisting(t *testing.T) {
 	}
 }
 
+func TestSetupSysrootEnvironment_DiscoverCustomPrefix(t *testing.T) {
+	for _, v := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "CFLAGS", "CPPFLAGS", "LDFLAGS"} {
+		t.Setenv(v, "")
+	}
+
+	parent := t.TempDir()
+	pb := &PKGBUILD{StartDir: filepath.Join(parent, "mypkg"), ArchComputed: "x86_64"}
+	sysroot := filepath.Join(parent, "yap-sysroot")
+
+	// Simulate carbonio-libevent extracted to a custom prefix inside the sysroot.
+	customPkgConfig := filepath.Join(sysroot, "opt", "zextras", "common", "lib", "pkgconfig")
+	customInclude := filepath.Join(sysroot, "opt", "zextras", "common", "include")
+	customLib := filepath.Join(sysroot, "opt", "zextras", "common", "lib")
+
+	for _, dir := range []string{customPkgConfig, customInclude, customLib} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("MkdirAll %s: %v", dir, err)
+		}
+	}
+
+	if err := pb.SetupSysrootEnvironment(); err != nil {
+		t.Fatalf("SetupSysrootEnvironment: %v", err)
+	}
+
+	pkgconfig := os.Getenv("PKG_CONFIG_PATH")
+	if !strings.Contains(pkgconfig, customPkgConfig) {
+		t.Errorf("PKG_CONFIG_PATH=%q missing custom prefix pkgconfig dir %q", pkgconfig, customPkgConfig)
+	}
+
+	cpath := os.Getenv("CPATH")
+	if !strings.Contains(cpath, customInclude) {
+		t.Errorf("CPATH=%q missing custom prefix include dir %q", cpath, customInclude)
+	}
+
+	libpath := os.Getenv("LIBRARY_PATH")
+	if !strings.Contains(libpath, customLib) {
+		t.Errorf("LIBRARY_PATH=%q missing custom prefix lib dir %q", libpath, customLib)
+	}
+}
+
 func TestSetupSysrootEnvironment_NoZextras(t *testing.T) {
 	for _, v := range []string{"CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "CFLAGS", "CPPFLAGS", "LDFLAGS"} {
 		t.Setenv(v, "")
