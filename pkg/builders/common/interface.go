@@ -324,6 +324,65 @@ func getUpdateCommand(format string) string {
 	}
 }
 
+// qualifyDepsForTargetArch rewrites a list of package names so they are
+// installed for the target (cross) architecture rather than the host arch.
+//
+// DEB: appends ":arm64" (or the appropriate DEB arch name) — requires the
+// target architecture to be registered with dpkg --add-architecture first
+// (handled by the Docker images).
+//
+// RPM: appends ".aarch64" (or the appropriate RPM arch name) — dnf/yum
+// accept "pkgname.arch" to pin the architecture of an install.
+//
+// Packages that already carry an arch qualifier are left unchanged to avoid
+// double-suffixing.  Version constraints in DEB format ("pkg (>= 1.0)") are
+// handled by suffixing only the name token.
+func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string {
+	archMapping := constants.GetArchMapping()
+	fmtArch := archMapping.TranslateArch(format, targetArch)
+
+	qualified := make([]string, len(deps))
+
+	for i, dep := range deps {
+		switch format {
+		case constants.FormatDEB:
+			// DEB version constraint: "libssl-dev (>= 1.0)" — suffix name only.
+			// Skip if already qualified (contains ':').
+			if strings.Contains(dep, ":") {
+				qualified[i] = dep
+				continue
+			}
+
+			if idx := strings.Index(dep, " ("); idx != -1 {
+				qualified[i] = dep[:idx] + ":" + fmtArch + dep[idx:]
+			} else {
+				qualified[i] = dep + ":" + fmtArch
+			}
+
+		case constants.FormatRPM:
+			// RPM: "pkgname.arch" — skip if already has a dot-arch suffix
+			// (heuristic: last token after final '.' is a known arch string).
+			if idx := strings.LastIndex(dep, "."); idx != -1 {
+				suffix := dep[idx+1:]
+				if suffix == constants.ArchX86_64 || suffix == constants.ArchAarch64 ||
+					suffix == constants.ArchI686 || suffix == constants.ArchArmv7hl ||
+					suffix == constants.ArchNoarch || suffix == constants.ArchPpc64le ||
+					suffix == constants.ArchS390x {
+					qualified[i] = dep
+					continue
+				}
+			}
+
+			qualified[i] = dep + "." + fmtArch
+
+		default:
+			qualified[i] = dep
+		}
+	}
+
+	return qualified
+}
+
 // Prepare installs build dependencies using the appropriate package manager.
 // This consolidates duplicated Prepare methods across all builders.
 func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
@@ -343,6 +402,25 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 		}
 
 		installArgs = append(installArgs, crossDeps...)
+
+		// Qualify makedepends with the target architecture so the package
+		// manager installs the target-arch variant of each library.
+		//
+		// DEB only: ":arm64" qualifiers work because the Docker images register
+		// the target arch with dpkg --add-architecture and add the ports repo.
+		//
+		// RPM is intentionally excluded: Rocky/Fedora x86_64 containers do not
+		// carry aarch64 -devel packages in their repos. The cross-compiler
+		// toolchain bundles its own sysroot, so host-arch -devel packages are
+		// used directly (the cross-compiler is pointed at them via PKG_CONFIG_PATH
+		// and CROSS_COMPILE set in SetupCrossCompilationEnvironment).
+		if bb.Format == constants.FormatDEB {
+			makeDepends = qualifyDepsForTargetArch(makeDepends, bb.Format, targetArch)
+			logger.Info("Qualifying makedepends for target architecture",
+				"target_arch", targetArch,
+				"format", bb.Format,
+				"packages", strings.Join(makeDepends, ", "))
+		}
 	}
 
 	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, makeDepends)

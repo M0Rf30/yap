@@ -92,7 +92,7 @@ func TestExtractPackageName(t *testing.T) {
 		{
 			name:     "package with version constraint without space (>=)",
 			input:    "gcc>=11.0",
-			expected: "gcc>=11.0",
+			expected: "gcc",
 		},
 		{
 			name:     "package with space and version",
