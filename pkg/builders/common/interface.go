@@ -352,12 +352,12 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 // This consolidates duplicated PrepareEnvironment methods across all builders.
 // Uses the package-level SkipToolchainValidation variable to control validation.
 func (bb *BaseBuilder) PrepareEnvironment(golang bool, targetArch string) error {
-	return bb.PrepareEnvironmentWithValidation(golang, targetArch, SkipToolchainValidation)
+	return bb.prepareEnvironmentWithValidation(golang, targetArch, SkipToolchainValidation)
 }
 
-// PrepareEnvironmentWithValidation sets up the build environment with optional toolchain validation.
+// prepareEnvironmentWithValidation sets up the build environment with optional toolchain validation.
 // This version allows callers to skip toolchain validation if needed.
-func (bb *BaseBuilder) PrepareEnvironmentWithValidation(golang bool, targetArch string, skipValidation bool) error {
+func (bb *BaseBuilder) prepareEnvironmentWithValidation(golang bool, targetArch string, skipValidation bool) error {
 	allArgs := bb.SetupEnvironmentDependencies(golang)
 
 	// Add cross-compilation dependencies if target architecture is different
@@ -380,7 +380,7 @@ func (bb *BaseBuilder) PrepareEnvironmentWithValidation(golang bool, targetArch 
 		err = bb.SetupCrossCompilationEnvironment(targetArch)
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "failed to setup cross-compilation environment").
-				WithOperation("PrepareEnvironmentWithValidation")
+				WithOperation("prepareEnvironmentWithValidation")
 		}
 	}
 
@@ -601,6 +601,7 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 
 	// Set up Rust cross-compilation environment variables
 	rustTarget := bb.getRustTargetArchitecture(targetArch)
+
 	rustTargetUpper := ""
 	if rustTarget != "" {
 		rustTargetUpper = strings.ToUpper(strings.ReplaceAll(rustTarget, "-", "_"))
@@ -821,4 +822,25 @@ func (bb *BaseBuilder) getGNUTriplet(arch string) string {
 	}
 
 	return ""
+}
+
+// PrepareScriptletWithHelpers prepends the PKGBUILD helper function preamble to a scriptlet body.
+// Returns the body unchanged if no preamble is needed.
+func (bb *BaseBuilder) PrepareScriptletWithHelpers(body string) string {
+	preamble := bb.PKGBUILD.HelperFunctionsPreamble(body)
+	if preamble == "" {
+		return body
+	}
+
+	return preamble + body
+}
+
+// ReadAndValidateChangelog reads the changelog from PKGBUILD and returns nil, nil if no changelog is present.
+func (bb *BaseBuilder) ReadAndValidateChangelog() ([]byte, error) {
+	data, err := bb.PKGBUILD.ReadChangelog()
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }

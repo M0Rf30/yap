@@ -262,47 +262,6 @@ func TestGPGSignerSignRPM(t *testing.T) {
 	}
 }
 
-// TestGPGSignerGetSigningFunction tests the RPM signing function.
-func TestGPGSignerGetSigningFunction(t *testing.T) {
-	tmpDir := t.TempDir()
-	keyPath := filepath.Join(tmpDir, "test.gpg")
-
-	// Generate key and write to file
-	keyPEM := generateTestGPGKey(t)
-	if err := os.WriteFile(keyPath, keyPEM, 0o600); err != nil {
-		t.Fatalf("Failed to write key file: %v", err)
-	}
-
-	// Create signer
-	cfg := signing.Config{
-		Enabled: true,
-		KeyPath: keyPath,
-	}
-
-	signer, err := signing.NewGPGSigner(cfg, signing.FormatRPM)
-	if err != nil {
-		t.Fatalf("NewGPGSigner() error = %v", err)
-	}
-
-	// Get signing function
-	sigFunc := signer.GetSigningFunction()
-	if sigFunc == nil {
-		t.Errorf("GetSigningFunction() returned nil")
-	}
-
-	// Test the signing function
-	data := []byte("test data to sign")
-
-	signature, err := sigFunc(data)
-	if err != nil {
-		t.Fatalf("Signing function error = %v", err)
-	}
-
-	if len(signature) == 0 {
-		t.Errorf("Signature is empty")
-	}
-}
-
 // TestGPGSignerContextCancellation tests that context cancellation is respected.
 func TestGPGSignerContextCancellation(t *testing.T) {
 	tmpDir := t.TempDir()

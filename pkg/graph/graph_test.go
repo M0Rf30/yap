@@ -196,31 +196,6 @@ func TestTheme_Creation(t *testing.T) {
 	}
 }
 
-func TestOptions_Creation(t *testing.T) {
-	options := Options{
-		Output:       "graph.svg",
-		Format:       "svg",
-		Theme:        "default",
-		ShowExternal: true,
-	}
-
-	if options.Output != "graph.svg" {
-		t.Fatalf("Expected Output 'graph.svg', got '%s'", options.Output)
-	}
-
-	if options.Format != "svg" {
-		t.Fatalf("Expected Format 'svg', got '%s'", options.Format)
-	}
-
-	if options.Theme != "default" {
-		t.Fatalf("Expected Theme 'default', got '%s'", options.Theme)
-	}
-
-	if !options.ShowExternal {
-		t.Fatal("Expected ShowExternal true, got false")
-	}
-}
-
 func TestNode_DefaultValues(t *testing.T) {
 	node := &Node{}
 

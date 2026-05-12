@@ -8,12 +8,6 @@ import (
 )
 
 const (
-	// ColorYellow defines the ANSI color code for yellow text.
-	ColorYellow = "\033[33m"
-	// ColorBlue defines the ANSI color code for blue text.
-	ColorBlue = "\033[34m"
-	// ColorWhite defines the ANSI color code for white text.
-	ColorWhite = "\033[37m"
 	// DockerOrg defines the Docker organization prefix for YAP containers.
 	DockerOrg = "docker.io/m0rf30/yap-"
 	// Git defines the git command name.
@@ -81,8 +75,6 @@ var (
 	DistroPackageManager = map[string]string{}
 	// PackagersSet contains the set of supported package managers.
 	PackagersSet = set.NewSet()
-	// CleanPrevious controls whether to clean previous builds.
-	CleanPrevious = false
 )
 
 // init initializes the package.

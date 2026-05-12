@@ -48,8 +48,6 @@ const (
 	PMApk = "apk"
 	// PMApt is the Debian/Ubuntu package manager.
 	PMApt = "apt"
-	// PMDnf is the modern RPM-based package manager (Fedora, RHEL 8+).
-	PMDnf = "dnf"
 	// PMPacman is the Arch Linux package manager.
 	PMPacman = "pacman"
 	// PMYum is the legacy RPM-based package manager.

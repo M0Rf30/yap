@@ -78,7 +78,7 @@ func printOrganizedFlags(cmd *cobra.Command) {
 			"cleanbuild", "nobuild", commandZap,
 		},
 		"Dependency Management": {
-			"nomakedeps", "skip-sync",
+			"nomakedeps", flagSkipSync,
 		},
 		"Version Control": {
 			"pkgver", "pkgrel",
@@ -87,7 +87,7 @@ func printOrganizedFlags(cmd *cobra.Command) {
 			"ssh-password",
 		},
 		"Build Range Control": {
-			"from", "to",
+			flagFrom, "to",
 		},
 	}
 

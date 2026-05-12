@@ -333,6 +333,7 @@ func (a *Apk) writeFileWithChecksum(
 		// Pass 1: compute SHA1 by streaming (no full buffer)
 		// #nosec G401 -- SHA1 required by APK format for checksum headers
 		hasher := sha1.New()
+
 		f1, err := file.Open()
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypePackaging,
@@ -340,13 +341,16 @@ func (a *Apk) writeFileWithChecksum(
 				WithOperation("writeFileWithChecksum").
 				WithContext("file", file.NameInArchive)
 		}
+
 		if _, err := io.Copy(hasher, f1); err != nil {
 			_ = f1.Close()
+
 			return errors.Wrap(err, errors.ErrTypePackaging,
 				fmt.Sprintf("file %s: computing checksum", file.NameInArchive)).
 				WithOperation("writeFileWithChecksum").
 				WithContext("file", file.NameInArchive)
 		}
+
 		_ = f1.Close()
 
 		hdr.PAXRecords["APK-TOOLS.checksum.SHA1"] = hex.EncodeToString(hasher.Sum(nil))

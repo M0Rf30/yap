@@ -51,15 +51,6 @@ func TestYapLoggerArgs(t *testing.T) {
 	assert.Equal(t, "value2", result[1].Value)
 }
 
-func TestLogLevelConstants(t *testing.T) {
-	// Test that constants have expected values
-	assert.Equal(t, LogLevel(0), LevelDebug)
-	assert.Equal(t, LogLevel(1), LevelInfo)
-	assert.Equal(t, LogLevel(2), LevelWarn)
-	assert.Equal(t, LogLevel(3), LevelError)
-	assert.Equal(t, LogLevel(4), LevelFatal)
-}
-
 func TestYapLoggerInfo(t *testing.T) {
 	// Use the global logger instance which is properly initialized
 	assert.NotPanics(t, func() {

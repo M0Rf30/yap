@@ -163,19 +163,6 @@ func processDependencies(
 	}
 }
 
-// DistroProject is an interface that defines the methods for creating and
-// preparing a project for a specific distribution.
-//
-// It includes the following methods:
-//   - Create(): error
-//     This method is responsible for creating the project.
-//   - Prepare(): error
-//     This method is responsible for preparing the project.
-type DistroProject interface {
-	Create() error
-	Prepare() error
-}
-
 // MultipleProject represents a collection of projects.
 //
 // It contains a slice of Project objects and provides methods to interact
@@ -185,7 +172,7 @@ type DistroProject interface {
 // packages and the ToPkgName field, which can be used to stop the build
 // process after a specific package.
 type MultipleProject struct {
-	BuildDir       string              `json:"buildDir"       validate:"required"`
+	BuildDir       string          `json:"buildDir"       validate:"required"`
 	Description    string          `json:"description"    validate:"required"`
 	Name           string          `json:"name"           validate:"required"`
 	Output         string          `json:"output"         validate:"required"`
@@ -356,6 +343,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		if err != nil {
 			return err
 		}
+
 		mpc.Output = absOutput
 	}
 
@@ -405,6 +393,7 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 				err := proj.Builder.Compile(NoBuild)
 				if err != nil {
 					cancel()
+
 					errorChan <- err
 
 					return
@@ -415,6 +404,7 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 					err := mpc.createPackage(proj)
 					if err != nil {
 						cancel()
+
 						errorChan <- err
 
 						return
@@ -424,6 +414,7 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 					if shouldInstall {
 						if err := mpc.installPackageForWorker(proj, pkgName, workerIDStr); err != nil {
 							cancel()
+
 							errorChan <- err
 
 							return
@@ -988,12 +979,6 @@ func (mpc *MultipleProject) setSingleProject(path string) {
 	mpc.Output = cleanFilePath
 	mpc.Projects = append(mpc.Projects, proj)
 	singleProject = true
-}
-
-// ReadProjectOnly reads the project configuration without initializing distro-specific components.
-// This is useful for operations like graph generation that only need project structure.
-func (mpc *MultipleProject) ReadProjectOnly(path string) error {
-	return mpc.readProject(path)
 }
 
 // validateJSON validates the JSON of the MultipleProject struct.
@@ -1787,6 +1772,7 @@ func (mpc *MultipleProject) generateSBOM(proj *Project, artifactPath string) err
 	}
 
 	opts := sbom.Options{Formats: formats}
+
 	_, err := sbom.Generate(proj.Builder.PKGBUILD, artifactPath, opts)
 	if err != nil {
 		return yerrors.Wrap(err, yerrors.ErrTypeBuild,
