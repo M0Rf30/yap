@@ -45,6 +45,9 @@ ARG VERSION=dev
 ARG TARGETARCH=amd64
 ARG GO_VERSION=1.26.1
 
+# Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Metadata labels
 LABEL org.opencontainers.image.title="yap-debian-jessie"
 LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Debian 8 (Jessie) with Go runtime 📦🐹"
@@ -58,6 +61,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Preseed debconf to prevent resolvconf postinst failure in containers
 RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
+
+# Add arm64 multiarch support
+RUN dpkg --add-architecture arm64 && \
+    sed -i 's/^deb http/deb [arch=amd64] http/g' /etc/apt/sources.list && \
+    echo "deb [arch=arm64] http://deb.debian.org/debian-ports/ jessie main" >> /etc/apt/sources.list && \
+    apt-get update && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install minimal runtime dependencies
 RUN apt-get update && \

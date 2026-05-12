@@ -57,8 +57,14 @@ LABEL org.opencontainers.image.version="${VERSION}"
 # Install minimal runtime dependencies
 RUN dnf -y update && dnf -y install \
     bash-completion \
+    binutils \
     ca-certificates \
+    dnf-plugins-core \
+    epel-release \
+    findutils \
     sudo && \
+    dnf config-manager --enable devel && \
+    dnf config-manager --enable powertools && \
     dnf clean all && rm -rf /var/cache/dnf
 
 # Create non-root user
