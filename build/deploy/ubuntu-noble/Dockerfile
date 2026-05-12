@@ -77,8 +77,11 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Grant passwordless sudo for yap binary to existing ubuntu user (uid 1000)
-RUN echo 'ubuntu ALL=(ALL) NOPASSWD: /usr/bin/yap' >> /etc/sudoers
+# Remove default ubuntu user and create yap user at uid/gid 1000
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    groupadd -g 1000 yap && \
+    useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
+    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get' >> /etc/sudoers
 
 # Copy binary and completion from builder
 COPY --from=builder /usr/bin/yap /usr/bin/yap
@@ -88,6 +91,6 @@ COPY --from=builder /tmp/yap-completion.bash /usr/share/bash-completion/completi
 RUN echo "source /usr/share/bash-completion/bash_completion" >> /etc/bash.bashrc
 
 # Switch to non-root user
-USER ubuntu
+USER yap
 
 ENTRYPOINT ["yap"]
