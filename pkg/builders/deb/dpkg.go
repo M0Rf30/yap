@@ -16,6 +16,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -225,9 +226,7 @@ func (d *Package) addScriptlets() error {
 		// called within this scriptlet, so that helpers like _postinst() or
 		// _postinst_legacy() are available at install time without injecting
 		// unrelated build-time helpers (_package, _package_systemd, etc.).
-		if helperPreamble := d.PKGBUILD.HelperFunctionsPreamble(script); helperPreamble != "" {
-			script = helperPreamble + script
-		}
+		script = d.PrepareScriptletWithHelpers(script)
 
 		if name == prermScript || name == postrmScript {
 			script = removeHeader + script
@@ -308,7 +307,7 @@ func (d *Package) createDebconfFile(name, variable string) error {
 // usr/share/doc/<pkgname>/changelog.Debian.gz in the package directory.
 // Returns nil if no changelog is specified.
 func (d *Package) createChangelogFile() error {
-	changelogData, err := d.PKGBUILD.ReadChangelog()
+	changelogData, err := d.ReadAndValidateChangelog()
 	if err != nil {
 		return err
 	}
@@ -443,7 +442,8 @@ func (d *Package) createDebResources() error {
 
 	size, err := files.GetDirSize(d.PKGBUILD.PackageDir)
 	if err != nil {
-		return fmt.Errorf("failed to get package dir size: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to get package dir size").
+			WithOperation("createDebResources")
 	}
 
 	d.PKGBUILD.InstalledSize = size / 1024

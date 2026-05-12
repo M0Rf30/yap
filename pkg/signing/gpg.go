@@ -191,21 +191,6 @@ func (s *GPGSigner) Sign(ctx context.Context, artifactPath string) error {
 	return nil
 }
 
-// SignRPM returns a signing function suitable for rpmpack.SetPGPSigner.
-// This function takes the header+payload bytes and returns the signature bytes.
-func (s *GPGSigner) SignRPM(data []byte) ([]byte, error) {
-	signatureBuf := bytes.NewBuffer(nil)
-
-	err := s.createBinaryDetachedSignature(data, signatureBuf)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.ErrTypePackaging,
-			"failed to sign RPM data").
-			WithOperation("SignRPM")
-	}
-
-	return signatureBuf.Bytes(), nil
-}
-
 // createArmoredDetachedSignature creates an ASCII-armored detached signature.
 func (s *GPGSigner) createArmoredDetachedSignature(
 	data []byte,
@@ -248,10 +233,4 @@ func (s *GPGSigner) createBinaryDetachedSignature(
 	}
 
 	return nil
-}
-
-// GetSigningFunction returns a function suitable for rpmpack.SetPGPSigner.
-// This is used to integrate with rpmpack's built-in signing support.
-func (s *GPGSigner) GetSigningFunction() func([]byte) ([]byte, error) {
-	return s.SignRPM
 }

@@ -139,7 +139,6 @@ type PKGBUILD struct {
 	PostUpgrade   string
 	PreInst       string
 	Prepare       string
-	PreRelease    string
 	PreRm         string
 	PreTrans      string
 	PreUpgrade    string

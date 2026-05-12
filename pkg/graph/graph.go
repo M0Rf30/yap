@@ -50,11 +50,3 @@ type Theme struct {
 	BorderColor  string
 	GridColor    string
 }
-
-// Options represents configuration options for graph generation.
-type Options struct {
-	Output       string
-	Format       string
-	Theme        string
-	ShowExternal bool
-}

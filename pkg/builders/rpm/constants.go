@@ -4,16 +4,16 @@ package rpm
 import "github.com/M0Rf30/yap/v2/pkg/constants"
 
 const (
-	// Communications represents the applications/communications RPM group.
-	Communications = "Applications/Communications"
-	// Engineering represents the applications/engineering RPM group.
-	Engineering = "Applications/Engineering"
-	// Internet represents the applications/internet RPM group.
-	Internet = "Applications/Internet"
-	// Multimedia represents the applications/multimedia RPM group.
-	Multimedia = "Applications/Multimedia"
-	// Tools represents the development/tools RPM group.
-	Tools = "Development/Tools"
+	// communications represents the applications/communications RPM group.
+	communications = "Applications/Communications"
+	// engineering represents the applications/engineering RPM group.
+	engineering = "Applications/Engineering"
+	// internet represents the applications/internet RPM group.
+	internet = "Applications/Internet"
+	// multimedia represents the applications/multimedia RPM group.
+	multimedia = "Applications/Multimedia"
+	// tools represents the development/tools RPM group.
+	tools = "Development/Tools"
 	// applicationsSystem is the RPM group for system applications.
 	applicationsSystem = "Applications/System"
 	// rpmSuffixEL is the RPM dist tag suffix for Enterprise Linux distros.
@@ -34,35 +34,35 @@ var (
 	RPMGroups = map[string]string{
 		"admin":        applicationsSystem,
 		"any":          "noarch",
-		"comm":         Communications,
+		"comm":         communications,
 		"database":     "Applications/Databases",
 		"debug":        "Development/Debuggers",
-		"devel":        Tools,
+		"devel":        tools,
 		"doc":          "Documentation",
 		"editors":      "Applications/Editors",
-		"electronics":  Engineering,
-		"embedded":     Engineering,
+		"electronics":  engineering,
+		"embedded":     engineering,
 		"fonts":        "Interface/Desktops",
 		"games":        "Amusements/Games",
-		groupGraphics:  Multimedia,
-		"httpd":        Internet,
-		"interpreters": Tools,
+		groupGraphics:  multimedia,
+		"httpd":        internet,
+		"interpreters": tools,
 		"kernel":       "System Environment/Kernel",
 		"libdevel":     "Development/Libraries",
 		"libs":         "System Environment/Libraries",
 		"localization": "Development/Languages",
-		"mail":         Communications,
+		"mail":         communications,
 		"math":         "Applications/Productivity",
 		groupMisc:      applicationsSystem,
-		groupNet:       Internet,
+		groupNet:       internet,
 		"news":         "Applications/Publishing",
-		"science":      Engineering,
+		"science":      engineering,
 		"shells":       "System Environment/Shells",
-		"sound":        Multimedia,
+		"sound":        multimedia,
 		"text":         "Applications/Text",
-		"vcs":          Tools,
-		"video":        Multimedia,
-		groupWeb:       Internet,
+		"vcs":          tools,
+		"video":        multimedia,
+		groupWeb:       internet,
 		"x11":          "User Interface/X",
 	}
 

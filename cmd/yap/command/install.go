@@ -130,9 +130,7 @@ func installPackage(packageType, artifactPath string) error {
 // InitializeInstallDescriptions sets the localized descriptions for the install command.
 // This must be called after i18n is initialized.
 func InitializeInstallDescriptions() {
-	installCmd.Short = i18n.T("commands.install.short")
-	installCmd.Long = i18n.T("commands.install.long")
-	installCmd.Example = i18n.T("commands.install.examples")
+	initCommandDescriptions(installCmd, "install", map[string]string{})
 }
 
 //nolint:gochecknoinits // Required for cobra command initialization

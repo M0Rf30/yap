@@ -255,33 +255,30 @@ func logStructuredError(yapErr *yapErrors.YapError) {
 // InitializeBuildDescriptions sets the localized descriptions for the build command.
 // This must be called after i18n is initialized.
 func InitializeBuildDescriptions() {
-	buildCmd.Short = i18n.T("commands.build.short")
-	buildCmd.Long = i18n.T("commands.build.long")
-	buildCmd.Example = i18n.T("commands.build.examples")
-
-	// Update flag descriptions with localized text
-	buildCmd.Flag("cleanbuild").Usage = i18n.T("flags.build.cleanbuild")
-	buildCmd.Flag("nobuild").Usage = i18n.T("flags.build.nobuild")
-	buildCmd.Flag("zap").Usage = i18n.T("flags.build.zap")
-	buildCmd.Flag("nomakedeps").Usage = i18n.T("flags.build.nomakedeps")
-	buildCmd.Flag("skip-sync").Usage = i18n.T("flags.build.skip_sync")
-	buildCmd.Flag("skip-toolchain-validation").Usage = i18n.T("flags.build.skip_toolchain_validation")
-	buildCmd.Flag("parallel").Usage = i18n.T("flags.build.parallel")
-	buildCmd.Flag("pkgver").Usage = i18n.T("flags.build.pkgver")
-	buildCmd.Flag("pkgrel").Usage = i18n.T("flags.build.pkgrel")
-	buildCmd.Flag("ssh-password").Usage = i18n.T("flags.build.ssh_password")
-	buildCmd.Flag("from").Usage = i18n.T("flags.build.from")
-	buildCmd.Flag("to").Usage = i18n.T("flags.build.to")
-	buildCmd.Flag("only").Usage = i18n.T("flags.build.only")
-	buildCmd.Flag("target-arch").Usage = i18n.T("flags.build.target_arch")
-	buildCmd.Flag("sbom").Usage = i18n.T("flags.build.sbom")
-	buildCmd.Flag("sbom-format").Usage = i18n.T("flags.build.sbom_format")
-	buildCmd.Flag("compression-deb").Usage = i18n.T("flags.build.compression_deb")
-	buildCmd.Flag("compression-rpm").Usage = i18n.T("flags.build.compression_rpm")
-	buildCmd.Flag("sign").Usage = i18n.T("flags.build.sign")
-	buildCmd.Flag("sign-key").Usage = i18n.T("flags.build.sign_key")
-	buildCmd.Flag("sign-passphrase").Usage = i18n.T("flags.build.sign_passphrase")
-	buildCmd.Flag("sign-key-name").Usage = i18n.T("flags.build.sign_key_name")
+	initCommandDescriptions(buildCmd, "build", map[string]string{
+		"cleanbuild":                "flags.build.cleanbuild",
+		"nobuild":                   "flags.build.nobuild",
+		commandZap:                  "flags.build.zap",
+		"nomakedeps":                "flags.build.nomakedeps",
+		flagSkipSync:                "flags.build.skip_sync",
+		"skip-toolchain-validation": "flags.build.skip_toolchain_validation",
+		"parallel":                  "flags.build.parallel",
+		"pkgver":                    "flags.build.pkgver",
+		"pkgrel":                    "flags.build.pkgrel",
+		"ssh-password":              "flags.build.ssh_password",
+		flagFrom:                    "flags.build.from",
+		"to":                        "flags.build.to",
+		"only":                      "flags.build.only",
+		"target-arch":               "flags.build.target_arch",
+		"sbom":                      "flags.build.sbom",
+		"sbom-format":               "flags.build.sbom_format",
+		"compression-deb":           "flags.build.compression_deb",
+		"compression-rpm":           "flags.build.compression_rpm",
+		"sign":                      "flags.build.sign",
+		"sign-key":                  "flags.build.sign_key",
+		"sign-passphrase":           "flags.build.sign_passphrase",
+		"sign-key-name":             "flags.build.sign_key_name",
+	})
 }
 
 //nolint:gochecknoinits // Required for cobra command registration
@@ -323,7 +320,7 @@ func init() {
 	buildCmd.Flags().BoolVarP(&buildOpts.NoMakeDeps,
 		"nomakedeps", "d", false, "")
 	buildCmd.Flags().BoolVarP(&buildOpts.SkipSyncDeps,
-		"skip-sync", "s", false, "")
+		flagSkipSync, "s", false, "")
 	buildCmd.Flags().BoolVarP(&buildOpts.SkipToolchainValidation,
 		"skip-toolchain-validation", "", false, "")
 	buildCmd.Flags().BoolVarP(&buildOpts.Parallel,
@@ -341,7 +338,7 @@ func init() {
 
 	// BUILD RANGE CONTROL FLAGS
 	buildCmd.Flags().StringVarP(&buildOpts.FromPkgName,
-		"from", "", "", "")
+		flagFrom, "", "", "")
 	buildCmd.Flags().StringVarP(&buildOpts.ToPkgName,
 		"to", "", "", "")
 

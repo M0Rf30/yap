@@ -4,11 +4,9 @@ package sbom
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -90,22 +88,4 @@ func Generate(pkg *pkgbuild.PKGBUILD, artifactPath string,
 	}
 
 	return generatedFiles, nil
-}
-
-// ValidateOptions validates SBOM generation options.
-// Returns an error if the options are invalid.
-func ValidateOptions(opts Options) error {
-	for _, format := range opts.Formats {
-		switch format {
-		case FormatCycloneDX, FormatSPDX:
-			// Valid formats
-		default:
-			return errors.New(errors.ErrTypeConfiguration,
-				fmt.Sprintf("invalid SBOM format: %s", format)).
-				WithOperation("ValidateOptions").
-				WithContext("format", string(format))
-		}
-	}
-
-	return nil
 }

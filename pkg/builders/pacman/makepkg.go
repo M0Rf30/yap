@@ -18,6 +18,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/crypto"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -120,7 +121,8 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 func (m *Pkg) computeBuildMetadata(artifactsPath string) error {
 	installedSize, err := files.GetDirSize(m.PKGBUILD.PackageDir)
 	if err != nil {
-		return fmt.Errorf("failed to get package dir size: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to get package dir size").
+			WithOperation("computeBuildMetadata")
 	}
 
 	m.PKGBUILD.InstalledSize = installedSize
@@ -211,7 +213,7 @@ func (m *Pkg) writeInstallScriptIfNeeded() error {
 // writeChangelogIfPresent writes a .CHANGELOG file in the package root when
 // the PKGBUILD declares a changelog source.
 func (m *Pkg) writeChangelogIfPresent() error {
-	changelogData, err := m.PKGBUILD.ReadChangelog()
+	changelogData, err := m.ReadAndValidateChangelog()
 	if err != nil {
 		return err
 	}

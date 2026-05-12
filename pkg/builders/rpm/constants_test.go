@@ -14,11 +14,11 @@ func TestRPMGroupConstants(t *testing.T) {
 	}
 
 	actualConstants := map[string]string{
-		"Communications": Communications,
-		"Engineering":    Engineering,
-		"Internet":       Internet,
-		"Multimedia":     Multimedia,
-		"Tools":          Tools,
+		"Communications": communications,
+		"Engineering":    engineering,
+		"Internet":       internet,
+		"Multimedia":     multimedia,
+		"Tools":          tools,
 	}
 
 	for name, expected := range expectedConstants {
@@ -49,16 +49,16 @@ func TestRPMGroups(t *testing.T) {
 		}
 	}
 
-	if RPMGroups["comm"] != Communications {
-		t.Errorf("RPMGroups[comm] should map to Communications constant")
+	if RPMGroups["comm"] != communications {
+		t.Errorf("RPMGroups[comm] should map to communications constant")
 	}
 
-	if RPMGroups["devel"] != Tools {
-		t.Errorf("RPMGroups[devel] should map to Tools constant")
+	if RPMGroups["devel"] != tools {
+		t.Errorf("RPMGroups[devel] should map to tools constant")
 	}
 
-	if RPMGroups["graphics"] != Multimedia {
-		t.Errorf("RPMGroups[graphics] should map to Multimedia constant")
+	if RPMGroups["graphics"] != multimedia {
+		t.Errorf("RPMGroups[graphics] should map to multimedia constant")
 	}
 }
 
@@ -106,22 +106,22 @@ func TestRPMDistros(t *testing.T) {
 func TestRPMGroupMappingConsistency(t *testing.T) {
 	multimediaGroups := []string{"graphics", "sound", "video"}
 	for _, group := range multimediaGroups {
-		if RPMGroups[group] != Multimedia {
-			t.Errorf("RPMGroups[%s] should map to Multimedia, got %q", group, RPMGroups[group])
+		if RPMGroups[group] != multimedia {
+			t.Errorf("RPMGroups[%s] should map to multimedia, got %q", group, RPMGroups[group])
 		}
 	}
 
 	internetGroups := []string{"httpd", "net", "web"}
 	for _, group := range internetGroups {
-		if RPMGroups[group] != Internet {
-			t.Errorf("RPMGroups[%s] should map to Internet, got %q", group, RPMGroups[group])
+		if RPMGroups[group] != internet {
+			t.Errorf("RPMGroups[%s] should map to internet, got %q", group, RPMGroups[group])
 		}
 	}
 
 	engineeringGroups := []string{"electronics", "embedded", "science"}
 	for _, group := range engineeringGroups {
-		if RPMGroups[group] != Engineering {
-			t.Errorf("RPMGroups[%s] should map to Engineering, got %q", group, RPMGroups[group])
+		if RPMGroups[group] != engineering {
+			t.Errorf("RPMGroups[%s] should map to engineering, got %q", group, RPMGroups[group])
 		}
 	}
 }

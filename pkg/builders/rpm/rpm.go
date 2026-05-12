@@ -231,41 +231,28 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 	// to have a similar behaviour between deb and rpm.
 	onlyOnUninstall := "if [ $1 -ne 0 ]; then exit 0; fi\n"
 
-	// withHelpers prepends only the helper function definitions that are
-	// actually called within the given scriptlet body, so that helpers like
-	// _postinst() are available at install time without injecting unrelated
-	// build-time helpers (_package, _package_systemd, etc.).
-	withHelpers := func(body string) string {
-		preamble := r.PKGBUILD.HelperFunctionsPreamble(body)
-		if preamble == "" {
-			return body
-		}
-
-		return preamble + body
-	}
-
 	if r.PKGBUILD.PreTrans != "" {
-		rpm.AddPretrans(withHelpers(r.PKGBUILD.PreTrans))
+		rpm.AddPretrans(r.PrepareScriptletWithHelpers(r.PKGBUILD.PreTrans))
 	}
 
 	if r.PKGBUILD.PreInst != "" {
-		rpm.AddPrein(withHelpers(r.PKGBUILD.PreInst))
+		rpm.AddPrein(r.PrepareScriptletWithHelpers(r.PKGBUILD.PreInst))
 	}
 
 	if r.PKGBUILD.PostInst != "" {
-		rpm.AddPostin(withHelpers(r.PKGBUILD.PostInst))
+		rpm.AddPostin(r.PrepareScriptletWithHelpers(r.PKGBUILD.PostInst))
 	}
 
 	if r.PKGBUILD.PreRm != "" {
-		rpm.AddPreun(withHelpers(onlyOnUninstall + r.PKGBUILD.PreRm))
+		rpm.AddPreun(r.PrepareScriptletWithHelpers(onlyOnUninstall + r.PKGBUILD.PreRm))
 	}
 
 	if r.PKGBUILD.PostRm != "" {
-		rpm.AddPostun(withHelpers(onlyOnUninstall + r.PKGBUILD.PostRm))
+		rpm.AddPostun(r.PrepareScriptletWithHelpers(onlyOnUninstall + r.PKGBUILD.PostRm))
 	}
 
 	if r.PKGBUILD.PostTrans != "" {
-		rpm.AddPosttrans(withHelpers(r.PKGBUILD.PostTrans))
+		rpm.AddPosttrans(r.PrepareScriptletWithHelpers(r.PKGBUILD.PostTrans))
 	}
 }
 
@@ -276,7 +263,7 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 //
 // The rpm parameter is reserved for future use when rpmpack adds changelog API.
 func (r *RPM) addChangelog(_ *rpmpack.RPM) {
-	changelogData, err := r.PKGBUILD.ReadChangelog()
+	changelogData, err := r.ReadAndValidateChangelog()
 	if err != nil {
 		logger.Warn("failed to read changelog for RPM package",
 			"error", err)

@@ -37,3 +37,9 @@ const (
 const (
 	pmApk = "apk"
 )
+
+// Flag names used across multiple commands
+const (
+	flagSkipSync = "skip-sync"
+	flagFrom     = "from"
+)

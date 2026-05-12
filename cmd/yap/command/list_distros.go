@@ -5,7 +5,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
 // listDistrosCmd represents the listDistros command.
@@ -31,9 +30,7 @@ func ListDistros() {
 // InitializeListDistrosDescriptions sets the localized descriptions for the list-distros command.
 // This must be called after i18n is initialized.
 func InitializeListDistrosDescriptions() {
-	listDistrosCmd.Short = i18n.T("commands.list_distros.short")
-	listDistrosCmd.Long = i18n.T("commands.list_distros.long")
-	listDistrosCmd.Example = i18n.T("commands.list_distros.examples")
+	initCommandDescriptions(listDistrosCmd, "list_distros", map[string]string{})
 }
 
 //nolint:gochecknoinits // Required for cobra command registration

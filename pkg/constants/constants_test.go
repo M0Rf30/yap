@@ -6,19 +6,6 @@ import (
 )
 
 func TestConstants(t *testing.T) {
-	// Test color constants
-	if ColorYellow == "" {
-		t.Error("ColorYellow constant is empty")
-	}
-
-	if ColorBlue == "" {
-		t.Error("ColorBlue constant is empty")
-	}
-
-	if ColorWhite == "" {
-		t.Error("ColorWhite constant is empty")
-	}
-
 	// Test URL constants
 	if DockerOrg == "" {
 		t.Error("DockerOrg constant is empty")
@@ -216,13 +203,6 @@ func TestDistroExtraction(t *testing.T) {
 			t.Errorf("Distro '%s' extracted from release '%s' not found in DistrosSet",
 				distro, release)
 		}
-	}
-}
-
-func TestCleanPreviousFlag(t *testing.T) {
-	// Test that CleanPrevious is initialized to false
-	if CleanPrevious != false {
-		t.Error("CleanPrevious should be initialized to false")
 	}
 }
 

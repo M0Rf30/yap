@@ -28,22 +28,6 @@ func argsToLoggerArgs(args ...any) []pterm.LoggerArgument {
 	return loggerArgs
 }
 
-// LogLevel represents the severity level of log messages for compatibility.
-type LogLevel int
-
-const (
-	// LevelDebug represents the debug log level.
-	LevelDebug LogLevel = iota
-	// LevelInfo represents the info log level.
-	LevelInfo
-	// LevelWarn represents the warning log level.
-	LevelWarn
-	// LevelError represents the error log level.
-	LevelError
-	// LevelFatal represents the fatal log level.
-	LevelFatal
-)
-
 var (
 	// MultiPrinter is the default multiprinter for concurrent logging.
 	MultiPrinter = pterm.DefaultMultiPrinter

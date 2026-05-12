@@ -67,13 +67,10 @@ var zapCmd = &cobra.Command{
 // InitializeZapDescriptions sets the localized descriptions for the zap command.
 // This must be called after i18n is initialized.
 func InitializeZapDescriptions() {
-	zapCmd.Short = i18n.T("commands.zap.short")
-	zapCmd.Long = i18n.T("commands.zap.long")
-	zapCmd.Example = i18n.T("commands.zap.examples")
-
-	// Update flag descriptions with localized text
-	zapCmd.Flag("from").Usage = i18n.T("flags.zap.from")
-	zapCmd.Flag("to").Usage = i18n.T("flags.zap.to")
+	initCommandDescriptions(zapCmd, "zap", map[string]string{
+		flagFrom: "flags.zap.from",
+		"to":     "flags.zap.to",
+	})
 }
 
 //nolint:gochecknoinits // Required for cobra command registration
@@ -104,7 +101,7 @@ func init() {
 
 	// BUILD RANGE CONTROL FLAGS - same as build command for target support
 	zapCmd.Flags().StringVarP(&project.FromPkgName,
-		"from", "", "", "")
+		flagFrom, "", "", "")
 	zapCmd.Flags().StringVarP(&project.ToPkgName,
 		"to", "", "", "")
 }

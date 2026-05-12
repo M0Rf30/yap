@@ -33,18 +33,13 @@ var graphCmd = &cobra.Command{
 
 // InitializeGraphDescriptions sets the localized descriptions for the graph command.
 // This must be called after i18n is initialized.
-//
-//nolint:dupl // Similar pattern across all command initializations
 func InitializeGraphDescriptions() {
-	graphCmd.Short = i18n.T("commands.graph.short")
-	graphCmd.Long = i18n.T("commands.graph.long")
-	graphCmd.Example = i18n.T("commands.graph.examples")
-
-	// Update flag descriptions with localized text
-	graphCmd.Flag("output").Usage = i18n.T("flags.graph.output")
-	graphCmd.Flag("format").Usage = i18n.T("flags.graph.format")
-	graphCmd.Flag("theme").Usage = i18n.T("flags.graph.theme")
-	graphCmd.Flag("show-external").Usage = i18n.T("flags.graph.show_external")
+	initCommandDescriptions(graphCmd, "graph", map[string]string{
+		"output":        "flags.graph.output",
+		"format":        "flags.graph.format",
+		"theme":         "flags.graph.theme",
+		"show-external": "flags.graph.show_external",
+	})
 }
 
 //nolint:gochecknoinits // Required for cobra command registration

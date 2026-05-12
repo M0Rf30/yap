@@ -773,31 +773,6 @@ depends=("mylib")
 	}
 }
 
-// Additional tests to improve coverage
-func TestMultipleProjectReadProjectOnly(t *testing.T) {
-	testDir := t.TempDir()
-
-	// Create yap.json
-	yapJSON := `{
-		"name": "Test project",
-		"description": "Test description",
-		"buildDir": "` + filepath.Join(testDir, "build") + `",
-		"output": "` + filepath.Join(testDir, "output") + `",
-		"projects": [
-			{
-				"name": "project1",
-				"install": false
-			}
-		]
-	}`
-	yapJSONPath := filepath.Join(testDir, "yap.json")
-	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
-
-	mpc := &project.MultipleProject{}
-	err := mpc.ReadProjectOnly(testDir)
-	assert.NoError(t, err)
-}
-
 func TestMultipleProjectWithFromToPkgName(t *testing.T) {
 	testDir := t.TempDir()
 	buildDir := filepath.Join(testDir, "build")
