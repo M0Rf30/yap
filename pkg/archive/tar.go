@@ -108,6 +108,8 @@ func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU b
 // only including entries whose NameInArchive matches at least one of the
 // provided glob patterns (using filepath.Match semantics).  If patterns is
 // empty every entry is extracted (equivalent to Extract).
+//
+//nolint:gocyclo,cyclop // symlink + dir + file handling requires branching; splitting would harm readability
 func ExtractFiltered(ctx context.Context, source, destination string, patterns []string) error {
 	if len(patterns) == 0 {
 		return Extract(ctx, source, destination)
@@ -178,6 +180,12 @@ func ExtractFiltered(ctx context.Context, source, destination string, patterns [
 			}
 
 			cleanNewPath := filepath.Clean(newPath)
+
+			// Handle symlinks: create them instead of trying to open as a regular file.
+			if archiveFile.Mode()&os.ModeSymlink != 0 {
+				_ = os.Remove(cleanNewPath) // remove stale symlink/file if present
+				return os.Symlink(archiveFile.LinkTarget, cleanNewPath)
+			}
 
 			newFile, err := os.OpenFile(cleanNewPath,
 				os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
@@ -263,6 +271,12 @@ func Extract(ctx context.Context, source, destination string) error {
 			}
 
 			cleanNewPath := filepath.Clean(newPath)
+
+			// Handle symlinks: create them instead of trying to open as a regular file.
+			if archiveFile.Mode()&os.ModeSymlink != 0 {
+				_ = os.Remove(cleanNewPath) // remove stale symlink/file if present
+				return os.Symlink(archiveFile.LinkTarget, cleanNewPath)
+			}
 
 			// Check if file already exists and has the same size to avoid re-extraction
 			if existingInfo, err := os.Stat(cleanNewPath); err == nil {
