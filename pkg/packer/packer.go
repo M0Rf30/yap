@@ -14,8 +14,8 @@ import (
 )
 
 // InstallOrExtractor is implemented by package builders that extract built
-// artifacts into the yap-sysroot directory so that dependent packages can
-// resolve headers and libraries without installing to the root filesystem.
+// artifacts to the root filesystem (/) so that dependent packages can
+// resolve headers and libraries.
 type InstallOrExtractor interface {
 	InstallOrExtract(artifactsPath, buildDir, targetArch string) error
 }

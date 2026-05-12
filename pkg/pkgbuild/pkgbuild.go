@@ -702,44 +702,8 @@ func (pkgBuild *PKGBUILD) SetPackageDirForSplit(subPkgName string) {
 //   - pkgdir, srcdir, startdir, repodir — per-package directory paths
 //     (repodir = git repository root; empty string if not in a git repo)
 //   - pkgname, pkgver, pkgrel — per-package identity fields
-//   - CPATH, LIBRARY_PATH, PKG_CONFIG_PATH — sysroot search paths (including
-//     Debian multiarch and RPM lib64 directories) prepended to their current
-//     global values
-//   - CFLAGS, CPPFLAGS — -I flags for each sysroot include directory
-//   - LDFLAGS — -L flags for each sysroot library directory
+//   - SOURCE_DATE_EPOCH — for reproducible builds (if set)
 func (pkgBuild *PKGBUILD) BuildEnvironmentSlice() []string {
-	includeDirs, libDirs, pkgConfigDirs := pkgBuild.sysrootPaths()
-
-	buildEnvPath := func(key string, prepend []string) string {
-		existing := os.Getenv(key)
-		parts := make([]string, 0, len(prepend)+1)
-		parts = append(parts, prepend...)
-
-		if existing != "" {
-			parts = append(parts, existing)
-		}
-
-		return key + "=" + strings.Join(parts, ":")
-	}
-
-	buildEnvFlags := func(key, prefix string, dirs []string) string {
-		existing := os.Getenv(key)
-
-		var flags strings.Builder
-
-		for _, dir := range dirs {
-			flags.WriteString(prefix)
-			flags.WriteString(dir)
-			flags.WriteString(" ")
-		}
-
-		if existing != "" {
-			flags.WriteString(existing)
-		}
-
-		return key + "=" + strings.TrimSpace(flags.String())
-	}
-
 	env := []string{
 		"pkgdir=" + pkgBuild.PackageDir,
 		"srcdir=" + pkgBuild.SourceDir,
@@ -748,12 +712,6 @@ func (pkgBuild *PKGBUILD) BuildEnvironmentSlice() []string {
 		"pkgname=" + pkgBuild.PkgName,
 		"pkgver=" + pkgBuild.PkgVer,
 		"pkgrel=" + pkgBuild.PkgRel,
-		buildEnvPath("CPATH", includeDirs),
-		buildEnvPath("LIBRARY_PATH", libDirs),
-		buildEnvPath("PKG_CONFIG_PATH", pkgConfigDirs),
-		buildEnvFlags("CFLAGS", "-I", includeDirs),
-		buildEnvFlags("CPPFLAGS", "-I", includeDirs),
-		buildEnvFlags("LDFLAGS", "-L", libDirs),
 	}
 
 	// Propagate SOURCE_DATE_EPOCH to build scripts for reproducible builds.
@@ -770,11 +728,6 @@ func (pkgBuild *PKGBUILD) BuildEnvironmentSlice() []string {
 //
 // NOTE: For parallel builds, prefer BuildEnvironmentSlice() which does not mutate
 // the global process environment and is safe to call from multiple goroutines.
-//
-// It always sets up sysroot environment paths (CPATH, LIBRARY_PATH, PKG_CONFIG_PATH,
-// CFLAGS, CPPFLAGS, LDFLAGS) pointing to yap-sysroot/ so that internal dependencies
-// extracted there are visible to both GCC toolchains (via CPATH/LIBRARY_PATH) and
-// autoconf ./configure scripts (via CFLAGS/LDFLAGS).
 //
 // It returns an error if setting any environment variable fails.
 func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
@@ -814,199 +767,9 @@ func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
 	// Resolve and export SOURCE_DATE_EPOCH for reproducible builds.
 	// If already set in the environment (by the user or CI), it is preserved;
 	// otherwise it is derived from the PKGBUILD file modification time.
-	if _, err := files.ResolveSourceDateEpoch(pkgBuild.Home); err != nil {
-		return err
-	}
+	_, err = files.ResolveSourceDateEpoch(pkgBuild.Home)
 
-	// Always set up sysroot environment so internal dependencies (extracted to
-	// yap-sysroot/) are visible to build scripts via CPATH/LIBRARY_PATH/PKG_CONFIG_PATH
-	// and to autoconf scripts via CFLAGS/CPPFLAGS/LDFLAGS.
-	return pkgBuild.SetupSysrootEnvironment()
-}
-
-// SetupSysrootEnvironment configures CPATH, LIBRARY_PATH, PKG_CONFIG_PATH,
-// CFLAGS, CPPFLAGS, and LDFLAGS to include paths from the yap-sysroot directory.
-// Paths cover standard FHS layouts, RPM lib64 directories, and Debian multiarch
-// triplet directories (e.g. usr/lib/x86_64-linux-gnu/) based on ArchComputed.
-func (pkgBuild *PKGBUILD) SetupSysrootEnvironment() error {
-	includeDirs, libDirs, pkgConfigDirs := pkgBuild.sysrootPaths()
-
-	if err := prependEnvPaths("CPATH", includeDirs); err != nil {
-		return err
-	}
-
-	if err := prependEnvPaths("LIBRARY_PATH", libDirs); err != nil {
-		return err
-	}
-
-	if err := prependEnvPaths("PKG_CONFIG_PATH", pkgConfigDirs); err != nil {
-		return err
-	}
-
-	if err := prependEnvFlags("CFLAGS", "-I", includeDirs); err != nil {
-		return err
-	}
-
-	if err := prependEnvFlags("CPPFLAGS", "-I", includeDirs); err != nil {
-		return err
-	}
-
-	return prependEnvFlags("LDFLAGS", "-L", libDirs)
-}
-
-// sysrootPaths returns the static include, library, and pkgconfig directory
-// lists for the yap-sysroot.  It covers the standard FHS layout (usr/include,
-// usr/lib), RPM lib64 directories, and Debian multiarch paths when ArchComputed
-// has a known GNU triplet.
-func (pkgBuild *PKGBUILD) sysrootPaths() (includeDirs, libDirs, pkgConfigDirs []string) {
-	sysrootDir := filepath.Join(filepath.Dir(pkgBuild.StartDir), "yap-sysroot")
-
-	// Static baseline: standard FHS paths always included (even before sysroot is populated).
-	includeDirs = []string{
-		filepath.Join(sysrootDir, "usr", "include"),
-		filepath.Join(sysrootDir, "usr", "local", "include"),
-	}
-
-	libDirs = []string{
-		filepath.Join(sysrootDir, "usr", "lib"),
-		filepath.Join(sysrootDir, "usr", "lib64"),
-		filepath.Join(sysrootDir, "usr", "local", "lib"),
-	}
-
-	pkgConfigDirs = []string{
-		filepath.Join(sysrootDir, "usr", "lib", "pkgconfig"),
-		filepath.Join(sysrootDir, "usr", "lib64", "pkgconfig"),
-		filepath.Join(sysrootDir, "usr", "share", "pkgconfig"),
-		filepath.Join(sysrootDir, "usr", "local", "lib", "pkgconfig"),
-	}
-
-	// Add Debian multiarch paths if the architecture has a known triplet.
-	triplet := gnuTriplet(pkgBuild.ArchComputed)
-	if triplet != "" {
-		includeDirs = append(includeDirs,
-			filepath.Join(sysrootDir, "usr", "include", triplet))
-		libDirs = append(libDirs,
-			filepath.Join(sysrootDir, "usr", "lib", triplet))
-		pkgConfigDirs = append(pkgConfigDirs,
-			filepath.Join(sysrootDir, "usr", "lib", triplet, "pkgconfig"))
-	}
-
-	// Dynamic discovery: walk the sysroot and add any pkgconfig / include / lib
-	// directories not already covered by the static list above.  This handles
-	// packages that install to non-standard prefixes (e.g. /opt/zextras/common/).
-	includeDirs = appendDiscoveredDirs(sysrootDir, includeDirs, isIncludeDir)
-	libDirs = appendDiscoveredDirs(sysrootDir, libDirs, isLibDir)
-	pkgConfigDirs = appendDiscoveredDirs(sysrootDir, pkgConfigDirs, isPkgConfigDir)
-
-	return includeDirs, libDirs, pkgConfigDirs
-}
-
-// isIncludeDir reports whether a directory name is a C/C++ include directory.
-func isIncludeDir(name string) bool { return name == "include" }
-
-// isLibDir reports whether a directory name is a library directory.
-func isLibDir(name string) bool {
-	return name == "lib" || name == "lib64" || name == "lib32"
-}
-
-// isPkgConfigDir reports whether a directory name is a pkg-config directory.
-func isPkgConfigDir(name string) bool { return name == "pkgconfig" }
-
-// appendDiscoveredDirs walks sysrootDir and appends any directories whose base
-// name satisfies match to existing, deduplicating against the existing slice.
-// Directories that do not exist on disk are silently skipped.
-func appendDiscoveredDirs(sysrootDir string, existing []string, match func(string) bool) []string {
-	seen := make(map[string]struct{}, len(existing))
-	for _, d := range existing {
-		seen[d] = struct{}{}
-	}
-
-	result := existing
-
-	_ = filepath.WalkDir(sysrootDir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !d.IsDir() {
-			return nil
-		}
-
-		if match(d.Name()) {
-			if _, already := seen[path]; !already {
-				seen[path] = struct{}{}
-				result = append(result, path)
-			}
-		}
-
-		return nil
-	})
-
-	return result
-}
-
-// gnuTriplet returns the Debian multiarch GNU triplet for the given
-// architecture (e.g. "x86_64" → "x86_64-linux-gnu").  Returns "" for
-// architectures without a known multiarch layout.
-func gnuTriplet(arch string) string {
-	switch arch {
-	case ArchAarch64:
-		return constants.TripletAarch64Linux
-	case ArchArmv7, "armv6":
-		return armLinuxGnueabihf
-	case i686Arch:
-		return constants.TripletI686Linux
-	case x86_64Arch:
-		return constants.TripletX8664Linux
-	case ppc64leArch:
-		return constants.TripletPpc64leLinux
-	case s390xArch:
-		return constants.TripletS390xLinux
-	case riscv64Arch:
-		return constants.TripletRiscv64Linux
-	default:
-		return ""
-	}
-}
-
-// prependEnvFlags prepends -I or -L flags to a space-separated env variable.
-func prependEnvFlags(key, prefix string, dirs []string) error {
-	if len(dirs) == 0 {
-		return nil
-	}
-
-	existing := os.Getenv(key)
-
-	var flags strings.Builder
-
-	for _, dir := range dirs {
-		flags.WriteString(prefix)
-		flags.WriteString(dir)
-		flags.WriteString(" ")
-	}
-
-	if existing != "" {
-		flags.WriteString(existing)
-	}
-
-	return os.Setenv(key, strings.TrimSpace(flags.String()))
-}
-
-// prependEnvPaths prepends dirs to the colon-separated environment variable named by key.
-func prependEnvPaths(key string, dirs []string) error {
-	if len(dirs) == 0 {
-		return nil
-	}
-
-	existing := os.Getenv(key)
-	parts := make([]string, 0, len(dirs)+1)
-	parts = append(parts, dirs...)
-
-	if existing != "" {
-		parts = append(parts, existing)
-	}
-
-	return os.Setenv(key, strings.Join(parts, ":"))
+	return err
 }
 
 // ValidateGeneral checks that mandatory items are correctly provided by the PKGBUILD

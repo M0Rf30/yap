@@ -17,11 +17,10 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
-// ExtractToSysroot extracts a package to a sysroot directory that mirrors the filesystem layout.
-// This allows cross-compiled packages to provide their files for dependent packages
-// without installation. The sysroot directory acts as a filesystem overlay for
-// build-time dependencies.
-func (bb *BaseBuilder) ExtractToSysroot(packagePath, sysrootDir string) error {
+// ExtractToRoot extracts a package directly to the root filesystem (/).
+// This extracts the package contents to the actual filesystem without
+// using a sysroot directory.
+func (bb *BaseBuilder) ExtractToRoot(packagePath string) error {
 	// Get package info for logging
 	pkgInfo, _ := os.Stat(packagePath)
 
@@ -34,7 +33,6 @@ func (bb *BaseBuilder) ExtractToSysroot(packagePath, sysrootDir string) error {
 	logger.Debug(i18n.T("logger.extract.extracting_package"),
 		"package", filepath.Base(packagePath),
 		"package_size_mb", packageSize/(1024*1024),
-		"sysroot_dir", sysrootDir,
 		"format", bb.Format)
 
 	var extractErr error
@@ -42,61 +40,81 @@ func (bb *BaseBuilder) ExtractToSysroot(packagePath, sysrootDir string) error {
 	switch bb.Format {
 	case constants.FormatDEB:
 		// DEB packages need special handling to extract data.tar from AR archive
-		extractErr = extractDEB(packagePath, sysrootDir)
-	case constants.FormatRPM, constants.FormatAPK, constants.FormatPacman:
-		// Use generic archive extraction for RPM, APK, and Pacman formats
-		extractErr = archive.Extract(context.Background(), packagePath, sysrootDir)
+		extractErr = extractDEB(packagePath, "/")
+	case constants.FormatRPM:
+		// RPM format: extract directly to root
+		extractErr = archive.Extract(context.Background(), packagePath, "/")
+	case constants.FormatAPK, constants.FormatPacman:
+		// APK and Pacman: extract to root, then clean up metadata files
+		extractErr = archive.Extract(context.Background(), packagePath, "/")
+		if extractErr == nil {
+			cleanupMetadataFiles(bb.Format)
+		}
 	default:
 		return errors.New(errors.ErrTypePackaging, "unsupported package format for extraction").
 			WithContext("format", bb.Format).
-			WithOperation("ExtractToSysroot")
+			WithOperation("ExtractToRoot")
 	}
 
 	if extractErr != nil {
 		return errors.Wrap(extractErr, errors.ErrTypePackaging, "failed to extract package").
 			WithContext("package", packagePath).
 			WithContext("format", bb.Format).
-			WithOperation("ExtractToSysroot")
+			WithOperation("ExtractToRoot")
 	}
-
-	// Calculate extraction statistics
-	fileCount, sysrootSize := countFilesAndSize(sysrootDir)
 
 	logger.Info(i18n.T("logger.extract.package_extracted"),
 		"package", filepath.Base(packagePath),
 		"format", bb.Format)
 
-	logger.Debug(i18n.T("logger.extract.extraction_stats"),
-		"files_extracted", fileCount,
-		"sysroot_size_mb", sysrootSize/(1024*1024),
-		"sysroot_dir", sysrootDir)
-
 	return nil
 }
 
-// countFilesAndSize walks the directory to count files and calculate total size.
-func countFilesAndSize(root string) (fileCount int, totalSize int64) {
-	_ = filepath.Walk(root, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			// Skip errors during walk
-			return err //nolint:wrapcheck // Intentionally returning error for Walk to skip
+// cleanupMetadataFiles removes package metadata files that were extracted to root.
+// These files should not be present on the actual filesystem.
+func cleanupMetadataFiles(format string) {
+	var metadataPatterns []string
+
+	switch format {
+	case constants.FormatAPK:
+		metadataPatterns = []string{
+			"/.PKGINFO",
+			"/.SIGN.*",
+			"/.pre-*",
+			"/.post-*",
+			"/.install",
+			"/.trigger*",
 		}
-
-		if !info.IsDir() {
-			fileCount++
-			totalSize += info.Size()
+	case constants.FormatPacman:
+		metadataPatterns = []string{
+			"/.PKGINFO",
+			"/.BUILDINFO",
+			"/.MTREE",
+			"/.INSTALL",
 		}
+	}
 
-		return nil
-	})
+	for _, pattern := range metadataPatterns {
+		// Handle glob patterns
+		if strings.Contains(pattern, "*") {
+			matches, err := filepath.Glob(pattern)
+			if err != nil {
+				continue
+			}
 
-	return fileCount, totalSize
+			for _, match := range matches {
+				_ = os.Remove(match) // Best-effort removal
+			}
+		} else {
+			_ = os.Remove(pattern) // Best-effort removal
+		}
+	}
 }
 
-// extractDEB extracts a Debian package (.deb) to the sysroot directory.
+// extractDEB extracts a Debian package (.deb) to the destination directory.
 // DEB format: AR archive containing control.tar.gz and data.tar.{gz,xz,zst}
 // We need to extract data.tar from the AR archive and then extract its contents.
-func extractDEB(packagePath, sysrootDir string) error {
+func extractDEB(packagePath, destDir string) error {
 	file, err := os.Open(packagePath) // #nosec G304 - packagePath is from trusted build artifacts
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open DEB package").
@@ -166,63 +184,22 @@ func extractDEB(packagePath, sysrootDir string) error {
 	}()
 
 	// Use archive.Extract to handle the tar extraction (with compression auto-detection)
-	return archive.Extract(context.Background(), dataTarPath, sysrootDir)
+	return archive.Extract(context.Background(), dataTarPath, destDir)
 }
 
-// GetSysrootDir returns the sysroot directory path for cross-compilation.
-func GetSysrootDir(buildDir string) string {
-	return filepath.Join(buildDir, "yap-sysroot")
-}
-
-// CleanupSysroot removes the sysroot directory.
-func CleanupSysroot(buildDir string) error {
-	sysrootDir := GetSysrootDir(buildDir)
-
-	if _, err := os.Stat(sysrootDir); os.IsNotExist(err) {
-		return nil // Already clean
-	}
-
-	// Log sysroot directory statistics before cleanup
-	fileCount, sysrootSize := countFilesAndSize(sysrootDir)
-	if fileCount > 0 {
-		logger.Debug(i18n.T("logger.extract.sysroot_cleaned"),
-			"sysroot_dir", sysrootDir,
-			"files_cleaned", fileCount,
-			"space_freed_mb", sysrootSize/(1024*1024))
-	}
-
-	if err := os.RemoveAll(sysrootDir); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to cleanup sysroot directory").
-			WithContext("sysroot_dir", sysrootDir).
-			WithOperation("CleanupSysroot")
-	}
-
-	return nil
-}
-
-// InstallOrExtract extracts the built package to yap-sysroot/ so that dependent
-// packages can find its headers and libraries without installing to the root
-// filesystem. This applies to both native and cross-compilation builds.
+// InstallOrExtract extracts the built package to the root filesystem (/).
+// This applies to both native and cross-compilation builds.
 func (bb *BaseBuilder) InstallOrExtract(artifactsPath, buildDir, targetArch string) error {
 	// targetArch is accepted for interface compatibility (packer.InstallOrExtractor)
-	// but unused: all builds extract to sysroot regardless of target architecture.
+	// but unused: extraction always goes to root filesystem.
 	_ = targetArch
-
-	sysrootDir := GetSysrootDir(buildDir)
-
-	// #nosec G301 - sysroot directory needs standard permissions for build artifacts
-	if err := os.MkdirAll(sysrootDir, 0o755); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create sysroot directory").
-			WithContext("sysroot_dir", sysrootDir).
-			WithOperation("InstallOrExtract")
-	}
+	_ = buildDir
 
 	pkgName := bb.BuildPackageName(getExtension(bb.Format))
 	pkgPath := filepath.Join(artifactsPath, pkgName)
 
 	logger.Info(i18n.T("logger.extract.extracting_to_sysroot"),
-		"package", filepath.Base(pkgPath),
-		"sysroot_dir", sysrootDir)
+		"package", filepath.Base(pkgPath))
 
-	return bb.ExtractToSysroot(pkgPath, sysrootDir)
+	return bb.ExtractToRoot(pkgPath)
 }

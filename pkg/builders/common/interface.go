@@ -702,7 +702,7 @@ export -f configure_cross 2>/dev/null || true
 	_ = os.Setenv("BUILD_ARCH", bb.PKGBUILD.ArchComputed)
 
 	// Configure pkg-config for cross-compilation: prepend toolchain paths to
-	// any existing PKG_CONFIG_PATH (set earlier by SetupSysrootEnvironment).
+	// any existing PKG_CONFIG_PATH.
 	crossPkgConfigPaths := []string{
 		"/usr/lib/" + ccPrefix + "/pkgconfig",
 		"/usr/local/lib/" + ccPrefix + "/pkgconfig",
