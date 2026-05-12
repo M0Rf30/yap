@@ -77,7 +77,7 @@ RUN apt-get update && \
 # Create non-root user
 RUN groupadd -g 1000 yap && \
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
-    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap' >> /etc/sudoers
+    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get' >> /etc/sudoers
 
 # Copy binary and completion from builder
 COPY --from=builder /usr/bin/yap /usr/bin/yap
