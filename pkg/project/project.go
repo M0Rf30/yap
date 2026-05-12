@@ -644,7 +644,6 @@ func setupCopyOptions() copy.Options {
 // as well as symlinks. Uses hardlinks when possible to reduce disk usage.
 // Returns an error if any operation fails; otherwise, returns nil.
 func (mpc *MultipleProject) copyProjects() error {
-	singleProject := len(mpc.Projects) == 1
 	copyOpt := setupCopyOptions()
 
 	for _, proj := range mpc.Projects {
@@ -658,8 +657,9 @@ func (mpc *MultipleProject) copyProjects() error {
 			return err
 		}
 
-		// Only copy if the source and destination are different
-		if !singleProject {
+		// Only copy if StartDir and Home differ (multi-project builds use a
+		// separate build dir; single-project builds use Home as StartDir directly).
+		if proj.Builder.PKGBUILD.StartDir != proj.Builder.PKGBUILD.Home {
 			err := copy.Copy(proj.Builder.PKGBUILD.Home, proj.Builder.PKGBUILD.StartDir, copyOpt)
 			if err != nil {
 				return err
