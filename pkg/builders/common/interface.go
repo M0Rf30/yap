@@ -350,9 +350,12 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 
 // PrepareEnvironment sets up the build environment with necessary tools.
 // This consolidates duplicated PrepareEnvironment methods across all builders.
-// Uses the package-level SkipToolchainValidation variable to control validation.
+// Toolchain validation is always skipped here: PrepareEnvironment is called by
+// "yap prepare" whose job is to *install* the cross-compiler — the toolchain
+// cannot be present before it is installed.  Validation runs later during the
+// build stage (builder.processFunction → SetupCrossCompilationEnvironment).
 func (bb *BaseBuilder) PrepareEnvironment(golang bool, targetArch string) error {
-	return bb.prepareEnvironmentWithValidation(golang, targetArch, SkipToolchainValidation)
+	return bb.prepareEnvironmentWithValidation(golang, targetArch, true)
 }
 
 // prepareEnvironmentWithValidation sets up the build environment with optional toolchain validation.
