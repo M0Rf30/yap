@@ -58,6 +58,7 @@ LABEL org.opencontainers.image.version="${VERSION}"
 RUN dnf -y update && dnf -y install \
     bash-completion \
     ca-certificates \
+    findutils \
     sudo && \
     dnf clean all && rm -rf /var/cache/dnf
 

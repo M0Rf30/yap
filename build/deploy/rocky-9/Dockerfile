@@ -58,7 +58,12 @@ LABEL org.opencontainers.image.version="${VERSION}"
 RUN dnf -y update && dnf -y install \
     bash-completion \
     ca-certificates \
+    dnf-plugins-core \
+    epel-release \
+    findutils \
     sudo && \
+    dnf config-manager --enable crb && \
+    dnf config-manager --enable devel && \
     dnf clean all && rm -rf /var/cache/dnf
 
 # Create non-root user

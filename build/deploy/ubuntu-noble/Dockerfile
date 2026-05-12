@@ -62,6 +62,17 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Preseed debconf to prevent resolvconf postinst failure in containers
 RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
 
+# Add arm64 multiarch support
+# Noble uses deb822 format (.sources files) instead of the legacy sources.list,
+# so we patch ubuntu.sources to restrict it to amd64 and add a separate
+# ports.ubuntu.com stanza for arm64.
+RUN dpkg --add-architecture arm64 && \
+    sed -i '/^Types:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources && \
+    printf 'Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports/\nSuites: noble noble-updates noble-security\nComponents: main restricted universe multiverse\nArchitectures: arm64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+      > /etc/apt/sources.list.d/ubuntu-ports-arm64.sources && \
+    apt-get update && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install minimal runtime dependencies
 RUN apt-get update && \
     apt-get upgrade -y && \

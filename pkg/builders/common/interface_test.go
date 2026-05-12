@@ -593,9 +593,9 @@ func TestSetupCrossCompilationEnvironment(t *testing.T) {
 				_ = os.Unsetenv(key)
 			}
 
-		_ = os.Unsetenv("CC")
-		_ = os.Unsetenv("CXX")
-		_ = os.Unsetenv("CROSS_COMPILE")
+			_ = os.Unsetenv("CC")
+			_ = os.Unsetenv("CXX")
+			_ = os.Unsetenv("CROSS_COMPILE")
 		})
 	}
 }

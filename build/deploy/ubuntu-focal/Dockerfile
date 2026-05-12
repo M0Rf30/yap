@@ -40,6 +40,9 @@ RUN if [ "${TARGETARCH}" = "$(go env GOARCH)" ]; then \
 # Runtime stage
 FROM ubuntu:focal
 
+# Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Build arguments for runtime stage
 ARG VERSION=dev
 ARG TARGETARCH=amd64
@@ -58,6 +61,15 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Preseed debconf to prevent resolvconf postinst failure in containers
 RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
+
+# Add arm64 multiarch support
+RUN dpkg --add-architecture arm64 && \
+    sed -i 's/^deb http/deb [arch=amd64] http/g' /etc/apt/sources.list && \
+    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal-security main restricted universe multiverse" >> /etc/apt/sources.list && \
+    apt-get update && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install minimal runtime dependencies
 RUN apt-get update && \
