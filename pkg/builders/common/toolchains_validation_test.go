@@ -69,18 +69,29 @@ func TestCrossToolchainValidateMissingGPlus(t *testing.T) {
 }
 
 func TestCrossToolchainValidateMissingBinutils(t *testing.T) {
-	// Test with missing binutils (nonexistent executable)
+	// Test with missing binutils (nonexistent package → nonexistent cross tools).
+	// binutilsPrefix() strips "binutils-" prefix, so "binutils-totally-fake" →
+	// prefix "totally-fake" → checked executables "totally-fake-ar", etc.
 	toolchain := CrossToolchainMap["x86_64"]["ubuntu"]
-	toolchain.BinutilsPackage = "nonexistent-binutils-totally-fake"
+	toolchain.BinutilsPackage = "binutils-totally-fake"
 
 	missing, err := toolchain.Validate()
 	if err == nil {
 		t.Error("Missing binutils should return error")
 	}
 
-	// Should include the missing binutils executable
-	if !slices.Contains(missing, "nonexistent-binutils-totally-fake") {
-		t.Errorf("Missing list should include nonexistent-binutils-totally-fake, got: %v", missing)
+	// Should include at least one of the cross-prefixed binutils tools.
+	found := false
+
+	for _, m := range missing {
+		if strings.HasPrefix(m, "totally-fake-") {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Missing list should include totally-fake-<tool> entries, got: %v", missing)
 	}
 
 	if !strings.Contains(err.Error(), "missing required toolchain executables") {
@@ -89,19 +100,23 @@ func TestCrossToolchainValidateMissingBinutils(t *testing.T) {
 }
 
 func TestCrossToolchainValidateMultipleMissing(t *testing.T) {
-	// Test with multiple missing packages (all fake executables)
+	// Test with multiple missing packages (all fake).
+	// GetExecutableName transforms:
+	//   "gcc-fake-arch"     → "fake-arch-gcc"
+	//   "g++-fake-arch"     → "fake-arch-g++"
+	//   "binutils-fake-arch" → prefix "fake-arch" → "fake-arch-ar", etc.
 	toolchain := CrossToolchainMap["x86_64"]["ubuntu"]
-	toolchain.GCCPackage = "missing-gcc-fake"
-	toolchain.GPlusPlusPackage = "missing-gpp-fake"
-	toolchain.BinutilsPackage = "missing-binutils-fake"
+	toolchain.GCCPackage = "gcc-fake-arch"
+	toolchain.GPlusPlusPackage = "g++-fake-arch"
+	toolchain.BinutilsPackage = "binutils-fake-arch"
 
 	missing, err := toolchain.Validate()
 	if err == nil {
 		t.Error("Multiple missing packages should return error")
 	}
 
-	// Should include all three fake executables
-	expectedMissing := []string{"missing-gcc-fake", "missing-gpp-fake", "missing-binutils-fake"}
+	// Validate() now reports executable names, not package names.
+	expectedMissing := []string{"fake-arch-gcc", "fake-arch-g++", "fake-arch-ar"}
 	for _, expected := range expectedMissing {
 		if !slices.Contains(missing, expected) {
 			t.Errorf("Missing list should include %s, got: %v", expected, missing)

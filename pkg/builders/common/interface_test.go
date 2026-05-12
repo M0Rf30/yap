@@ -857,7 +857,8 @@ func TestCrossCompilationToolchainMapping(t *testing.T) {
 		{"aarch64", "debian", true},
 		{"aarch64", "ubuntu", true},
 		{"aarch64", "fedora", true},
-		{"aarch64", "alpine", true},
+		// Note: alpine is NOT supported for cross-compilation via host toolchains
+		// Use native Alpine containers instead
 		{"armv7", "arch", true},
 		{"armv7", "debian", true},
 		{"i686", "arch", true},

@@ -50,8 +50,8 @@ func TestGetExecutableName(t *testing.T) {
 		{
 			name:         "Alpine GCC",
 			packageName:  "gcc-aarch64",
-			expectedExec: "aarch64-gcc",
-			description:  "Alpine package name to executable (basic transform)",
+			expectedExec: "aarch64-alpine-linux-musl-gcc",
+			description:  "Alpine package name to executable (musl triplet)",
 		},
 		{
 			name:         "Alpine G++",

@@ -16,10 +16,12 @@ func TestValidateToolchainI18nErrorMessages(t *testing.T) {
 		errorContains []string
 	}{
 		{
-			name:        "Valid toolchain - aarch64/deb",
-			targetArch:  "aarch64",
-			format:      "deb",
-			expectError: true, // Most dev systems won't have cross-compilers installed
+			name:       "Valid toolchain - aarch64/deb",
+			targetArch: "aarch64",
+			format:     "deb",
+			// expectError depends on whether the cross-compiler is installed;
+			// we only check the error message content when an error does occur.
+			expectError: ValidateToolchain("aarch64", "deb") != nil,
 			errorContains: []string{
 				"aarch64",
 				"deb",
@@ -36,13 +38,13 @@ func TestValidateToolchainI18nErrorMessages(t *testing.T) {
 			},
 		},
 		{
-			name:        "Valid toolchain - i686/apk",
+			name:        "APK format always unsupported for cross-compilation",
 			targetArch:  "i686",
 			format:      "apk",
 			expectError: true,
 			errorContains: []string{
-				"i686",
-				"apk",
+				"Alpine",
+				"not supported",
 			},
 		},
 		{
@@ -132,22 +134,13 @@ func TestValidateToolchainI18nDistroSpecificNotes(t *testing.T) {
 		unexpectedNote string
 	}{
 		{
-			name:       "Alpine APK - should contain Alpine note",
-			targetArch: "aarch64",
-			format:     "apk",
-			expectedNotes: []string{
-				i18n.T("errors.cross_compilation.alpine_note"),
-			},
-			unexpectedNote: i18n.T("errors.cross_compilation.arch_multilib_note"),
-		},
-		{
 			name:       "Arch i686 - should contain multilib note",
 			targetArch: "i686",
 			format:     "pacman",
 			expectedNotes: []string{
 				i18n.T("errors.cross_compilation.arch_multilib_note"),
 			},
-			unexpectedNote: i18n.T("errors.cross_compilation.alpine_note"),
+			unexpectedNote: i18n.T("errors.cross_compilation.arch_prefix_note"),
 		},
 		{
 			name:       "Arch aarch64 - should contain prefix note",
@@ -156,14 +149,14 @@ func TestValidateToolchainI18nDistroSpecificNotes(t *testing.T) {
 			expectedNotes: []string{
 				i18n.T("errors.cross_compilation.arch_prefix_note"),
 			},
-			unexpectedNote: i18n.T("errors.cross_compilation.alpine_note"),
+			unexpectedNote: i18n.T("errors.cross_compilation.arch_multilib_note"),
 		},
 		{
-			name:           "Debian - should not contain Arch/Alpine notes",
+			name:           "Debian - should not contain Arch notes",
 			targetArch:     "armv7",
 			format:         "deb",
 			expectedNotes:  []string{},
-			unexpectedNote: i18n.T("errors.cross_compilation.alpine_note"),
+			unexpectedNote: i18n.T("errors.cross_compilation.arch_multilib_note"),
 		},
 	}
 
@@ -201,7 +194,6 @@ func TestValidateToolchainI18nInstallationCommands(t *testing.T) {
 	}{
 		{name: "DEB format", targetArch: "aarch64", format: "deb"},
 		{name: "RPM format", targetArch: "armv7", format: "rpm"},
-		{name: "APK format", targetArch: "x86_64", format: "apk"},
 		{name: "Pacman format", targetArch: "i686", format: "pacman"},
 	}
 
@@ -224,7 +216,6 @@ func TestValidateToolchainI18nInstallationCommands(t *testing.T) {
 			formatToDistro := map[string]string{
 				"deb":    "ubuntu",
 				"rpm":    "fedora",
-				"apk":    "alpine",
 				"pacman": "arch",
 			}
 
