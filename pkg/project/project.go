@@ -538,8 +538,8 @@ func (mpc *MultipleProject) doInstallOrExtract(proj *Project) error {
 }
 
 // installPackageForWorker handles package extraction for a worker.
-// It calls doInstallOrExtract, which always extracts to sysroot — extraction is
-// goroutine-safe because each project writes to its own yap-sysroot directory.
+// It calls doInstallOrExtract, which always extracts to the root filesystem — extraction is
+// goroutine-safe.
 func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, workerID string) error {
 	logger.Info(i18n.T("logger.installing_package"),
 		"package", pkgName,
@@ -1650,14 +1650,6 @@ func (mpc *MultipleProject) cleanSingleProjectArtifacts(proj *Project) error {
 	pkgDir := filepath.Join(proj.Builder.PKGBUILD.StartDir, "pkg")
 	if _, err := os.Stat(pkgDir); err == nil {
 		if err := os.RemoveAll(pkgDir); err != nil {
-			return err
-		}
-	}
-
-	// Remove yap-sysroot directory (contains extracted internal dependencies)
-	sysrootDir := filepath.Join(proj.Builder.PKGBUILD.StartDir, "yap-sysroot")
-	if _, err := os.Stat(sysrootDir); err == nil {
-		if err := os.RemoveAll(sysrootDir); err != nil {
 			return err
 		}
 	}

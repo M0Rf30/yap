@@ -11,7 +11,6 @@ import (
 
 	"github.com/blakesmith/ar"
 
-	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -130,38 +129,31 @@ func writeARMember(t *testing.T, w *ar.Writer, name string, data []byte) {
 	}
 }
 
-func TestExtractToSysroot(t *testing.T) {
+func TestExtractToRoot(t *testing.T) {
 	// Create temporary directory
 	tmpDir := t.TempDir()
 
 	// Create test DEB package
 	debPath := createTestDEB(t, tmpDir)
 
-	// Create sysroot directory
-	sysrootDir := filepath.Join(tmpDir, "sysroot")
-
-	// Create BaseBuilder
-	pkg := &pkgbuild.PKGBUILD{
-		PkgName:      "test-package",
-		StartDir:     tmpDir,
-		ArchComputed: "x86_64",
+	// Test extraction to a temporary root directory
+	// We'll use a subdirectory to simulate root extraction
+	testRootDir := filepath.Join(tmpDir, "test-root")
+	if err := os.MkdirAll(testRootDir, 0o755); err != nil {
+		t.Fatalf("Failed to create test root dir: %v", err)
 	}
 
-	bb := &BaseBuilder{
-		PKGBUILD: pkg,
-		Format:   constants.FormatDEB,
-	}
-
-	// Test extraction
-	err := bb.ExtractToSysroot(debPath, sysrootDir)
+	// For this test, we'll extract to the test root directory
+	// by modifying the test to use extractDEB directly
+	err := extractDEB(debPath, testRootDir)
 	if err != nil {
-		t.Fatalf("ExtractToSysroot failed: %v", err)
+		t.Fatalf("extractDEB failed: %v", err)
 	}
 
 	// Verify extracted files
 	expectedFiles := []string{
-		filepath.Join(sysrootDir, "opt", "test", "lib", "libtest.so"),
-		filepath.Join(sysrootDir, "opt", "test", "include", "test.h"),
+		filepath.Join(testRootDir, "opt", "test", "lib", "libtest.so"),
+		filepath.Join(testRootDir, "opt", "test", "include", "test.h"),
 	}
 
 	for _, expectedFile := range expectedFiles {
@@ -171,7 +163,7 @@ func TestExtractToSysroot(t *testing.T) {
 	}
 }
 
-func TestExtractToSysroot_UnsupportedFormat(t *testing.T) {
+func TestExtractToRoot_UnsupportedFormat(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	pkg := &pkgbuild.PKGBUILD{
@@ -184,53 +176,9 @@ func TestExtractToSysroot_UnsupportedFormat(t *testing.T) {
 		Format:   "unsupported",
 	}
 
-	err := bb.ExtractToSysroot("/fake/path.deb", tmpDir)
+	err := bb.ExtractToRoot("/fake/path.deb")
 	if err == nil {
 		t.Error("Expected error for unsupported format, got nil")
-	}
-}
-
-func TestGetSysrootDir(t *testing.T) {
-	buildDir := "/tmp/test-build"
-	expected := filepath.Join(buildDir, "yap-sysroot")
-
-	result := GetSysrootDir(buildDir)
-
-	if result != expected {
-		t.Errorf("GetSysrootDir() = %s, want %s", result, expected)
-	}
-}
-
-func TestCleanupSysroot(t *testing.T) {
-	tmpDir := t.TempDir()
-	sysrootDir := GetSysrootDir(tmpDir)
-
-	// Create sysroot directory with files
-	testDir := filepath.Join(sysrootDir, "opt", "test")
-	if err := os.MkdirAll(testDir, 0o755); err != nil {
-		t.Fatalf("Failed to create sysroot dir: %v", err)
-	}
-
-	testFile := filepath.Join(testDir, "file.txt")
-	if err := os.WriteFile(testFile, []byte("test"), 0o644); err != nil {
-		t.Fatalf("Failed to write test file: %v", err)
-	}
-
-	// Cleanup
-	err := CleanupSysroot(tmpDir)
-	if err != nil {
-		t.Fatalf("CleanupSysroot failed: %v", err)
-	}
-
-	// Verify sysroot directory is removed
-	if _, err := os.Stat(sysrootDir); !os.IsNotExist(err) {
-		t.Error("Sysroot directory should be removed")
-	}
-
-	// Cleanup again should not error
-	err = CleanupSysroot(tmpDir)
-	if err != nil {
-		t.Errorf("CleanupSysroot on non-existent dir should not error: %v", err)
 	}
 }
 
@@ -293,9 +241,9 @@ func TestExtractDEB_MissingDataTar(t *testing.T) {
 		t.Fatalf("Failed to create invalid DEB: %v", err)
 	}
 
-	sysrootDir := filepath.Join(tmpDir, "sysroot")
+	destDir := filepath.Join(tmpDir, "dest")
 
-	err := extractDEB(invalidDEB, sysrootDir)
+	err := extractDEB(invalidDEB, destDir)
 	if err == nil {
 		t.Error("Expected error for invalid DEB, got nil")
 	}
