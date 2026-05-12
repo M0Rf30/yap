@@ -1039,3 +1039,102 @@ func TestSetupCrossCompilationEnvironment_AppendsPkgConfigPath(t *testing.T) {
 		t.Errorf("PKG_CONFIG_PATH=%q lost existing value %q", result, existing)
 	}
 }
+
+func TestQualifyDepsForTargetArch(t *testing.T) {
+	tests := []struct {
+		name       string
+		deps       []string
+		format     string
+		targetArch string
+		want       []string
+	}{
+		// DEB: plain package
+		{
+			name:       "DEB plain aarch64",
+			deps:       []string{"libssl-dev", "zlib1g-dev"},
+			format:     constants.FormatDEB,
+			targetArch: "aarch64",
+			want:       []string{"libssl-dev:arm64", "zlib1g-dev:arm64"},
+		},
+		// DEB: version-constrained package
+		{
+			name:       "DEB version constraint aarch64",
+			deps:       []string{"libssl-dev (>= 1.1)", "zlib1g-dev"},
+			format:     constants.FormatDEB,
+			targetArch: "aarch64",
+			want:       []string{"libssl-dev:arm64 (>= 1.1)", "zlib1g-dev:arm64"},
+		},
+		// DEB: already qualified — no double-suffix
+		{
+			name:       "DEB already qualified",
+			deps:       []string{"libssl-dev:arm64"},
+			format:     constants.FormatDEB,
+			targetArch: "aarch64",
+			want:       []string{"libssl-dev:arm64"},
+		},
+		// DEB: armv7 → armhf
+		{
+			name:       "DEB armv7 → armhf",
+			deps:       []string{"libssl-dev"},
+			format:     constants.FormatDEB,
+			targetArch: "armv7",
+			want:       []string{"libssl-dev:armhf"},
+		},
+		// RPM: qualifyDepsForTargetArch still handles RPM correctly at the
+		// function level, but Prepare() does not call it for RPM (Rocky/Fedora
+		// x86_64 containers don't carry aarch64 -devel packages in their repos).
+		// These tests verify the function logic is correct if ever re-enabled.
+		{
+			name:       "RPM plain aarch64",
+			deps:       []string{"openssl-devel", "zlib-devel"},
+			format:     constants.FormatRPM,
+			targetArch: "aarch64",
+			want:       []string{"openssl-devel.aarch64", "zlib-devel.aarch64"},
+		},
+		{
+			name:       "RPM already qualified",
+			deps:       []string{"openssl-devel.aarch64"},
+			format:     constants.FormatRPM,
+			targetArch: "aarch64",
+			want:       []string{"openssl-devel.aarch64"},
+		},
+		{
+			name:       "RPM noarch skipped",
+			deps:       []string{"some-scripts.noarch"},
+			format:     constants.FormatRPM,
+			targetArch: "aarch64",
+			want:       []string{"some-scripts.noarch"},
+		},
+		// APK: unchanged
+		{
+			name:       "APK unchanged",
+			deps:       []string{"openssl-dev", "zlib-dev"},
+			format:     constants.FormatAPK,
+			targetArch: "aarch64",
+			want:       []string{"openssl-dev", "zlib-dev"},
+		},
+		// Empty list
+		{
+			name:       "empty deps",
+			deps:       []string{},
+			format:     constants.FormatDEB,
+			targetArch: "aarch64",
+			want:       []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := qualifyDepsForTargetArch(tt.deps, tt.format, tt.targetArch)
+			if len(got) != len(tt.want) {
+				t.Fatalf("len=%d want %d: got %v", len(got), len(tt.want), got)
+			}
+
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("[%d] got %q want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}

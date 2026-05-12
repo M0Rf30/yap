@@ -399,12 +399,14 @@ func TestI686PackageNaming(t *testing.T) {
 	tests := []struct {
 		distro             string
 		expectedGCC        string
-		expectedAdditional string
+		expectedAdditional string // empty string means no additional packages expected
 		note               string
 	}{
 		{"ubuntu", "gcc-i686-linux-gnu", "libc6-dev-i386-cross", "Standard cross-compiler"},
 		{"debian", "gcc-i686-linux-gnu", "libc6-dev-i386-cross", "Standard cross-compiler"},
-		{"fedora", "gcc-i686-linux-gnu", "libc6-dev-i386-cross", "Standard cross-compiler"},
+		// Fedora bundles the target sysroot in the cross-compiler package itself;
+		// libc6-dev-*-cross packages are Debian/Ubuntu-only.
+		{"fedora", "gcc-i686-linux-gnu", "", "RPM: sysroot bundled in cross-compiler"},
 		{"arch", "gcc-multilib", "lib32-gcc-libs", "Arch uses multilib packages"},
 	}
 
@@ -422,16 +424,22 @@ func TestI686PackageNaming(t *testing.T) {
 					tt.distro, tt.expectedGCC, toolchain.GCCPackage, tt.note)
 			}
 
-			// Check for expected additional package
-			hasExpected := slices.Contains(toolchain.AdditionalPackages, tt.expectedAdditional)
-
-			if !hasExpected {
-				t.Errorf("%s: Expected additional package '%s', got %v (%s)",
-					tt.distro, tt.expectedAdditional, toolchain.AdditionalPackages, tt.note)
+			if tt.expectedAdditional == "" {
+				// Expect no additional packages
+				if len(toolchain.AdditionalPackages) != 0 {
+					t.Errorf("%s: Expected no additional packages, got %v (%s)",
+						tt.distro, toolchain.AdditionalPackages, tt.note)
+				}
+			} else {
+				// Check for expected additional package
+				if !slices.Contains(toolchain.AdditionalPackages, tt.expectedAdditional) {
+					t.Errorf("%s: Expected additional package '%s', got %v (%s)",
+						tt.distro, tt.expectedAdditional, toolchain.AdditionalPackages, tt.note)
+				}
 			}
 
-			t.Logf("%s/i686: GCC=%s, Additional=%s (%s)",
-				tt.distro, toolchain.GCCPackage, tt.expectedAdditional, tt.note)
+			t.Logf("%s/i686: GCC=%s, Additional=%v (%s)",
+				tt.distro, toolchain.GCCPackage, toolchain.AdditionalPackages, tt.note)
 		})
 	}
 }

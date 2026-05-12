@@ -23,6 +23,7 @@ const (
 	gppArmv7Pkg      = "g++-armv7"
 	lib32GccLibs     = "lib32-gcc-libs"
 	libc6DevI386     = "libc6-dev-i386-cross"
+	libc6DevArmhf    = "libc6-dev-armhf-cross"
 	gccFmtPattern    = "gcc-%s"
 	gppFmtPattern    = "g++-%s"
 	binutilsFmtPat   = "binutils-%s"
@@ -238,32 +239,42 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 		},
 	}
 
-	// Define architecture-specific additional packages
+	// Define architecture-specific additional packages.
+	// libc6-dev-*-cross packages only exist on Debian/Ubuntu; Fedora and Arch
+	// bundle the target sysroot inside the cross-compiler package itself.
 	archAdditional := map[string]map[string][]string{
 		constants.ArchAarch64: {
-			defaultKey: {"libc6-dev-arm64-cross"},
+			constants.DistroDebian: {"libc6-dev-arm64-cross"},
+			constants.DistroUbuntu: {"libc6-dev-arm64-cross"},
 		},
 		constants.ArchArmv7: {
-			defaultKey: {"libc6-dev-armhf-cross"},
+			constants.DistroDebian: {libc6DevArmhf},
+			constants.DistroUbuntu: {libc6DevArmhf},
 		},
 		constants.ArchArmv6: {
-			defaultKey: {"libc6-dev-armhf-cross"},
+			constants.DistroDebian: {libc6DevArmhf},
+			constants.DistroUbuntu: {libc6DevArmhf},
 		},
 		constants.ArchI686: {
-			constants.DistroArch: {lib32GccLibs}, // Arch multilib needs lib32 libraries
-			defaultKey:           {libc6DevI386},
+			constants.DistroArch:   {lib32GccLibs}, // Arch multilib needs lib32 libraries
+			constants.DistroDebian: {libc6DevI386},
+			constants.DistroUbuntu: {libc6DevI386},
 		},
 		constants.ArchX86_64: {
-			defaultKey: {"libc6-dev-amd64-cross"},
+			constants.DistroDebian: {"libc6-dev-amd64-cross"},
+			constants.DistroUbuntu: {"libc6-dev-amd64-cross"},
 		},
 		constants.ArchPpc64le: {
-			defaultKey: {"libc6-dev-ppc64el-cross"},
+			constants.DistroDebian: {"libc6-dev-ppc64el-cross"},
+			constants.DistroUbuntu: {"libc6-dev-ppc64el-cross"},
 		},
 		constants.ArchS390x: {
-			defaultKey: {"libc6-dev-s390x-cross"},
+			constants.DistroDebian: {"libc6-dev-s390x-cross"},
+			constants.DistroUbuntu: {"libc6-dev-s390x-cross"},
 		},
 		constants.ArchRiscv64: {
-			defaultKey: {"libc6-dev-riscv64-cross"},
+			constants.DistroDebian: {"libc6-dev-riscv64-cross"},
+			constants.DistroUbuntu: {"libc6-dev-riscv64-cross"},
 		},
 	}
 

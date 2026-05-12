@@ -142,7 +142,13 @@ func extractPackageName(dep string) string {
 		return ""
 	}
 
-	return fields[0]
+	// Split on version operators that may appear without spaces (e.g. "pkg>1.0", "pkg>=2.0").
+	name := fields[0]
+	if idx := strings.IndexAny(name, "><=!"); idx != -1 {
+		name = name[:idx]
+	}
+
+	return name
 }
 
 // processDependencies iterates through a list of dependencies and processes each one
