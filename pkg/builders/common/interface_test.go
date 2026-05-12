@@ -527,7 +527,6 @@ func TestSetupCrossCompilationEnvironment(t *testing.T) {
 				"CARGO_BUILD_TARGET": "aarch64-unknown-linux-gnu",
 				"GOOS":               "linux",
 				"GOARCH":             "arm64",
-				"TARGET_ARCH":        "aarch64",
 			},
 		},
 		{
@@ -538,7 +537,6 @@ func TestSetupCrossCompilationEnvironment(t *testing.T) {
 				"CARGO_BUILD_TARGET": "armv7-unknown-linux-gnueabihf",
 				"GOOS":               "linux",
 				"GOARCH":             "arm",
-				"TARGET_ARCH":        "armv7",
 			},
 		},
 		{
@@ -595,11 +593,9 @@ func TestSetupCrossCompilationEnvironment(t *testing.T) {
 				_ = os.Unsetenv(key)
 			}
 
-			_ = os.Unsetenv("CC")
-			_ = os.Unsetenv("CXX")
-			_ = os.Unsetenv("CROSS_COMPILE")
-			_ = os.Unsetenv("HOST_ARCH")
-			_ = os.Unsetenv("BUILD_ARCH")
+		_ = os.Unsetenv("CC")
+		_ = os.Unsetenv("CXX")
+		_ = os.Unsetenv("CROSS_COMPILE")
 		})
 	}
 }

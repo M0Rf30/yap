@@ -685,11 +685,12 @@ export -f configure_cross 2>/dev/null || true
 		_ = os.Setenv("CXX_FOR_TARGET", gppExecutable)
 	}
 
-	// Set common cross-compilation variables
+	// Set common cross-compilation variables.
+	// CROSS_COMPILE is the canonical indicator (e.g. "aarch64-linux-gnu-").
+	// We intentionally do NOT set TARGET_ARCH/HOST_ARCH/BUILD_ARCH because
+	// GNU make's implicit LINK.c rule expands $(TARGET_ARCH) verbatim into
+	// compile commands, breaking any package that uses the default link rule.
 	_ = os.Setenv("CROSS_COMPILE", ccPrefix+"-")
-	_ = os.Setenv("TARGET_ARCH", targetArch)
-	_ = os.Setenv("HOST_ARCH", bb.PKGBUILD.ArchComputed)
-	_ = os.Setenv("BUILD_ARCH", bb.PKGBUILD.ArchComputed)
 
 	// Configure pkg-config for cross-compilation: prepend toolchain paths to
 	// any existing PKG_CONFIG_PATH.
