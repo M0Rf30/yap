@@ -60,8 +60,8 @@ RUN apk add --no-cache \
     sudo
 
 # Create non-root user
-RUN addgroup -g 1001 yap && \
-    adduser -D -u 1001 -G yap -s /bin/bash yap && \
+RUN addgroup -g 1000 yap && \
+    adduser -D -u 1000 -G yap -s /bin/bash yap && \
     echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap' >> /etc/sudoers
 
 # Copy binary and completion from builder

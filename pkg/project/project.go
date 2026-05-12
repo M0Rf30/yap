@@ -263,6 +263,53 @@ func (mpc *MultipleProject) Clean() error {
 	return nil
 }
 
+// syncDependencies handles dependency synchronization and preparation.
+// It updates the package manager, prepares make dependencies, and installs
+// external runtime dependencies.
+func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []string) error {
+	if !SkipSyncDeps {
+		err := packageManager.Update()
+		if err != nil {
+			return err
+		}
+	}
+
+	if !NoMakeDeps {
+		err := packageManager.Prepare(makeDepends, TargetArch)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Install external runtime dependencies
+	if !SkipSyncDeps && len(runtimeDepends) > 0 {
+		logger.Debug(i18n.T("logger.installing_external_runtime_dependencies"),
+			"count", len(runtimeDepends))
+
+		err := packageManager.Prepare(runtimeDepends, TargetArch)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// resolveOutputPath converts the output path to an absolute path.
+// This must be done once before any parallel work to prevent data races.
+func (mpc *MultipleProject) resolveOutputPath() error {
+	if mpc.Output != "" {
+		absOutput, err := filepath.Abs(mpc.Output)
+		if err != nil {
+			return err
+		}
+
+		mpc.Output = absOutput
+	}
+
+	return nil
+}
+
 // MultiProject is a function that performs multiple project operations.
 //
 // It takes in the following parameters:
@@ -287,13 +334,6 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	if !SkipSyncDeps {
-		err := packageManager.Update()
-		if err != nil {
-			return err
-		}
-	}
-
 	err = mpc.populateProjects(distro, release, path)
 	if err != nil {
 		return err
@@ -312,42 +352,73 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	if !NoMakeDeps {
-		makeDepends = mpc.getMakeDeps()
+	makeDepends = mpc.getMakeDeps()
+	runtimeDepends = mpc.getRuntimeDeps()
 
-		err := packageManager.Prepare(makeDepends, TargetArch)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Install external runtime dependencies
-	if !SkipSyncDeps {
-		runtimeDepends = mpc.getRuntimeDeps()
-
-		if len(runtimeDepends) > 0 {
-			logger.Debug(i18n.T("logger.installing_external_runtime_dependencies"),
-				"count", len(runtimeDepends))
-
-			err := packageManager.Prepare(runtimeDepends, TargetArch)
-			if err != nil {
-				return err
-			}
-		}
+	err = mpc.syncDependencies(makeDepends, runtimeDepends)
+	if err != nil {
+		return err
 	}
 
 	// Resolve output path to absolute once, before any parallel work
 	// This prevents data races in createPackage when called from parallel workers
-	if mpc.Output != "" {
-		absOutput, err := filepath.Abs(mpc.Output)
-		if err != nil {
-			return err
-		}
+	return mpc.resolveOutputPath()
+}
 
-		mpc.Output = absOutput
+// runWorker executes the build pipeline for a single project in a worker goroutine.
+// It handles compilation, package creation, and optional installation.
+// Returns early if context is cancelled or if ToPkgName is reached.
+func (mpc *MultipleProject) runWorker(ctx context.Context, cancel context.CancelFunc,
+	proj *Project, pkgName, workerIDStr string, shouldInstall bool, errorChan chan<- error) {
+	// Check if cancelled before starting work
+	select {
+	case <-ctx.Done():
+		return
+	default:
 	}
 
-	return nil
+	logger.Debug(i18n.T("logger.creating_package"),
+		"package", pkgName,
+		"version", proj.Builder.PKGBUILD.PkgVer,
+		"release", proj.Builder.PKGBUILD.PkgRel,
+		"worker_id", workerIDStr)
+
+	// Step 1: Build the package
+	err := proj.Builder.Compile(NoBuild)
+	if err != nil {
+		cancel()
+
+		errorChan <- err
+
+		return
+	}
+
+	if !NoBuild {
+		// Step 2: Create the package file
+		err := mpc.createPackage(proj)
+		if err != nil {
+			cancel()
+
+			errorChan <- err
+
+			return
+		}
+
+		// Step 3: Install immediately (Arch Linux style) or extract for cross-compilation
+		if shouldInstall {
+			if err := mpc.installPackageForWorker(proj, pkgName, workerIDStr); err != nil {
+				cancel()
+
+				errorChan <- err
+
+				return
+			}
+		}
+	}
+
+	if ToPkgName != "" && pkgName == ToPkgName {
+		return
+	}
 }
 
 // buildProjectsParallel builds multiple projects in parallel for better performance.
@@ -374,57 +445,8 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 			workerIDStr := fmt.Sprintf("worker-%d", workerID)
 
 			for proj := range projectChan {
-				// Check if cancelled before starting work
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
 				pkgName := proj.Builder.PKGBUILD.PkgName
-
-				logger.Debug(i18n.T("logger.creating_package"),
-					"package", pkgName,
-					"version", proj.Builder.PKGBUILD.PkgVer,
-					"release", proj.Builder.PKGBUILD.PkgRel,
-					"worker_id", workerIDStr)
-
-				// Step 1: Build the package
-				err := proj.Builder.Compile(NoBuild)
-				if err != nil {
-					cancel()
-
-					errorChan <- err
-
-					return
-				}
-
-				if !NoBuild {
-					// Step 2: Create the package file
-					err := mpc.createPackage(proj)
-					if err != nil {
-						cancel()
-
-						errorChan <- err
-
-						return
-					}
-
-					// Step 3: Install immediately (Arch Linux style) or extract for cross-compilation
-					if shouldInstall {
-						if err := mpc.installPackageForWorker(proj, pkgName, workerIDStr); err != nil {
-							cancel()
-
-							errorChan <- err
-
-							return
-						}
-					}
-				}
-
-				if ToPkgName != "" && pkgName == ToPkgName {
-					return
-				}
+				mpc.runWorker(ctx, cancel, proj, pkgName, workerIDStr, shouldInstall, errorChan)
 			}
 		}(workerNum)
 	}
