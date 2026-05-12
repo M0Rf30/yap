@@ -61,20 +61,7 @@ func (builder *Builder) Compile(noBuild bool) error {
 	}
 
 	if !noBuild {
-		err := builder.processFunction(builder.PKGBUILD.Prepare, "logger.preparing_sources", "prepare")
-		if err != nil {
-			return err
-		}
-
-		err = builder.processFunction(builder.PKGBUILD.Build, "logger.building", "build")
-		if err != nil {
-			return err
-		}
-
-		err = builder.processFunctionInFakeroot(builder.PKGBUILD.Package, "logger.generating_package", "package")
-		if err != nil {
-			return err
-		}
+		return builder.runBuildStages()
 	}
 
 	return nil
@@ -154,6 +141,89 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 			WithContext("release", pkgRel).
 			WithContext("stage", stage).
 			WithOperation(stage)
+	}
+
+	return nil
+}
+
+// runBuildStages executes prepare → build → package (or split-package) stages.
+func (builder *Builder) runBuildStages() error {
+	if err := builder.processFunction(builder.PKGBUILD.Prepare, "logger.preparing_sources", "prepare"); err != nil {
+		return err
+	}
+
+	if err := builder.processFunction(builder.PKGBUILD.Build, "logger.building", "build"); err != nil {
+		return err
+	}
+
+	if builder.PKGBUILD.IsSplitPackage() {
+		return builder.compileSplitPackages()
+	}
+
+	return builder.processFunctionInFakeroot(builder.PKGBUILD.Package, "logger.generating_package", "package")
+}
+
+// compileSplitPackages runs the package_<name>() function for each sub-package
+// defined in a split PKGBUILD (pkgname=('foo' 'bar' ...)). Each sub-package
+// gets its own PackageDir so the install trees are kept separate.
+func (builder *Builder) compileSplitPackages() error {
+	pkgVer := builder.PKGBUILD.PkgVer
+	pkgRel := builder.PKGBUILD.PkgRel
+
+	for _, subName := range builder.PKGBUILD.PkgNames {
+		// Look up package_<name>() from the dedicated split-package function map.
+		funcBody, ok := builder.PKGBUILD.SplitPackageFuncs[subName]
+
+		if !ok {
+			// Fall back to the shared package() if no per-package function exists.
+			if builder.PKGBUILD.Package == "" {
+				logger.Warn("no package function found for split sub-package, skipping",
+					"subpackage", subName)
+
+				continue
+			}
+
+			funcBody = builder.PKGBUILD.Package
+		}
+
+		// Point PackageDir at the sub-package's own directory.
+		builder.PKGBUILD.SetPackageDirForSplit(subName)
+		builder.PKGBUILD.PkgName = subName
+
+		if err := files.ExistsMakeDir(builder.PKGBUILD.PackageDir); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild,
+				i18n.T("errors.build.failed_to_initialize_directories")).
+				WithContext("package", subName).
+				WithContext("version", pkgVer).
+				WithContext("release", pkgRel).
+				WithOperation("compileSplitPackages")
+		}
+
+		logger.Info(i18n.T("logger.generating_package"),
+			"pkgver", pkgVer, "pkgrel", pkgRel, "subpackage", subName)
+
+		preamble := builder.PKGBUILD.BuildScriptPreamble()
+		pkgEnv := builder.PKGBUILD.BuildEnvironmentSlice()
+
+		// Statically parse the function body to extract per-package variable overrides
+		// (pkgdesc, depends, conflicts, etc.) before running the script.
+		// This uses the same AddItem/parseDirective path as top-level PKGBUILD parsing,
+		// giving full __distro and _arch suffix support for free.
+		if err := builder.PKGBUILD.ParseSplitOverrides(funcBody); err != nil {
+			logger.Warn("failed to parse split-package overrides, using global values",
+				"subpackage", subName, "error", err)
+		}
+
+		if err := shell.RunScriptInFakeroot(
+			"  set -e\n  set -x\n"+preamble+funcBody, subName, pkgEnv,
+		); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
+				WithContext("package", subName).
+				WithContext("version", pkgVer).
+				WithContext("release", pkgRel).
+				WithContext("stage", "package").
+				WithOperation("compileSplitPackages")
+		}
 	}
 
 	return nil

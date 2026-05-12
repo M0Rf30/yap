@@ -1,10 +1,12 @@
 package parser_test
 
 import (
+	"strings"
 	"testing"
 
 	"mvdan.cc/sh/v3/shell"
 
+	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -411,4 +413,54 @@ func TestParserEnhancementIntegration(t *testing.T) {
 	t.Log("Array variables and loops are properly expanded using mvdan/sh shell expansion")
 	t.Log("Runtime shell variables (like $file in loops) are correctly removed during parsing")
 	t.Log("This is correct behavior: PKGBUILD variables expand at parse time, shell variables at runtime")
+}
+
+func TestParseFile_SplitPackage(t *testing.T) {
+	// Use the testdata split-package fixture
+	testdataPath := "testdata/split-package"
+
+	pkgBuild, err := parser.ParseFile("ubuntu", "focal", testdataPath, testdataPath)
+	if err != nil {
+		t.Fatalf("ParseFile() error: %v", err)
+	}
+
+	// Verify basic split package properties
+	if pkgBuild.PkgBase != "mybase" {
+		t.Errorf("PkgBase = %q, want %q", pkgBuild.PkgBase, "mybase")
+	}
+
+	if len(pkgBuild.PkgNames) != 2 {
+		t.Fatalf("PkgNames len = %d, want 2", len(pkgBuild.PkgNames))
+	}
+
+	if pkgBuild.PkgNames[0] != "mybase-lib" || pkgBuild.PkgNames[1] != "mybase-dev" {
+		t.Errorf("PkgNames = %v, want [mybase-lib mybase-dev]", pkgBuild.PkgNames)
+	}
+
+	if !pkgBuild.IsSplitPackage() {
+		t.Error("IsSplitPackage() should return true")
+	}
+
+	// Verify split package functions are present
+	if _, ok := pkgBuild.SplitPackageFuncs["mybase-lib"]; !ok {
+		t.Error("SplitPackageFuncs[mybase-lib] should be present")
+	}
+
+	if _, ok := pkgBuild.SplitPackageFuncs["mybase-dev"]; !ok {
+		t.Error("SplitPackageFuncs[mybase-dev] should be present")
+	}
+
+	// Verify no shared package() function
+	if pkgBuild.Package != "" {
+		t.Errorf("Package should be empty for split package, got %q", pkgBuild.Package)
+	}
+
+	// Verify shared build() function is present
+	if pkgBuild.Build == "" {
+		t.Error("Build should not be empty")
+	}
+
+	if !strings.Contains(pkgBuild.Build, "echo \"building\"") {
+		t.Errorf("Build should contain 'echo \"building\"', got %q", pkgBuild.Build)
+	}
 }

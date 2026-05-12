@@ -2039,6 +2039,259 @@ func TestSetupSysrootEnvironment_NoMultiarchForUnknownArch(t *testing.T) {
 	}
 }
 
+// --- Split-package (pkgbase) tests ---
+
+func TestIsSplitPackage_Single(t *testing.T) {
+	pb := &PKGBUILD{PkgName: "foo"}
+	if pb.IsSplitPackage() {
+		t.Error("single package should not be a split package")
+	}
+}
+
+func TestIsSplitPackage_Split(t *testing.T) {
+	pb := &PKGBUILD{PkgNames: []string{"foo", "foo-dev"}}
+	if !pb.IsSplitPackage() {
+		t.Error("pkgname array with 2 entries should be a split package")
+	}
+}
+
+func TestEffectivePkgBase_WithPkgBase(t *testing.T) {
+	pb := &PKGBUILD{PkgBase: "mybase", PkgName: "mybase-lib"}
+	if got := pb.EffectivePkgBase(); got != "mybase" {
+		t.Errorf("EffectivePkgBase() = %q, want %q", got, "mybase")
+	}
+}
+
+func TestEffectivePkgBase_FallbackToPkgName(t *testing.T) {
+	pb := &PKGBUILD{PkgName: "mypkg"}
+	if got := pb.EffectivePkgBase(); got != "mypkg" {
+		t.Errorf("EffectivePkgBase() = %q, want %q", got, "mypkg")
+	}
+}
+
+func TestAddItem_PkgBase(t *testing.T) {
+	pb := &PKGBUILD{}
+	pb.Init()
+
+	if err := pb.AddItem("pkgbase", "mybase"); err != nil {
+		t.Fatalf("AddItem(pkgbase) error: %v", err)
+	}
+
+	if pb.PkgBase != "mybase" {
+		t.Errorf("PkgBase = %q, want %q", pb.PkgBase, "mybase")
+	}
+}
+
+func TestAddItem_PkgnameArray(t *testing.T) {
+	pb := &PKGBUILD{}
+	pb.Init()
+
+	if err := pb.AddItem("pkgname", []string{"foo", "foo-dev", "foo-doc"}); err != nil {
+		t.Fatalf("AddItem(pkgname array) error: %v", err)
+	}
+
+	if len(pb.PkgNames) != 3 {
+		t.Fatalf("PkgNames len = %d, want 3", len(pb.PkgNames))
+	}
+
+	// PkgName should be set to the first entry.
+	if pb.PkgName != "foo" {
+		t.Errorf("PkgName = %q, want %q", pb.PkgName, "foo")
+	}
+
+	if !pb.IsSplitPackage() {
+		t.Error("should be a split package after pkgname array assignment")
+	}
+}
+
+func TestSetPackageDirForSplit_Default(t *testing.T) {
+	base := t.TempDir()
+	pb := &PKGBUILD{
+		Distro:   "ubuntu",
+		StartDir: base,
+		PkgNames: []string{"foo", "foo-dev"},
+	}
+
+	pb.SetPackageDirForSplit("foo-dev")
+
+	want := filepath.Join(base, "pkg-ubuntu", "foo-dev")
+	if pb.PackageDir != want {
+		t.Errorf("PackageDir = %q, want %q", pb.PackageDir, want)
+	}
+}
+
+func TestSetPackageDirForSplit_Arch(t *testing.T) {
+	base := t.TempDir()
+	pb := &PKGBUILD{
+		Distro:   "arch",
+		StartDir: base,
+		PkgNames: []string{"foo", "foo-dev"},
+	}
+
+	pb.SetPackageDirForSplit("foo")
+
+	want := filepath.Join(base, "pkg", "foo")
+	if pb.PackageDir != want {
+		t.Errorf("PackageDir = %q, want %q", pb.PackageDir, want)
+	}
+}
+
+func TestSetPackageDirForSplit_Alpine(t *testing.T) {
+	base := t.TempDir()
+	pb := &PKGBUILD{
+		Distro:   "alpine",
+		StartDir: base,
+		PkgNames: []string{"foo", "foo-dev"},
+	}
+
+	pb.SetPackageDirForSplit("foo-dev")
+
+	want := filepath.Join(base, "apk", "pkg", "foo-dev")
+	if pb.PackageDir != want {
+		t.Errorf("PackageDir = %q, want %q", pb.PackageDir, want)
+	}
+}
+
+func TestValidateGeneral_SplitPackageNoPackageFunc(t *testing.T) {
+	// A split package with no package() function should pass validation
+	// (it uses package_<name>() functions instead).
+	pb := &PKGBUILD{
+		PkgName:  "foo",
+		PkgNames: []string{"foo", "foo-dev"},
+		PkgDesc:  "A test package",
+		PkgVer:   "1.0",
+		PkgRel:   "1",
+		License:  []string{"MIT"},
+		Package:  "", // no shared package() — valid for split packages
+	}
+	pb.Init()
+
+	if err := pb.ValidateGeneral(); err != nil {
+		t.Errorf("ValidateGeneral() should pass for split package without package(): %v", err)
+	}
+}
+
+func TestValidateGeneral_SinglePackageMissingPackageFunc(t *testing.T) {
+	// A single package without package() should still fail validation.
+	pb := &PKGBUILD{
+		PkgName: "foo",
+		PkgDesc: "A test package",
+		PkgVer:  "1.0",
+		PkgRel:  "1",
+		License: []string{"MIT"},
+		Package: "",
+	}
+	pb.Init()
+
+	if err := pb.ValidateGeneral(); err == nil {
+		t.Error("ValidateGeneral() should fail for single package without package()")
+	}
+}
+
+func TestMapFunctions_SplitPackageFuncs(t *testing.T) {
+	pb := &PKGBUILD{}
+	pb.Init()
+
+	// Add a split package function
+	err := pb.AddItem("package_mybase-lib", FuncBody("install -d \"$pkgdir/usr/lib\""))
+	if err != nil {
+		t.Fatalf("AddItem(package_mybase-lib) error: %v", err)
+	}
+
+	// Verify it's in SplitPackageFuncs
+	if body, ok := pb.SplitPackageFuncs["mybase-lib"]; !ok {
+		t.Error("package_mybase-lib should be in SplitPackageFuncs")
+	} else if body != "install -d \"$pkgdir/usr/lib\"" {
+		t.Errorf("SplitPackageFuncs[mybase-lib] = %q, want %q", body, "install -d \"$pkgdir/usr/lib\"")
+	}
+
+	// Verify it's NOT in HelperFunctions
+	if _, ok := pb.HelperFunctions["package_mybase-lib"]; ok {
+		t.Error("package_mybase-lib should NOT be in HelperFunctions")
+	}
+}
+
+func TestMapFunctions_HelperNotSplit(t *testing.T) {
+	pb := &PKGBUILD{}
+	pb.Init()
+
+	// Add a helper function
+	err := pb.AddItem("_helper_func", FuncBody("echo helper"))
+	if err != nil {
+		t.Fatalf("AddItem(_helper_func) error: %v", err)
+	}
+
+	// Verify it's in HelperFunctions
+	if body, ok := pb.HelperFunctions["_helper_func"]; !ok {
+		t.Error("_helper_func should be in HelperFunctions")
+	} else if body != "_helper_func() {\necho helper\n}" {
+		t.Errorf("HelperFunctions[_helper_func] = %q, want %q", body, "_helper_func() {\necho helper\n}")
+	}
+
+	// Verify it's NOT in SplitPackageFuncs
+	if _, ok := pb.SplitPackageFuncs["_helper_func"]; ok {
+		t.Error("_helper_func should NOT be in SplitPackageFuncs")
+	}
+}
+
+func TestParseSplitOverrides_Scalar(t *testing.T) {
+	pb := &PKGBUILD{Distro: "ubuntu"}
+	pb.Init()
+
+	funcBody := "pkgdesc=\"The library\"\ndepends=('glibc' 'libfoo')\n"
+
+	err := pb.ParseSplitOverrides(funcBody)
+	if err != nil {
+		t.Fatalf("ParseSplitOverrides() error: %v", err)
+	}
+
+	if pb.PkgDesc != "The library" {
+		t.Errorf("PkgDesc = %q, want %q", pb.PkgDesc, "The library")
+	}
+
+	if len(pb.Depends) != 2 || pb.Depends[0] != "glibc" || pb.Depends[1] != "libfoo" {
+		t.Errorf("Depends = %v, want [glibc libfoo]", pb.Depends)
+	}
+}
+
+func TestParseSplitOverrides_DistroSuffix(t *testing.T) {
+	pb := &PKGBUILD{Distro: "ubuntu", Codename: "focal"}
+	pb.Init()
+
+	funcBody := "depends__ubuntu=('libfoo-ubuntu')\n"
+
+	err := pb.ParseSplitOverrides(funcBody)
+	if err != nil {
+		t.Fatalf("ParseSplitOverrides() error: %v", err)
+	}
+
+	if len(pb.Depends) != 1 || pb.Depends[0] != "libfoo-ubuntu" {
+		t.Errorf("Depends = %v, want [libfoo-ubuntu]", pb.Depends)
+	}
+}
+
+func TestParseSplitOverrides_NonOverrideIgnored(t *testing.T) {
+	pb := &PKGBUILD{}
+	pb.Init()
+
+	funcBody := "pkgver=\"2.0\"\npkgdesc=\"ok\"\n"
+
+	err := pb.ParseSplitOverrides(funcBody)
+	if err != nil {
+		t.Fatalf("ParseSplitOverrides() error: %v", err)
+	}
+
+	// pkgver is not an override var, so it should be ignored
+	if pb.PkgVer != "" {
+		t.Errorf("PkgVer = %q, want %q (should not be overridden)", pb.PkgVer, "")
+	}
+
+	// pkgdesc is an override var, so it should be set
+	if pb.PkgDesc != "ok" {
+		t.Errorf("PkgDesc = %q, want %q", pb.PkgDesc, "ok")
+	}
+}
+
 func TestGnuTriplet(t *testing.T) {
 	cases := []struct {
 		arch, want string
