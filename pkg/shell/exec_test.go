@@ -3,6 +3,8 @@ package shell
 import (
 	"bytes"
 	"context"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -346,5 +348,73 @@ func TestExecWithSudoContextValidation(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "not allowed for sudo execution") {
 		t.Fatalf("Expected validation error for bash, got: %v", err)
+	}
+}
+
+func TestRunScriptInFakeroot(t *testing.T) {
+	// Basic echo — should succeed under fakeroot user namespace.
+	err := RunScriptInFakeroot("echo 'fakeroot test'", "test-package")
+	if err != nil {
+		t.Fatalf("RunScriptInFakeroot failed: %v", err)
+	}
+}
+
+func TestRunScriptInFakerootOwnership(t *testing.T) {
+	// Create a temp file and verify that `install -o root -g root` succeeds
+	// inside the user namespace (the file will be owned by the mapped UID, not
+	// real root, but the command must not fail).
+	dir := t.TempDir()
+
+	script := "touch " + dir + "/src.txt\n" +
+		"install -o root -g root -m 0644 " + dir + "/src.txt " + dir + "/dst.txt\n"
+
+	err := RunScriptInFakeroot(script, "test-package")
+	if err != nil {
+		t.Fatalf("RunScriptInFakeroot ownership test failed: %v", err)
+	}
+}
+
+func TestRunScriptInFakerootEmpty(t *testing.T) {
+	err := RunScriptInFakeroot("", "test-package")
+	if err != nil {
+		t.Fatalf("RunScriptInFakeroot with empty script failed: %v", err)
+	}
+}
+
+func TestRunScriptInFakerootInvalidSyntax(t *testing.T) {
+	err := RunScriptInFakeroot("echo 'unclosed quote", "test-package")
+	if err == nil {
+		t.Fatal("Expected error for invalid script syntax, got nil")
+	}
+}
+
+func TestApplyFakeroot(t *testing.T) {
+	// applyFakeroot should set CLONE_NEWUSER and UID/GID mappings when not root.
+	cmd := &exec.Cmd{}
+	applyFakeroot(cmd)
+
+	if os.Getuid() == 0 {
+		// Already root — applyFakeroot is a no-op; SysProcAttr may be nil.
+		return
+	}
+
+	if cmd.SysProcAttr == nil {
+		t.Fatal("applyFakeroot should set SysProcAttr")
+	}
+
+	if len(cmd.SysProcAttr.UidMappings) == 0 {
+		t.Fatal("applyFakeroot should set UidMappings")
+	}
+
+	if len(cmd.SysProcAttr.GidMappings) == 0 {
+		t.Fatal("applyFakeroot should set GidMappings")
+	}
+
+	if cmd.SysProcAttr.UidMappings[0].ContainerID != 0 {
+		t.Fatalf("Expected ContainerID 0, got %d", cmd.SysProcAttr.UidMappings[0].ContainerID)
+	}
+
+	if cmd.SysProcAttr.UidMappings[0].HostID != os.Getuid() {
+		t.Fatalf("Expected HostID %d, got %d", os.Getuid(), cmd.SysProcAttr.UidMappings[0].HostID)
 	}
 }
