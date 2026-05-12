@@ -641,12 +641,15 @@ export -f configure_cross 2>/dev/null || true
 	envMutex.Lock()
 	defer envMutex.Unlock()
 
+	// For cross-compilation, set CC/CXX to the bare cross-compiler and use
+	// CCACHE_PREFIX so ccache wraps it transparently.  Setting CC="ccache
+	// aarch64-linux-gnu-gcc" breaks build systems (e.g. OpenSSL's Configure)
+	// that derive the cross-prefix by stripping a known suffix from CC.
+	_ = os.Setenv("CC", gccExecutable)
+	_ = os.Setenv("CXX", gppExecutable)
+
 	if ccacheAvailable {
-		_ = os.Setenv("CC", "ccache "+gccExecutable)
-		_ = os.Setenv("CXX", "ccache "+gppExecutable)
-	} else {
-		_ = os.Setenv("CC", gccExecutable)
-		_ = os.Setenv("CXX", gppExecutable)
+		_ = os.Setenv("CCACHE_PREFIX", "ccache")
 	}
 
 	_ = os.Setenv("AR", binutilsPrefix+"-ar")
@@ -664,18 +667,10 @@ export -f configure_cross 2>/dev/null || true
 		_ = os.Setenv("CARGO_TARGET_"+rustTargetUpper+"_LINKER",
 			binutilsPrefix+"-ld")
 
-		// Set CC and CXX for Rust's build script integration
-		// Use the executable names (already converted above)
-		rustCC := gccExecutable
-		rustCXX := gppExecutable
-
-		if ccacheAvailable {
-			rustCC = "ccache " + rustCC
-			rustCXX = "ccache " + rustCXX
-		}
-
-		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CC", rustCC)
-		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CXX", rustCXX)
+		// Rust build script CC/CXX: use bare cross-compiler; ccache wraps
+		// via CCACHE_PREFIX set above.
+		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CC", gccExecutable)
+		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CXX", gppExecutable)
 	}
 
 	// Set up Go cross-compilation environment variables
@@ -684,15 +679,10 @@ export -f configure_cross 2>/dev/null || true
 		_ = os.Setenv("GOOS", goOS)
 		_ = os.Setenv("GOARCH", goArch)
 
-		// Set up CGO for cross-compilation using executable names
+		// CGO: bare cross-compiler; ccache wraps via CCACHE_PREFIX.
 		_ = os.Setenv("CGO_ENABLED", "1")
-		if ccacheAvailable {
-			_ = os.Setenv("CC_FOR_TARGET", "ccache "+gccExecutable)
-			_ = os.Setenv("CXX_FOR_TARGET", "ccache "+gppExecutable)
-		} else {
-			_ = os.Setenv("CC_FOR_TARGET", gccExecutable)
-			_ = os.Setenv("CXX_FOR_TARGET", gppExecutable)
-		}
+		_ = os.Setenv("CC_FOR_TARGET", gccExecutable)
+		_ = os.Setenv("CXX_FOR_TARGET", gppExecutable)
 	}
 
 	// Set common cross-compilation variables
