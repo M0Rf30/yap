@@ -246,6 +246,23 @@ func (builder *Builder) processFunctionInFakeroot(pkgbuildFunction, message, sta
 
 	logger.Info(i18n.T(message), "pkgver", pkgVer, "pkgrel", pkgRel)
 
+	// Propagate cross-compilation environment to the package() stage so that
+	// tools like strip/objcopy use the cross-prefixed variants when packaging
+	// cross-compiled binaries.
+	if builder.PKGBUILD.TargetArch != "" &&
+		builder.PKGBUILD.TargetArch != builder.PKGBUILD.ArchComputed {
+		format := constants.DistroFormat(builder.PKGBUILD.Distro)
+		tempBuilder := &common.BaseBuilder{
+			PKGBUILD: builder.PKGBUILD,
+			Format:   format,
+		}
+
+		if err := tempBuilder.SetupCrossCompilationEnvironment(builder.PKGBUILD.TargetArch); err != nil {
+			logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
+				"package", pkgName, "target_arch", builder.PKGBUILD.TargetArch, "error", err)
+		}
+	}
+
 	preamble := builder.PKGBUILD.BuildScriptPreamble()
 
 	err := shell.RunScriptInFakeroot("  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)

@@ -573,14 +573,11 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	gccExecutable := toolchainPackages.GetExecutableName(toolchainPackages.GCCPackage)
 	gppExecutable := toolchainPackages.GetExecutableName(toolchainPackages.GPlusPlusPackage)
 
-	// Extract binutils prefix for tool names
-	// BinutilsPackage is like "binutils-aarch64-linux-gnu", we need "aarch64-linux-gnu-ar", etc.
-	binutilsPrefix := strings.TrimPrefix(toolchainPackages.BinutilsPackage, "binutils-")
-	if binutilsPrefix == toolchainPackages.BinutilsPackage {
-		// If no binutils- prefix, try the package conversion logic
-		// For packages like "aarch64-linux-gnu-binutils", extract the prefix
-		binutilsPrefix = strings.TrimSuffix(toolchainPackages.BinutilsPackage, "-binutils")
-	}
+	// Extract binutils prefix for cross tool names (e.g. "aarch64-linux-gnu" →
+	// "aarch64-linux-gnu-ar").  Use the canonical binutilsPrefix() helper which
+	// handles both "binutils-<prefix>" (Debian/Alpine) and "<prefix>-binutils"
+	// (Arch) naming conventions correctly.
+	binutilsPrefix := toolchainPackages.binutilsPrefix()
 
 	// Calculate CROSS_COMPILE prefix from the executable name
 	ccPrefix := ""

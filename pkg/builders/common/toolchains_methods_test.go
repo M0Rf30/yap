@@ -105,11 +105,12 @@ func TestCrossToolchainMapCompleteness(t *testing.T) {
 		"i686",
 	}
 
+	// Note: alpine is NOT in the map because Alpine cross-compilation via host
+	// toolchains is not supported. Use native Alpine containers instead.
 	distributions := []string{
 		"ubuntu",
 		"fedora",
 		"debian",
-		"alpine",
 		"arch",
 	}
 
@@ -137,10 +138,12 @@ func TestCrossToolchainPackageValidation(t *testing.T) {
 }
 
 // TestRiscv64Support verifies that RISC-V 64-bit architecture is fully supported.
+// Note: Alpine is not included because Alpine cross-compilation via host toolchains
+// is not supported.
 func TestRiscv64Support(t *testing.T) {
 	t.Parallel()
 
-	distributions := []string{"debian", "ubuntu", "fedora", "alpine", "arch"}
+	distributions := []string{"debian", "ubuntu", "fedora", "arch"}
 
 	for _, distro := range distributions {
 		t.Run(fmt.Sprintf("%s_riscv64", distro), func(t *testing.T) {
@@ -184,6 +187,8 @@ func TestRiscv64Support(t *testing.T) {
 }
 
 // TestRiscv64PackageNaming verifies distribution-specific package naming for RISC-V.
+// Note: Alpine is not included because Alpine cross-compilation via host toolchains
+// is not supported.
 func TestRiscv64PackageNaming(t *testing.T) {
 	t.Parallel()
 
@@ -194,7 +199,6 @@ func TestRiscv64PackageNaming(t *testing.T) {
 		{"ubuntu", "gcc-riscv64-linux-gnu"},
 		{"debian", "gcc-riscv64-linux-gnu"},
 		{"fedora", "gcc-riscv64-linux-gnu"},
-		{"alpine", "gcc-riscv64"},
 		{"arch", "riscv64-linux-gnu-gcc"},
 	}
 
@@ -215,11 +219,12 @@ func TestRiscv64PackageNaming(t *testing.T) {
 	}
 }
 
-// TestAlpineMuslSupport verifies that all Alpine toolchains include musl-dev.
+// TestAlpineMuslSupport verifies that Alpine cross-compilation is not supported
+// via host toolchains. Alpine should use native containers instead.
 func TestAlpineMuslSupport(t *testing.T) {
 	t.Parallel()
 
-	// All supported architectures should have musl-dev on Alpine
+	// Verify Alpine is not in the CrossToolchainMap for any architecture
 	architectures := []string{
 		"aarch64", "armv7", "armv6", "i686",
 		"x86_64", "ppc64le", "s390x", "riscv64",
@@ -229,106 +234,57 @@ func TestAlpineMuslSupport(t *testing.T) {
 		t.Run(fmt.Sprintf("alpine_%s", arch), func(t *testing.T) {
 			t.Parallel()
 
-			toolchain, err := GetCrossToolchain(arch, "alpine")
-			if err != nil {
-				t.Fatalf("Failed to get Alpine toolchain for %s: %v", arch, err)
+			// Alpine should not be in the map
+			if _, exists := CrossToolchainMap[arch]["alpine"]; exists {
+				t.Errorf("Alpine should not be in CrossToolchainMap for %s", arch)
 			}
 
-			// Verify musl-dev is in additional packages
-			hasMuslDev := slices.Contains(toolchain.AdditionalPackages, "musl-dev")
-
-			if !hasMuslDev {
-				t.Errorf("Alpine toolchain for %s missing musl-dev in AdditionalPackages: %v",
-					arch, toolchain.AdditionalPackages)
-			}
-
-			// Verify all packages are defined
-			if toolchain.GCCPackage == "" {
-				t.Errorf("Alpine %s: GCC package not defined", arch)
-			}
-
-			if toolchain.GPlusPlusPackage == "" {
-				t.Errorf("Alpine %s: G++ package not defined", arch)
-			}
-
-			if toolchain.BinutilsPackage == "" {
-				t.Errorf("Alpine %s: Binutils package not defined", arch)
-			}
-
-			t.Logf("Alpine/%s: GCC=%s, musl-dev=%v",
-				arch, toolchain.GCCPackage, hasMuslDev)
+			t.Logf("Alpine/%s: Correctly not in CrossToolchainMap (use native containers)",
+				arch)
 		})
 	}
 }
 
-// TestAlpinePackageNaming verifies Alpine uses simplified package naming.
+// TestAlpinePackageNaming verifies Alpine is not in the CrossToolchainMap.
+// Alpine cross-compilation via host toolchains is not supported.
 func TestAlpinePackageNaming(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		arch        string
-		expectedGCC string
-		expectedGPP string
-		note        string
-	}{
-		{"aarch64", "gcc-aarch64", "g++-aarch64", "Simple arch-based naming"},
-		{"armv7", "gcc-armv7", "g++-armv7", "Simple arch-based naming"},
-		{"armv6", "gcc-armhf", "g++-armhf", "Special case: uses armhf"},
-		{"i686", "gcc-i686", "g++-i686", "Simple arch-based naming"},
-		{"x86_64", "gcc-x86_64", "g++-x86_64", "Simple arch-based naming (not GNU triplet)"},
-		{"ppc64le", "gcc-ppc64le", "g++-ppc64le", "Simple arch-based naming (not powerpc64le)"},
-		{"s390x", "gcc-s390x", "g++-s390x", "Simple arch-based naming (not GNU triplet)"},
-		{"riscv64", "gcc-riscv64", "g++-riscv64", "Simple arch-based naming"},
+	architectures := []string{
+		"aarch64", "armv7", "armv6", "i686",
+		"x86_64", "ppc64le", "s390x", "riscv64",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.arch, func(t *testing.T) {
+	for _, arch := range architectures {
+		t.Run(arch, func(t *testing.T) {
 			t.Parallel()
 
-			toolchain, err := GetCrossToolchain(tt.arch, "alpine")
-			if err != nil {
-				t.Fatalf("Failed to get Alpine toolchain for %s: %v", tt.arch, err)
+			// Alpine should not be in the map
+			if _, exists := CrossToolchainMap[arch]["alpine"]; exists {
+				t.Errorf("Alpine should not be in CrossToolchainMap for %s", arch)
 			}
 
-			if toolchain.GCCPackage != tt.expectedGCC {
-				t.Errorf("Alpine %s: Expected GCC '%s', got '%s' (%s)",
-					tt.arch, tt.expectedGCC, toolchain.GCCPackage, tt.note)
-			}
-
-			if toolchain.GPlusPlusPackage != tt.expectedGPP {
-				t.Errorf("Alpine %s: Expected G++ '%s', got '%s' (%s)",
-					tt.arch, tt.expectedGPP, toolchain.GPlusPlusPackage, tt.note)
-			}
-
-			t.Logf("Alpine/%s: GCC=%s, G++=%s (%s)",
-				tt.arch, toolchain.GCCPackage, toolchain.GPlusPlusPackage, tt.note)
+			t.Logf("Alpine/%s: Correctly not in CrossToolchainMap", arch)
 		})
 	}
 }
 
-// TestAlpineVsGlibcPackages verifies Alpine uses musl while others use glibc.
+// TestAlpineVsGlibcPackages verifies Alpine is not in the CrossToolchainMap
+// because Alpine cross-compilation via host toolchains is not supported.
 func TestAlpineVsGlibcPackages(t *testing.T) {
 	t.Parallel()
 
 	arch := "aarch64"
 
-	// Get Alpine toolchain
-	alpineToolchain, err := GetCrossToolchain(arch, "alpine")
-	if err != nil {
-		t.Fatalf("Failed to get Alpine toolchain: %v", err)
+	// Verify Alpine is NOT in the map
+	if _, exists := CrossToolchainMap[arch]["alpine"]; exists {
+		t.Error("Alpine should not be in CrossToolchainMap - use native Alpine containers instead")
 	}
 
-	// Get Ubuntu toolchain (glibc-based)
+	// Get Ubuntu toolchain (glibc-based) for comparison
 	ubuntuToolchain, err := GetCrossToolchain(arch, "ubuntu")
 	if err != nil {
 		t.Fatalf("Failed to get Ubuntu toolchain: %v", err)
-	}
-
-	// Alpine should have musl-dev
-	hasMuslDev := slices.Contains(alpineToolchain.AdditionalPackages, "musl-dev")
-
-	if !hasMuslDev {
-		t.Error("Alpine toolchain should include musl-dev")
 	}
 
 	// Ubuntu should have libc6-dev (glibc)
@@ -338,20 +294,16 @@ func TestAlpineVsGlibcPackages(t *testing.T) {
 		t.Error("Ubuntu toolchain should include libc6-dev-arm64-cross")
 	}
 
-	// Package naming should be different
-	if alpineToolchain.GCCPackage == ubuntuToolchain.GCCPackage {
-		t.Error("Alpine and Ubuntu should have different GCC package names")
-	}
-
-	t.Logf("Alpine packages: %v", alpineToolchain.GetAllPackages())
 	t.Logf("Ubuntu packages: %v", ubuntuToolchain.GetAllPackages())
 }
 
 // TestI686MultilibSupport verifies i686 toolchain configuration across distributions.
+// Note: Alpine is not included because Alpine cross-compilation via host toolchains
+// is not supported.
 func TestI686MultilibSupport(t *testing.T) {
 	t.Parallel()
 
-	distributions := []string{"debian", "ubuntu", "fedora", "alpine", "arch"}
+	distributions := []string{"debian", "ubuntu", "fedora", "arch"}
 
 	for _, distro := range distributions {
 		t.Run(fmt.Sprintf("%s_i686", distro), func(t *testing.T) {
@@ -439,6 +391,8 @@ func TestI686ArchMultilibPackages(t *testing.T) {
 }
 
 // TestI686PackageNaming verifies distribution-specific package naming for i686.
+// Note: Alpine is not included because Alpine cross-compilation via host toolchains
+// is not supported.
 func TestI686PackageNaming(t *testing.T) {
 	t.Parallel()
 
@@ -451,7 +405,6 @@ func TestI686PackageNaming(t *testing.T) {
 		{"ubuntu", "gcc-i686-linux-gnu", "libc6-dev-i386-cross", "Standard cross-compiler"},
 		{"debian", "gcc-i686-linux-gnu", "libc6-dev-i386-cross", "Standard cross-compiler"},
 		{"fedora", "gcc-i686-linux-gnu", "libc6-dev-i386-cross", "Standard cross-compiler"},
-		{"alpine", "gcc-i686", "musl-dev", "Alpine simplified naming with musl"},
 		{"arch", "gcc-multilib", "lib32-gcc-libs", "Arch uses multilib packages"},
 	}
 
@@ -640,35 +593,36 @@ func TestValidateToolchainFormatMapping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// This test doesn't validate actual executables, just checks that the
-			// format-to-distro mapping works by verifying the error message contains
-			// the expected distribution-specific information
 			err := ValidateToolchain(targetArch, tt.format)
-
-			// The function will likely return an error because we don't have all
-			// cross-compilers installed, but we can check the error message contains
-			// distribution-specific information
-			if err != nil {
-				errMsg := err.Error()
-
-				// Verify the error message contains architecture information
-				if !strings.Contains(errMsg, targetArch) {
-					t.Errorf("Error message should contain architecture '%s', got: %v",
-						targetArch, err)
-				}
-
-				// Verify the error message contains format information
-				if !strings.Contains(errMsg, tt.format) {
-					t.Errorf("Error message should contain format '%s', got: %v",
-						tt.format, err)
-				}
-
-				t.Logf("Format '%s' -> Distribution '%s' mapping verified in error: %v",
-					tt.format, tt.expectedDistro, err)
-			} else {
-				// If no error, the toolchain is actually installed - that's fine
+			if err == nil {
 				t.Logf("Toolchain for %s/%s is installed", targetArch, tt.format)
+				return
 			}
+
+			errMsg := err.Error()
+
+			// APK always returns an "Alpine not supported" error.
+			if tt.format == "apk" {
+				if !strings.Contains(errMsg, "Alpine") || !strings.Contains(errMsg, "not supported") {
+					t.Errorf("APK error should contain 'Alpine' and 'not supported', got: %v", err)
+				}
+
+				t.Logf("Format '%s' -> Alpine unsupported verified: %v", tt.format, err)
+
+				return
+			}
+
+			// For other formats verify architecture and format appear in the message.
+			if !strings.Contains(errMsg, targetArch) {
+				t.Errorf("Error message should contain architecture '%s', got: %v", targetArch, err)
+			}
+
+			if !strings.Contains(errMsg, tt.format) {
+				t.Errorf("Error message should contain format '%s', got: %v", tt.format, err)
+			}
+
+			t.Logf("Format '%s' -> Distribution '%s' mapping verified in error: %v",
+				tt.format, tt.expectedDistro, err)
 		})
 	}
 }
@@ -719,12 +673,6 @@ func TestValidateToolchainDistributionSpecificGuidance(t *testing.T) {
 		format           string
 		expectedGuidance string
 	}{
-		{
-			name:             "Alpine APK includes musl guidance",
-			targetArch:       "aarch64",
-			format:           "apk",
-			expectedGuidance: "errors.cross_compilation.alpine_note",
-		},
 		{
 			name:             "Arch i686 includes multilib guidance",
 			targetArch:       "i686",
@@ -785,12 +733,6 @@ func TestValidateToolchainInstallationCommands(t *testing.T) {
 			expectedCommand: "sudo dnf install",
 		},
 		{
-			name:            "APK uses apk add",
-			targetArch:      "aarch64",
-			format:          "apk",
-			expectedCommand: "sudo apk add",
-		},
-		{
 			name:            "Pacman uses pacman -S",
 			targetArch:      "aarch64",
 			format:          "pacman",
@@ -838,28 +780,34 @@ func TestValidateToolchainAllSupportedCombinations(t *testing.T) {
 			combinationCount++
 
 			t.Run(fmt.Sprintf("%s_%s", arch, format), func(t *testing.T) {
-				// This should not panic
 				err := ValidateToolchain(arch, format)
 				if err == nil {
 					successCount++
 
 					t.Logf("✓ Toolchain available for %s/%s", arch, format)
-				} else {
-					errorCount++
-					// Verify error message is non-empty and contains basic info
-					errMsg := err.Error()
-					if errMsg == "" {
-						t.Errorf("Error message is empty for %s/%s", arch, format)
-					}
 
-					if !strings.Contains(errMsg, arch) {
-						t.Errorf("Error message missing architecture '%s' for %s/%s",
-							arch, arch, format)
-					}
-
-					t.Logf("✗ Toolchain not available for %s/%s (expected): %v",
-						arch, format, err)
+					return
 				}
+
+				errorCount++
+				errMsg := err.Error()
+
+				if errMsg == "" {
+					t.Errorf("Error message is empty for %s/%s", arch, format)
+					return
+				}
+
+				// APK always returns an "Alpine not supported" error.
+				if format == "apk" {
+					if !strings.Contains(errMsg, "Alpine") && !strings.Contains(errMsg, "not supported") {
+						t.Errorf("APK error should contain 'Alpine' or 'not supported' for %s/%s",
+							arch, format)
+					}
+				} else if !strings.Contains(errMsg, arch) {
+					t.Errorf("Error message missing architecture '%s' for %s/%s", arch, arch, format)
+				}
+
+				t.Logf("✗ Toolchain not available for %s/%s (expected): %v", arch, format, err)
 			})
 		}
 	}

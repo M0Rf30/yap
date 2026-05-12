@@ -62,35 +62,38 @@ type CrossToolchain struct {
 }
 
 // Validate checks if the required toolchain executables are available in PATH.
+// It resolves package names to their actual executable names before checking.
 func (ct *CrossToolchain) Validate() ([]string, error) {
 	var missing []string
 
-	// Check GCC
+	// Check GCC — resolve package name to executable name first.
 	if ct.GCCPackage != "" {
-		if _, err := exec.LookPath(ct.GCCPackage); err != nil {
-			missing = append(missing, ct.GCCPackage)
+		exe := ct.GetExecutableName(ct.GCCPackage)
+		if _, err := exec.LookPath(exe); err != nil {
+			missing = append(missing, exe)
 		}
 	}
 
-	// Check G++
+	// Check G++ — resolve package name to executable name first.
 	if ct.GPlusPlusPackage != "" {
-		if _, err := exec.LookPath(ct.GPlusPlusPackage); err != nil {
-			missing = append(missing, ct.GPlusPlusPackage)
+		exe := ct.GetExecutableName(ct.GPlusPlusPackage)
+		if _, err := exec.LookPath(exe); err != nil {
+			missing = append(missing, exe)
 		}
 	}
 
-	// Check Binutils
+	// Check cross-prefixed binutils tools (ar, strip, etc.) derived from the
+	// binutils package name.  We skip the host-native tools (ar, ld, …) because
+	// those are always present and checking them adds no signal for cross builds.
 	if ct.BinutilsPackage != "" {
-		if _, err := exec.LookPath(ct.BinutilsPackage); err != nil {
-			missing = append(missing, ct.BinutilsPackage)
-		}
-	}
-
-	// Check for common binutils tools
-	binutilsTools := []string{"ar", "ld", "strip", "objdump", "nm"}
-	for _, tool := range binutilsTools {
-		if _, err := exec.LookPath(tool); err != nil {
-			missing = append(missing, tool)
+		prefix := ct.binutilsPrefix()
+		if prefix != "" {
+			for _, tool := range []string{"ar", "strip", "nm", "objdump", "objcopy"} {
+				exe := prefix + "-" + tool
+				if _, err := exec.LookPath(exe); err != nil {
+					missing = append(missing, exe)
+				}
+			}
 		}
 	}
 
@@ -101,6 +104,27 @@ func (ct *CrossToolchain) Validate() ([]string, error) {
 	}
 
 	return nil, nil
+}
+
+// binutilsPrefix derives the cross-tool prefix from the BinutilsPackage name.
+// Examples:
+//   - "binutils-aarch64-linux-gnu"  → "aarch64-linux-gnu"   (Debian/Ubuntu/Fedora)
+//   - "aarch64-linux-gnu-binutils"  → "aarch64-linux-gnu"   (Arch)
+//   - "binutils-armv7"              → "armv7"               (Alpine)
+func (ct *CrossToolchain) binutilsPrefix() string {
+	pkg := ct.BinutilsPackage
+
+	// "binutils-<prefix>" style (Debian, Ubuntu, Fedora, Alpine)
+	if after, ok := strings.CutPrefix(pkg, "binutils-"); ok {
+		return after
+	}
+
+	// "<prefix>-binutils" style (Arch)
+	if before, ok := strings.CutSuffix(pkg, "-binutils"); ok {
+		return before
+	}
+
+	return ""
 }
 
 // GetAllPackages returns all packages needed for this toolchain.
@@ -169,12 +193,10 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 			binutilsKey:   binutilsFmtPat,
 			additionalKey: "",
 		},
-		constants.DistroAlpine: {
-			gccKey:        gccFmtPattern,
-			gppKey:        gppFmtPattern,
-			binutilsKey:   binutilsFmtPat,
-			additionalKey: muslDevPkg,
-		},
+		// Alpine Linux does not ship Linux-userspace cross-compiler packages
+		// (gcc-aarch64, etc.) in its repos.  Cross-compilation for APK targets
+		// requires bootstrap.sh or a native Alpine container/QEMU environment.
+		// Alpine is intentionally omitted from CrossToolchainMap.
 		constants.DistroArch: {
 			gccKey:        archGccFmtPat,
 			gppKey:        archGppFmtPat,
@@ -206,20 +228,7 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 				binutilsKey: "aarch64-linux-gnu-binutils",
 			},
 		},
-		constants.ArchArmv6: {
-			constants.DistroAlpine: {
-				gccKey:      gccArmhf,
-				gppKey:      gppArmhf,
-				binutilsKey: binArmhf,
-			},
-		},
-		constants.ArchArmv7: {
-			constants.DistroAlpine: {
-				gccKey:      "gcc-armv7",
-				gppKey:      gppArmv7Pkg,
-				binutilsKey: "binutils-armv7",
-			},
-		},
+
 		constants.ArchS390x: {
 			constants.DistroFedora: {
 				gccKey:      gccS390xRH,
@@ -232,37 +241,29 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 	// Define architecture-specific additional packages
 	archAdditional := map[string]map[string][]string{
 		constants.ArchAarch64: {
-			constants.DistroAlpine: {muslDevPkg},
-			defaultKey:             {"libc6-dev-arm64-cross"},
+			defaultKey: {"libc6-dev-arm64-cross"},
 		},
 		constants.ArchArmv7: {
-			constants.DistroAlpine: {muslDevPkg},
-			defaultKey:             {"libc6-dev-armhf-cross"},
+			defaultKey: {"libc6-dev-armhf-cross"},
 		},
 		constants.ArchArmv6: {
-			constants.DistroAlpine: {muslDevPkg},
-			defaultKey:             {"libc6-dev-armhf-cross"},
+			defaultKey: {"libc6-dev-armhf-cross"},
 		},
 		constants.ArchI686: {
-			constants.DistroAlpine: {muslDevPkg},
-			constants.DistroArch:   {lib32GccLibs}, // Arch multilib needs lib32 libraries
-			defaultKey:             {libc6DevI386},
+			constants.DistroArch: {lib32GccLibs}, // Arch multilib needs lib32 libraries
+			defaultKey:           {libc6DevI386},
 		},
 		constants.ArchX86_64: {
-			constants.DistroAlpine: {muslDevPkg},
-			defaultKey:             {"libc6-dev-amd64-cross"},
+			defaultKey: {"libc6-dev-amd64-cross"},
 		},
 		constants.ArchPpc64le: {
-			constants.DistroAlpine: {muslDevPkg},
-			defaultKey:             {"libc6-dev-ppc64el-cross"},
+			defaultKey: {"libc6-dev-ppc64el-cross"},
 		},
 		constants.ArchS390x: {
-			constants.DistroAlpine: {muslDevPkg},
-			defaultKey:             {"libc6-dev-s390x-cross"},
+			defaultKey: {"libc6-dev-s390x-cross"},
 		},
 		constants.ArchRiscv64: {
-			constants.DistroAlpine: {muslDevPkg},
-			defaultKey:             {"libc6-dev-riscv64-cross"},
+			defaultKey: {"libc6-dev-riscv64-cross"},
 		},
 	}
 
@@ -285,9 +286,10 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 		constants.ArchAarch64, constants.ArchArmv7, constants.ArchArmv6, constants.ArchI686,
 		constants.ArchX86_64, constants.ArchPpc64le, constants.ArchS390x, constants.ArchRiscv64,
 	}
+	// Alpine is excluded: it has no Linux-userspace cross-compiler packages.
 	distributions := []string{
 		constants.DistroDebian, constants.DistroUbuntu, constants.DistroFedora,
-		constants.DistroAlpine, constants.DistroArch,
+		constants.DistroArch,
 	}
 
 	for _, arch := range architectures {
@@ -300,18 +302,10 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 				continue
 			}
 
-			// Determine which pattern to use for this architecture
-			// For Alpine, use simple arch name (armv7, aarch64, etc.)
-			// For Debian/Ubuntu/Fedora/Arch, use GNU triplet from archPatterns
+			// All supported distros use GNU triplet patterns.
 			archPattern := arch
-			if distro == constants.DistroAlpine {
-				// Alpine uses simplified names
-				archPattern = arch
-			} else {
-				// Debian, Ubuntu, Fedora, Arch use GNU triplet patterns
-				if pattern, exists := archPatterns[arch]; exists {
-					archPattern = pattern
-				}
+			if pattern, exists := archPatterns[arch]; exists {
+				archPattern = pattern
 			}
 
 			// Start with base values using the appropriate pattern
@@ -378,39 +372,51 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 	return result
 }()
 
-// GetExecutableName converts a package name to its executable name.
-// Different distributions use different naming conventions:
-//   - Debian/Ubuntu/Fedora: gcc-aarch64-linux-gnu -> aarch64-linux-gnu-gcc
-//   - Arch Linux: aarch64-linux-gnu-gcc -> aarch64-linux-gnu-gcc (already correct)
-//   - Alpine: gcc-aarch64 -> aarch64-alpine-linux-musl-gcc (needs special handling)
+// alpineMuslTriplets maps Alpine arch names (as used in package names like
+// "gcc-aarch64") to their full musl cross-compiler triplet prefixes.
+var alpineMuslTriplets = map[string]string{
+	constants.ArchAarch64: "aarch64-alpine-linux-musl",
+	constants.ArchArmv7:   "armv7-alpine-linux-musleabihf",
+	"armhf":               "arm-alpine-linux-musleabihf",
+	"x86":                 "i586-alpine-linux-musl",
+	constants.ArchX86_64:  "x86_64-alpine-linux-musl",
+	constants.ArchPpc64le: "powerpc64le-alpine-linux-musl",
+	constants.ArchS390x:   "s390x-alpine-linux-musl",
+	constants.ArchRiscv64: "riscv64-alpine-linux-musl",
+}
+
+// GetExecutableName converts a package name to its actual cross-compiler
+// executable name.  Naming conventions differ by distribution:
+//
+//   - Debian/Ubuntu: gcc-aarch64-linux-gnu  → aarch64-linux-gnu-gcc
+//   - Fedora:        gcc-c++-aarch64-linux-gnu → aarch64-linux-gnu-g++
+//   - Arch:          aarch64-linux-gnu-gcc  → aarch64-linux-gnu-gcc (already correct)
+//   - Alpine:        gcc-aarch64            → aarch64-alpine-linux-musl-gcc
 func (ct *CrossToolchain) GetExecutableName(packageName string) string {
-	// Handle Fedora's gcc-c++ pattern (G++)
+	// Fedora G++: "gcc-c++-<triplet>" → "<triplet>-g++"
 	if after, ok := strings.CutPrefix(packageName, "gcc-c++-"); ok {
-		suffix := after
-		// Fedora: gcc-c++-aarch64-linux-gnu -> aarch64-linux-gnu-g++
-		return suffix + "-g++"
+		return after + "-g++"
 	}
 
-	// Handle g++ pattern
+	// Debian/Ubuntu G++: "g++-<triplet>" → "<triplet>-g++"
 	if after, ok := strings.CutPrefix(packageName, "g++-"); ok {
-		suffix := after
-		// Debian/Ubuntu: g++-aarch64-linux-gnu -> aarch64-linux-gnu-g++
-		return suffix + "-g++"
+		return after + "-g++"
 	}
 
-	// Handle gcc pattern
+	// GCC: "gcc-<suffix>" → resolve suffix to executable.
 	if after, ok := strings.CutPrefix(packageName, "gcc-"); ok {
-		suffix := after
+		// Alpine uses short arch names (e.g. "gcc-aarch64").  Map them to the
+		// full musl triplet so the executable name is correct.
+		if triplet, ok := alpineMuslTriplets[after]; ok {
+			return triplet + "-gcc"
+		}
 
-		// Alpine special case: gcc-aarch64 needs to become aarch64-alpine-linux-musl-gcc
-		// However, we can't reliably determine this without knowing the distribution
-		// So we'll just do the basic transformation and let Alpine handle it
-		// Alpine: gcc-aarch64 -> aarch64-gcc (which may need further handling at runtime)
-		return suffix + "-gcc"
+		// Debian/Ubuntu/Fedora: "gcc-aarch64-linux-gnu" → "aarch64-linux-gnu-gcc"
+		return after + "-gcc"
 	}
 
-	// Otherwise, return as-is (already in correct format for Arch, etc.)
-	// Arch: aarch64-linux-gnu-gcc -> aarch64-linux-gnu-gcc
+	// Arch (and any already-correct form): return as-is.
+	// e.g. "aarch64-linux-gnu-gcc" stays "aarch64-linux-gnu-gcc".
 	return packageName
 }
 
@@ -444,12 +450,25 @@ func GetCrossToolchain(arch, distro string) (CrossToolchain, error) {
 // ValidateToolchain checks if the required cross-compilation toolchain is available
 // for the given target architecture and package format. It returns a detailed error
 // message with installation instructions if the toolchain is missing.
+//
+// APK (Alpine) format always returns an error: Alpine does not ship Linux-userspace
+// cross-compiler packages.  Use a native Alpine container or QEMU instead.
 func ValidateToolchain(targetArch, format string) error {
+	// Alpine cross-compilation via host packages is not supported.
+	if format == constants.FormatAPK {
+		return errors.New(errors.ErrTypeBuild,
+			"cross-compilation for APK (Alpine) is not supported via host toolchains: "+
+				"Alpine does not ship Linux-userspace cross-compiler packages. "+
+				"Use a native Alpine container or QEMU binfmt_misc instead.").
+			WithOperation("ValidateToolchain").
+			WithContext("targetArch", targetArch).
+			WithContext("format", format)
+	}
+
 	// Map package format to distribution for toolchain lookup
 	formatToDistro := map[string]string{
 		constants.FormatDEB:    constants.DistroUbuntu,
 		constants.FormatRPM:    constants.DistroFedora,
-		constants.FormatAPK:    constants.DistroAlpine,
 		constants.FormatPacman: constants.DistroArch,
 	}
 
@@ -522,10 +541,7 @@ func ValidateToolchain(targetArch, format string) error {
 	// Add additional distribution-specific guidance
 	msg.WriteString("\n" + i18n.T("errors.cross_compilation.path_note") + "\n")
 
-	switch distro {
-	case constants.DistroAlpine:
-		msg.WriteString(i18n.T("errors.cross_compilation.alpine_note") + "\n")
-	case constants.DistroArch:
+	if distro == constants.DistroArch {
 		if targetArch == constants.ArchI686 {
 			msg.WriteString(i18n.T("errors.cross_compilation.arch_multilib_note") + "\n")
 		} else {
