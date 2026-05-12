@@ -677,17 +677,7 @@ func (mpc *MultipleProject) copyProjects() error {
 // Note: mpc.Output is expected to be an absolute path, resolved once in MultiProject()
 // before any parallel workers are launched.
 func (mpc *MultipleProject) createPackage(proj *Project) error {
-	defer func() {
-		err := os.RemoveAll(proj.Builder.PKGBUILD.PackageDir)
-		if err != nil {
-			logger.Warn(i18n.T("logger.failed_to_remove_package_directory"),
-				"path", proj.Builder.PKGBUILD.PackageDir,
-				"error", err)
-		}
-	}()
-
-	err := files.ExistsMakeDir(mpc.Output)
-	if err != nil {
+	if err := files.ExistsMakeDir(mpc.Output); err != nil {
 		return err
 	}
 
@@ -705,8 +695,25 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		options.SetDebugDir(absDebugDir)
 	}
 
-	err = proj.PackageManager.PrepareFakeroot(mpc.Output, TargetArch)
-	if err != nil {
+	if proj.Builder.PKGBUILD.IsSplitPackage() {
+		return mpc.createSplitPackages(proj)
+	}
+
+	return mpc.createSinglePackage(proj)
+}
+
+// createSinglePackage handles the PrepareFakeroot → BuildPackage → post-build
+// pipeline for a non-split (single) package.
+func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
+	defer func() {
+		if err := os.RemoveAll(proj.Builder.PKGBUILD.PackageDir); err != nil {
+			logger.Warn(i18n.T("logger.failed_to_remove_package_directory"),
+				"path", proj.Builder.PKGBUILD.PackageDir,
+				"error", err)
+		}
+	}()
+
+	if err := proj.PackageManager.PrepareFakeroot(mpc.Output, TargetArch); err != nil {
 		return err
 	}
 
@@ -721,6 +728,44 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 	}
 
 	return mpc.runPostBuildHooks(proj, artifactPath)
+}
+
+// createSplitPackages iterates over each sub-package produced by a split PKGBUILD
+// and runs PrepareFakeroot → BuildPackage → post-build hooks for each one.
+func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
+	for _, subName := range proj.Builder.PKGBUILD.PkgNames {
+		// Point the PKGBUILD at this sub-package's install tree.
+		proj.Builder.PKGBUILD.PkgName = subName
+		proj.Builder.PKGBUILD.SetPackageDirForSplit(subName)
+
+		pkgDir := proj.Builder.PKGBUILD.PackageDir
+
+		if err := proj.PackageManager.PrepareFakeroot(mpc.Output, TargetArch); err != nil {
+			return err
+		}
+
+		logger.Info(i18n.T("logger.building_resulting_package"),
+			"package", subName,
+			"version", proj.Builder.PKGBUILD.PkgVer,
+			"release", proj.Builder.PKGBUILD.PkgRel)
+
+		artifactPath, err := proj.PackageManager.BuildPackage(mpc.Output, TargetArch)
+		if err != nil {
+			return err
+		}
+
+		if err := mpc.runPostBuildHooks(proj, artifactPath); err != nil {
+			return err
+		}
+
+		// Clean up this sub-package's install tree.
+		if err := os.RemoveAll(pkgDir); err != nil {
+			logger.Warn(i18n.T("logger.failed_to_remove_package_directory"),
+				"path", pkgDir, "error", err)
+		}
+	}
+
+	return nil
 }
 
 // runPostBuildHooks executes signing and SBOM generation after a successful

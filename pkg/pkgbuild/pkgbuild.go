@@ -13,6 +13,8 @@ import (
 	"text/template"
 
 	"github.com/github/go-spdx/v2/spdxexp"
+	mvdanshell "mvdan.cc/sh/v3/shell"
+	"mvdan.cc/sh/v3/syntax"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -38,6 +40,7 @@ type FuncBody string
 
 const (
 	dependsKey        = "depends"
+	licenseKey        = "license"
 	alpineDistro      = "alpine"
 	archDistro        = "arch"
 	armLinuxGnueabihf = "arm-linux-gnueabihf"
@@ -47,6 +50,7 @@ const (
 	s390xArch         = "s390x"
 	riscv64Arch       = "riscv64"
 	pkgdescKey        = "pkgdesc"
+	pkgbaseKey        = "pkgbase"
 	pkgnameKey        = "pkgname"
 	pkgrelKey         = "pkgrel"
 	pkgverKey         = "pkgver"
@@ -116,45 +120,48 @@ type PKGBUILD struct {
 	HostArch        string // Host architecture for cross-compilation (where package will run)
 	// RepoDir is the git repository root. Walks up from the yap.json directory
 	// to find a .git dir; falls back to the parent of the yap.json directory.
-	RepoDir       string
-	Install       string
-	InstalledSize int64
-	License       []string
-	Maintainer    string
-	MakeDepends   []string
-	OptDepends    []string
-	Options       []string
-	Origin        string
-	Package       string
-	PackageDir    string
-	PkgDesc       string
-	PkgDest       string
-	PkgName       string
-	PkgRel        string
-	PkgType       string
-	PkgVer        string
-	PostInst      string
-	PostRm        string
-	PostTrans     string
-	PostUpgrade   string
-	PreInst       string
-	Prepare       string
-	PreRm         string
-	PreTrans      string
-	PreUpgrade    string
-	priorities    map[string]int
-	Priority      string
-	Provides      []string
-	Replaces      []string
-	Section       string
-	SourceDir     string
-	SourceURI     []string
-	StartDir      string
-	TargetArch    string // Target architecture for cross-compilation (what we're building for)
-	URL           string
-	StaticEnabled bool
-	StripEnabled  bool
-	YAPVersion    string
+	RepoDir           string
+	Install           string
+	InstalledSize     int64
+	License           []string
+	Maintainer        string
+	MakeDepends       []string
+	OptDepends        []string
+	Options           []string
+	Origin            string
+	Package           string
+	PackageDir        string
+	PkgBase           string // pkgbase — shared base name for split packages; equals PkgName when not a split package
+	PkgDesc           string
+	PkgDest           string
+	PkgName           string
+	PkgNames          []string          // pkgname array — populated for split packages; empty for single packages
+	SplitPackageFuncs map[string]string // package_<name>() bodies, keyed by sub-package name
+	PkgRel            string
+	PkgType           string
+	PkgVer            string
+	PostInst          string
+	PostRm            string
+	PostTrans         string
+	PostUpgrade       string
+	PreInst           string
+	Prepare           string
+	PreRm             string
+	PreTrans          string
+	PreUpgrade        string
+	priorities        map[string]int
+	Priority          string
+	Provides          []string
+	Replaces          []string
+	Section           string
+	SourceDir         string
+	SourceURI         []string
+	StartDir          string
+	TargetArch        string // Target architecture for cross-compilation (what we're building for)
+	URL               string
+	StaticEnabled     bool
+	StripEnabled      bool
+	YAPVersion        string
 }
 
 // AddItem adds an item to the PKGBUILD.
@@ -400,11 +407,119 @@ func (pkgBuild *PKGBUILD) Init() {
 	pkgBuild.CustomVariables = make(map[string]string)
 	pkgBuild.CustomArrays = make(map[string][]string)
 	pkgBuild.HelperFunctions = make(map[string]string)
+	pkgBuild.SplitPackageFuncs = make(map[string]string)
 
 	pkgBuild.FullDistroName = pkgBuild.Distro
 	if pkgBuild.Codename != "" {
 		pkgBuild.FullDistroName += "_" + pkgBuild.Codename
 	}
+}
+
+// splitOverrideKeys is the set of variable names that package_<name>() functions
+// may override, matching makepkg's pkgbuild_schema_package_overrides.
+// The __distro and _arch suffix variants are handled automatically by AddItem/parseDirective.
+var splitOverrideKeys = map[string]struct{}{
+	pkgdescKey: {}, archDistro: {}, "url": {}, licenseKey: {}, "groups": {},
+	dependsKey: {}, "optdepends": {}, "provides": {}, "conflicts": {}, "replaces": {},
+	"backup": {}, "options": {}, "install": {}, "changelog": {},
+}
+
+// ParseSplitOverrides parses the body of a package_<name>() function and applies
+// any recognized override variables (pkgdesc, depends, conflicts, etc.) to the
+// PKGBUILD struct via AddItem — giving full __distro and _arch suffix support for free.
+//
+// funcBody is the raw function body string as stored in SplitPackageFuncs (no braces).
+func (pkgBuild *PKGBUILD) ParseSplitOverrides(funcBody string) error {
+	// Wrap the body in a dummy function so the parser sees valid bash syntax,
+	// then walk only the assignments inside it.
+	wrapped := "_yap_split_fn() {\n" + funcBody + "\n}"
+
+	f, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(wrapped), "")
+	if err != nil {
+		// Parse errors are non-fatal for override extraction — the body will still
+		// be executed by the shell interpreter; we just won't have static overrides.
+		logger.Warn("failed to parse split-package function body for override extraction",
+			"error", err)
+
+		return nil
+	}
+
+	syntax.Walk(f, func(node syntax.Node) bool {
+		fd, ok := node.(*syntax.FuncDecl)
+		if !ok {
+			return true
+		}
+
+		// Walk assignments inside the dummy function body.
+		syntax.Walk(fd.Body, func(inner syntax.Node) bool {
+			pkgBuild.applyOverrideAssign(inner)
+
+			return true
+		})
+
+		return false // don't recurse further into the FuncDecl
+	})
+
+	return nil
+}
+
+// applyOverrideAssign checks whether a syntax node is an assignment for a
+// recognized split-package override variable and, if so, applies it via AddItem.
+func (pkgBuild *PKGBUILD) applyOverrideAssign(node syntax.Node) {
+	assign, ok := node.(*syntax.Assign)
+	if !ok {
+		return
+	}
+
+	name := assign.Name.Value
+
+	// Strip any __distro or _arch suffix to get the base key,
+	// then check if it's a recognized override var.
+	baseKey, _, hasDistro := strings.Cut(name, "__")
+	if !hasDistro {
+		// No __ separator — try single _ for arch suffix (e.g. depends_x86_64).
+		// Use the last underscore as the split point.
+		if idx := strings.LastIndex(name, "_"); idx != -1 {
+			baseKey = name[:idx]
+		} else {
+			baseKey = name
+		}
+	}
+
+	if _, known := splitOverrideKeys[baseKey]; !known {
+		return
+	}
+
+	// Apply via AddItem — handles __distro / _arch priority automatically.
+	if assign.Array != nil {
+		var arrVal []string
+
+		for _, line := range set.StringifyArray(assign) {
+			arrVal, _ = mvdanshell.Fields(line, os.Getenv)
+		}
+
+		_ = pkgBuild.AddItem(name, arrVal)
+	} else {
+		varVal, _ := mvdanshell.Expand(set.StringifyAssign(assign), os.Getenv)
+		_ = pkgBuild.AddItem(name, varVal)
+	}
+}
+
+// IsSplitPackage reports whether this PKGBUILD defines multiple packages
+// (i.e. pkgname is an array with more than one entry).
+func (pkgBuild *PKGBUILD) IsSplitPackage() bool {
+	return len(pkgBuild.PkgNames) > 1
+}
+
+// EffectivePkgBase returns the base name for this package. For split packages
+// this is PkgBase (set from the pkgbase= directive). For single packages it
+// falls back to PkgName.
+func (pkgBuild *PKGBUILD) EffectivePkgBase() string {
+	if pkgBuild.PkgBase != "" {
+		return pkgBuild.PkgBase
+	}
+
+	return pkgBuild.PkgName
 }
 
 // BuildScriptPreamble generates a bash preamble that declares custom scalar
@@ -550,7 +665,31 @@ func (pkgBuild *PKGBUILD) SetMainFolders() {
 			folderName = "pkg-" + pkgBuild.Distro
 		}
 
-		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, folderName)
+		// For split packages each sub-package gets its own subdirectory so that
+		// package_foo() and package_bar() can install into separate trees.
+		if pkgBuild.IsSplitPackage() {
+			pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, folderName, pkgBuild.PkgName)
+		} else {
+			pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, folderName)
+		}
+	}
+}
+
+// SetPackageDirForSplit overrides PackageDir for a specific sub-package name.
+// Called by Builder.Compile when iterating split sub-packages.
+func (pkgBuild *PKGBUILD) SetPackageDirForSplit(subPkgName string) {
+	switch pkgBuild.Distro {
+	case alpineDistro:
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, "apk", "pkg", subPkgName)
+	default:
+		var folderName string
+		if pkgBuild.Distro == archDistro {
+			folderName = "pkg"
+		} else {
+			folderName = "pkg-" + pkgBuild.Distro
+		}
+
+		pkgBuild.PackageDir = filepath.Join(pkgBuild.StartDir, folderName, subPkgName)
 	}
 }
 
@@ -893,8 +1032,9 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() error {
 			"pkgname", pkgBuild.PkgName)
 	}
 
-	// Check for package() function
-	if pkgBuild.Package == "" {
+	// Check for package() function — not required for split packages, which use
+	// package_<name>() functions instead (detected by PkgNames being non-empty).
+	if pkgBuild.Package == "" && !pkgBuild.IsSplitPackage() {
 		checkErrors = append(checkErrors, "package function")
 
 		logger.Error(i18n.T("logger.validategeneral.error.missing_package_function_1"),
@@ -1032,6 +1172,21 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 		}
 
 		pkgBuild.Backup = arrVal
+	case pkgnameKey:
+		// Split-package form: pkgname=('foo' 'bar')
+		// Store the list; PkgName is set to the first entry so single-package
+		// code paths continue to work unchanged.
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.PkgNames = arrVal
+
+		if len(arrVal) > 0 {
+			pkgBuild.PkgName = arrVal[0]
+			_ = os.Setenv(pkgnameKey, arrVal[0])
+		}
 	default:
 		// Store unknown arrays (e.g. _modules, _extra_files) as custom arrays.
 		// They will be declared as bash array variables in the build script preamble.
@@ -1067,6 +1222,8 @@ func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any) bool {
 //
 // data must be of type FuncBody; plain string values (variables) are ignored so
 // that scalar variables such as "maintainer" are not confused with functions.
+//
+//nolint:gocyclo,cyclop // switch statement with many cases
 func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 	fb, ok := data.(FuncBody)
 	if !ok {
@@ -1099,7 +1256,19 @@ func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 	case "post_upgrade":
 		pkgBuild.PostUpgrade = body
 	default:
-		// Store any other function (e.g. _package, _package_systemd, _install_helper)
+		// package_<name>() functions are split-package packaging functions — store
+		// them separately so they are NOT injected into build/prepare preambles.
+		if subName, ok := strings.CutPrefix(key, "package_"); ok {
+			if pkgBuild.SplitPackageFuncs == nil {
+				pkgBuild.SplitPackageFuncs = make(map[string]string)
+			}
+
+			pkgBuild.SplitPackageFuncs[subName] = body
+
+			return
+		}
+
+		// Store any other function (e.g. _install_helper, _common_setup)
 		// as a helper. The full definition is reconstructed so it can be prepended to
 		// build scripts verbatim.
 		if pkgBuild.HelperFunctions == nil {
@@ -1126,6 +1295,14 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 
 		err = os.Setenv(key, strVal)
 		pkgBuild.PkgName = strVal
+	case pkgbaseKey:
+		strVal, ok := data.(string)
+		if !ok {
+			return
+		}
+
+		err = os.Setenv(key, strVal)
+		pkgBuild.PkgBase = strVal
 	case "epoch":
 		strVal, ok := data.(string)
 		if !ok {

@@ -1,0 +1,27 @@
+pkgbase=mybase
+pkgname=('mybase-lib' 'mybase-dev')
+pkgver=1.0
+pkgrel=1
+pkgdesc="A test split package"
+arch=('any')
+license=('MIT')
+depends=('glibc')
+makedepends=('gcc')
+source=('test.tar.gz')
+sha256sums=('0000000000000000000000000000000000000000000000000000000000000000')
+
+build() {
+	echo "building"
+}
+
+package_mybase-lib() {
+	pkgdesc="The library"
+	depends=('glibc')
+	install -d "$pkgdir/usr/lib"
+}
+
+package_mybase-dev() {
+	pkgdesc="Development files"
+	depends=('mybase-lib')
+	install -d "$pkgdir/usr/include"
+}

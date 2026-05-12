@@ -548,13 +548,13 @@ func interpretCmdError(ctx context.Context, stderr interface{ Write([]byte) (int
 				}
 
 				sig := int(status.Signal())
-				//nolint:gosec // signal values are bounded 0-127
-				return interp.ExitStatus(uint8(128 + sig))
+
+				return interp.ExitStatus(uint8(128 + sig)) // #nosec G115 -- signal values are bounded 0-127
 			}
 
 			exitCode := status.ExitStatus()
-			//nolint:gosec // exit codes are bounded 0-255
-			return interp.ExitStatus(uint8(exitCode))
+
+			return interp.ExitStatus(uint8(exitCode)) // #nosec G115 -- exit codes are bounded 0-255
 		}
 
 		return interp.ExitStatus(1)
