@@ -62,8 +62,8 @@ RUN yum -y update && yum -y install \
     yum clean all && rm -rf /var/cache/yum
 
 # Create non-root user
-RUN groupadd -g 1001 yap && \
-    useradd -m -u 1001 -g 1001 -s /bin/bash yap && \
+RUN groupadd -g 1000 yap && \
+    useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
     echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap' >> /etc/sudoers
 
 # Copy binary and completion from builder

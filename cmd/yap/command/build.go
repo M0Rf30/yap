@@ -255,6 +255,7 @@ func logStructuredError(yapErr *yapErrors.YapError) {
 // InitializeBuildDescriptions sets the localized descriptions for the build command.
 // This must be called after i18n is initialized.
 func InitializeBuildDescriptions() {
+	// #nosec G101 -- map keys are CLI flag names, not credentials
 	initCommandDescriptions(buildCmd, "build", map[string]string{
 		"cleanbuild":                "flags.build.cleanbuild",
 		"nobuild":                   "flags.build.nobuild",

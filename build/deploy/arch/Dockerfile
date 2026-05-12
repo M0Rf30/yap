@@ -62,8 +62,8 @@ RUN pacman -Syu --noconfirm && pacman -S --noconfirm \
     pacman -Scc --noconfirm && rm -rf /var/cache/pacman/pkg/*
 
 # Create non-root user
-RUN groupadd -g 1001 yap && \
-    useradd -m -u 1001 -g 1001 -s /bin/bash yap && \
+RUN groupadd -g 1000 yap && \
+    useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
     echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap' >> /etc/sudoers
 
 # Copy binary and completion from builder
