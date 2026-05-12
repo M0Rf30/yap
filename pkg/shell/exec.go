@@ -4,11 +4,14 @@ package shell
 import (
 	"bytes"
 	"context"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -466,6 +469,219 @@ func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error 
 	err = runner.Run(context.Background(), script)
 	duration := time.Since(start)
 
+	return logScriptResult(err, packageName, duration, &outputBuf, "RunScriptWithPackage")
+}
+
+// fakerootExecHandler returns an interp.ExecHandlerFunc middleware that applies Linux
+// user-namespace fakeroot to every subprocess spawned by the mvdan/sh interpreter.
+// This allows package() scripts to call `install -o root -g root` (and similar) without
+// actually being root: the kernel maps UID/GID 0 inside the namespace back to the real caller.
+//
+// Commands that cannot be resolved to a binary on PATH are passed to next (e.g. shell
+// built-ins handled by a prior handler in the chain).
+// Modelled after lure.sh/fakeroot and the default mvdan/sh exec handler.
+func fakerootExecHandler(killTimeout time.Duration) func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+	return func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+		return func(ctx context.Context, args []string) error {
+			hc := interp.HandlerCtx(ctx)
+
+			path, err := interp.LookPathDir(hc.Dir, hc.Env, args[0])
+			if err != nil {
+				// Not a binary on PATH — let the next handler deal with it.
+				return next(ctx, args)
+			}
+
+			cmd := &exec.Cmd{
+				Path:   path,
+				Args:   args,
+				Env:    fakerootExecEnv(hc.Env),
+				Dir:    hc.Dir,
+				Stdin:  hc.Stdin,
+				Stdout: hc.Stdout,
+				Stderr: hc.Stderr,
+			}
+
+			applyFakeroot(cmd)
+
+			if err = cmd.Start(); err == nil {
+				if done := ctx.Done(); done != nil {
+					go func() {
+						<-done
+
+						if killTimeout <= 0 || runtime.GOOS == "windows" {
+							_ = cmd.Process.Signal(os.Kill)
+
+							return
+						}
+
+						go func() {
+							time.Sleep(killTimeout)
+
+							_ = cmd.Process.Signal(os.Kill)
+						}()
+
+						_ = cmd.Process.Signal(os.Interrupt)
+					}()
+				}
+
+				err = cmd.Wait()
+			}
+
+			return interpretCmdError(ctx, hc.Stderr, err)
+		}
+	}
+}
+
+// interpretCmdError converts an exec error into the appropriate interp exit status.
+// Extracted to avoid duplication between fakerootExecHandler and any future handlers.
+func interpretCmdError(ctx context.Context, stderr interface{ Write([]byte) (int, error) }, err error) error {
+	var exitErr *exec.ExitError
+
+	var execErr *exec.Error
+
+	switch {
+	case stderrors.As(err, &exitErr):
+		if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
+			if status.Signaled() {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+
+				sig := int(status.Signal())
+				//nolint:gosec // signal values are bounded 0-127
+				return interp.ExitStatus(uint8(128 + sig))
+			}
+
+			exitCode := status.ExitStatus()
+			//nolint:gosec // exit codes are bounded 0-255
+			return interp.ExitStatus(uint8(exitCode))
+		}
+
+		return interp.ExitStatus(1)
+	case stderrors.As(err, &execErr):
+		_, _ = fmt.Fprintf(stderr, "%v\n", execErr)
+
+		return interp.ExitStatus(127)
+	default:
+		return err
+	}
+}
+
+// fakerootExecEnv converts the mvdan/sh environment into a []string suitable for exec.Cmd.Env.
+// Extracted from mvdan/sh interp/vars.go (same approach as lure-sh).
+func fakerootExecEnv(env expand.Environ) []string {
+	list := make([]string, 0, 64)
+
+	env.Each(func(name string, vr expand.Variable) bool {
+		if !vr.IsSet() {
+			for i, kv := range list {
+				if strings.HasPrefix(kv, name+"=") {
+					list[i] = ""
+				}
+			}
+		}
+
+		if vr.Exported && vr.Kind == expand.String {
+			list = append(list, name+"="+vr.String())
+		}
+
+		return true
+	})
+
+	return list
+}
+
+// RunScriptInFakeroot executes a shell script identically to RunScriptWithPackage
+// but wraps every subprocess in a Linux user-namespace fakeroot so that ownership
+// operations (install -o root, chown, etc.) succeed without real root privileges.
+// Use this for the package() stage of PKGBUILD execution.
+//
+//nolint:gocyclo,cyclop // mirrors RunScriptWithPackage complexity
+func RunScriptInFakeroot(cmds, packageName string, extraEnv ...[]string) error {
+	start := time.Now()
+
+	if packageName != "" {
+		logger.Info(i18n.T("logger.shell.info.exec_script"), "package", packageName)
+	} else {
+		logger.Info(i18n.T("logger.runscriptwithpackage.info.executing_shell_script_3"))
+	}
+
+	if cmds != "" {
+		logScriptContent(cmds)
+	}
+
+	script, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(cmds), "")
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.failed_to_parse_script")).
+			WithOperation("RunScriptInFakeroot")
+	}
+
+	_, err = MultiPrinter.Start()
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.failed_to_start_multiprinter")).
+			WithOperation("RunScriptInFakeroot")
+	}
+
+	writer := MultiPrinter.Writer
+
+	var decoratedWriter *PackageDecoratedWriter
+	if packageName != "" {
+		decoratedWriter = NewPackageDecoratedWriter(MultiPrinter.Writer, packageName)
+
+		defer func() {
+			_ = decoratedWriter.Close()
+		}()
+
+		writer = decoratedWriter
+	}
+
+	var outputBuf bytes.Buffer
+
+	teeWriter := io.MultiWriter(writer, &outputBuf)
+
+	envMap := make(map[string]string)
+
+	for _, kv := range os.Environ() {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			envMap[k] = v
+		}
+	}
+
+	for _, extra := range extraEnv {
+		for _, kv := range extra {
+			if k, v, ok := strings.Cut(kv, "="); ok {
+				envMap[k] = v
+			}
+		}
+	}
+
+	mergedEnv := make([]string, 0, len(envMap))
+
+	for k, v := range envMap {
+		mergedEnv = append(mergedEnv, k+"="+v)
+	}
+
+	runner, err := interp.New(
+		interp.Env(expand.ListEnviron(mergedEnv...)),
+		interp.StdIO(nil, teeWriter, teeWriter),
+		interp.ExecHandlers(archiveExecHandler, fakerootExecHandler(0)),
+	)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.failed_to_create_script_runner")).
+			WithOperation("RunScriptInFakeroot")
+	}
+
+	logger.Debug(i18n.T("logger.runscriptwithpackage.debug.starting_script_execution_1"))
+
+	err = runner.Run(context.Background(), script)
+	duration := time.Since(start)
+
+	return logScriptResult(err, packageName, duration, &outputBuf, "RunScriptInFakeroot")
+}
+
+// logScriptResult logs the outcome of a script run and returns a wrapped error on failure.
+// Extracted to eliminate duplication between RunScriptWithPackage and RunScriptInFakeroot.
+func logScriptResult(err error, packageName string, duration time.Duration, outputBuf *bytes.Buffer, op string) error {
 	if err != nil {
 		scriptErr := err.Error()
 		if captured := strings.TrimSpace(outputBuf.String()); captured != "" {
@@ -484,7 +700,7 @@ func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error 
 		}
 
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.shell.script_execution_failed")).
-			WithOperation("RunScriptWithPackage")
+			WithOperation(op)
 	}
 
 	if packageName != "" {

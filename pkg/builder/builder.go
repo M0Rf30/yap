@@ -71,7 +71,7 @@ func (builder *Builder) Compile(noBuild bool) error {
 			return err
 		}
 
-		err = builder.processFunction(builder.PKGBUILD.Package, "logger.generating_package", "package")
+		err = builder.processFunctionInFakeroot(builder.PKGBUILD.Package, "logger.generating_package", "package")
 		if err != nil {
 			return err
 		}
@@ -147,6 +147,38 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	// Pass pkgEnv so the interpreter receives per-package dirs/names without
 	// relying on the (racy) global os environment.
 	err := shell.RunScriptWithPackage("  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
+			WithContext("package", pkgName).
+			WithContext("version", pkgVer).
+			WithContext("release", pkgRel).
+			WithContext("stage", stage).
+			WithOperation(stage)
+	}
+
+	return nil
+}
+
+// processFunctionInFakeroot is identical to processFunction but executes the script
+// inside a Linux user-namespace fakeroot so that ownership operations such as
+// `install -o root -g root` succeed without real root privileges.
+// Use this for the package() stage.
+func (builder *Builder) processFunctionInFakeroot(pkgbuildFunction, message, stage string) error {
+	if pkgbuildFunction == "" {
+		return nil
+	}
+
+	pkgName := builder.PKGBUILD.PkgName
+	pkgVer := builder.PKGBUILD.PkgVer
+	pkgRel := builder.PKGBUILD.PkgRel
+
+	pkgEnv := builder.PKGBUILD.BuildEnvironmentSlice()
+
+	logger.Info(i18n.T(message), "pkgver", pkgVer, "pkgrel", pkgRel)
+
+	preamble := builder.PKGBUILD.BuildScriptPreamble()
+
+	err := shell.RunScriptInFakeroot("  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).
