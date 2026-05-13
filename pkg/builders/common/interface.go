@@ -324,6 +324,65 @@ func getUpdateCommand(format string) string {
 	}
 }
 
+// partitionArchAllDeps splits a DEB dependency list into two groups:
+// arch-specific packages (need ":arm64" qualifier) and packages that must
+// be installed without an arch qualifier.
+//
+// A package is left unqualified when:
+//   - Architecture: all  — no arch-specific variant exists in the repos.
+//   - Essential: yes     — pre-installed on the host; installing the foreign-arch
+//     variant alongside it would cause a conflict (e.g. bash).
+//   - Multi-Arch: no (or absent) AND already installed for the host arch —
+//     the package cannot coexist across architectures.
+//
+// Packages that cannot be queried are assumed arch-specific so apt can
+// surface a clear error if something is truly missing.
+func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
+	for _, dep := range deps {
+		// Strip version constraint for the lookup: "libssl-dev (>= 1.0)" → "libssl-dev"
+		name, _, _ := strings.Cut(dep, " (")
+		// Strip any existing arch qualifier
+		name, _, _ = strings.Cut(name, ":")
+
+		out, err := exec.CommandContext(context.Background(), "apt-cache", "show", name).Output() // #nosec G204
+		if err != nil {
+			archSpecific = append(archSpecific, dep)
+			continue
+		}
+
+		info := string(out)
+
+		// Architecture: all — no arch-specific variant.
+		if strings.Contains(info, "Architecture: all") {
+			archAll = append(archAll, dep)
+			continue
+		}
+
+		// Essential packages (e.g. bash) conflict when installed for a foreign arch
+		// alongside the host-arch version.
+		if strings.Contains(info, "Essential: yes") {
+			archAll = append(archAll, dep)
+			continue
+		}
+
+		// Multi-Arch: no (or absent) + already installed → would conflict.
+		multiArchForeign := strings.Contains(info, "Multi-Arch: foreign") ||
+			strings.Contains(info, "Multi-Arch: allowed") ||
+			strings.Contains(info, "Multi-Arch: same")
+		if !multiArchForeign {
+			dpkgOut, dpkgErr := exec.CommandContext(context.Background(), "dpkg", "-s", name).Output() // #nosec G204
+			if dpkgErr == nil && strings.Contains(string(dpkgOut), "Status: install ok installed") {
+				archAll = append(archAll, dep)
+				continue
+			}
+		}
+
+		archSpecific = append(archSpecific, dep)
+	}
+
+	return archSpecific, archAll
+}
+
 // qualifyDepsForTargetArch rewrites a list of package names so they are
 // installed for the target (cross) architecture rather than the host arch.
 //
@@ -415,7 +474,12 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 		// used directly (the cross-compiler is pointed at them via PKG_CONFIG_PATH
 		// and CROSS_COMPILE set in SetupCrossCompilationEnvironment).
 		if bb.Format == constants.FormatDEB {
-			makeDepends = qualifyDepsForTargetArch(makeDepends, bb.Format, targetArch)
+			// Separate Architecture:all packages — they have no arch-specific
+			// variant and must be installed without an arch qualifier.
+			archSpecific, archAll := partitionArchAllDeps(makeDepends)
+			qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
+			qualified = append(qualified, archAll...)
+			makeDepends = qualified
 			logger.Info("Qualifying makedepends for target architecture",
 				"target_arch", targetArch,
 				"format", bb.Format,
