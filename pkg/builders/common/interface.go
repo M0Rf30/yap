@@ -133,7 +133,7 @@ func (bb *BaseBuilder) BuildPackageName(extension string) string {
 	}
 
 	switch extension {
-	case constants.ExtAPK:
+	case constants.ExtAPK, constants.ExtRPM:
 		name += "." + bb.PKGBUILD.ArchComputed
 	case constants.ExtDEB:
 		name = fmt.Sprintf("%s_%s-%s_%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.PkgVer,

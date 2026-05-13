@@ -109,7 +109,7 @@ func TestBuildPackageName(t *testing.T) {
 	}{
 		{"apk", ".apk", "test-package-1.0.0-1.x86_64.apk"},
 		{"deb", ".deb", "test-package_1.0.0-1_x86_64.deb"},
-		{"rpm", ".rpm", "test-package-1.0.0-1-x86_64.rpm"},
+		{"rpm", ".rpm", "test-package-1.0.0-1.x86_64.rpm"},
 		{"pacman", ".pkg.tar.zst", "test-package-1.0.0-1-x86_64.pkg.tar.zst"},
 	}
 
@@ -137,7 +137,7 @@ func TestBuildPackageNameWithEpoch(t *testing.T) {
 		expected  string
 	}{
 		{".pkg.tar.zst", "test-package-2:1.0.0-1-x86_64.pkg.tar.zst"},
-		{".rpm", "test-package-2:1.0.0-1-x86_64.rpm"},
+		{".rpm", "test-package-2:1.0.0-1.x86_64.rpm"},
 		{".apk", "test-package-1.0.0-1.x86_64.apk"}, // APK doesn't use epoch in filename
 		{".deb", "test-package_1.0.0-1_x86_64.deb"}, // DEB doesn't use epoch in filename
 	}
