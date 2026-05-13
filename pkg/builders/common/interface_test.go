@@ -478,7 +478,7 @@ func TestGetUpdateCommand(t *testing.T) {
 		expected string
 	}{
 		{constants.FormatDEB, "update"},
-		{constants.FormatRPM, "update"},
+		{constants.FormatRPM, "makecache"},
 		{constants.FormatPacman, "-Sy"},
 		{constants.FormatAPK, "update"},
 		{"unknown", ""}, // Test unknown format

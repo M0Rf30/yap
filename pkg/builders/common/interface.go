@@ -309,12 +309,14 @@ func getExtension(format string) string {
 }
 
 // getUpdateCommand returns the update command for the given format.
+// For RPM, "update" would upgrade packages interactively (prompting [y/N]);
+// "makecache" only refreshes repo metadata, matching apt/apk semantics.
 func getUpdateCommand(format string) string {
 	switch format {
 	case constants.FormatDEB:
 		return updateCommand
 	case constants.FormatRPM:
-		return updateCommand
+		return "makecache"
 	case constants.FormatPacman:
 		return "-Sy"
 	case constants.FormatAPK:
