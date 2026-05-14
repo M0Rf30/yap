@@ -12,6 +12,9 @@ Priority: {{.Priority}}
 {{- if .ArchComputed}}
 Architecture: {{.ArchComputed}}
 {{- end }}
+{{- if eq .ArchComputed "all"}}
+Multi-Arch: foreign
+{{- end }}
 {{- /* Optional fields */ -}}
 {{- if .Maintainer}}
 Maintainer: {{.Maintainer}}
