@@ -233,12 +233,21 @@ func (bb *BaseBuilder) CreateFileWalker() *files.Walker {
 }
 
 // LogPackageCreated logs successful package creation with consistent formatting.
+// When running under sudo, ownership of the artifact is transferred to the
+// original invoking user so downstream consumers (CI agents, etc.) can read it
+// without elevated privileges.
 func (bb *BaseBuilder) LogPackageCreated(artifactPath string) {
 	logger.Info(i18n.T("logger.logpackagecreated.info.package_artifact_created_3"),
 		"format", bb.Format,
 		"pkgver", bb.PKGBUILD.PkgVer,
 		"pkgrel", bb.PKGBUILD.PkgRel,
 		"artifact", artifactPath)
+
+	if err := platform.PreserveOwnership(artifactPath); err != nil {
+		logger.Warn(i18n.T("logger.preserveownership.warn.failed_to_get_original_1"),
+			"path", artifactPath,
+			"error", err)
+	}
 }
 
 // FormatRelease formats the package release string with distribution-specific suffixes.

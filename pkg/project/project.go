@@ -26,6 +26,8 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/repo"
 	"github.com/M0Rf30/yap/v2/pkg/sbom"
 	"github.com/M0Rf30/yap/v2/pkg/signing"
 )
@@ -59,6 +61,7 @@ type BuildOptions struct {
 	OnlyPkgNames            string
 	DebugDir                string
 	SBOMFormat              string
+	ExtraRepos              []string
 }
 
 // Apply propagates BuildOptions values to the package-level globals.
@@ -79,6 +82,7 @@ func (o *BuildOptions) Apply() {
 	OnlyPkgNames = o.OnlyPkgNames
 	DebugDir = o.DebugDir
 	SBOMFormat = o.SBOMFormat
+	ExtraRepos = o.ExtraRepos
 }
 
 // Global variables for build configuration
@@ -113,6 +117,10 @@ var (
 	// When set, debug info is extracted from ELF binaries before stripping
 	// and saved in a .build-id directory structure suitable for debuginfod.
 	DebugDir string
+	// ExtraRepos carries `--repo k=v,...` tokens supplied on the command line.
+	// They are parsed and merged with yap.json `repos` entries before the
+	// package manager runs any update or install step.
+	ExtraRepos []string
 	// SBOM enables Software Bill of Materials generation.
 	// When true, SBOM files are generated for each built package.
 	SBOM bool
@@ -186,6 +194,7 @@ type MultipleProject struct {
 	CompressionDeb string          `json:"compressionDeb" validate:""`
 	CompressionRpm string          `json:"compressionRpm" validate:""`
 	Signing        *signing.Config `json:"signing,omitempty"`
+	Repos          []repo.Repo     `json:"repos,omitempty"`
 }
 
 // Project represents a single project.
@@ -301,6 +310,22 @@ func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []strin
 	return nil
 }
 
+// setupExtraRepos installs custom apt/dnf repositories declared in yap.json
+// (mpc.Repos) and via the repeatable --repo CLI flag (ExtraRepos). It runs
+// before any package manager update so subsequent installs can resolve the new
+// sources.
+func (mpc *MultipleProject) setupExtraRepos(distro string) error {
+	cliRepos, err := repo.ParseFlags(ExtraRepos)
+	if err != nil {
+		return err
+	}
+
+	merged := append([]repo.Repo{}, mpc.Repos...)
+	merged = append(merged, cliRepos...)
+
+	return repo.Setup(distro, merged)
+}
+
 // resolveOutputPath converts the output path to an absolute path.
 // This must be done once before any parallel work to prevent data races.
 func (mpc *MultipleProject) resolveOutputPath() error {
@@ -337,6 +362,10 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 
 	packageManager, err = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
 	if err != nil {
+		return err
+	}
+
+	if err := mpc.setupExtraRepos(distro); err != nil {
 		return err
 	}
 
@@ -687,6 +716,14 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		return err
 	}
 
+	// Preserve ownership of the output directory so consumers running as the
+	// invoking user (e.g. CI agents) can traverse it after a sudo build.
+	if err := platform.PreserveOwnership(mpc.Output); err != nil {
+		logger.Warn(i18n.T("logger.preserveownership.warn.failed_to_get_original_1"),
+			"path", mpc.Output,
+			"error", err)
+	}
+
 	// Configure debug symbol separation before stripping occurs in PrepareFakeroot.
 	if DebugDir != "" {
 		absDebugDir, absErr := filepath.Abs(DebugDir)
@@ -696,6 +733,12 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 
 		if mkErr := files.ExistsMakeDir(absDebugDir); mkErr != nil {
 			return mkErr
+		}
+
+		if err := platform.PreserveOwnership(absDebugDir); err != nil {
+			logger.Warn(i18n.T("logger.preserveownership.warn.failed_to_get_original_1"),
+				"path", absDebugDir,
+				"error", err)
 		}
 
 		options.SetDebugDir(absDebugDir)

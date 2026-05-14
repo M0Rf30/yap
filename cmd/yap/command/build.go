@@ -376,4 +376,10 @@ func init() {
 		"sign-passphrase", "", "", "Passphrase for private key (prefer env var YAP_SIGN_PASSPHRASE)")
 	buildCmd.Flags().StringVarP(&signKeyName,
 		"sign-key-name", "", "", "Key name for APK signing (e.g., 'mykey')")
+
+	// EXTRA REPOSITORY FLAGS
+	buildCmd.Flags().StringSliceVar(&buildOpts.ExtraRepos,
+		"repo", nil,
+		"Extra repository spec (repeatable): name=<n>,url=<u>,suite=<s>,components=<a+b>,"+
+			"keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>")
 }
