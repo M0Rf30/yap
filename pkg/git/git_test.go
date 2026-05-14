@@ -13,7 +13,7 @@ func TestCloneNonExistentRepo(t *testing.T) {
 	clonePath := filepath.Join(tempDir, "test-repo")
 
 	// Try to clone a non-existent repository
-	err := Clone(clonePath, "https://github.com/non-existent-user/non-existent-repo.git", "", "")
+	err := Clone(clonePath, "https://github.com/non-existent-user/non-existent-repo.git", "", "", "")
 
 	// This should fail, which is expected
 	if err == nil {
@@ -26,7 +26,7 @@ func TestCloneInvalidURL(t *testing.T) {
 	clonePath := filepath.Join(tempDir, "test-repo")
 
 	// Try to clone with an invalid URL
-	err := Clone(clonePath, "invalid-url", "", "")
+	err := Clone(clonePath, "invalid-url", "", "", "")
 
 	// This should fail, which is expected
 	if err == nil {
@@ -36,7 +36,7 @@ func TestCloneInvalidURL(t *testing.T) {
 
 func TestCloneEmptyPath(t *testing.T) {
 	// Try to clone to an empty path
-	err := Clone("", "https://github.com/octocat/Hello-World.git", "", "")
+	err := Clone("", "https://github.com/octocat/Hello-World.git", "", "", "")
 
 	// This should fail, which is expected
 	if err == nil {
@@ -52,7 +52,7 @@ func TestCloneWithBranch(t *testing.T) {
 	branchRef := plumbing.NewBranchReferenceName("main")
 
 	// Try to clone a non-existent repository with branch
-	err := Clone(clonePath, "https://github.com/non-existent-user/non-existent-repo.git", "", branchRef)
+	err := Clone(clonePath, "https://github.com/non-existent-user/non-existent-repo.git", "", branchRef, "")
 
 	// This should fail, which is expected for non-existent repo
 	if err == nil {
@@ -65,7 +65,7 @@ func TestCloneWithSSHPassword(t *testing.T) {
 	clonePath := filepath.Join(tempDir, "test-repo")
 
 	// Try to clone with SSH password (this will likely fail due to missing SSH keys)
-	err := Clone(clonePath, "git@github.com:non-existent-user/non-existent-repo.git", "test-password", "")
+	err := Clone(clonePath, "git@github.com:non-existent-user/non-existent-repo.git", "test-password", "", "")
 
 	// This should fail, which is expected
 	if err == nil {
@@ -86,7 +86,7 @@ func TestHandleExistingRepoNonExistent(t *testing.T) {
 	}
 
 	// Try to clone to existing non-git directory
-	err = Clone(nonExistentPath, "https://github.com/non-existent-user/non-existent-repo.git", "", "")
+	err = Clone(nonExistentPath, "https://github.com/non-existent-user/non-existent-repo.git", "", "", "")
 
 	// This should fail when it tries to open the existing path as a git repo
 	if err == nil {
@@ -152,7 +152,7 @@ func TestEmptyReferenceName(t *testing.T) {
 	// Test with empty reference name (should use default branch)
 	var emptyRef plumbing.ReferenceName = ""
 
-	err := Clone(clonePath, "https://github.com/non-existent-user/non-existent-repo.git", "", emptyRef)
+	err := Clone(clonePath, "https://github.com/non-existent-user/non-existent-repo.git", "", emptyRef, "")
 
 	// This should fail for non-existent repo, but tests the empty reference handling
 	if err == nil {
@@ -171,7 +171,7 @@ func TestCloneToExistingFile(t *testing.T) {
 	}
 
 	// Try to clone to the existing file path
-	err = Clone(existingFile, "https://github.com/non-existent-user/non-existent-repo.git", "", "")
+	err = Clone(existingFile, "https://github.com/non-existent-user/non-existent-repo.git", "", "", "")
 
 	// This should fail when it tries to use the file as a git repository
 	if err == nil {
