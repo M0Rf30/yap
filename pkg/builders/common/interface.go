@@ -18,6 +18,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/repo"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
@@ -464,6 +465,13 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 			"target_arch", targetArch,
 			"build_arch", bb.PKGBUILD.ArchComputed)
 
+		// Register the foreign architecture and its ports repository before any
+		// :<arch> qualifier is sent to apt; without this the install would fail
+		// because archive.ubuntu.com only carries the build-host arch.
+		if err := bb.ensureCrossArchRepo(targetArch); err != nil {
+			return err
+		}
+
 		crossDeps := bb.getCrossCompilerDependencies(targetArch)
 		if len(crossDeps) > 0 {
 			logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
@@ -476,8 +484,9 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 		// Qualify makedepends with the target architecture so the package
 		// manager installs the target-arch variant of each library.
 		//
-		// DEB only: ":arm64" qualifiers work because the Docker images register
-		// the target arch with dpkg --add-architecture and add the ports repo.
+		// DEB only: ":arm64" qualifiers work because ensureCrossArchRepo above
+		// registered the architecture with dpkg --add-architecture and added the
+		// ports repo.
 		//
 		// RPM is intentionally excluded: Rocky/Fedora x86_64 containers do not
 		// carry aarch64 -devel packages in their repos. The cross-compiler
@@ -501,6 +510,23 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, makeDepends)
 }
 
+// ensureCrossArchRepo registers the foreign architecture (dpkg
+// --add-architecture) and adds the matching ports apt source so the package
+// manager can resolve target-arch libraries and the cross-compiler. The work
+// is restricted to DEB-based distros: RPM/APK/Pacman targets either ship the
+// toolchain in the base repos or rely on a bundled sysroot.
+func (bb *BaseBuilder) ensureCrossArchRepo(targetArch string) error {
+	if bb.Format != constants.FormatDEB {
+		return nil
+	}
+
+	return repo.SetupCrossAPT(repo.CrossAptOptions{
+		Distro:     bb.PKGBUILD.Distro,
+		Codename:   bb.PKGBUILD.Codename,
+		TargetArch: targetArch,
+	})
+}
+
 // PrepareEnvironment sets up the build environment with necessary tools.
 // This consolidates duplicated PrepareEnvironment methods across all builders.
 // Toolchain validation is always skipped here: PrepareEnvironment is called by
@@ -518,6 +544,14 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(golang bool, targetArch 
 
 	// Add cross-compilation dependencies if target architecture is different
 	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
+		// Register the foreign architecture and its ports repo before apt-get
+		// install pulls cross-arch libraries. This keeps `yap prepare` and `yap
+		// build` symmetrical: both paths reach apt with the right sources in
+		// place regardless of how the image was prebuilt.
+		if err := bb.ensureCrossArchRepo(targetArch); err != nil {
+			return err
+		}
+
 		if err := bb.handleCrossCompilation(targetArch, skipValidation, &allArgs); err != nil {
 			return err
 		}

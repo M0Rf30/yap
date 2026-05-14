@@ -62,19 +62,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Preseed debconf to prevent resolvconf postinst failure in containers
 RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
 
-# Add arm64 multiarch support. 26.04 (like noble) ships deb822 .sources files,
-# so we restrict the default ubuntu.sources to amd64 and add a separate
-# ports.ubuntu.com stanza for arm64. The codename is read from /etc/os-release
-# at build time so the file stays correct even if the codename is renamed.
-RUN . /etc/os-release && \
-    dpkg --add-architecture arm64 && \
-    sed -i '/^Types:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources && \
-    printf 'Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports/\nSuites: %s %s-updates %s-security\nComponents: main restricted universe multiverse\nArchitectures: arm64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
-      "${VERSION_CODENAME}" "${VERSION_CODENAME}" "${VERSION_CODENAME}" \
-      > /etc/apt/sources.list.d/ubuntu-ports-arm64.sources && \
-    apt-get update && \
-    rm -rf /var/lib/apt/lists/*
-
 # Install minimal runtime dependencies
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -100,7 +87,7 @@ ENV PATH="/usr/lib/ccache:${PATH}"
 RUN userdel -r ubuntu 2>/dev/null || true && \
     groupadd -g 1000 yap && \
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
-    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get, /usr/sbin/update-ccache-symlinks' >> /etc/sudoers
+    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get, /usr/bin/dpkg, /usr/sbin/update-ccache-symlinks' >> /etc/sudoers
 
 # Copy binary and completion from builder
 COPY --from=builder /usr/bin/yap /usr/bin/yap
