@@ -54,17 +54,25 @@ LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${VERSION}"
 
 
-# Install minimal runtime dependencies
-RUN dnf -y update && dnf -y install \
-    bash-completion \
-    ca-certificates \
-    dnf-plugins-core \
-    epel-release \
-    findutils \
-    sudo && \
+# Install minimal runtime dependencies. EPEL must be enabled first because
+# ccache lives there on Rocky 9; the package is not available in the base
+# repos and dnf does not refresh metadata within a single transaction.
+RUN dnf -y update && \
+    dnf -y install \
+        bash-completion \
+        ca-certificates \
+        dnf-plugins-core \
+        epel-release \
+        findutils \
+        sudo && \
     dnf config-manager --enable crb && \
     dnf config-manager --enable devel && \
+    dnf -y install ccache && \
     dnf clean all && rm -rf /var/cache/dnf
+
+# The Rocky ccache package installs compiler symlinks under /usr/lib64/ccache;
+# placing that directory first in PATH wraps gcc/g++ transparently.
+ENV PATH="/usr/lib64/ccache:${PATH}"
 
 # Create non-root user
 RUN groupadd -g 1000 yap && \

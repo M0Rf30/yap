@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -531,6 +531,10 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(golang bool, targetArch 
 		return err
 	}
 
+	// Refresh ccache compiler symlinks so freshly installed cross-compilers are
+	// wrapped automatically when /usr/lib/ccache (or /usr/lib64/ccache) is in PATH.
+	bb.refreshCcacheSymlinks()
+
 	// Set up cross-compilation environment after dependencies are installed
 	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
 		err = bb.SetupCrossCompilationEnvironment(targetArch)
@@ -541,6 +545,30 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(golang bool, targetArch 
 	}
 
 	return nil
+}
+
+// refreshCcacheSymlinks runs the distribution-provided helper that creates
+// /usr/lib/ccache/<compiler> symlinks for every compiler currently installed on
+// the system. Without this step, cross-compilers installed at runtime would
+// bypass ccache because their symlinks are generated only at package install
+// time. The call is best-effort: it logs and returns on failure so the build
+// can proceed without caching.
+func (bb *BaseBuilder) refreshCcacheSymlinks() {
+	if _, err := exec.LookPath("ccache"); err != nil {
+		return
+	}
+
+	bin, err := exec.LookPath("update-ccache-symlinks")
+	if err != nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := exec.CommandContext(ctx, "sudo", "-n", bin).Run(); err != nil {
+		logger.Warn("ccache: update-ccache-symlinks failed", "error", err)
+	}
 }
 
 // getCrossCompilerDependencies returns cross-compiler dependencies for target architecture.
@@ -637,30 +665,22 @@ func (bb *BaseBuilder) SetupCcache() error {
 	envMutex.Lock()
 	defer envMutex.Unlock()
 
-	// Set up ccache environment variables
-	// These variables will be used by the build process to enable ccache
-	// CC and CXX are set to use ccache wrapper
-	// Additionally, set some common ccache configuration options
+	// Set up ccache environment variables. CC/CXX are wrapped only when the
+	// build is not cross-compiling — for cross builds SetupCrossCompilationEnvironment
+	// runs after this function and substitutes the bare cross-compiler, relying
+	// on the /usr/lib/ccache (or /usr/lib64/ccache) symlinks to invoke ccache.
 	_ = os.Setenv("CC", "ccache gcc")
 	_ = os.Setenv("CXX", "ccache g++")
 	_ = os.Setenv("CCACHE_BASEDIR", bb.PKGBUILD.StartDir)
 	_ = os.Setenv("CCACHE_SLOPPINESS", "time_macros,include_file_mtime")
 	_ = os.Setenv("CCACHE_NOHASHDIR", "1")
 
+	// CCACHE_DIR is intentionally left unset so ccache resolves to its default
+	// $HOME/.cache/ccache. Persistent caches (e.g. Kubernetes volumes) mounted
+	// at that path are then shared across builds within the same user account.
+
 	logger.Info(i18n.T("logger.setupccache.info.ccache_enabled_for_build_1"),
 		"package", bb.PKGBUILD.PkgName)
-
-	// Create ccache directory if it doesn't exist
-	ccacheDir := filepath.Join(bb.PKGBUILD.StartDir, ".ccache")
-	if _, err := os.Stat(ccacheDir); os.IsNotExist(err) {
-		err = os.MkdirAll(ccacheDir, 0o750)
-		if err != nil {
-			logger.Warn(i18n.T("logger.setupccache.warn.failed_to_create_ccache_dir_1"),
-				"dir", ccacheDir, "error", err)
-		}
-	}
-
-	_ = os.Setenv("CCACHE_DIR", ccacheDir)
 
 	return nil
 }

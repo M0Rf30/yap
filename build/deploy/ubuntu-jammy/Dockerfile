@@ -78,6 +78,7 @@ RUN apt-get update && \
     bash-completion \
     binutils \
     ca-certificates \
+    ccache \
     sudo && \
     # Set timezone
     ln -sf /usr/share/zoneinfo/UTC /etc/localtime && \
@@ -86,11 +87,16 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Make ccache visible to every compiler invocation. The Debian/Ubuntu ccache
+# package installs compiler symlinks under /usr/lib/ccache; placing that
+# directory first in PATH wraps gcc/g++ and cross-compilers transparently.
+ENV PATH="/usr/lib/ccache:${PATH}"
+
 # Remove default ubuntu user and create yap user at uid/gid 1000
 RUN userdel -r ubuntu 2>/dev/null || true && \
     groupadd -g 1000 yap && \
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
-    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get' >> /etc/sudoers
+    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get, /usr/sbin/update-ccache-symlinks' >> /etc/sudoers
 
 # Copy binary and completion from builder
 COPY --from=builder /usr/bin/yap /usr/bin/yap

@@ -38,7 +38,7 @@ RUN if [ "${TARGETARCH}" = "$(go env GOARCH)" ]; then \
     fi
 
 # Runtime stage
-FROM ubuntu:bionic
+FROM ubuntu:resolute
 
 # Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -49,8 +49,8 @@ ARG TARGETARCH=amd64
 ARG GO_VERSION=1.26.1
 
 # Metadata labels
-LABEL org.opencontainers.image.title="yap-ubuntu-bionic"
-LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Ubuntu 18.04 LTS with Go runtime 📦🐹"
+LABEL org.opencontainers.image.title="yap-ubuntu-26.04"
+LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Ubuntu 26.04 LTS with Go runtime 📦🐹"
 LABEL org.opencontainers.image.vendor="M0Rf30"
 LABEL org.opencontainers.image.source="https://github.com/M0Rf30/yap"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
@@ -62,12 +62,16 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Preseed debconf to prevent resolvconf postinst failure in containers
 RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
 
-# Add arm64 multiarch support
-RUN dpkg --add-architecture arm64 && \
-    sed -i 's/^deb http/deb [arch=amd64] http/g' /etc/apt/sources.list && \
-    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ bionic main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ bionic-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ bionic-security main restricted universe multiverse" >> /etc/apt/sources.list && \
+# Add arm64 multiarch support. 26.04 (like noble) ships deb822 .sources files,
+# so we restrict the default ubuntu.sources to amd64 and add a separate
+# ports.ubuntu.com stanza for arm64. The codename is read from /etc/os-release
+# at build time so the file stays correct even if the codename is renamed.
+RUN . /etc/os-release && \
+    dpkg --add-architecture arm64 && \
+    sed -i '/^Types:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources && \
+    printf 'Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports/\nSuites: %s %s-updates %s-security\nComponents: main restricted universe multiverse\nArchitectures: arm64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+      "${VERSION_CODENAME}" "${VERSION_CODENAME}" "${VERSION_CODENAME}" \
+      > /etc/apt/sources.list.d/ubuntu-ports-arm64.sources && \
     apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
@@ -78,6 +82,7 @@ RUN apt-get update && \
     bash-completion \
     binutils \
     ca-certificates \
+    ccache \
     sudo && \
     # Set timezone
     ln -sf /usr/share/zoneinfo/UTC /etc/localtime && \
@@ -86,11 +91,16 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Make ccache visible to every compiler invocation. The Debian/Ubuntu ccache
+# package installs compiler symlinks under /usr/lib/ccache; placing that
+# directory first in PATH wraps gcc/g++ and cross-compilers transparently.
+ENV PATH="/usr/lib/ccache:${PATH}"
+
 # Remove default ubuntu user and create yap user at uid/gid 1000
 RUN userdel -r ubuntu 2>/dev/null || true && \
     groupadd -g 1000 yap && \
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
-    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get' >> /etc/sudoers
+    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get, /usr/sbin/update-ccache-symlinks' >> /etc/sudoers
 
 # Copy binary and completion from builder
 COPY --from=builder /usr/bin/yap /usr/bin/yap
