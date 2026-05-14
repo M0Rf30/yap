@@ -1138,3 +1138,50 @@ func TestQualifyDepsForTargetArch(t *testing.T) {
 		})
 	}
 }
+
+func TestIsHostOnlyPackage(t *testing.T) {
+	t.Parallel()
+
+	// Packages that must be detected as host-only
+	hostOnly := []string{
+		// Perl interpreters
+		"perl", "perl-base", "perl-modules",
+		// Perl modules (suffix -perl)
+		"libcommon-sense-perl", "libsocket6-perl", "libtry-tiny-perl", "libnet-ssleay-perl",
+		// Build tools
+		"make", "re2c", "bison", "byacc", "flex", "gawk",
+		"autoconf", "automake", "libtool", "cmake", "meson",
+		"pkg-config", "git", "patch", "m4",
+	}
+
+	for _, pkg := range hostOnly {
+		t.Run("host-only/"+pkg, func(t *testing.T) {
+			t.Parallel()
+
+			if !isHostOnlyPackage(pkg) {
+				t.Errorf("isHostOnlyPackage(%q) = false, want true", pkg)
+			}
+		})
+	}
+
+	// Packages that must NOT be detected as host-only
+	notHostOnly := []string{
+		"libssl-dev", "libmagic1", "zlib1g-dev", "my-custom-pkg",
+		"libperl5.34", "",
+	}
+
+	for _, pkg := range notHostOnly {
+		name := pkg
+		if name == "" {
+			name = "empty"
+		}
+
+		t.Run("not-host-only/"+name, func(t *testing.T) {
+			t.Parallel()
+
+			if isHostOnlyPackage(pkg) {
+				t.Errorf("isHostOnlyPackage(%q) = true, want false", pkg)
+			}
+		})
+	}
+}
