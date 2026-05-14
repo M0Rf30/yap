@@ -29,6 +29,7 @@ import (
 const (
 	fileProtocol = "file"
 	branchKey    = "branch"
+	commitKey    = "commit"
 	tagKey       = "tag"
 	skipValue    = "SKIP"
 )
@@ -95,6 +96,24 @@ func (src *Source) Get() error {
 
 	switch sourceType {
 	case "http", "https", "ftp", constants.Git:
+		// For git sources, if the path contains a bare/mirror repo (e.g. from
+		// a CI stash or makepkg-style cache), create a working copy from it
+		// matching makepkg's extract_git() behavior. If extraction fails
+		// (e.g. stale cache missing the requested commit), remove the bare
+		// repo and fall through to a fresh clone from the remote URL.
+		if sourceType == constants.Git && files.Exists(sourceFilePath) && git.IsBareRepo(sourceFilePath) {
+			if err := git.ExtractFromBare(sourceFilePath, src.SrcDir, src.RefKey, src.RefValue); err == nil {
+				return nil
+			}
+
+			logger.Warn("bare repo extraction failed, falling back to fresh clone",
+				"path", sourceFilePath)
+
+			_ = os.RemoveAll(sourceFilePath)
+			// Also remove the failed working copy attempt
+			_ = os.RemoveAll(filepath.Join(src.SrcDir, filepath.Base(sourceFilePath)))
+		}
+
 		// Use singleflight to prevent duplicate downloads of the same file
 		if !files.Exists(sourceFilePath) {
 			_, err, _ := downloadGroup.Do(sourceFilePath, func() (any, error) {
@@ -179,7 +198,12 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 	case constants.Git:
 		referenceName := src.getReferenceType()
 
-		return git.Clone(dloadFilePath, normalizedURI, sshPassword, referenceName)
+		commitHash := ""
+		if src.RefKey == commitKey {
+			commitHash = src.RefValue
+		}
+
+		return git.Clone(dloadFilePath, normalizedURI, sshPassword, referenceName, commitHash)
 	default:
 		// Use enhanced download with resume capability and 3 retries, with context information
 		_, err := shell.MultiPrinter.Start()
