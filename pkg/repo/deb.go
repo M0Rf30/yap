@@ -24,7 +24,7 @@ func setupDeb(r *Repo) error {
 
 	components := r.Components
 	if len(components) == 0 {
-		components = []string{"main"}
+		components = []string{componentMain}
 	}
 
 	signedBy := ""

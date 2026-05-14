@@ -112,7 +112,10 @@ func init() {
 		"golang", "g", false, "")
 	prepareCmd.Flags().StringVarP(&TargetArch,
 		"target-arch", "t", "", "Target architecture for cross-compilation (e.g., arm64, armv7, x86_64)")
-	prepareCmd.Flags().StringSliceVar(&project.ExtraRepos,
+	// StringArrayVar (not StringSliceVar) so commas inside the spec are not
+	// treated as multi-value separators — every --repo invocation maps to one
+	// repository definition.
+	prepareCmd.Flags().StringArrayVar(&project.ExtraRepos,
 		"repo", nil,
 		"Extra repository spec (repeatable): name=<n>,url=<u>,suite=<s>,components=<a+b>,"+
 			"keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>")

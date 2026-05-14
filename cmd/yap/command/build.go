@@ -378,7 +378,10 @@ func init() {
 		"sign-key-name", "", "", "Key name for APK signing (e.g., 'mykey')")
 
 	// EXTRA REPOSITORY FLAGS
-	buildCmd.Flags().StringSliceVar(&buildOpts.ExtraRepos,
+	// StringArrayVar (not StringSliceVar) so commas inside the spec are not
+	// treated as multi-value separators — every --repo invocation maps to one
+	// repository definition.
+	buildCmd.Flags().StringArrayVar(&buildOpts.ExtraRepos,
 		"repo", nil,
 		"Extra repository spec (repeatable): name=<n>,url=<u>,suite=<s>,components=<a+b>,"+
 			"keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>")
