@@ -349,6 +349,28 @@ func getUpdateCommand(format string) string {
 //
 // Packages that cannot be queried are assumed arch-specific so apt can
 // surface a clear error if something is truly missing.
+// isHostOnlyPackage returns true for packages that must run on the build host
+// and should never be qualified with the target architecture during cross-builds.
+// Installing these as :arm64 would pull in conflicting transitive dependencies
+// (e.g. perl:arm64 alongside host perl, or make:arm64 alongside host make).
+func isHostOnlyPackage(name string) bool {
+	// Perl modules and interpreters
+	if strings.HasSuffix(name, "-perl") || name == "perl" || name == "perl-base" ||
+		name == "perl-modules" {
+		return true
+	}
+
+	// Common build tools that are always host-arch
+	switch name {
+	case "make", "re2c", "bison", "byacc", "flex", "gawk",
+		"autoconf", "automake", "libtool", "cmake", "meson",
+		"pkg-config", "git", "patch", "m4":
+		return true
+	}
+
+	return false
+}
+
 func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 	for _, dep := range deps {
 		// Strip version constraint for the lookup: "libssl-dev (>= 1.0)" → "libssl-dev"
@@ -356,9 +378,28 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 		// Strip any existing arch qualifier
 		name, _, _ = strings.Cut(name, ":")
 
+		// Perl modules (*-perl), interpreters (perl, perl-base), and common
+		// build tools run on the build host, not the target. Qualifying them
+		// with the target arch pulls in conflicting transitive dependencies
+		// (e.g. perl:arm64 conflicts with host perl). Keep them unqualified.
+		if isHostOnlyPackage(name) {
+			archAll = append(archAll, dep)
+			continue
+		}
+
 		out, err := exec.CommandContext(context.Background(), "apt-cache", "show", name).Output() // #nosec G204
 		if err != nil {
-			archSpecific = append(archSpecific, dep)
+			// Package not in apt cache (e.g. custom repo packages).
+			// If it is already installed for the host arch, qualifying it with the
+			// target arch would cause a conflict (same package, two architectures,
+			// Multi-Arch not set). Treat it as arch-all to avoid the conflict.
+			dpkgOut, dpkgErr := exec.CommandContext(context.Background(), "dpkg", "-s", name).Output() // #nosec G204
+			if dpkgErr == nil && strings.Contains(string(dpkgOut), "Status: install ok installed") {
+				archAll = append(archAll, dep)
+			} else {
+				archSpecific = append(archSpecific, dep)
+			}
+
 			continue
 		}
 
@@ -494,16 +535,7 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 		// used directly (the cross-compiler is pointed at them via PKG_CONFIG_PATH
 		// and CROSS_COMPILE set in SetupCrossCompilationEnvironment).
 		if bb.Format == constants.FormatDEB {
-			// Separate Architecture:all packages — they have no arch-specific
-			// variant and must be installed without an arch qualifier.
-			archSpecific, archAll := partitionArchAllDeps(makeDepends)
-			qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
-			qualified = append(qualified, archAll...)
-			makeDepends = qualified
-			logger.Info("Qualifying makedepends for target architecture",
-				"target_arch", targetArch,
-				"format", bb.Format,
-				"packages", strings.Join(makeDepends, ", "))
+			return bb.installCrossDeps(makeDepends, installArgs, targetArch)
 		}
 	}
 
@@ -514,6 +546,32 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 // --add-architecture) and adds the matching ports apt source so the package
 // manager can resolve target-arch libraries and the cross-compiler. The work
 // is restricted to DEB-based distros: RPM/APK/Pacman targets either ship the
+// installCrossDeps installs DEB cross-compilation dependencies in two passes.
+// Architecture:all packages are installed first so they are present when
+// arch-specific (target-arch) packages are installed — this satisfies
+// transitive dependencies that arch-specific packages may have on arch-all
+// packages (e.g. carbonio-openldap:arm64 → carbonio-core which is arch:all).
+func (bb *BaseBuilder) installCrossDeps(makeDepends, installArgs []string, targetArch string) error {
+	archSpecific, archAll := partitionArchAllDeps(makeDepends)
+	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
+
+	logger.Info("Qualifying makedepends for target architecture",
+		"target_arch", targetArch,
+		"format", bb.Format,
+		"arch_specific", strings.Join(qualified, ", "),
+		"arch_all", strings.Join(archAll, ", "))
+
+	// Install arch-all (host) packages first so they are available to
+	// satisfy transitive dependencies of the target-arch packages.
+	if len(archAll) > 0 {
+		if err := bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, archAll); err != nil {
+			return err
+		}
+	}
+
+	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, qualified)
+}
+
 // toolchain in the base repos or rely on a bundled sysroot.
 func (bb *BaseBuilder) ensureCrossArchRepo(targetArch string) error {
 	if bb.Format != constants.FormatDEB {
