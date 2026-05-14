@@ -33,7 +33,7 @@ jobs:
       - name: 📋 Set matrix
         id: set-matrix
         run: |
-          echo 'matrix=["alpine","rocky-8","rocky-9","rocky-10","ubuntu-jammy","ubuntu-noble"]' >> "$GITHUB_OUTPUT"
+          echo 'matrix=["alpine","rocky-8","rocky-9","rocky-10","ubuntu-jammy","ubuntu-noble", "ubuntu-resolute"]' >> "$GITHUB_OUTPUT"
 
   # Build each OS image
   docker-build:
