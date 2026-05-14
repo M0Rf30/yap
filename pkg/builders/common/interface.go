@@ -600,7 +600,9 @@ func (bb *BaseBuilder) refreshCcacheSymlinks() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := exec.CommandContext(ctx, "sudo", "-n", bin).Run(); err != nil {
+	// bin is the absolute path returned by exec.LookPath — it cannot be
+	// influenced by user input and yap is expected to run as root.
+	if err := exec.CommandContext(ctx, bin).Run(); err != nil { // #nosec G204
 		logger.Warn("ccache: update-ccache-symlinks failed", "error", err)
 	}
 }

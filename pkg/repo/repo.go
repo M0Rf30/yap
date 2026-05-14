@@ -22,6 +22,14 @@ import (
 // keyFetchTimeout bounds how long a GPG key download may take.
 const keyFetchTimeout = 30 * time.Second
 
+// Internal format identifiers used to dispatch Setup to the per-format writer
+// and to gate yap.json `format` values supplied by users.
+const (
+	formatDeb     = "deb"
+	formatRPM     = "rpm"
+	componentMain = "main"
+)
+
 // Repo describes one additional package repository. The same structure is used
 // for both yap.json declarations and CLI parsing. Fields that do not apply to
 // a given format are ignored at write time.
@@ -79,13 +87,13 @@ func setupOne(pm string, r *Repo, distro string, idx int) error {
 	}
 
 	switch format {
-	case "deb":
+	case formatDeb:
 		if pm != constants.PMApt {
 			return nil
 		}
 
 		return setupDeb(r)
-	case "rpm":
+	case formatRPM:
 		if pm != constants.PMYum && pm != constants.PMZypper {
 			return nil
 		}
@@ -114,9 +122,9 @@ func appliesTo(r *Repo, distro string) bool {
 func formatFor(pm string) string {
 	switch pm {
 	case constants.PMApt:
-		return "deb"
+		return formatDeb
 	case constants.PMYum, constants.PMZypper:
-		return "rpm"
+		return formatRPM
 	}
 
 	return ""

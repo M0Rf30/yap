@@ -94,7 +94,7 @@ func SetupCrossAPT(opts CrossAptOptions) error {
 		Name:       "yap-cross-" + targetDebArch,
 		URL:        portsURI,
 		Suite:      codename,
-		Components: []string{"main", "restricted", "universe", "multiverse"},
+		Components: []string{componentMain, "restricted", "universe", "multiverse"},
 	}
 
 	keyring := archiveKeyringFor(distro)
