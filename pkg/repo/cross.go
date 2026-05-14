@@ -282,6 +282,8 @@ func writeRoot(path string, data []byte) error {
 // runTool invokes the named tool directly inside a bounded context. yap is
 // expected to run as root; on non-root invocations the underlying tool will
 // return its standard EPERM error and surface it to the caller.
+// Output is captured and discarded; callers that need output should use
+// exec.Command directly.
 func runTool(timeout time.Duration, name string, args ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -289,10 +291,21 @@ func runTool(timeout time.Duration, name string, args ...string) error {
 	// name and args are limited to constant strings supplied by callers in
 	// this package (dpkg, apt-get, ...); there is no flow from user input.
 	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 
-	return cmd.Run()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// Log the output only on failure so the user can diagnose the problem.
+		if len(out) > 0 {
+			logger.Warn("repo: command failed",
+				"command", name,
+				"args", args,
+				"output", strings.TrimSpace(string(out)))
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 // readOSRelease parses /etc/os-release and returns the distro ID and version

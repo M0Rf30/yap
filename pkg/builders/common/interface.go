@@ -436,6 +436,52 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 	return archSpecific, archAll
 }
 
+// partitionArchAllDepsForExtract is a relaxed variant of partitionArchAllDeps
+// used by DownloadAndExtractCrossDeps. Since extraction bypasses dpkg, there
+// are no multi-arch conflicts. The only packages left unqualified are:
+//   - Architecture: all — no arch-specific variant exists.
+//   - Host-only tools (perl, make, etc.) — must run on the build host.
+//
+// Packages already installed for the host arch are still qualified with the
+// target arch because extraction overwrites files without dpkg conflict checks.
+func partitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []string) {
+	for _, dep := range deps {
+		name, _, _ := strings.Cut(dep, " (")
+		name, _, _ = strings.Cut(name, ":")
+
+		if isHostOnlyPackage(name) {
+			archAll = append(archAll, dep)
+			continue
+		}
+
+		out, err := exec.CommandContext(context.Background(), "apt-cache", "show", name).Output() // #nosec G204
+		if err != nil {
+			// Not in apt cache — assume arch-specific so apt can surface a clear error.
+			archSpecific = append(archSpecific, dep)
+			continue
+		}
+
+		info := string(out)
+
+		if strings.Contains(info, "Architecture: all") {
+			archAll = append(archAll, dep)
+			continue
+		}
+
+		// Essential packages still conflict even with extraction because
+		// overwriting host binaries (e.g. /bin/bash) with target-arch
+		// binaries would break the build environment.
+		if strings.Contains(info, "Essential: yes") {
+			archAll = append(archAll, dep)
+			continue
+		}
+
+		archSpecific = append(archSpecific, dep)
+	}
+
+	return archSpecific, archAll
+}
+
 // qualifyDepsForTargetArch rewrites a list of package names so they are
 // installed for the target (cross) architecture rather than the host arch.
 //
@@ -540,6 +586,94 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 	}
 
 	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, makeDepends)
+}
+
+// DownloadAndExtractCrossDeps downloads runtime dependencies and extracts them
+// directly to the root filesystem without registering them in the dpkg database.
+// This avoids the circular dependency problem where arch-all meta-packages
+// (e.g. carbonio-core) depend on arch-specific packages (e.g. carbonio-openldap)
+// that conflict with the target-arch variants needed for cross-compilation.
+//
+// The function partitions deps the same way as installCrossDeps: arch-all
+// packages are downloaded unqualified, arch-specific ones are qualified with
+// the target architecture (e.g. :arm64). All packages are extracted via
+// dpkg -x (pure Go equivalent) so no dependency resolution occurs.
+func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch string) error {
+	if bb.Format != constants.FormatDEB {
+		// Non-DEB formats: fall back to normal install (no cross-arch conflict).
+		installArgs := constants.GetInstallArgs(bb.Format)
+
+		return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, deps)
+	}
+
+	// Use the extract-safe partitioning: since we download+extract (not dpkg -i),
+	// there are no dpkg conflicts, so packages already installed for the host arch
+	// must still be downloaded as target-arch.
+	archSpecific, archAll := partitionArchAllDepsForExtract(deps)
+	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
+
+	all := make([]string, 0, len(archAll)+len(qualified))
+	all = append(all, archAll...)
+	all = append(all, qualified...)
+
+	if len(all) == 0 {
+		return nil
+	}
+
+	logger.Info("Downloading and extracting cross-build runtime deps",
+		"target_arch", targetArch,
+		"arch_specific", strings.Join(qualified, ", "),
+		"arch_all", strings.Join(archAll, ", "))
+
+	// Create a temporary directory for downloaded .deb files.
+	tmpDir, err := os.MkdirTemp("", "yap-cross-deps-*")
+	if err != nil {
+		return fmt.Errorf("create temp dir for cross deps: %w", err)
+	}
+
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	// Download all packages in one apt-get download call.
+	args := append([]string{"download", "--allow-unauthenticated", "-o", "Dir::Cache::Archives=" + tmpDir}, all...)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "apt-get", args...) // #nosec G204
+	cmd.Dir = tmpDir
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if len(out) > 0 {
+			logger.Warn("apt-get download failed",
+				"output", strings.TrimSpace(string(out)))
+		}
+
+		return fmt.Errorf("apt-get download cross deps: %w", err)
+	}
+
+	// Extract each downloaded .deb to the root filesystem.
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		return fmt.Errorf("read cross deps dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".deb") {
+			continue
+		}
+
+		debPath := tmpDir + "/" + entry.Name()
+
+		logger.Info("Extracting cross-build runtime dep",
+			"package", entry.Name())
+
+		if err := extractDEB(debPath, "/"); err != nil {
+			return fmt.Errorf("extract cross dep %s: %w", entry.Name(), err)
+		}
+	}
+
+	return nil
 }
 
 // ensureCrossArchRepo registers the foreign architecture (dpkg
