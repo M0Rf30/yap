@@ -296,15 +296,16 @@ func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []strin
 		}
 	}
 
-	// Install external runtime dependencies
-	if !SkipSyncDeps && len(runtimeDepends) > 0 {
-		logger.Debug(i18n.T("logger.installing_external_runtime_dependencies"),
-			"count", len(runtimeDepends))
-
-		err := packageManager.Prepare(runtimeDepends, TargetArch)
-		if err != nil {
-			return err
-		}
+	// Install external runtime dependencies.
+	//
+	// During cross-builds, runtime deps are downloaded and extracted directly
+	// to the root filesystem (dpkg -x equivalent) instead of apt-installed.
+	// This avoids circular dependency conflicts: arch-all meta-packages (e.g.
+	// carbonio-core) depend on arch-specific packages (e.g. carbonio-openldap)
+	// for the host arch, which conflict with the target-arch variants needed
+	// for cross-compilation linking.
+	if err := mpc.installRuntimeDeps(runtimeDepends); err != nil {
+		return err
 	}
 
 	return nil
@@ -312,6 +313,30 @@ func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []strin
 
 // setupExtraRepos installs custom apt/dnf repositories declared in yap.json
 // (mpc.Repos) and via the repeatable --repo CLI flag (ExtraRepos). It runs
+// installRuntimeDeps installs external runtime dependencies. During
+// cross-builds it downloads and extracts them to avoid arch conflicts;
+// otherwise it delegates to the normal package manager install path.
+func (mpc *MultipleProject) installRuntimeDeps(runtimeDepends []string) error {
+	if SkipSyncDeps || len(runtimeDepends) == 0 {
+		return nil
+	}
+
+	logger.Debug(i18n.T("logger.installing_external_runtime_dependencies"),
+		"count", len(runtimeDepends))
+
+	isCrossBuild := TargetArch != "" && TargetArch != runtime.GOARCH
+	if !isCrossBuild {
+		return packageManager.Prepare(runtimeDepends, TargetArch)
+	}
+
+	extractor, ok := packageManager.(packer.CrossDepsExtractor)
+	if !ok {
+		return packageManager.Prepare(runtimeDepends, TargetArch)
+	}
+
+	return extractor.DownloadAndExtractCrossDeps(runtimeDepends, TargetArch)
+}
+
 // before any package manager update so subsequent installs can resolve the new
 // sources.
 func (mpc *MultipleProject) setupExtraRepos(distro string) error {

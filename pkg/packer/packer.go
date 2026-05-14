@@ -41,6 +41,14 @@ type Packer interface {
 	Update() error
 }
 
+// CrossDepsExtractor is implemented by builders that support downloading and
+// extracting cross-build runtime dependencies without registering them in the
+// package database. This avoids circular dependency conflicts between arch-all
+// meta-packages and their arch-specific transitive dependencies.
+type CrossDepsExtractor interface {
+	DownloadAndExtractCrossDeps(deps []string, targetArch string) error
+}
+
 // GetPackageManager returns a Packer interface based on the given package build and distribution.
 //
 // pkgBuild: A pointer to a pkgbuild.PKGBUILD struct.
