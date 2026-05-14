@@ -9,6 +9,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/project"
+	"github.com/M0Rf30/yap/v2/pkg/repo"
 )
 
 var (
@@ -45,6 +46,19 @@ var (
 
 			packageManager, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
 			if err != nil {
+				logger.Error(err.Error(), "error", err)
+
+				return
+			}
+
+			cliRepos, err := repo.ParseFlags(project.ExtraRepos)
+			if err != nil {
+				logger.Error(err.Error(), "error", err)
+
+				return
+			}
+
+			if err := repo.Setup(distro, cliRepos); err != nil {
 				logger.Error(err.Error(), "error", err)
 
 				return
@@ -98,4 +112,8 @@ func init() {
 		"golang", "g", false, "")
 	prepareCmd.Flags().StringVarP(&TargetArch,
 		"target-arch", "t", "", "Target architecture for cross-compilation (e.g., arm64, armv7, x86_64)")
+	prepareCmd.Flags().StringSliceVar(&project.ExtraRepos,
+		"repo", nil,
+		"Extra repository spec (repeatable): name=<n>,url=<u>,suite=<s>,components=<a+b>,"+
+			"keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>")
 }
