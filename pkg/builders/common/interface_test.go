@@ -720,6 +720,34 @@ func TestSetTargetArchitecture(t *testing.T) {
 			format:         "rpm",
 			expectedResult: "x86_64",
 		},
+		{
+			name:           "arch-any deb preserved during cross-compilation",
+			initialArch:    "any",
+			targetArch:     "aarch64",
+			format:         "deb",
+			expectedResult: "all",
+		},
+		{
+			name:           "arch-any rpm preserved during cross-compilation",
+			initialArch:    "any",
+			targetArch:     "aarch64",
+			format:         "rpm",
+			expectedResult: "noarch",
+		},
+		{
+			name:           "arch-any apk preserved during cross-compilation",
+			initialArch:    "any",
+			targetArch:     "aarch64",
+			format:         "apk",
+			expectedResult: "all",
+		},
+		{
+			name:           "arch-any preserved with empty target",
+			initialArch:    "any",
+			targetArch:     "",
+			format:         "deb",
+			expectedResult: "all",
+		},
 	}
 
 	for _, tt := range tests {

@@ -154,9 +154,11 @@ func (bb *BaseBuilder) TranslateArchitecture() {
 
 // SetTargetArchitecture sets the target architecture for cross-compilation and translates it.
 // If targetArch is empty, it uses the current ArchComputed value.
+// Architecture-independent packages (arch=any) are never overridden — they always
+// produce arch-all packages regardless of the cross-compilation target.
 // This consolidates the duplicated architecture handling pattern across all builders.
 func (bb *BaseBuilder) SetTargetArchitecture(targetArch string) {
-	if targetArch != "" {
+	if targetArch != "" && bb.PKGBUILD.ArchComputed != pkgbuild.ArchAny {
 		bb.PKGBUILD.ArchComputed = targetArch
 	}
 
