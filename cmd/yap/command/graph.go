@@ -1,11 +1,11 @@
 package command
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/graph/layout"
 	"github.com/M0Rf30/yap/v2/pkg/graph/loader"
 	"github.com/M0Rf30/yap/v2/pkg/graph/render"
@@ -75,7 +75,10 @@ func runGraphCommand(cmd *cobra.Command, args []string) error {
 
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
-		return fmt.Errorf(i18n.T("errors.graph.failed_to_resolve_project_path")+": %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.graph.failed_to_resolve_project_path")).
+			WithOperation("runGraphCommand").
+			WithContext("projectPath", projectPath)
 	}
 
 	logger.Info(i18n.T("logger.rungraphcommand.info.generating_dependency_graph_1"),
@@ -85,7 +88,10 @@ func runGraphCommand(cmd *cobra.Command, args []string) error {
 	// Load project configuration only
 	graphData, err := loader.LoadProjectForGraph(absPath, graphTheme)
 	if err != nil {
-		return fmt.Errorf(i18n.T("errors.graph.failed_to_load_project")+": %w", err)
+		return errors.Wrap(err, errors.ErrTypeConfiguration,
+			i18n.T("errors.graph.failed_to_load_project")).
+			WithOperation("runGraphCommand").
+			WithContext("projectPath", absPath)
 	}
 
 	// Calculate layout

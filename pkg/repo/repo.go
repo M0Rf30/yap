@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -78,7 +79,9 @@ func setupOne(pm string, r *Repo, distro string, idx int) error {
 	}
 
 	if r.Name == "" || r.URL == "" {
-		return fmt.Errorf("repo: name and url are required (entry %d)", idx)
+		return errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf("repo: name and url are required (entry %d)", idx)).
+			WithOperation("setupOne")
 	}
 
 	format := r.Format
@@ -154,7 +157,9 @@ func parseFlag(token string) (Repo, error) {
 	for part := range strings.SplitSeq(token, ",") {
 		kv := strings.SplitN(part, "=", 2)
 		if len(kv) != 2 {
-			return r, fmt.Errorf("repo: expected key=val in %q", part)
+			return r, errors.New(errors.ErrTypeValidation,
+				fmt.Sprintf("repo: expected key=val in %q", part)).
+				WithOperation("parseFlag")
 		}
 
 		key := strings.TrimSpace(kv[0])
@@ -178,7 +183,9 @@ func parseFlag(token string) (Repo, error) {
 		case "gpgCheck":
 			r.GPGCheck = val == "true" || val == "1"
 		default:
-			return r, fmt.Errorf("repo: unknown key %q", key)
+			return r, errors.New(errors.ErrTypeValidation,
+				fmt.Sprintf("repo: unknown key %q", key)).
+				WithOperation("parseFlag")
 		}
 	}
 
@@ -217,12 +224,19 @@ func fetchKey(url, dst string) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("repo: fetch key %s: %w", url, err)
+		return errors.Wrap(err, errors.ErrTypeNetwork,
+			"failed to fetch repo key").
+			WithOperation("fetchKey").
+			WithContext("url", url)
 	}
 	defer closeQuiet(resp.Body, "key response body")
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("repo: fetch key %s: status %d", url, resp.StatusCode)
+		return errors.New(errors.ErrTypeNetwork,
+			"failed to fetch repo key").
+			WithOperation("fetchKey").
+			WithContext("url", url).
+			WithContext("status", resp.StatusCode)
 	}
 
 	// dst is built from a constant directory plus a sanitized repo name; apt
@@ -235,7 +249,10 @@ func fetchKey(url, dst string) error {
 	defer closeQuiet(f, dst)
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		return fmt.Errorf("repo: write key %s: %w", dst, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			"failed to write repo key").
+			WithOperation("fetchKey").
+			WithContext("path", dst)
 	}
 
 	return nil

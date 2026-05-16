@@ -4,8 +4,6 @@ package platform
 import (
 	"bufio"
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -13,6 +11,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/download"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -54,7 +53,9 @@ type OSRelease struct {
 func ParseOSRelease() (OSRelease, error) {
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
-		return OSRelease{}, fmt.Errorf("%s: %w", i18n.T("errors.platform.open_os_release_failed"), err)
+		return OSRelease{}, errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.platform.open_os_release_failed")).
+			WithOperation("ParseOSRelease")
 	}
 
 	defer func() {
@@ -91,7 +92,9 @@ func ParseOSRelease() (OSRelease, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return OSRelease{}, fmt.Errorf("%s: %w", i18n.T("errors.platform.scan_os_release_failed"), err)
+		return OSRelease{}, errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.platform.scan_os_release_failed")).
+			WithOperation("ParseOSRelease")
 	}
 
 	return osRelease, nil
@@ -142,30 +145,42 @@ func GOSetup() error {
 
 	_, err := shell.MultiPrinter.Start()
 	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.platform.start_multiprinter_failed"), err)
+		return errors.Wrap(err, errors.ErrTypeBuild,
+			i18n.T("errors.platform.start_multiprinter_failed")).
+			WithOperation("GOSetup")
 	}
 
 	if err := download.Download(
 		goArchivePath,
 		constants.GoArchiveURL,
 		shell.MultiPrinter.Writer); err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.platform.download_go_archive_failed"), err)
+		return errors.Wrap(err, errors.ErrTypeBuild,
+			i18n.T("errors.platform.download_go_archive_failed")).
+			WithOperation("GOSetup")
 	}
 
 	if err := archive.Extract(context.Background(), goArchivePath, "/usr/lib"); err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.platform.extract_go_archive_failed"), err)
+		return errors.Wrap(err, errors.ErrTypeBuild,
+			i18n.T("errors.platform.extract_go_archive_failed")).
+			WithOperation("GOSetup")
 	}
 
 	if err := os.Symlink("/usr/lib/go/bin/go", goExecutable); err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.platform.create_go_symlink_failed"), err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.platform.create_go_symlink_failed")).
+			WithOperation("GOSetup")
 	}
 
 	if err := os.Symlink("/usr/lib/go/bin/gofmt", "/usr/bin/gofmt"); err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.platform.create_gofmt_symlink_failed"), err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.platform.create_gofmt_symlink_failed")).
+			WithOperation("GOSetup")
 	}
 
 	if err := os.RemoveAll(goArchivePath); err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.platform.remove_go_archive_failed"), err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.platform.remove_go_archive_failed")).
+			WithOperation("GOSetup")
 	}
 
 	logger.Info(i18n.T("logger.gosetup.info.go_successfully_installed_1"))
@@ -183,7 +198,8 @@ func PullContainers(distro string) error {
 	case files.Exists("/usr/bin/docker"):
 		containerApp = "/usr/bin/docker"
 	default:
-		return errors.New(i18n.T("errors.platform.no_container_app_found"))
+		return errors.New(errors.ErrTypeFileSystem,
+			i18n.T("errors.platform.no_container_app_found"))
 	}
 
 	args := []string{

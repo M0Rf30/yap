@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
@@ -77,8 +78,11 @@ func validateDistroArg(distro string) error {
 		}
 	}
 
-	return fmt.Errorf(i18n.T("errors.validation.unsupported_distribution")+": %w",
-		distro, formatDistroSuggestions(baseDist), ErrDistributionEmpty)
+	return yapErrors.Wrap(ErrDistributionEmpty,
+		yapErrors.ErrTypeValidation,
+		i18n.T("errors.validation.unsupported_distribution")).
+		WithOperation("validateDistroArg").
+		WithContext("distro", distro)
 }
 
 // validateProjectPath validates that the project path exists and contains yap.json or PKGBUILD.
@@ -89,13 +93,20 @@ func validateProjectPath(path string) error {
 
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return fmt.Errorf(i18n.T("errors.validation.invalid_path")+": %w", path, err)
+		return yapErrors.Wrap(err, yapErrors.ErrTypeValidation,
+			i18n.T("errors.validation.invalid_path")).
+			WithOperation("validateProjectPath").
+			WithContext("path", path)
 	}
 
 	// Check if path exists
 	_, err = os.Stat(absPath)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("%s: %w", absPath, ErrPathNotExist)
+		return yapErrors.Wrap(ErrPathNotExist,
+			yapErrors.ErrTypeFileSystem,
+			i18n.T("errors.validation.path_not_exist")).
+			WithOperation("validateProjectPath").
+			WithContext("path", absPath)
 	}
 
 	// Check for yap.json file (multiproject)
@@ -107,8 +118,11 @@ func validateProjectPath(path string) error {
 	_, pkgbuildErr := os.Stat(pkgbuildPath)
 
 	if os.IsNotExist(yapJSONErr) && os.IsNotExist(pkgbuildErr) {
-		return fmt.Errorf(i18n.T("errors.validation.no_project_files")+": %w",
-			absPath, ErrProjectFileNotFound)
+		return yapErrors.Wrap(ErrProjectFileNotFound,
+			yapErrors.ErrTypeFileSystem,
+			i18n.T("errors.validation.no_project_files")).
+			WithOperation("validateProjectPath").
+			WithContext("path", absPath)
 	}
 
 	return nil
@@ -147,8 +161,13 @@ func formatDistroSuggestions(input string) string {
 func createValidateDistroArgs(minArgs int) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
 		if len(args) < minArgs {
-			return fmt.Errorf(i18n.T("errors.validation.insufficient_args_detailed")+": %w",
-				minArgs, len(args), cmd.CommandPath(), cmd.CommandPath(), ErrInsufficientArgs)
+			return yapErrors.Wrap(ErrInsufficientArgs,
+				yapErrors.ErrTypeValidation,
+				i18n.T("errors.validation.insufficient_args_detailed")).
+				WithOperation("createValidateDistroArgs").
+				WithContext("minArgs", minArgs).
+				WithContext("providedArgs", len(args)).
+				WithContext("command", cmd.CommandPath())
 		}
 
 		if err := validateDistroForCommand(cmd, args); err != nil {
@@ -272,9 +291,12 @@ func parseSingleArg(firstArg string) (distro, release, fullJSONPath string, err 
 	}
 
 	// Neither valid distro nor valid path
-	return "", "", "", fmt.Errorf(
-		"argument '%s' is neither a valid distribution nor a valid project path",
-		firstArg)
+	return "", "", "", yapErrors.New(yapErrors.ErrTypeValidation,
+		fmt.Sprintf(
+			"argument '%s' is neither a valid distribution nor a valid project path",
+			firstArg)).
+		WithOperation("parseSingleArg").
+		WithContext("argument", firstArg)
 }
 
 // isPathArgument checks if the argument looks like a path.

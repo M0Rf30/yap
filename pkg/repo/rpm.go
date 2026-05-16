@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -39,7 +40,11 @@ func setupRPM(r *Repo) error {
 		defer cancel()
 
 		if err := exec.CommandContext(ctx, "rpm", "--import", gpgKey).Run(); err != nil {
-			return fmt.Errorf("repo %q: rpm --import %s: %w", r.Name, gpgKey, err)
+			return errors.Wrap(err, errors.ErrTypeBuild,
+				fmt.Sprintf("repo %q: rpm --import %s", r.Name, gpgKey)).
+				WithOperation("setupRPM").
+				WithContext("repo", r.Name).
+				WithContext("key", gpgKey)
 		}
 	}
 
@@ -61,7 +66,10 @@ func setupRPM(r *Repo) error {
 	// dnf reads /etc/yum.repos.d files as the unprivileged update process, so
 	// world-readable 0o644 is the documented mode.
 	if err := os.WriteFile(dst, []byte(b.String()), 0o644); err != nil { // #nosec G306
-		return fmt.Errorf("repo %q: write %s: %w", r.Name, dst, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			fmt.Sprintf("repo %q: write %s", r.Name, dst)).
+			WithOperation("setupRPM").
+			WithContext("path", dst)
 	}
 
 	logger.Info("repo: installed yum repo",

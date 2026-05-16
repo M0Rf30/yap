@@ -20,6 +20,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/download"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/git"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -136,7 +137,9 @@ func (src *Source) Get() error {
 		}
 	case fileProtocol:
 	default:
-		return fmt.Errorf("%s", i18n.T("errors.source.unsupported_source_type"))
+		return errors.New(errors.ErrTypeValidation, i18n.T("errors.source.unsupported_source_type")).
+			WithOperation("Get").
+			WithContext("source_uri", src.SourceItemURI)
 	}
 
 	err := src.validateSource(sourceFilePath)
@@ -289,7 +292,10 @@ func (src *Source) symlinkSources(symlinkSource string) error {
 func (src *Source) validateSource(sourceFilePath string) error {
 	info, err := os.Stat(sourceFilePath)
 	if err != nil {
-		return fmt.Errorf(i18n.T("errors.source.failed_to_open_file_for_hash"), sourceFilePath)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.source.failed_to_open_file_for_hash")).
+			WithOperation("validateSource").
+			WithContext("path", sourceFilePath)
 	}
 
 	// If it's a directory, handle based on protocol (like makepkg)
@@ -305,7 +311,9 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		// For non-VCS, non-file protocols, directories are not supported (like makepkg)
 		// The file protocol (local files) also shouldn't accept directories in source arrays
 
-		return fmt.Errorf(i18n.T("errors.source.directory_not_supported"), sourceFilePath)
+		return errors.New(errors.ErrTypeValidation, i18n.T("errors.source.directory_not_supported")).
+			WithOperation("validateSource").
+			WithContext("path", sourceFilePath)
 	}
 
 	if src.Hash == skipValue {
@@ -323,7 +331,10 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	case 128:
 		hashSum = sha512.New()
 	default:
-		return fmt.Errorf(i18n.T("errors.source.unsupported_hash_length"), len(src.Hash))
+		return errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf(i18n.T("errors.source.unsupported_hash_length"), len(src.Hash))).
+			WithOperation("validateSource").
+			WithContext("hash_length", len(src.Hash))
 	}
 
 	file, err := files.Open(filepath.Clean(sourceFilePath))
@@ -343,14 +354,20 @@ func (src *Source) validateSource(sourceFilePath string) error {
 
 	_, err = io.Copy(hashSum, file)
 	if err != nil {
-		return fmt.Errorf(i18n.T("errors.source.failed_to_copy_file"), sourceFilePath)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, i18n.T("errors.source.failed_to_copy_file")).
+			WithOperation("validateSource").
+			WithContext("path", sourceFilePath)
 	}
 
 	sum := hashSum.Sum(nil)
 	hexSum := hex.EncodeToString(sum)
 
 	if hexSum != src.Hash {
-		return fmt.Errorf(i18n.T("errors.source.hash_verification_failed"), src.SourceItemPath)
+		return errors.New(errors.ErrTypeValidation, i18n.T("errors.source.hash_verification_failed")).
+			WithOperation("validateSource").
+			WithContext("source_path", src.SourceItemPath).
+			WithContext("expected_hash", src.Hash).
+			WithContext("actual_hash", hexSum)
 	}
 
 	logger.Info(i18n.T("logger.integrity_check_for"),

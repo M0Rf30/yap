@@ -11,6 +11,8 @@ import (
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
 	"gopkg.in/yaml.v3"
+
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 //go:embed locales/*
@@ -43,7 +45,9 @@ func Init(lang string) error {
 
 		_, err = bundle.ParseMessageFileBytes(data, filename)
 		if err != nil {
-			return fmt.Errorf("failed to parse locale file %s: %w", filename, err)
+			return errors.Wrap(err, errors.ErrTypeConfiguration,
+				fmt.Sprintf("failed to parse locale file %s", filename)).
+				WithOperation("Init")
 		}
 	}
 

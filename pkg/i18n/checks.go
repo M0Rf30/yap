@@ -9,6 +9,8 @@ import (
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
 	"gopkg.in/yaml.v3"
+
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // Message represents a single translation message.
@@ -38,13 +40,17 @@ func CheckIntegrity() error {
 
 		data, err := localeFS.ReadFile(filename)
 		if err != nil {
-			return fmt.Errorf("failed to read locale file %s: %w", filename, err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem,
+				fmt.Sprintf("failed to read locale file %s", filename)).
+				WithOperation("CheckIntegrity")
 		}
 
 		// Parse the YAML to check formatting
 		var messages []Message
 		if err := yaml.Unmarshal(data, &messages); err != nil {
-			return fmt.Errorf("failed to parse YAML in %s: %w", filename, err)
+			return errors.Wrap(err, errors.ErrTypeConfiguration,
+				fmt.Sprintf("failed to parse YAML in %s", filename)).
+				WithOperation("CheckIntegrity")
 		}
 
 		// Check for duplicate message IDs
@@ -53,7 +59,9 @@ func CheckIntegrity() error {
 
 		for _, msg := range messages {
 			if seenIDs[msg.ID] {
-				return fmt.Errorf("duplicate message ID '%s' found in %s", msg.ID, filename)
+				return errors.New(errors.ErrTypeValidation,
+					fmt.Sprintf("duplicate message ID '%s' found in %s", msg.ID, filename)).
+					WithOperation("CheckIntegrity")
 			}
 
 			seenIDs[msg.ID] = true
@@ -74,7 +82,10 @@ func CheckIntegrity() error {
 	}
 
 	if len(missingIDs) > 0 {
-		return fmt.Errorf("inconsistent message IDs found: %s", strings.Join(missingIDs, ", "))
+		return errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf("inconsistent message IDs found: %s",
+				strings.Join(missingIDs, ", "))).
+			WithOperation("CheckIntegrity")
 	}
 
 	return nil
@@ -91,13 +102,17 @@ func GetMessageIDs() ([]string, error) {
 
 	data, err := localeFS.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read reference locale file %s: %w", filename, err)
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem,
+			fmt.Sprintf("failed to read reference locale file %s", filename)).
+			WithOperation("GetMessageIDs")
 	}
 
 	// Parse the YAML
 	var messages []Message
 	if err := yaml.Unmarshal(data, &messages); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML in %s: %w", filename, err)
+		return nil, errors.Wrap(err, errors.ErrTypeConfiguration,
+			fmt.Sprintf("failed to parse YAML in %s", filename)).
+			WithOperation("GetMessageIDs")
 	}
 
 	// Extract message IDs
