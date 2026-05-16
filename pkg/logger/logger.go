@@ -3,6 +3,7 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/pterm/pterm"
@@ -163,6 +164,14 @@ func SetVerbose(verbose bool) {
 		ptermLogger = ptermLogger.WithLevel(pterm.LogLevelInfo)
 	}
 
+	Logger.ptermLogger = ptermLogger
+}
+
+// SetWriter redirects the underlying logger's output to the given writer.
+// Intended for tests and benchmarks that need to silence log noise (pass io.Discard).
+// Not goroutine-safe; call before spinning up any concurrent loggers.
+func SetWriter(w io.Writer) {
+	ptermLogger = ptermLogger.WithWriter(w)
 	Logger.ptermLogger = ptermLogger
 }
 
