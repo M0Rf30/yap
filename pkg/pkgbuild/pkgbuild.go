@@ -712,6 +712,7 @@ func (pkgBuild *PKGBUILD) BuildEnvironmentSlice() []string {
 		"pkgname=" + pkgBuild.PkgName,
 		"pkgver=" + pkgBuild.PkgVer,
 		"pkgrel=" + pkgBuild.PkgRel,
+		"CARCH=" + pkgBuild.GetTargetArchitecture(),
 	}
 
 	// Propagate SOURCE_DATE_EPOCH to build scripts for reproducible builds.
@@ -742,6 +743,11 @@ func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
 	}
 
 	err = os.Setenv("startdir", pkgBuild.StartDir)
+	if err != nil {
+		return err
+	}
+
+	err = os.Setenv("CARCH", pkgBuild.GetTargetArchitecture())
 	if err != nil {
 		return err
 	}
@@ -1175,7 +1181,10 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 			return
 		}
 
-		pkgBuild.TargetArch = strVal
+		// CLI flag takes precedence: only apply PKGBUILD-file value when not already set.
+		if pkgBuild.TargetArch == "" {
+			pkgBuild.TargetArch = strVal
+		}
 	case "build_arch":
 		strVal, ok := data.(string)
 		if !ok {
@@ -1260,8 +1269,12 @@ func (pkgBuild *PKGBUILD) parseCombinedArchDistro(input string) (
 		return "", 0, false
 	}
 
-	currentArch := platform.GetArchitecture()
-	if possibleArch != currentArch {
+	effectiveArch := pkgBuild.TargetArch
+	if effectiveArch == "" {
+		effectiveArch = platform.GetArchitecture()
+	}
+
+	if possibleArch != effectiveArch {
 		return key, prioritySkip, true // Invalid architecture for current system
 	}
 
@@ -1294,8 +1307,12 @@ func (pkgBuild *PKGBUILD) parseArchitectureOnly(input string) (
 		return "", 0, false
 	}
 
-	currentArch := platform.GetArchitecture()
-	if possibleArch == currentArch {
+	effectiveArch := pkgBuild.TargetArch
+	if effectiveArch == "" {
+		effectiveArch = platform.GetArchitecture()
+	}
+
+	if possibleArch == effectiveArch {
 		return key, priorityArchMatch, true // Higher priority than distribution-specific
 	}
 

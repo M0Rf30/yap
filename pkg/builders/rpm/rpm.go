@@ -46,13 +46,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string) *RPM {
 // BuildPackage creates an RPM package based on the provided PKGBUILD information.
 // Returns the path to the created RPM file.
 func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, error) {
-	r.LogCrossCompilation(targetArch)
-
-	// Use target architecture for cross-compilation if specified
 	arch := r.PKGBUILD.ArchComputed
-	if targetArch != "" {
-		arch = targetArch
-	}
 
 	pkgName := fmt.Sprintf("%s-%s-%s.%s.rpm",
 		r.PKGBUILD.PkgName,
@@ -166,6 +160,7 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, err
 func (r *RPM) PrepareFakeroot(_ string, targetArch string) error {
 	r.getGroup()
 	r.getRelease()
+	r.LogCrossCompilation(targetArch)
 	r.SetTargetArchitecture(targetArch)
 
 	if r.PKGBUILD.StripEnabled {

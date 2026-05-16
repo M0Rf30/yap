@@ -110,9 +110,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 		}
 
 		// Set up cross-compilation environment if target architecture is specified
-		// Check if cross-compilation is needed
-		if builder.PKGBUILD.TargetArch != "" &&
-			builder.PKGBUILD.TargetArch != builder.PKGBUILD.ArchComputed {
+		if builder.PKGBUILD.IsCrossCompilation() {
 			err = tempBuilder.SetupCrossCompilationEnvironment(builder.PKGBUILD.TargetArch)
 			if err != nil {
 				logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
@@ -249,8 +247,7 @@ func (builder *Builder) processFunctionInFakeroot(pkgbuildFunction, message, sta
 	// Propagate cross-compilation environment to the package() stage so that
 	// tools like strip/objcopy use the cross-prefixed variants when packaging
 	// cross-compiled binaries.
-	if builder.PKGBUILD.TargetArch != "" &&
-		builder.PKGBUILD.TargetArch != builder.PKGBUILD.ArchComputed {
+	if builder.PKGBUILD.IsCrossCompilation() {
 		format := constants.DistroFormat(builder.PKGBUILD.Distro)
 		tempBuilder := &common.BaseBuilder{
 			PKGBUILD: builder.PKGBUILD,

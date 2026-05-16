@@ -53,8 +53,6 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string) *Package {
 // The method calls dpkgDeb to create the package and removes the
 // package directory, returning the path to the created DEB file and an error if any step fails.
 func (d *Package) BuildPackage(artifactsPath string, targetArch string) (string, error) {
-	d.LogCrossCompilation(targetArch)
-
 	debTemp, err := os.MkdirTemp(d.PKGBUILD.SourceDir, "tmp")
 	if err != nil {
 		return "", err
@@ -108,6 +106,7 @@ func (d *Package) BuildPackage(artifactsPath string, targetArch string) (string,
 // resources, and strips binaries. The method returns an error if any step fails.
 func (d *Package) PrepareFakeroot(_ string, targetArch string) error {
 	d.getRelease()
+	d.LogCrossCompilation(targetArch)
 	d.SetTargetArchitecture(targetArch)
 
 	err := os.RemoveAll(d.debDir)

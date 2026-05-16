@@ -31,11 +31,12 @@ var OverridePkgVer string
 // - release: the release version.
 // - startDir: the starting directory.
 // - home: the home directory.
+// - targetArch: the target architecture for cross-compilation (empty string for native).
 //
 // Returns:
 // - *pkgbuild.PKGBUILD: the parsed PKGBUILD object.
 // - error: an error if any occurred during parsing.
-func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, error) {
+func ParseFile(distro, release, startDir, home, targetArch string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
 	if err != nil {
 		logger.Error(i18n.T("logger.parsefile.error.failed_to_get_root_1"),
@@ -45,11 +46,12 @@ func ParseFile(distro, release, startDir, home string) (*pkgbuild.PKGBUILD, erro
 	}
 
 	pkgBuild := &pkgbuild.PKGBUILD{
-		Distro:    distro,
-		Codename:  release,
-		StartDir:  startDir,
-		Home:      home,
-		SourceDir: filepath.Join(startDir, "src"),
+		Distro:     distro,
+		Codename:   release,
+		StartDir:   startDir,
+		Home:       home,
+		SourceDir:  filepath.Join(startDir, "src"),
+		TargetArch: targetArch,
 	}
 
 	pkgBuild.Init()

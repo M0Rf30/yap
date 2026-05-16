@@ -256,12 +256,18 @@ func (src *Source) parseURI() {
 func (src *Source) symlinkSources(symlinkSource string) error {
 	symlinkTarget := filepath.Join(src.SrcDir, src.SourceItemPath)
 
-	// Check if target already exists and points to the correct source
+	// Check if target already exists
 	if linkTarget, err := os.Readlink(symlinkTarget); err == nil {
+		// It's a symlink: check if it already points to the right place
 		if linkTarget == symlinkSource {
 			return nil // Already correctly linked
 		}
 		// Remove existing incorrect symlink
+		if err := os.Remove(symlinkTarget); err != nil {
+			return err
+		}
+	} else if _, err := os.Lstat(symlinkTarget); err == nil {
+		// It's a regular file or directory — remove it so we can symlink
 		if err := os.Remove(symlinkTarget); err != nil {
 			return err
 		}

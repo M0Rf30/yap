@@ -347,6 +347,29 @@ func TestSource_symlinkSources(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "Regular file exists at target (not a symlink)",
+			setupSource: func(t *testing.T) (string, string) {
+				t.Helper()
+
+				tempDir := t.TempDir()
+				sourceFile := filepath.Join(tempDir, "source.txt")
+				err := os.WriteFile(sourceFile, []byte("new content"), 0o600)
+				require.NoError(t, err)
+
+				srcDir := filepath.Join(tempDir, "src")
+				err = os.MkdirAll(srcDir, 0o755)
+				require.NoError(t, err)
+
+				// Create a regular file (not a symlink) at the target location
+				existingFile := filepath.Join(srcDir, "source.txt")
+				err = os.WriteFile(existingFile, []byte("old content"), 0o600)
+				require.NoError(t, err)
+
+				return sourceFile, srcDir
+			},
+			expectError: false,
+		},
 	}
 
 	for _, testCase := range tests {
