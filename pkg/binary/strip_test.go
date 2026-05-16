@@ -1,8 +1,11 @@
 package binary_test
 
 import (
+	"debug/elf"
+	enc "encoding/binary"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/M0Rf30/yap/v2/pkg/binary"
@@ -207,4 +210,67 @@ func contains(s, substr string) bool {
 
 			return false
 		}())
+}
+
+// writeMinimalELF writes a minimal 64-bit little-endian ELF header to path with
+// the given machine type. Just enough for debug/elf.Open to parse successfully —
+// no sections, no segments. Used to test foreign-arch detection in strip.
+func writeMinimalELF(t *testing.T, path string, machine elf.Machine) {
+	t.Helper()
+
+	// 64-byte ELF64 header.
+	hdr := make([]byte, 64)
+	// e_ident
+	hdr[0] = 0x7f
+	hdr[1] = 'E'
+	hdr[2] = 'L'
+	hdr[3] = 'F'
+	hdr[4] = 2 // ELFCLASS64
+	hdr[5] = 1 // ELFDATA2LSB (little-endian)
+	hdr[6] = 1 // EV_CURRENT
+	// Set e_type to ET_EXEC, e_machine to the requested arch, e_version to 1.
+	enc.LittleEndian.PutUint16(hdr[16:], 2)
+	enc.LittleEndian.PutUint16(hdr[18:], uint16(machine))
+	enc.LittleEndian.PutUint32(hdr[20:], 1)
+	// Set e_ehsize to 64; phentsize and shentsize remain zero (no segments/sections).
+	enc.LittleEndian.PutUint16(hdr[52:], 64)
+
+	if err := os.WriteFile(path, hdr, 0o755); err != nil {
+		t.Fatalf("write minimal ELF: %v", err)
+	}
+}
+
+// TestStripSkipsForeignArchELFOnFallback verifies that when STRIP points to a
+// missing cross-strip AND the target is a foreign-arch ELF, strip is skipped
+// (returns nil) rather than handing the binary to native strip — native strip
+// cannot parse foreign-arch ELFs and would hard-fail the build.
+func TestStripSkipsForeignArchELFOnFallback(t *testing.T) {
+	// Pick a machine that is not the host. If host is amd64, use aarch64; otherwise amd64.
+	var foreign elf.Machine
+	if runtime.GOARCH == "amd64" {
+		foreign = elf.EM_AARCH64
+	} else {
+		foreign = elf.EM_X86_64
+	}
+
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "foreign_binary")
+	writeMinimalELF(t, testFile, foreign)
+
+	originalStrip := os.Getenv("STRIP")
+
+	defer func() {
+		if originalStrip != "" {
+			_ = os.Setenv("STRIP", originalStrip)
+		} else {
+			_ = os.Unsetenv("STRIP")
+		}
+	}()
+
+	_ = os.Setenv("STRIP", "this-cross-strip-does-not-exist")
+
+	// Must return nil: foreign-arch ELF, cross-strip missing → skip with warning.
+	if err := binary.StripFile(testFile); err != nil {
+		t.Errorf("expected nil (skip strip on foreign-arch fallback), got: %v", err)
+	}
 }
