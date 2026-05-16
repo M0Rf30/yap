@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -16,11 +17,17 @@ import (
 func CheckWritable(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.T("errors.files.failed_to_stat_file"), err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.files.failed_to_stat_file")).
+			WithOperation("CheckWritable").
+			WithContext("path", path)
 	}
 
 	if info.Mode().Perm()&0o200 == 0 {
-		return fmt.Errorf(i18n.T("errors.files.file_not_writable"), path)
+		return errors.New(errors.ErrTypeFileSystem,
+			fmt.Sprintf(i18n.T("errors.files.file_not_writable"), path)).
+			WithOperation("CheckWritable").
+			WithContext("path", path)
 	}
 
 	return nil
@@ -30,7 +37,11 @@ func CheckWritable(path string) error {
 func Chmod(path string, perm os.FileMode) error {
 	if err := os.Chmod(path, perm); err != nil {
 		logger.Error(i18n.T("logger.chmod.error.failed_to_chmod_1"), "path", path, "error", err)
-		return fmt.Errorf("%s: %w", i18n.T("errors.files.failed_to_change_permissions"), err)
+
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.files.failed_to_change_permissions")).
+			WithOperation("Chmod").
+			WithContext("path", path)
 	}
 
 	return nil
@@ -81,10 +92,16 @@ func ExistsMakeDir(path string) error {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(path, 0o750); err != nil {
-			return fmt.Errorf(i18n.T("errors.files.failed_to_create_directory"), path)
+			return errors.Wrap(err, errors.ErrTypeFileSystem,
+				fmt.Sprintf(i18n.T("errors.files.failed_to_create_directory"), path)).
+				WithOperation("ExistsMakeDir").
+				WithContext("path", path)
 		}
 	} else if err != nil {
-		return fmt.Errorf(i18n.T("errors.files.failed_to_access_directory"), path)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			fmt.Sprintf(i18n.T("errors.files.failed_to_access_directory"), path)).
+			WithOperation("ExistsMakeDir").
+			WithContext("path", path)
 	}
 
 	return nil

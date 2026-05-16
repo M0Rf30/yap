@@ -17,6 +17,7 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -851,8 +852,10 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() error {
 
 	// Return error if there are validation errors
 	if len(checkErrors) > 0 {
-		return fmt.Errorf("pkgbuild validation failed for %q: %s",
-			pkgBuild.PkgName, strings.Join(checkErrors, ", "))
+		return errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf("pkgbuild validation failed for %q: %s",
+				pkgBuild.PkgName, strings.Join(checkErrors, ", "))).
+			WithOperation("Validate")
 	}
 
 	return nil
@@ -879,7 +882,10 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() error {
 
 	// Return error if there are validation errors
 	if len(validationErrors) > 0 {
-		return fmt.Errorf("missing mandatory variables: %s", strings.Join(validationErrors, ", "))
+		return errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf("missing mandatory variables: %s",
+				strings.Join(validationErrors, ", "))).
+			WithOperation("ValidateMandatoryItems")
 	}
 
 	return nil
@@ -1410,7 +1416,9 @@ func (pkgBuild *PKGBUILD) parseDistributionOnly(input string) (
 	}
 
 	if len(split) != 2 {
-		return key, priorityBase, fmt.Errorf(i18n.T("errors.pkgbuild.invalid_directive_use"), input)
+		return key, priorityBase, errors.New(errors.ErrTypeConfiguration,
+			fmt.Sprintf(i18n.T("errors.pkgbuild.invalid_directive_use"), input)).
+			WithOperation("parseDirective")
 	}
 
 	if pkgBuild.FullDistroName == "" {

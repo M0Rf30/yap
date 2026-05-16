@@ -13,6 +13,7 @@ import (
 
 	"github.com/cavaliergopher/grab/v3"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -30,7 +31,9 @@ func Download(destination, uri string, writer io.Writer) error {
 
 	req, err := grab.NewRequest(destination, uri)
 	if err != nil {
-		return fmt.Errorf(i18n.T("errors.download.download_failed")+" %s", err)
+		return errors.Wrap(err, errors.ErrTypeNetwork, i18n.T("errors.download.download_failed")).
+			WithOperation("Download").
+			WithContext("uri", uri)
 	}
 
 	resp := client.Do(req)
@@ -89,8 +92,11 @@ func WithResume(ctx context.Context, destination, uri string, maxRetries int, wr
 		}
 	}
 
-	return fmt.Errorf(i18n.T("errors.download.download_failed_after_attempts"),
-		maxRetries+1, lastErr)
+	return errors.Wrap(lastErr, errors.ErrTypeNetwork,
+		fmt.Sprintf(i18n.T("errors.download.download_failed_after_attempts"), maxRetries+1)).
+		WithOperation("WithResume").
+		WithContext("uri", uri).
+		WithContext("max_retries", maxRetries)
 }
 
 // WithResumeContext downloads a file with context information for enhanced
@@ -142,8 +148,11 @@ func WithResumeContext(
 		}
 	}
 
-	return fmt.Errorf(i18n.T("errors.download.download_failed_after_attempts"),
-		maxRetries+1, lastErr)
+	return errors.Wrap(lastErr, errors.ErrTypeNetwork,
+		fmt.Sprintf(i18n.T("errors.download.download_failed_after_attempts"), maxRetries+1)).
+		WithOperation("WithResumeContext").
+		WithContext("uri", uri).
+		WithContext("max_retries", maxRetries)
 }
 
 // downloadWithResumeInternal performs the actual download with resume capability.
@@ -158,7 +167,9 @@ func downloadWithResumeInternal(
 
 	resp := client.Do(req)
 	if resp.HTTPResponse == nil {
-		return fmt.Errorf("%s", i18n.T("errors.download.download_failed_no_response"))
+		return errors.New(errors.ErrTypeNetwork, i18n.T("errors.download.download_failed_no_response")).
+			WithOperation("downloadWithResumeInternal").
+			WithContext("uri", uri)
 	}
 
 	logDownloadStart(uri, resp)
@@ -176,7 +187,9 @@ func prepareDownloadRequest(
 
 	req, err := grab.NewRequest(destination, uri)
 	if err != nil {
-		return nil, nil, fmt.Errorf(i18n.T("errors.download.download_failed")+" %s", err)
+		return nil, nil, errors.Wrap(err, errors.ErrTypeNetwork, i18n.T("errors.download.download_failed")).
+			WithOperation("prepareDownloadRequest").
+			WithContext("uri", uri)
 	}
 
 	configureResumeIfPossible(req, destination, uri)

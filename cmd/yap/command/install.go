@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
@@ -39,13 +40,19 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Check if file exists
 	if _, err := os.Stat(artifactPath); os.IsNotExist(err) {
-		return fmt.Errorf(i18n.T("errors.install.artifact_not_found"), artifactPath)
+		return errors.New(errors.ErrTypeFileSystem,
+			fmt.Sprintf(i18n.T("errors.install.artifact_not_found"), artifactPath)).
+			WithOperation("runInstall").
+			WithContext("path", artifactPath)
 	}
 
 	// Get absolute path
 	absPath, err := filepath.Abs(artifactPath)
 	if err != nil {
-		return fmt.Errorf(i18n.T("errors.install.failed_to_resolve_path")+": %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.install.failed_to_resolve_path")).
+			WithOperation("runInstall").
+			WithContext("path", artifactPath)
 	}
 
 	// Detect package type from file extension
@@ -77,7 +84,10 @@ func detectPackageType(filePath string) (string, error) {
 	case strings.Contains(lowerName, ".pkg.tar."):
 		return packageTypePkg, nil
 	default:
-		return "", fmt.Errorf(i18n.T("errors.install.unsupported_package_format"), fileName)
+		return "", errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf(i18n.T("errors.install.unsupported_package_format"), fileName)).
+			WithOperation("detectPackageType").
+			WithContext("fileName", fileName)
 	}
 }
 
@@ -106,7 +116,10 @@ func installPackage(packageType, artifactPath string) error {
 		cmd = "pacman"
 		args = []string{"-U", "--noconfirm", artifactPath}
 	default:
-		return fmt.Errorf(i18n.T("errors.install.unsupported_package_type"), packageType)
+		return errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf(i18n.T("errors.install.unsupported_package_type"), packageType)).
+			WithOperation("installPackage").
+			WithContext("packageType", packageType)
 	}
 
 	logger.Info(i18n.T("logger.installpackage.info.installing_package_1"),
@@ -117,7 +130,11 @@ func installPackage(packageType, artifactPath string) error {
 	// Execute the installation command with the same pattern as internal managers
 	err := shell.Exec(context.Background(), false, "", cmd, args...)
 	if err != nil {
-		return fmt.Errorf(i18n.T("errors.install.installation_failed")+": %w", cmd, err)
+		return errors.Wrap(err, errors.ErrTypeBuild,
+			i18n.T("errors.install.installation_failed")).
+			WithOperation("installPackage").
+			WithContext("command", cmd).
+			WithContext("packageType", packageType)
 	}
 
 	logger.Info(i18n.T("logger.installpackage.info.package_installed_successfully_1"),

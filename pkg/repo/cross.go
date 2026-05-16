@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -83,7 +84,10 @@ func SetupCrossAPT(opts CrossAptOptions) error {
 	}
 
 	if err := runTool(aptCommandTimeout, "dpkg", "--add-architecture", targetDebArch); err != nil {
-		return fmt.Errorf("repo: dpkg --add-architecture %s: %w", targetDebArch, err)
+		return errors.Wrap(err, errors.ErrTypeBuild,
+			fmt.Sprintf("repo: dpkg --add-architecture %s", targetDebArch)).
+			WithOperation("SetupCrossAPT").
+			WithContext("arch", targetDebArch)
 	}
 
 	if err := restrictNativeSources(hostDebArch); err != nil {
@@ -163,7 +167,10 @@ func writeCrossSource(r *Repo, targetDebArch, codename, distro, keyring string) 
 	dst := filepath.Join(debSourcesDir, "yap-"+r.Name+".sources")
 	// apt must read this file as the unprivileged _apt user.
 	if err := os.WriteFile(dst, []byte(body), 0o644); err != nil { // #nosec G306
-		return fmt.Errorf("repo %q: write %s: %w", r.Name, dst, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			fmt.Sprintf("repo %q: write %s", r.Name, dst)).
+			WithOperation("writeCrossSource").
+			WithContext("path", dst)
 	}
 
 	logger.Info("repo: installed cross-arch apt source",
@@ -273,7 +280,10 @@ func writeRoot(path string, data []byte) error {
 	// path is composed of package constants plus a sanitized repo name; the
 	// caller controls the value and apt requires world-readable mode.
 	if err := os.WriteFile(path, data, 0o644); err != nil { // #nosec G306,G703
-		return fmt.Errorf("repo: write %s: %w", path, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			fmt.Sprintf("repo: write %s", path)).
+			WithOperation("writeRoot").
+			WithContext("path", path)
 	}
 
 	return nil

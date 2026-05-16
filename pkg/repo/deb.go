@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -19,7 +20,9 @@ const (
 // to support the deb822 Signed-By directive (Ubuntu Focal+, Debian Bullseye+).
 func setupDeb(r *Repo) error {
 	if r.Suite == "" {
-		return fmt.Errorf("repo %q: suite is required for deb format", r.Name)
+		return errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf("repo %q: suite is required for deb format", r.Name)).
+			WithOperation("setupDeb")
 	}
 
 	components := r.Components
@@ -61,7 +64,10 @@ func setupDeb(r *Repo) error {
 	// apt must read this file as the unprivileged _apt user, so it has to be
 	// world-readable; gosec's stricter 0o600 default does not apply here.
 	if err := os.WriteFile(dst, []byte(b.String()), 0o644); err != nil { // #nosec G306
-		return fmt.Errorf("repo %q: write %s: %w", r.Name, dst, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			fmt.Sprintf("repo %q: write %s", r.Name, dst)).
+			WithOperation("setupDeb").
+			WithContext("path", dst)
 	}
 
 	logger.Info("repo: installed apt source",

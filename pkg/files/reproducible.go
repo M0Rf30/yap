@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // ResolveSourceDateEpoch returns a deterministic build timestamp for
@@ -24,7 +26,9 @@ func ResolveSourceDateEpoch(pkgbuildDir string) (time.Time, error) {
 	if env := os.Getenv("SOURCE_DATE_EPOCH"); env != "" {
 		epoch, err := strconv.ParseInt(env, 10, 64)
 		if err != nil {
-			return time.Time{}, fmt.Errorf("invalid SOURCE_DATE_EPOCH %q: %w", env, err)
+			return time.Time{}, errors.Wrap(err, errors.ErrTypeConfiguration,
+				fmt.Sprintf("invalid SOURCE_DATE_EPOCH %q", env)).
+				WithOperation("ResolveSourceDateEpoch")
 		}
 
 		return time.Unix(epoch, 0).UTC(), nil
@@ -43,7 +47,9 @@ func ResolveSourceDateEpoch(pkgbuildDir string) (time.Time, error) {
 
 	err := os.Setenv("SOURCE_DATE_EPOCH", strconv.FormatInt(epoch, 10))
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to export SOURCE_DATE_EPOCH: %w", err)
+		return time.Time{}, errors.Wrap(err, errors.ErrTypeConfiguration,
+			"failed to export SOURCE_DATE_EPOCH").
+			WithOperation("ResolveSourceDateEpoch")
 	}
 
 	return time.Unix(epoch, 0).UTC(), nil

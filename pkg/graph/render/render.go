@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/graph"
 	"github.com/M0Rf30/yap/v2/pkg/graph/layout"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -40,7 +41,9 @@ func GenerateSVGGraph(graphData *graph.Data, outputPath string, showExternal boo
 	// Write SVG file
 	file, err := os.Create(filepath.Clean(outputPath))
 	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create output file").
+			WithOperation("GenerateSVGGraph").
+			WithContext("path", outputPath)
 	}
 
 	defer func() {
@@ -50,18 +53,24 @@ func GenerateSVGGraph(graphData *graph.Data, outputPath string, showExternal boo
 	}()
 
 	if _, err := file.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n"); err != nil {
-		return fmt.Errorf("failed to write XML header: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write XML header").
+			WithOperation("GenerateSVGGraph").
+			WithContext("path", outputPath)
 	}
 
 	// Marshal and write SVG
 	xmlData, err := xml.MarshalIndent(svg, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal SVG: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to marshal SVG").
+			WithOperation("GenerateSVGGraph").
+			WithContext("path", outputPath)
 	}
 
 	_, err = file.Write(xmlData)
 	if err != nil {
-		return fmt.Errorf("failed to write SVG data: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write SVG data").
+			WithOperation("GenerateSVGGraph").
+			WithContext("path", outputPath)
 	}
 
 	logger.Info(i18n.T("logger.generatesvggraph.info.svg_graph_generated_successfully_1"),

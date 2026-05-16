@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/graph"
 	"github.com/M0Rf30/yap/v2/pkg/graph/theme"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
@@ -35,13 +36,19 @@ func LoadProjectForGraph(projectPath, themeName string) (*graph.Data, error) {
 			return createSinglePackageGraph(pkgName, themeName), nil
 		}
 
-		return nil, fmt.Errorf("no yap.json or PKGBUILD found in %s", projectPath)
+		return nil, errors.New(errors.ErrTypeConfiguration,
+			fmt.Sprintf("no yap.json or PKGBUILD found in %s", projectPath)).
+			WithOperation("LoadProjectForGraph").
+			WithContext("path", projectPath)
 	}
 
 	// Parse yap.json
 	content, err := os.ReadFile(filepath.Clean(yamlPath))
 	if err != nil {
-		return nil, fmt.Errorf("failed to read yap.json: %w", err)
+		return nil, errors.Wrap(err, errors.ErrTypeConfiguration,
+			"failed to read yap.json").
+			WithOperation("LoadProjectForGraph").
+			WithContext("path", yamlPath)
 	}
 
 	var config struct {
@@ -54,7 +61,10 @@ func LoadProjectForGraph(projectPath, themeName string) (*graph.Data, error) {
 
 	err = json.Unmarshal(content, &config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse yap.json: %w", err)
+		return nil, errors.Wrap(err, errors.ErrTypeConfiguration,
+			"failed to parse yap.json").
+			WithOperation("LoadProjectForGraph").
+			WithContext("path", yamlPath)
 	}
 
 	return createMultiPackageGraph(config.Projects, projectPath, themeName), nil

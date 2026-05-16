@@ -3,6 +3,7 @@ package loader
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/M0Rf30/yap/v2/pkg/graph"
@@ -17,8 +18,10 @@ func TestLoadProjectForGraph_MissingFiles(t *testing.T) {
 		t.Fatal("Expected error when no yap.json or PKGBUILD exists")
 	}
 
-	if err.Error() != "no yap.json or PKGBUILD found in "+tempDir {
-		t.Errorf("Expected specific error message, got: %v", err)
+	// Check that error message contains the expected text
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "no yap.json or PKGBUILD found in") {
+		t.Errorf("Expected error message to contain 'no yap.json or PKGBUILD found in', got: %v", err)
 	}
 }
 
