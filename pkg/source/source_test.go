@@ -582,3 +582,65 @@ func TestSource_Integration(t *testing.T) {
 		assert.NoError(t, err)
 	}
 }
+
+func TestShouldSkipExtract(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		sourceItemPath string
+		noExtract      []string
+		want           bool
+	}{
+		{
+			name:           "empty noextract list",
+			sourceItemPath: "app-1.0.tar.gz",
+			noExtract:      nil,
+			want:           false,
+		},
+		{
+			name:           "file in noextract",
+			sourceItemPath: "app-1.0.patch",
+			noExtract:      []string{"app-1.0.patch"},
+			want:           true,
+		},
+		{
+			name:           "file not in noextract",
+			sourceItemPath: "app-1.0.tar.gz",
+			noExtract:      []string{"app-1.0.patch"},
+			want:           false,
+		},
+		{
+			name:           "basename matched from full path",
+			sourceItemPath: "/some/dir/app-1.0.patch",
+			noExtract:      []string{"app-1.0.patch"},
+			want:           true,
+		},
+		{
+			name:           "custom name via :: syntax (SourceItemPath is the custom name)",
+			sourceItemPath: "mypatch",
+			noExtract:      []string{"mypatch"},
+			want:           true,
+		},
+		{
+			name:           "no partial match",
+			sourceItemPath: "app-1.0.patch",
+			noExtract:      []string{"app-1.0"},
+			want:           false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			src := &Source{
+				SourceItemPath: tt.sourceItemPath,
+				NoExtract:      tt.noExtract,
+			}
+			if got := src.shouldSkipExtract(); got != tt.want {
+				t.Errorf("shouldSkipExtract() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -79,6 +80,10 @@ type Source struct {
 	// StartDir is the root where a copied PKGBUILD lives and all the source items
 	// are downloaded. It generally contains the src and pkg folders.
 	StartDir string
+	// NoExtract is the list of filenames that should NOT be extracted from
+	// their archives, matching makepkg's noextract semantics: exact basename
+	// match, file is still symlinked into $srcdir but archive.Extract is skipped.
+	NoExtract []string
 }
 
 // Get retrieves the source file from the specified URI.
@@ -144,9 +149,11 @@ func (src *Source) Get() error {
 		return err
 	}
 
-	err = archive.Extract(context.Background(), sourceFilePath, src.SrcDir)
-	if err != nil {
-		return err
+	if !src.shouldSkipExtract() {
+		err = archive.Extract(context.Background(), sourceFilePath, src.SrcDir)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -350,4 +357,10 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		"source", src.SourceItemURI)
 
 	return nil
+}
+
+// shouldSkipExtract reports whether this source file should be skipped during
+// extraction, matching makepkg's noextract semantics: exact basename match only.
+func (src *Source) shouldSkipExtract() bool {
+	return slices.Contains(src.NoExtract, filepath.Base(src.SourceItemPath))
 }

@@ -55,6 +55,7 @@ const (
 	pkgrelKey         = "pkgrel"
 	pkgverKey         = "pkgver"
 	makedependsKey    = "makedepends"
+	noextractKey      = "noextract"
 	sourceKey         = "source"
 	b2sumsKey         = "b2sums"
 	customKey         = "CUSTOM"
@@ -130,6 +131,7 @@ type PKGBUILD struct {
 	MakeDepends       []string
 	OptDepends        []string
 	Options           []string
+	NoExtract         []string
 	Origin            string
 	Package           string
 	PackageDir        string
@@ -971,6 +973,13 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any, priority int) {
 		} else {
 			pkgBuild.SourceURI = arrVal
 		}
+	case noextractKey:
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.NoExtract = arrVal
 	case "backup":
 		arrVal, ok := data.([]string)
 		if !ok {

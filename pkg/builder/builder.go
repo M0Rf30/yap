@@ -329,6 +329,7 @@ func (builder *Builder) getSources() error {
 			sourceObj := source.Source{
 				StartDir:       builder.PKGBUILD.StartDir,
 				Hash:           builder.PKGBUILD.HashSums[index],
+				NoExtract:      builder.PKGBUILD.NoExtract,
 				PkgName:        builder.PKGBUILD.PkgName,
 				SourceItemURI:  sourceURI,
 				SrcDir:         builder.PKGBUILD.SourceDir,
