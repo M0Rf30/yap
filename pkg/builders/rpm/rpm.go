@@ -178,11 +178,16 @@ func (r *RPM) PrepareFakeroot(_ string, targetArch string) error {
 	r.LogCrossCompilation(targetArch)
 	r.SetTargetArchitecture(targetArch)
 
-	if r.PKGBUILD.StripEnabled {
-		return options.Strip(r.PKGBUILD.PackageDir)
-	}
-
-	return nil
+	return options.Apply(r.PKGBUILD.PackageDir, options.Options{
+		DebugEnabled:     r.PKGBUILD.DebugEnabled,
+		DocsEnabled:      r.PKGBUILD.DocsEnabled,
+		EmptyDirsEnabled: r.PKGBUILD.EmptyDirsEnabled,
+		LibtoolEnabled:   r.PKGBUILD.LibtoolEnabled,
+		PurgeEnabled:     r.PKGBUILD.PurgeEnabled,
+		StaticEnabled:    r.PKGBUILD.StaticEnabled,
+		StripEnabled:     r.PKGBUILD.StripEnabled,
+		ZipManEnabled:    r.PKGBUILD.ZipManEnabled,
+	})
 }
 
 // createFilesInsideRPM prepares and adds files to the specified RPM object.

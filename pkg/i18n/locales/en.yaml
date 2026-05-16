@@ -907,6 +907,18 @@
 - id: logger.sbom_generation_failed
   translation: "Failed to generate SBOM"
 
+# Logger messages - Package options
+- id: logger.options.info.removing_docs
+  translation: "Removing documentation directories"
+- id: logger.options.info.removing_libtool
+  translation: "Removing libtool .la files"
+- id: logger.options.info.removing_empty_dirs
+  translation: "Removing empty directories"
+- id: logger.options.info.compressing_man_pages
+  translation: "Compressing man and info pages"
+- id: logger.options.info.purging_files
+  translation: "Purging unwanted files"
+
 # Logger messages - Package signing
 - id: logger.signing_artifact
   translation: "Signing package artifact"

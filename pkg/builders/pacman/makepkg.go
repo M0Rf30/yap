@@ -99,10 +99,17 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 		return err
 	}
 
-	if m.PKGBUILD.StripEnabled {
-		if err := options.Strip(m.PKGBUILD.PackageDir); err != nil {
-			return err
-		}
+	if err := options.Apply(m.PKGBUILD.PackageDir, options.Options{
+		DebugEnabled:     m.PKGBUILD.DebugEnabled,
+		DocsEnabled:      m.PKGBUILD.DocsEnabled,
+		EmptyDirsEnabled: m.PKGBUILD.EmptyDirsEnabled,
+		LibtoolEnabled:   m.PKGBUILD.LibtoolEnabled,
+		PurgeEnabled:     m.PKGBUILD.PurgeEnabled,
+		StaticEnabled:    m.PKGBUILD.StaticEnabled,
+		StripEnabled:     m.PKGBUILD.StripEnabled,
+		ZipManEnabled:    m.PKGBUILD.ZipManEnabled,
+	}); err != nil {
+		return err
 	}
 
 	if err := m.writeMTREE(); err != nil {

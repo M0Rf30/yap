@@ -161,8 +161,14 @@ type PKGBUILD struct {
 	StartDir          string
 	TargetArch        string // Target architecture for cross-compilation (what we're building for)
 	URL               string
+	DebugEnabled      bool
+	DocsEnabled       bool
+	EmptyDirsEnabled  bool
+	LibtoolEnabled    bool
+	PurgeEnabled      bool
 	StaticEnabled     bool
 	StripEnabled      bool
+	ZipManEnabled     bool
 	YAPVersion        string
 }
 
@@ -415,6 +421,10 @@ func (pkgBuild *PKGBUILD) Init() {
 	if pkgBuild.Codename != "" {
 		pkgBuild.FullDistroName += "_" + pkgBuild.Codename
 	}
+
+	// Apply option defaults so PKGBUILDs without an options=() array still
+	// get the correct behaviour (e.g. emptydirs=true keeps empty dirs).
+	pkgBuild.processOptions()
 }
 
 // splitOverrideKeys is the set of variable names that package_<name>() functions
@@ -1418,19 +1428,61 @@ func (pkgBuild *PKGBUILD) checkLicense() bool {
 	return isValid
 }
 
-func (pkgBuild *PKGBUILD) processOptions() {
-	// Initialize all flags to true
-	pkgBuild.StaticEnabled = true
-	pkgBuild.StripEnabled = true
+// optionDefaults maps each makepkg option name to its default enabled state.
+// Options not listed here are ignored. Negated form ("!name") always inverts.
+var optionDefaults = map[string]bool{
+	"debug":      false,
+	"docs":       true,
+	"emptydirs":  true,
+	"libtool":    true,
+	"purge":      false,
+	"staticlibs": true,
+	"strip":      true,
+	"zipman":     false,
+}
 
-	// Iterate over the features array
+func (pkgBuild *PKGBUILD) processOptions() {
+	// Apply makepkg defaults.
+	pkgBuild.DebugEnabled = optionDefaults["debug"]
+	pkgBuild.DocsEnabled = optionDefaults["docs"]
+	pkgBuild.EmptyDirsEnabled = optionDefaults["emptydirs"]
+	pkgBuild.LibtoolEnabled = optionDefaults["libtool"]
+	pkgBuild.PurgeEnabled = optionDefaults["purge"]
+	pkgBuild.StaticEnabled = optionDefaults["staticlibs"]
+	pkgBuild.StripEnabled = optionDefaults["strip"]
+	pkgBuild.ZipManEnabled = optionDefaults["zipman"]
+
 	for _, option := range pkgBuild.Options {
-		switch {
-		case strings.HasPrefix(option, "!strip"):
-			pkgBuild.StripEnabled = false
-		case strings.HasPrefix(option, "!staticlibs"):
-			pkgBuild.StaticEnabled = false
+		negated := strings.HasPrefix(option, "!")
+		name := strings.TrimPrefix(option, "!")
+
+		if _, known := optionDefaults[name]; !known {
+			continue
 		}
+
+		pkgBuild.applyOption(name, !negated)
+	}
+}
+
+// applyOption sets the PKGBUILD flag corresponding to the given option name.
+func (pkgBuild *PKGBUILD) applyOption(name string, enabled bool) {
+	switch name {
+	case "debug":
+		pkgBuild.DebugEnabled = enabled
+	case "docs":
+		pkgBuild.DocsEnabled = enabled
+	case "emptydirs":
+		pkgBuild.EmptyDirsEnabled = enabled
+	case "libtool":
+		pkgBuild.LibtoolEnabled = enabled
+	case "purge":
+		pkgBuild.PurgeEnabled = enabled
+	case "staticlibs":
+		pkgBuild.StaticEnabled = enabled
+	case "strip":
+		pkgBuild.StripEnabled = enabled
+	case "zipman":
+		pkgBuild.ZipManEnabled = enabled
 	}
 }
 
