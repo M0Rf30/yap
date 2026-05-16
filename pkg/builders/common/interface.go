@@ -324,48 +324,67 @@ func getUpdateCommand(format string) string {
 	}
 }
 
+// installCrossToolchain installs the cross-compiler toolchain (gcc/g++/binutils
+// and libc6-dev-*-cross on DEB) as a dedicated apt/dnf/pacman call.
+//
+// This is a *separate* call from makedepends installation because GetDepends
+// short-circuits when its makeDepends slice is empty (e.g. Go-only PKGBUILDs).
+// Folding the toolchain packages into installArgs and relying on the
+// makedepends call to flush them would silently drop them in that case,
+// leaving binutils-<target>-strip absent from PATH and breaking later strip
+// passes on foreign-arch ELFs.
+func (bb *BaseBuilder) installCrossToolchain(targetArch string, installArgs []string) error {
+	crossDeps := bb.getCrossCompilerDependencies(targetArch)
+	if len(crossDeps) == 0 {
+		return nil
+	}
+
+	logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
+		"target_arch", targetArch,
+		"packages", strings.Join(crossDeps, ", "))
+
+	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, crossDeps)
+}
+
 // Prepare installs build dependencies using the appropriate package manager.
 // This consolidates duplicated Prepare methods across all builders.
 func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 	installArgs := constants.GetInstallArgs(bb.Format)
 
-	// Add cross-compilation dependencies if target architecture is different
-	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
-		logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
-			"target_arch", targetArch,
-			"build_arch", bb.PKGBUILD.ArchComputed)
+	// Non-cross-compile path: install makedepends directly.
+	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
+		return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, makeDepends)
+	}
 
-		// Register the foreign architecture and its ports repository before any
-		// :<arch> qualifier is sent to apt; without this the install would fail
-		// because archive.ubuntu.com only carries the build-host arch.
-		if err := bb.ensureCrossArchRepo(targetArch); err != nil {
-			return err
-		}
+	logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
+		"target_arch", targetArch,
+		"build_arch", bb.PKGBUILD.ArchComputed)
 
-		crossDeps := bb.getCrossCompilerDependencies(targetArch)
-		if len(crossDeps) > 0 {
-			logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
-				"target_arch", targetArch,
-				"packages", strings.Join(crossDeps, ", "))
-		}
+	// Register the foreign architecture and its ports repository before any
+	// :<arch> qualifier is sent to apt; without this the install would fail
+	// because archive.ubuntu.com only carries the build-host arch.
+	if err := bb.ensureCrossArchRepo(targetArch); err != nil {
+		return err
+	}
 
-		installArgs = append(installArgs, crossDeps...)
+	if err := bb.installCrossToolchain(targetArch, installArgs); err != nil {
+		return err
+	}
 
-		// Qualify makedepends with the target architecture so the package
-		// manager installs the target-arch variant of each library.
-		//
-		// DEB only: ":arm64" qualifiers work because ensureCrossArchRepo above
-		// registered the architecture with dpkg --add-architecture and added the
-		// ports repo.
-		//
-		// RPM is intentionally excluded: Rocky/Fedora x86_64 containers do not
-		// carry aarch64 -devel packages in their repos. The cross-compiler
-		// toolchain bundles its own sysroot, so host-arch -devel packages are
-		// used directly (the cross-compiler is pointed at them via PKG_CONFIG_PATH
-		// and CROSS_COMPILE set in SetupCrossCompilationEnvironment).
-		if bb.Format == constants.FormatDEB {
-			return bb.installCrossDeps(makeDepends, installArgs, targetArch)
-		}
+	// Qualify makedepends with the target architecture so the package
+	// manager installs the target-arch variant of each library.
+	//
+	// DEB only: ":arm64" qualifiers work because ensureCrossArchRepo above
+	// registered the architecture with dpkg --add-architecture and added the
+	// ports repo.
+	//
+	// RPM is intentionally excluded: Rocky/Fedora x86_64 containers do not
+	// carry aarch64 -devel packages in their repos. The cross-compiler
+	// toolchain bundles its own sysroot, so host-arch -devel packages are
+	// used directly (the cross-compiler is pointed at them via PKG_CONFIG_PATH
+	// and CROSS_COMPILE set in SetupCrossCompilationEnvironment).
+	if bb.Format == constants.FormatDEB {
+		return bb.installCrossDeps(makeDepends, installArgs, targetArch)
 	}
 
 	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, makeDepends)
