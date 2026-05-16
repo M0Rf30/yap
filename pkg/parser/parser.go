@@ -67,6 +67,7 @@ func ParseFile(distro, release, startDir, home, targetArch string) (*pkgbuild.PK
 	}
 
 	pkgBuild.SetMainFolders()
+	pkgBuild.Finalize()
 
 	if OverridePkgRel != "" {
 		pkgBuild.PkgRel = OverridePkgRel

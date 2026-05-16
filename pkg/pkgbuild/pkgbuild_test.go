@@ -1239,6 +1239,9 @@ func TestPKGBUILD_MultiArchitectureSupport_Integration(t *testing.T) {
 		}
 	}
 
+	// Finalize to merge arch-specific accumulators into base arrays
+	pb.Finalize()
+
 	// Verify basic fields are set
 	if pb.PkgName != "multi-arch-test" {
 		t.Errorf("Expected PkgName 'multi-arch-test', got '%s'", pb.PkgName)
@@ -2176,6 +2179,9 @@ func TestPKGBUILD_parseArchitectureOnly_UsesTargetArch(t *testing.T) {
 		t.Errorf("AddItem(source_x86_64) returned error: %v", err)
 	}
 
+	// Finalize to merge arch-specific accumulators into base arrays
+	pb.Finalize()
+
 	// Assert that base source + aarch64 source are present (appended, not replaced)
 	// Expected: [generic, aarch64] (x86_64 is skipped)
 	if len(pb.SourceURI) != 2 {
@@ -2212,6 +2218,9 @@ func TestPKGBUILD_parseArchitectureOnly_NativeArch(t *testing.T) {
 	if err != nil {
 		t.Errorf("AddItem(source_aarch64) returned error: %v", err)
 	}
+
+	// Finalize to merge arch-specific accumulators into base arrays
+	pb.Finalize()
 
 	// On x86_64 host, should select x86_64 source
 	// Note: This test only works correctly on x86_64 hosts
@@ -2338,6 +2347,9 @@ func TestPKGBUILD_ArchSpecificSourceAppended(t *testing.T) {
 		t.Errorf("AddItem(sha256sums_aarch64) returned error: %v", err)
 	}
 
+	// Finalize to merge arch-specific accumulators into base arrays
+	pb.Finalize()
+
 	// Assert SourceURI has 3 entries (2 base + 1 arch-specific)
 	if len(pb.SourceURI) != 3 {
 		t.Errorf("Expected 3 SourceURI entries, got %d: %v", len(pb.SourceURI), pb.SourceURI)
@@ -2397,6 +2409,9 @@ func TestPKGBUILD_WrongArchSourceSkipped(t *testing.T) {
 		t.Errorf("AddItem(sha256sums_x86_64) returned error: %v", err)
 	}
 
+	// Finalize to merge arch-specific accumulators into base arrays
+	pb.Finalize()
+
 	// Assert SourceURI has only 1 entry (base only, x86_64 not appended)
 	if len(pb.SourceURI) != 1 {
 		t.Errorf("Expected 1 SourceURI entry, got %d: %v", len(pb.SourceURI), pb.SourceURI)
@@ -2446,4 +2461,160 @@ func TestPKGBUILD_BaseSourceReplaces(t *testing.T) {
 	if pb.SourceURI[0] != "second.tar.gz" {
 		t.Errorf("Expected SourceURI[0]='second.tar.gz', got %q", pb.SourceURI[0])
 	}
+}
+
+// TestPKGBUILD_ArchSourceOrderIndependent verifies that arch-specific source
+// entries are appended to base entries regardless of declaration order.
+func TestPKGBUILD_ArchSourceOrderIndependent(t *testing.T) {
+	t.Run("arch-before-base", func(t *testing.T) {
+		pb := &PKGBUILD{
+			TargetArch:     "aarch64",
+			Distro:         "ubuntu",
+			FullDistroName: "ubuntu_jammy",
+		}
+		pb.Init()
+
+		// Add arch-specific source first
+		err := pb.AddItem("source_aarch64", []string{"https://example.com/binary-aarch64"})
+		if err != nil {
+			t.Errorf("AddItem(source_aarch64) returned error: %v", err)
+		}
+
+		// Add base source second
+		err = pb.AddItem("source", []string{"local-file.conf"})
+		if err != nil {
+			t.Errorf("AddItem(source) returned error: %v", err)
+		}
+
+		// Finalize to merge accumulators
+		pb.Finalize()
+
+		// Assert order: base first, then arch-specific
+		if len(pb.SourceURI) != 2 {
+			t.Errorf("Expected 2 SourceURI entries, got %d: %v", len(pb.SourceURI), pb.SourceURI)
+		}
+
+		if pb.SourceURI[0] != "local-file.conf" {
+			t.Errorf("Expected SourceURI[0]='local-file.conf', got %q", pb.SourceURI[0])
+		}
+
+		if pb.SourceURI[1] != "https://example.com/binary-aarch64" {
+			t.Errorf("Expected SourceURI[1]='https://example.com/binary-aarch64', got %q", pb.SourceURI[1])
+		}
+	})
+
+	t.Run("base-before-arch", func(t *testing.T) {
+		pb := &PKGBUILD{
+			TargetArch:     "aarch64",
+			Distro:         "ubuntu",
+			FullDistroName: "ubuntu_jammy",
+		}
+		pb.Init()
+
+		// Add base source first
+		err := pb.AddItem("source", []string{"local-file.conf"})
+		if err != nil {
+			t.Errorf("AddItem(source) returned error: %v", err)
+		}
+
+		// Add arch-specific source second
+		err = pb.AddItem("source_aarch64", []string{"https://example.com/binary-aarch64"})
+		if err != nil {
+			t.Errorf("AddItem(source_aarch64) returned error: %v", err)
+		}
+
+		// Finalize to merge accumulators
+		pb.Finalize()
+
+		// Assert order: base first, then arch-specific (same as above)
+		if len(pb.SourceURI) != 2 {
+			t.Errorf("Expected 2 SourceURI entries, got %d: %v", len(pb.SourceURI), pb.SourceURI)
+		}
+
+		if pb.SourceURI[0] != "local-file.conf" {
+			t.Errorf("Expected SourceURI[0]='local-file.conf', got %q", pb.SourceURI[0])
+		}
+
+		if pb.SourceURI[1] != "https://example.com/binary-aarch64" {
+			t.Errorf("Expected SourceURI[1]='https://example.com/binary-aarch64', got %q", pb.SourceURI[1])
+		}
+	})
+}
+
+// TestPKGBUILD_ArchChecksumOrderIndependent verifies that arch-specific checksum
+// entries are appended to base entries regardless of declaration order.
+func TestPKGBUILD_ArchChecksumOrderIndependent(t *testing.T) {
+	t.Run("arch-before-base", func(t *testing.T) {
+		pb := &PKGBUILD{
+			TargetArch:     "aarch64",
+			Distro:         "ubuntu",
+			FullDistroName: "ubuntu_jammy",
+		}
+		pb.Init()
+
+		// Add arch-specific checksum first
+		err := pb.AddItem("sha256sums_aarch64", []string{"aarch64_hash_value"})
+		if err != nil {
+			t.Errorf("AddItem(sha256sums_aarch64) returned error: %v", err)
+		}
+
+		// Add base checksum second
+		err = pb.AddItem("sha256sums", []string{"base_hash_value"})
+		if err != nil {
+			t.Errorf("AddItem(sha256sums) returned error: %v", err)
+		}
+
+		// Finalize to merge accumulators
+		pb.Finalize()
+
+		// Assert order: base first, then arch-specific
+		if len(pb.HashSums) != 2 {
+			t.Errorf("Expected 2 HashSums entries, got %d: %v", len(pb.HashSums), pb.HashSums)
+		}
+
+		if pb.HashSums[0] != "base_hash_value" {
+			t.Errorf("Expected HashSums[0]='base_hash_value', got %q", pb.HashSums[0])
+		}
+
+		if pb.HashSums[1] != "aarch64_hash_value" {
+			t.Errorf("Expected HashSums[1]='aarch64_hash_value', got %q", pb.HashSums[1])
+		}
+	})
+
+	t.Run("base-before-arch", func(t *testing.T) {
+		pb := &PKGBUILD{
+			TargetArch:     "aarch64",
+			Distro:         "ubuntu",
+			FullDistroName: "ubuntu_jammy",
+		}
+		pb.Init()
+
+		// Add base checksum first
+		err := pb.AddItem("sha256sums", []string{"base_hash_value"})
+		if err != nil {
+			t.Errorf("AddItem(sha256sums) returned error: %v", err)
+		}
+
+		// Add arch-specific checksum second
+		err = pb.AddItem("sha256sums_aarch64", []string{"aarch64_hash_value"})
+		if err != nil {
+			t.Errorf("AddItem(sha256sums_aarch64) returned error: %v", err)
+		}
+
+		// Finalize to merge accumulators
+		pb.Finalize()
+
+		// Assert order: base first, then arch-specific (same as above)
+		if len(pb.HashSums) != 2 {
+			t.Errorf("Expected 2 HashSums entries, got %d: %v", len(pb.HashSums), pb.HashSums)
+		}
+
+		if pb.HashSums[0] != "base_hash_value" {
+			t.Errorf("Expected HashSums[0]='base_hash_value', got %q", pb.HashSums[0])
+		}
+
+		if pb.HashSums[1] != "aarch64_hash_value" {
+			t.Errorf("Expected HashSums[1]='aarch64_hash_value', got %q", pb.HashSums[1])
+		}
+	})
 }
