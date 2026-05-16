@@ -354,3 +354,90 @@ package() {
 		t.Errorf("Expected HashSums ['bbbb'], got %v", pkgBuild.HashSums)
 	}
 }
+
+// TestParseFile_ArchSplitSourceAppended tests that arch-specific source/checksum
+// arrays are appended to base arrays rather than replacing them (makepkg behavior).
+func TestParseFile_ArchSplitSourceAppended(t *testing.T) {
+	// Create a temp dir with a PKGBUILD containing both base and arch-specific sources
+	tempDir := t.TempDir()
+
+	pkgbuildContent := `pkgname="arch-split-test"
+pkgver="1.0.0"
+pkgrel="1"
+pkgdesc="Test arch-split source appending"
+arch=("x86_64" "aarch64")
+license=("MIT")
+source=(
+  "local-config.conf"
+  "local-service.service"
+)
+source_aarch64=(
+  "https://example.com/binary-aarch64"
+)
+source_x86_64=(
+  "https://example.com/binary-x86_64"
+)
+sha256sums=(
+  "aaaa"
+  "bbbb"
+)
+sha256sums_aarch64=(
+  "SKIP"
+)
+sha256sums_x86_64=(
+  "SKIP"
+)
+
+package() {
+  echo done
+}
+`
+
+	pkgbuildPath := filepath.Join(tempDir, "PKGBUILD")
+
+	err := os.WriteFile(pkgbuildPath, []byte(pkgbuildContent), 0o600)
+	if err != nil {
+		t.Fatalf("Failed to write PKGBUILD: %v", err)
+	}
+
+	// Create the local source files (needed for local file sources)
+	err = os.WriteFile(filepath.Join(tempDir, "local-config.conf"), []byte(""), 0o600)
+	if err != nil {
+		t.Fatalf("Failed to write local-config.conf: %v", err)
+	}
+
+	err = os.WriteFile(filepath.Join(tempDir, "local-service.service"), []byte(""), 0o600)
+	if err != nil {
+		t.Fatalf("Failed to write local-service.service: %v", err)
+	}
+
+	// Parse with target_arch = "aarch64"
+	pkgBuild, err := parser.ParseFile("ubuntu", "jammy", tempDir, tempDir, "aarch64")
+	if err != nil {
+		t.Fatalf("ParseFile() error = %v", err)
+	}
+
+	// Verify SourceURI has 3 entries: 2 base + 1 aarch64-specific
+	if len(pkgBuild.SourceURI) != 3 {
+		t.Errorf("Expected 3 SourceURI entries, got %d: %v", len(pkgBuild.SourceURI), pkgBuild.SourceURI)
+	}
+
+	expectedSources := []string{"local-config.conf", "local-service.service", "https://example.com/binary-aarch64"}
+	for i, expected := range expectedSources {
+		if i >= len(pkgBuild.SourceURI) || pkgBuild.SourceURI[i] != expected {
+			t.Errorf("SourceURI[%d]: expected %q, got %q", i, expected, pkgBuild.SourceURI[i])
+		}
+	}
+
+	// Verify HashSums has 3 entries: 2 base + 1 aarch64-specific
+	if len(pkgBuild.HashSums) != 3 {
+		t.Errorf("Expected 3 HashSums entries, got %d: %v", len(pkgBuild.HashSums), pkgBuild.HashSums)
+	}
+
+	expectedHashes := []string{"aaaa", "bbbb", "SKIP"}
+	for i, expected := range expectedHashes {
+		if i >= len(pkgBuild.HashSums) || pkgBuild.HashSums[i] != expected {
+			t.Errorf("HashSums[%d]: expected %q, got %q", i, expected, pkgBuild.HashSums[i])
+		}
+	}
+}

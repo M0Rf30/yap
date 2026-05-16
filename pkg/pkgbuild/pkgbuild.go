@@ -180,7 +180,7 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 
 	pkgBuild.priorities[key] = priority
 	pkgBuild.mapVariables(key, data)
-	pkgBuild.mapArrays(key, data)
+	pkgBuild.mapArrays(key, data, priority)
 	pkgBuild.mapFunctions(key, data)
 
 	return nil
@@ -849,9 +849,15 @@ func (pkgBuild *PKGBUILD) ValidateMandatoryItems() error {
 // mapArrays reads an array name and its content and maps them to the PKGBUILD
 // struct.
 //
+// mapArrays maps an array key+value into the PKGBUILD struct.
+// priority is forwarded so that arch-specific source/checksum arrays
+// (priority > priorityBase) are APPENDED to the base arrays rather than
+// replacing them — matching makepkg behaviour where source_aarch64 is
+// concatenated onto source, not a replacement.
+//
 //nolint:gocyclo,cyclop // Central dispatch function for PKGBUILD array field mapping
-func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
-	if pkgBuild.mapChecksumsArrays(key, data) {
+func (pkgBuild *PKGBUILD) mapArrays(key string, data any, priority int) {
+	if pkgBuild.mapChecksumsArrays(key, data, priority) {
 		return
 	}
 
@@ -933,7 +939,12 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 			return
 		}
 
-		pkgBuild.SourceURI = arrVal
+		if priority > priorityBase {
+			// Arch-specific source_<arch>: append to base source array (makepkg semantics).
+			pkgBuild.SourceURI = append(pkgBuild.SourceURI, arrVal...)
+		} else {
+			pkgBuild.SourceURI = arrVal
+		}
 	case "backup":
 		arrVal, ok := data.([]string)
 		if !ok {
@@ -969,12 +980,20 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any) {
 	}
 }
 
-// mapChecksumsArrays handles mapping of checksum arrays and returns true if handled
-func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any) bool {
+// mapChecksumsArrays handles mapping of checksum arrays and returns true if handled.
+// priority is used to decide append vs replace: arch-specific checksum arrays
+// (e.g. sha256sums_aarch64, priority > priorityBase) are appended to HashSums
+// to match the corresponding arch-specific source entries.
+func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any, priority int) bool {
 	switch key {
 	case sha512sumsKey, sha384sumsKey, sha256sumsKey, sha224sumsKey, b2sumsKey, cksumsKey:
 		if arrVal, ok := data.([]string); ok {
-			pkgBuild.HashSums = arrVal
+			if priority > priorityBase {
+				// Arch-specific: append alongside the arch-specific source entries.
+				pkgBuild.HashSums = append(pkgBuild.HashSums, arrVal...)
+			} else {
+				pkgBuild.HashSums = arrVal
+			}
 		}
 
 		return true
