@@ -438,6 +438,21 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 		return nil
 	}
 
+	// Idempotency: the cross-compile env is process-global (os.Setenv) and
+	// changes only when the target architecture changes. Subsequent packages
+	// in the same yap.json that target the same arch don't need to re-run
+	// the setup. Skipping also avoids:
+	//   - log spam ("Rust/Go/autoconf cross-compilation configured" per pkg);
+	//   - PKG_CONFIG_PATH duplication (each call appends the existing value
+	//     back to the prepended toolchain paths, so paths multiply per pkg);
+	//   - unnecessary contention on envMutex during parallel builds.
+	if os.Getenv("YAP_CROSS_ENV_FOR") == targetArch {
+		logger.Debug("cross-compilation environment already configured; skipping",
+			"target_arch", targetArch)
+
+		return nil
+	}
+
 	logger.Info(i18n.T("logger.cross_compilation.setting_up_cross_compilation_environment"),
 		"target_arch", targetArch,
 		"build_arch", bb.PKGBUILD.ArchComputed)
@@ -658,6 +673,12 @@ export -f configure_cross 2>/dev/null || true
 		"target_arch", targetArch,
 		"cc", os.Getenv("CC"),
 		"cxx", os.Getenv("CXX"))
+
+	// Mark setup so subsequent packages targeting the same arch skip the
+	// full re-configuration. Cleared implicitly by yap exiting; if a future
+	// caller needs to force re-setup (e.g. arch change mid-run), they should
+	// os.Unsetenv("YAP_CROSS_ENV_FOR") first.
+	_ = os.Setenv("YAP_CROSS_ENV_FOR", targetArch)
 
 	return nil
 }

@@ -66,9 +66,13 @@ func TestCrossCompilationWithCcache(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear environment
+			// Clear environment, including the per-process memoization sentinels
+			// (YAP_CCACHE_SETUP / YAP_CROSS_ENV_FOR) — without this, a previous
+			// subtest's setup would short-circuit this one.
 			_ = os.Setenv("CC", "")
 			_ = os.Setenv("CXX", "")
+			_ = os.Unsetenv("YAP_CCACHE_SETUP")
+			_ = os.Unsetenv("YAP_CROSS_ENV_FOR")
 
 			bb := NewBaseBuilder(pkg, tt.format)
 

@@ -479,13 +479,38 @@ func (bb *BaseBuilder) Update() error {
 // SetupCcache checks if ccache is available and configures the build environment to use it.
 // This function sets up environment variables to enable ccache for faster compilation.
 // It uses a mutex to serialize access to os.Setenv to prevent race conditions in parallel builds.
+//
+// Idempotent: returns immediately if YAP_CCACHE_SETUP is already set. The
+// ccache configuration is process-global (os.Setenv), so re-running it for
+// every package in a yap.json iteration only produces redundant log lines
+// and pointless envMutex contention.
+//
+// Note: SetupCcache and SetupCrossCompilationEnvironment write to the same
+// CC/CXX variables. When both are needed for a build, the call site invokes
+// SetupCcache first, then SetupCrossCompilationEnvironment, which overwrites
+// CC/CXX with the cross-compiler and relies on CCACHE_PREFIX to wrap it.
+// The memoization here is per-process, so a yap.json batch that mixes
+// cross- and non-cross-arch builds will not re-run ccache setup between
+// them — that pattern was already racy with the process-global os.Setenv
+// approach and is tracked separately.
 func (bb *BaseBuilder) SetupCcache() error {
+	// Already configured for this process — skip.
+	if os.Getenv("YAP_CCACHE_SETUP") == "1" {
+		logger.Debug("ccache already configured; skipping",
+			"package", bb.PKGBUILD.PkgName)
+
+		return nil
+	}
+
 	// Check if ccache is available in the system using Go's exec.LookPath
 	_, err := exec.LookPath("ccache")
 	ccacheAvailable := err == nil // ccache is available if command is found in PATH
 
 	if !ccacheAvailable {
-		// ccache not found, log and continue without ccache
+		// ccache not found, log and continue without ccache.
+		// Mark "setup attempted" so subsequent packages don't repeat the lookup.
+		_ = os.Setenv("YAP_CCACHE_SETUP", "1")
+
 		logger.Info(i18n.T("logger.setupccache.info.ccache_not_found_skipping_1"),
 			"package", bb.PKGBUILD.PkgName)
 
@@ -509,6 +534,10 @@ func (bb *BaseBuilder) SetupCcache() error {
 	// CCACHE_DIR is intentionally left unset so ccache resolves to its default
 	// $HOME/.cache/ccache. Persistent caches (e.g. Kubernetes volumes) mounted
 	// at that path are then shared across builds within the same user account.
+
+	// Mark setup so subsequent packages in the same process skip the full
+	// re-configuration. See the function-level comment for rationale.
+	_ = os.Setenv("YAP_CCACHE_SETUP", "1")
 
 	logger.Info(i18n.T("logger.setupccache.info.ccache_enabled_for_build_1"),
 		"package", bb.PKGBUILD.PkgName)
