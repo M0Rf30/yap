@@ -127,17 +127,16 @@ func createSVGContent(graphData *graph.Data, showExternal bool) *SVG {
 	}
 
 	// Add CSS styles and definitions
-	svg.Defs.Content = createSVGStyles(&theme)
+	svg.Style = createCSSRules(&theme)
+	svg.Defs.Content = createSVGDefs(&theme)
 	svg.Content = createSVGContentBody(graphData, bounds, titleHeight, showExternal)
 
 	return svg
 }
 
-// createSVGStyles creates the CSS styles for the SVG.
-func createSVGStyles(theme *graph.Theme) string {
-	return fmt.Sprintf(`
-    <style>
-      .graph-bg {
+// createCSSRules creates the CSS rules for the SVG (without <style> tags).
+func createCSSRules(theme *graph.Theme) string {
+	return fmt.Sprintf(`.graph-bg {
         fill: %s;
       }
       .node-internal {
@@ -249,10 +248,16 @@ func createSVGStyles(theme *graph.Theme) string {
         font-size: 12px;
         font-weight: 500;
         text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
-      }
-    </style>
-    <defs>
-      <marker id="arrowhead-runtime" markerWidth="12" markerHeight="9"
+      }`,
+		theme.Background, theme.NodeInternal, theme.BorderColor,
+		theme.NodeExternal, theme.BorderColor, theme.NodePopular, theme.BorderColor,
+		theme.EdgeRuntime, theme.EdgeMake, theme.EdgeCheck, theme.EdgeOptional,
+		theme.TextColor, theme.TextColor, theme.TextColor, theme.TextColor, theme.TextColor)
+}
+
+// createSVGDefs creates the SVG marker and filter definitions (without <defs> wrapper).
+func createSVGDefs(theme *graph.Theme) string {
+	return fmt.Sprintf(`<marker id="arrowhead-runtime" markerWidth="12" markerHeight="9"
        refX="11" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
         <polygon points="0 0, 12 4.5, 0 9" fill="%s" stroke="%s" stroke-width="0.5"/>
       </marker>
@@ -270,12 +275,7 @@ func createSVGStyles(theme *graph.Theme) string {
       </marker>
       <filter id="shadow" x="-20%%" y="-20%%" width="140%%" height="140%%">
         <feDropShadow dx="3" dy="3" stdDeviation="4" flood-opacity="0.4"/>
-      </filter>
-    </defs>`,
-		theme.Background, theme.NodeInternal, theme.BorderColor,
-		theme.NodeExternal, theme.BorderColor, theme.NodePopular, theme.BorderColor,
-		theme.EdgeRuntime, theme.EdgeMake, theme.EdgeCheck, theme.EdgeOptional,
-		theme.TextColor, theme.TextColor, theme.TextColor, theme.TextColor, theme.TextColor,
+      </filter>`,
 		theme.EdgeRuntime, theme.EdgeRuntime, theme.EdgeMake, theme.EdgeMake,
 		theme.EdgeCheck, theme.EdgeCheck, theme.EdgeOptional, theme.EdgeOptional)
 }
@@ -291,10 +291,20 @@ func createSVGContentBody(graphData *graph.Data, bounds *graph.Bounds,
 
 	// Title and subtitle
 	centerX := bounds.Width / 2
+
+	// Count internal nodes
+	internalCount := 0
+
+	for _, node := range graphData.Nodes {
+		if !node.IsExternal {
+			internalCount++
+		}
+	}
+
 	fmt.Fprintf(&content, `
   <text x="%.1f" y="40" class="title-text">Dependency Graph</text>
-  <text x="%.1f" y="65" class="subtitle-text">Package Dependencies and Build Order</text>`,
-		centerX, centerX)
+  <text x="%.1f" y="65" class="subtitle-text">%d packages · %d dependencies</text>`,
+		centerX, centerX, internalCount, len(graphData.Edges))
 
 	// Offset content for title
 	fmt.Fprintf(&content, `<g transform="translate(0, %.1f)">`, titleHeight)
@@ -505,7 +515,7 @@ func addNodes(content *strings.Builder, graphData *graph.Data, showExternal bool
       <title>%s
 Package: %s
 Version: %s-%s
-Level: %d
+Build level: %d
 Type: %s</title>
     </rect>
     <text x="%.1f" y="%.1f" class="node-text">%s</text>`,
@@ -518,6 +528,16 @@ Type: %s</title>
 			fmt.Fprintf(content, `
     <text x="%.1f" y="%.1f" class="version-text">v%s</text>`,
 				node.X, node.Y+12, node.Version)
+		}
+
+		// Level badge for internal nodes
+		if !node.IsExternal {
+			badgeX := rectX + rectWidth - 12
+			badgeY := rectY + 2
+			fmt.Fprintf(content, `
+    <rect x="%.1f" y="%.1f" width="20" height="14" rx="3" fill="rgba(0,0,0,0.4)"/>
+    <text x="%.1f" y="%.1f" font-size="9" fill="white" text-anchor="middle" dominant-baseline="central">L%d</text>`,
+				badgeX, badgeY, badgeX+10, badgeY+7, node.Level)
 		}
 
 		content.WriteString(`
@@ -533,11 +553,11 @@ func addLegend(content *strings.Builder, bounds *graph.Bounds) {
     <text x="50" y="%.1f" class="legend-text">Legend:</text>
 
     <!-- Node Types -->
-    <circle cx="70" cy="%.1f" r="8" class="node-internal" />
+    <rect x="62" y="%.1f" width="16" height="16" rx="3" class="node-internal" />
     <text x="85" y="%.1f" class="legend-text">Internal Package</text>
-    <circle cx="200" cy="%.1f" r="8" class="node-popular" />
+    <rect x="192" y="%.1f" width="16" height="16" rx="3" class="node-popular" />
     <text x="215" y="%.1f" class="legend-text">Popular Package</text>
-    <circle cx="330" cy="%.1f" r="8" class="node-external" />
+    <rect x="322" y="%.1f" width="16" height="16" rx="3" class="node-external" />
     <text x="345" y="%.1f" class="legend-text">External Package</text>
 
     <!-- Dependency Types -->
@@ -554,7 +574,7 @@ func addLegend(content *strings.Builder, bounds *graph.Bounds) {
     <text x="590" y="%.1f" class="legend-text">Optional Dependency</text>
   </g>`,
 		legendY,
-		legendY+20, legendY+25, legendY+20, legendY+25, legendY+20, legendY+25,
+		legendY+12, legendY+25, legendY+12, legendY+25, legendY+12, legendY+25,
 		legendY+40, legendY+40, legendY+45,
 		legendY+40, legendY+40, legendY+45,
 		legendY+40, legendY+40, legendY+45,

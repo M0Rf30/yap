@@ -103,7 +103,7 @@ func createMultiPackageGraph(projects []struct {
 	}
 
 	// Create nodes from project names and parse PKGBUILD files
-	for i, proj := range projects {
+	for _, proj := range projects {
 		// Use YAP's proper parser for graph generation
 		pkgName, version, release := parsePKGBUILD(filepath.Join(projectPath, proj.Name))
 
@@ -127,15 +127,28 @@ func createMultiPackageGraph(projects []struct {
 			Width:        nodeWidth,
 			Height:       60,
 			IsExternal:   false,
-			IsPopular:    i < 3, // Make first 3 projects popular for demo
+			IsPopular:    false, // Will be computed from in-degree
 			Dependencies: nil,
-			Level:        0, // All at same level initially
+			Level:        0, // Will be computed from DAG
 		}
 		graphData.Nodes[proj.Name] = node
 	}
 
 	// Add dependencies by parsing PKGBUILD files
 	addDependenciesFromPKGBUILD(graphData, projects, projectPath)
+
+	// Compute in-degree (how many packages depend on this one)
+	inDegree := make(map[string]int)
+	for _, edge := range graphData.Edges {
+		inDegree[edge.To]++
+	}
+	// Mark nodes with in-degree >= 2 as popular
+	for name, node := range graphData.Nodes {
+		node.IsPopular = !node.IsExternal && inDegree[name] >= 2
+	}
+
+	// Compute DAG levels
+	computeDAGLevels(graphData)
 
 	return graphData
 }
@@ -235,6 +248,9 @@ func addDependenciesFromPKGBUILD(graphData *graph.Data, projects []struct {
 			}
 		}
 	}
+
+	// Deduplicate edges
+	graphData.Edges = deduplicateEdges(graphData.Edges)
 }
 
 // parseDependenciesFromPKGBUILD extracts dependency arrays from a PKGBUILD file.
@@ -406,6 +422,11 @@ func parseDependencyLine(line string) []string {
 
 // cleanDependencyName removes version constraints from dependency names.
 func cleanDependencyName(dep string) string {
+	// Strip arch suffix like "bison:amd64" → "bison"
+	if idx := strings.Index(dep, ":"); idx != -1 {
+		dep = dep[:idx]
+	}
+
 	// Remove version constraints like >=1.0, <2.0, etc.
 	for _, op := range []string{">=", "<=", "=", ">", "<"} {
 		if before, _, ok := strings.Cut(dep, op); ok {
@@ -414,4 +435,92 @@ func cleanDependencyName(dep string) string {
 	}
 
 	return strings.TrimSpace(dep)
+}
+
+// deduplicateEdges removes duplicate edges (same From+To+Type).
+func deduplicateEdges(edges []graph.Edge) []graph.Edge {
+	seen := make(map[string]bool)
+
+	result := make([]graph.Edge, 0, len(edges))
+	for _, e := range edges {
+		key := e.From + "|" + e.To + "|" + e.Type
+		if !seen[key] {
+			seen[key] = true
+
+			result = append(result, e)
+		}
+	}
+
+	return result
+}
+
+// computeDAGLevels assigns level to each node based on longest path from roots.
+// Uses Kahn's algorithm (BFS topological sort) on internal→internal edges only.
+// Nodes in cycles get level 0; external nodes keep their assigned level.
+func computeDAGLevels(graphData *graph.Data) {
+	inDeg, adj := buildInternalGraph(graphData)
+	level := kahnLongestPath(inDeg, adj)
+
+	for name, node := range graphData.Nodes {
+		if !node.IsExternal {
+			node.Level = level[name]
+		}
+	}
+}
+
+// buildInternalGraph builds in-degree and adjacency maps for internal nodes only.
+func buildInternalGraph(graphData *graph.Data) (inDeg map[string]int, adj map[string][]string) {
+	inDeg = make(map[string]int)
+	adj = make(map[string][]string)
+
+	for name, node := range graphData.Nodes {
+		if !node.IsExternal {
+			inDeg[name] = 0
+		}
+	}
+
+	for _, edge := range graphData.Edges {
+		from := graphData.Nodes[edge.From]
+		to := graphData.Nodes[edge.To]
+
+		if from == nil || to == nil || from.IsExternal || to.IsExternal {
+			continue
+		}
+
+		adj[edge.From] = append(adj[edge.From], edge.To)
+		inDeg[edge.To]++
+	}
+
+	return inDeg, adj
+}
+
+// kahnLongestPath runs Kahn's BFS and returns the longest-path level for each node.
+func kahnLongestPath(inDeg map[string]int, adj map[string][]string) map[string]int {
+	level := make(map[string]int)
+	queue := []string{}
+
+	for name, deg := range inDeg {
+		if deg == 0 {
+			queue = append(queue, name)
+			level[name] = 0
+		}
+	}
+
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+
+		for _, next := range adj[cur] {
+			if level[cur]+1 > level[next] {
+				level[next] = level[cur] + 1
+			}
+
+			inDeg[next]--
+			if inDeg[next] == 0 {
+				queue = append(queue, next)
+			}
+		}
+	}
+
+	return level
 }

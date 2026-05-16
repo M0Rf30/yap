@@ -222,7 +222,7 @@ func TestCreateSVGContent(t *testing.T) {
 	}
 }
 
-func TestCreateSVGStyles(t *testing.T) {
+func TestCreateCSSRules(t *testing.T) {
 	theme := &graph.Theme{
 		Background:   "#ffffff",
 		NodeInternal: "#007acc",
@@ -230,10 +230,10 @@ func TestCreateSVGStyles(t *testing.T) {
 		TextColor:    "#000000",
 	}
 
-	styles := createSVGStyles(theme)
+	styles := createCSSRules(theme)
 
 	if styles == "" {
-		t.Error("createSVGStyles returned empty string")
+		t.Error("createCSSRules returned empty string")
 	}
 
 	// Check that styles contain expected elements
@@ -242,5 +242,33 @@ func TestCreateSVGStyles(t *testing.T) {
 		if !strings.Contains(styles, element) {
 			t.Errorf("Styles missing element: %s", element)
 		}
+	}
+}
+
+func TestCreateSVGDefs(t *testing.T) {
+	theme := &graph.Theme{
+		EdgeRuntime:  "#333333",
+		EdgeMake:     "#666666",
+		EdgeCheck:    "#999999",
+		EdgeOptional: "#cccccc",
+	}
+
+	defs := createSVGDefs(theme)
+
+	if defs == "" {
+		t.Error("createSVGDefs returned empty string")
+	}
+
+	// Check that defs contain expected marker elements
+	expectedElements := []string{"arrowhead-runtime", "arrowhead-make", "arrowhead-check", "arrowhead-optional"}
+	for _, element := range expectedElements {
+		if !strings.Contains(defs, element) {
+			t.Errorf("Defs missing element: %s", element)
+		}
+	}
+
+	// Ensure no <defs> wrapper tags
+	if strings.Contains(defs, "<defs>") || strings.Contains(defs, "</defs>") {
+		t.Error("createSVGDefs should not contain <defs> wrapper tags")
 	}
 }
