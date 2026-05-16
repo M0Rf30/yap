@@ -91,6 +91,28 @@ func TestPKGBUILD_AddItem(t *testing.T) {
 	}
 }
 
+func TestNoExtractParsing(t *testing.T) {
+	pb := &PKGBUILD{}
+	pb.Init()
+
+	err := pb.AddItem("noextract", []string{"app-1.0.patch", "data.bin"})
+	if err != nil {
+		t.Fatalf("AddItem noextract failed: %v", err)
+	}
+
+	if len(pb.NoExtract) != 2 {
+		t.Fatalf("Expected 2 NoExtract entries, got %d: %v", len(pb.NoExtract), pb.NoExtract)
+	}
+
+	if pb.NoExtract[0] != "app-1.0.patch" {
+		t.Errorf("NoExtract[0]: expected 'app-1.0.patch', got %q", pb.NoExtract[0])
+	}
+
+	if pb.NoExtract[1] != "data.bin" {
+		t.Errorf("NoExtract[1]: expected 'data.bin', got %q", pb.NoExtract[1])
+	}
+}
+
 func TestPKGBUILD_ComputeArchitecture(t *testing.T) {
 	pb := &PKGBUILD{}
 
