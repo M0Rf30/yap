@@ -7,11 +7,56 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
+
+// hostElfMachine returns the ELF machine constant for the current host architecture.
+// It returns elf.EM_NONE for architectures we don't have a mapping for, which
+// disables the foreign-arch detection (we fall back to attempting strip).
+func hostElfMachine() elf.Machine {
+	switch runtime.GOARCH {
+	case "amd64":
+		return elf.EM_X86_64
+	case "386":
+		return elf.EM_386
+	case "arm64":
+		return elf.EM_AARCH64
+	case "arm":
+		return elf.EM_ARM
+	case "ppc64le", "ppc64":
+		return elf.EM_PPC64
+	case "s390x":
+		return elf.EM_S390
+	case "riscv64":
+		return elf.EM_RISCV
+	default:
+		return elf.EM_NONE
+	}
+}
+
+// isForeignArchELF returns true if the file is an ELF binary whose architecture
+// differs from the build host. Returns false for non-ELF files, unreadable files,
+// or when the host architecture isn't mapped — the strip pass then proceeds
+// normally (and fails loudly if there's a genuine problem).
+func isForeignArchELF(path string) bool {
+	f, err := elf.Open(path)
+	if err != nil {
+		return false // not an ELF or unreadable; let strip handle it
+	}
+
+	defer func() { _ = f.Close() }()
+
+	host := hostElfMachine()
+	if host == elf.EM_NONE {
+		return false
+	}
+
+	return f.Machine != host
+}
 
 // ReadBuildID reads the ELF build-id from the given binary.
 // Returns an empty string if the binary has no build-id.
@@ -123,23 +168,35 @@ func StripLTO(path string, args ...string) error {
 }
 
 func strip(path string, args ...string) error {
-	args = append(args, path)
-
 	// Use cross-compilation strip if STRIP environment variable is set.
 	// This allows stripping binaries compiled for foreign architectures.
-	// If the cross-strip tool is not found in PATH, fall back to the native
-	// strip and emit a warning — this avoids hard failures when the cross
-	// toolchain is not installed on the build host (e.g. pre-built binary
-	// packages that don't require compilation).
 	stripCmd := os.Getenv("STRIP")
 	if stripCmd == "" {
 		stripCmd = "strip"
 	} else if _, err := exec.LookPath(stripCmd); err != nil {
+		// Cross-strip not installed. Two cases:
+		//   (a) The binary is host-arch (pre-built package that doesn't actually
+		//       need a cross toolchain): native strip works correctly.
+		//   (b) The binary is foreign-arch (real cross-compile output): native
+		//       strip cannot parse it and will hard-fail. Skip with a warning
+		//       rather than break the build — strip is an optional optimization,
+		//       not a correctness requirement.
+		if isForeignArchELF(path) {
+			logger.Warn(
+				"cross-strip not found and binary is foreign-arch; skipping strip",
+				"cross_strip", stripCmd,
+				"binary", path)
+
+			return nil
+		}
+
 		logger.Warn("cross-strip not found in PATH, falling back to native strip",
 			"cross_strip", stripCmd)
 
 		stripCmd = "strip"
 	}
+
+	args = append(args, path)
 
 	return shell.Exec(context.Background(), false, "", stripCmd, args...)
 }
