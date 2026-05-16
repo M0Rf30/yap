@@ -30,7 +30,7 @@ DOCKER_BUILD_FLAGS = --progress=plain --no-cache
 # Available distributions (dynamically retrieved from build/deploy folder)
 DISTROS = $(shell find build/deploy -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
-.PHONY: all build clean test deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats
+.PHONY: all build clean test test-coverage bench deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats
 
 # Default target
 all: clean deps fmt lint lint-md test doc build
@@ -59,6 +59,11 @@ test-coverage:
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
+
+# Run benchmarks
+bench:
+	@echo "Running benchmarks..."
+	$(GOTEST) -bench=. -benchmem -run=^$$ -benchtime=3s ./...
 
 # Download dependencies
 deps:
@@ -231,6 +236,7 @@ help:
 	@echo "  clean            - Clean build artifacts"
 	@echo "  test             - Run tests"
 	@echo "  test-coverage    - Run tests with coverage report"
+	@echo "  bench            - Run benchmarks"
 	@echo "  deps             - Download dependencies"
 	@echo "  fmt              - Format code"
 	@echo "  lint             - Lint code"
