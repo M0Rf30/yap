@@ -5,13 +5,13 @@ go 1.26.0
 toolchain go1.26.1
 
 require (
+	github.com/M0Rf30/rpmpack v0.0.0-20260516153039-ce80a51ac79c
 	github.com/ProtonMail/go-crypto v1.4.1
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.6.0
 	github.com/go-git/go-git/v5 v5.19.0
 	github.com/go-playground/validator/v10 v10.30.2
-	github.com/google/rpmpack v0.7.1
 	github.com/klauspost/compress v1.18.6
 	github.com/klauspost/pgzip v1.2.6
 	github.com/mholt/archives v0.1.6-0.20251107150748-4a3da7803a6f

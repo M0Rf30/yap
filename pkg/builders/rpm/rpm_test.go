@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	rpmpack "github.com/google/rpmpack"
+	rpmpack "github.com/M0Rf30/rpmpack"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/files"
