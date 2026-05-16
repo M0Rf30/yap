@@ -346,30 +346,31 @@ func TestPKGBUILD_mapVariables(t *testing.T) {
 
 func TestPKGBUILD_mapArrays(t *testing.T) {
 	pb := &PKGBUILD{}
+	pb.Init()
 
 	// Test mapping arch
-	pb.mapArrays("arch", []string{"x86_64", "any"})
+	pb.mapArrays("arch", []string{"x86_64", "any"}, priorityBase)
 
 	if len(pb.Arch) != 2 || pb.Arch[0] != "x86_64" || pb.Arch[1] != "any" {
 		t.Errorf("Expected Arch ['x86_64', 'any'], got %v", pb.Arch)
 	}
 
 	// Test mapping depends
-	pb.mapArrays("depends", []string{"glibc", "gcc"})
+	pb.mapArrays("depends", []string{"glibc", "gcc"}, priorityBase)
 
 	if len(pb.Depends) != 2 || pb.Depends[0] != "glibc" || pb.Depends[1] != "gcc" {
 		t.Errorf("Expected Depends ['glibc', 'gcc'], got %v", pb.Depends)
 	}
 
 	// Test mapping source
-	pb.mapArrays("source", []string{"https://example.com/source.tar.gz"})
+	pb.mapArrays("source", []string{"https://example.com/source.tar.gz"}, priorityBase)
 
 	if len(pb.SourceURI) != 1 || pb.SourceURI[0] != "https://example.com/source.tar.gz" {
 		t.Errorf("Expected SourceURI ['https://example.com/source.tar.gz'], got %v", pb.SourceURI)
 	}
 
 	// Test mapping sha256sums
-	pb.mapArrays("sha256sums", []string{"abcd1234"})
+	pb.mapArrays("sha256sums", []string{"abcd1234"}, priorityBase)
 
 	if len(pb.HashSums) != 1 || pb.HashSums[0] != "abcd1234" {
 		t.Errorf("Expected HashSums ['abcd1234'], got %v", pb.HashSums)
@@ -819,69 +820,70 @@ func TestPKGBUILD_ValidateGeneral_AllValidationPaths(t *testing.T) {
 
 func TestPKGBUILD_mapArrays_EdgeCases(t *testing.T) {
 	pb := &PKGBUILD{}
+	pb.Init()
 
 	// Test with unknown array key
-	pb.mapArrays("unknown_array", []string{"value1", "value2"})
+	pb.mapArrays("unknown_array", []string{"value1", "value2"}, priorityBase)
 	// Should not panic, just ignore unknown keys
 
 	// Test with empty array
-	pb.mapArrays("depends", []string{})
+	pb.mapArrays("depends", []string{}, priorityBase)
 
 	if len(pb.Depends) != 0 {
 		t.Error("Empty array should result in empty slice")
 	}
 
 	// Test makedepends
-	pb.mapArrays("makedepends", []string{"cmake", "make"})
+	pb.mapArrays("makedepends", []string{"cmake", "make"}, priorityBase)
 
 	if len(pb.MakeDepends) != 2 || pb.MakeDepends[0] != "cmake" || pb.MakeDepends[1] != "make" {
 		t.Errorf("Expected MakeDepends ['cmake', 'make'], got %v", pb.MakeDepends)
 	}
 
 	// Test optdepends
-	pb.mapArrays("optdepends", []string{"optional-pkg"})
+	pb.mapArrays("optdepends", []string{"optional-pkg"}, priorityBase)
 
 	if len(pb.OptDepends) != 1 || pb.OptDepends[0] != "optional-pkg" {
 		t.Errorf("Expected OptDepends ['optional-pkg'], got %v", pb.OptDepends)
 	}
 
 	// Test license
-	pb.mapArrays("license", []string{"GPL-3.0"})
+	pb.mapArrays("license", []string{"GPL-3.0"}, priorityBase)
 
 	if len(pb.License) != 1 || pb.License[0] != "GPL-3.0" {
 		t.Errorf("Expected License ['GPL-3.0'], got %v", pb.License)
 	}
 
 	// Test backup
-	pb.mapArrays("backup", []string{"/etc/config"})
+	pb.mapArrays("backup", []string{"/etc/config"}, priorityBase)
 
 	if len(pb.Backup) != 1 || pb.Backup[0] != "/etc/config" {
 		t.Errorf("Expected Backup ['/etc/config'], got %v", pb.Backup)
 	}
 
 	// Test options
-	pb.mapArrays("options", []string{"!strip"})
+	pb.mapArrays("options", []string{"!strip"}, priorityBase)
 
 	if len(pb.Options) != 1 || pb.Options[0] != "!strip" {
 		t.Errorf("Expected Options ['!strip'], got %v", pb.Options)
 	}
 
 	// Test provides
-	pb.mapArrays("provides", []string{"some-library"})
+	pb.mapArrays("provides", []string{"some-library"}, priorityBase)
 
 	if len(pb.Provides) != 1 || pb.Provides[0] != "some-library" {
 		t.Errorf("Expected Provides ['some-library'], got %v", pb.Provides)
 	}
 
 	// Test conflicts
-	pb.mapArrays("conflicts", []string{"conflicting-package"})
+	pb.mapArrays("conflicts", []string{"conflicting-package"}, priorityBase)
 
 	if len(pb.Conflicts) != 1 || pb.Conflicts[0] != "conflicting-package" {
 		t.Errorf("Expected Conflicts ['conflicting-package'], got %v", pb.Conflicts)
 	}
 
 	// Test replaces
-	pb.mapArrays("replaces", []string{"replaced-package"})
+	pb.mapArrays("replaces", []string{"replaced-package"}, priorityBase)
 
 	if len(pb.Replaces) != 1 || pb.Replaces[0] != "replaced-package" {
 		t.Errorf("Expected Replaces ['replaced-package'], got %v", pb.Replaces)
@@ -1591,7 +1593,7 @@ func TestPKGBUILD_MapChecksumsArrays_AllTypes(t *testing.T) {
 			pbLocal := &PKGBUILD{}
 			pbLocal.Init()
 
-			result := pbLocal.mapChecksumsArrays(checksumType, []string{expectedHash})
+			result := pbLocal.mapChecksumsArrays(checksumType, []string{expectedHash}, priorityBase)
 			if !result {
 				t.Errorf("mapChecksumsArrays should handle %s", checksumType)
 			}
@@ -1608,7 +1610,7 @@ func TestPKGBUILD_MapChecksumsArrays_UnknownType(t *testing.T) {
 	pb.Init()
 
 	// Test with unknown checksum type
-	result := pb.mapChecksumsArrays("unknown_checksums", []string{"test_hash"})
+	result := pb.mapChecksumsArrays("unknown_checksums", []string{"test_hash"}, priorityBase)
 	if result {
 		t.Error("mapChecksumsArrays should return false for unknown checksum types")
 	}
@@ -2140,7 +2142,7 @@ func TestPKGBUILD_parseArchitectureOnly_UsesTargetArch(t *testing.T) {
 		t.Errorf("AddItem(source) returned error: %v", err)
 	}
 
-	// Add aarch64-specific source (should be selected because TargetArch = "aarch64")
+	// Add aarch64-specific source (should be appended because TargetArch = "aarch64")
 	err = pb.AddItem("source_aarch64", []string{"https://example.com/binary-aarch64"})
 	if err != nil {
 		t.Errorf("AddItem(source_aarch64) returned error: %v", err)
@@ -2152,9 +2154,18 @@ func TestPKGBUILD_parseArchitectureOnly_UsesTargetArch(t *testing.T) {
 		t.Errorf("AddItem(source_x86_64) returned error: %v", err)
 	}
 
-	// Assert that aarch64 source is selected (priority 4 > priority 0)
-	if len(pb.SourceURI) != 1 || pb.SourceURI[0] != "https://example.com/binary-aarch64" {
-		t.Errorf("Expected SourceURI ['https://example.com/binary-aarch64'], got %v", pb.SourceURI)
+	// Assert that base source + aarch64 source are present (appended, not replaced)
+	// Expected: [generic, aarch64] (x86_64 is skipped)
+	if len(pb.SourceURI) != 2 {
+		t.Errorf("Expected 2 SourceURI entries, got %d: %v", len(pb.SourceURI), pb.SourceURI)
+	}
+
+	if pb.SourceURI[0] != "https://example.com/binary-generic" {
+		t.Errorf("Expected SourceURI[0]='https://example.com/binary-generic', got %q", pb.SourceURI[0])
+	}
+
+	if pb.SourceURI[1] != "https://example.com/binary-aarch64" {
+		t.Errorf("Expected SourceURI[1]='https://example.com/binary-aarch64', got %q", pb.SourceURI[1])
 	}
 }
 
@@ -2268,5 +2279,149 @@ func TestPKGBUILD_BuildEnvironmentSlice_ExportsCARCH(t *testing.T) {
 	// Assert that CARCH=x86_64 is in the environment slice
 	if !slices.Contains(env2, "CARCH=x86_64") {
 		t.Errorf("Expected CARCH=x86_64 in BuildEnvironmentSlice, got %v", env2)
+	}
+}
+
+// TestPKGBUILD_ArchSpecificSourceAppended tests that arch-specific source/checksum
+// arrays are appended to base arrays rather than replacing them (makepkg behavior).
+func TestPKGBUILD_ArchSpecificSourceAppended(t *testing.T) {
+	pb := &PKGBUILD{
+		TargetArch:     "aarch64",
+		Distro:         "ubuntu",
+		FullDistroName: "ubuntu_jammy",
+	}
+	pb.Init()
+
+	// Add base sources
+	err := pb.AddItem("source", []string{"local-file.conf", "local-file2.service"})
+	if err != nil {
+		t.Errorf("AddItem(source) returned error: %v", err)
+	}
+
+	// Add base checksums
+	err = pb.AddItem("sha256sums", []string{"aaa", "bbb"})
+	if err != nil {
+		t.Errorf("AddItem(sha256sums) returned error: %v", err)
+	}
+
+	// Add arch-specific source (should be appended)
+	err = pb.AddItem("source_aarch64", []string{"https://example.com/binary-aarch64"})
+	if err != nil {
+		t.Errorf("AddItem(source_aarch64) returned error: %v", err)
+	}
+
+	// Add arch-specific checksum (should be appended)
+	err = pb.AddItem("sha256sums_aarch64", []string{"SKIP"})
+	if err != nil {
+		t.Errorf("AddItem(sha256sums_aarch64) returned error: %v", err)
+	}
+
+	// Assert SourceURI has 3 entries (2 base + 1 arch-specific)
+	if len(pb.SourceURI) != 3 {
+		t.Errorf("Expected 3 SourceURI entries, got %d: %v", len(pb.SourceURI), pb.SourceURI)
+	}
+
+	expectedSources := []string{"local-file.conf", "local-file2.service", "https://example.com/binary-aarch64"}
+	for i, expected := range expectedSources {
+		if i >= len(pb.SourceURI) || pb.SourceURI[i] != expected {
+			t.Errorf("SourceURI[%d]: expected %q, got %q", i, expected, pb.SourceURI[i])
+		}
+	}
+
+	// Assert HashSums has 3 entries (2 base + 1 arch-specific)
+	if len(pb.HashSums) != 3 {
+		t.Errorf("Expected 3 HashSums entries, got %d: %v", len(pb.HashSums), pb.HashSums)
+	}
+
+	expectedHashes := []string{"aaa", "bbb", "SKIP"}
+	for i, expected := range expectedHashes {
+		if i >= len(pb.HashSums) || pb.HashSums[i] != expected {
+			t.Errorf("HashSums[%d]: expected %q, got %q", i, expected, pb.HashSums[i])
+		}
+	}
+}
+
+// TestPKGBUILD_WrongArchSourceSkipped tests that arch-specific sources for
+// non-matching architectures are skipped.
+func TestPKGBUILD_WrongArchSourceSkipped(t *testing.T) {
+	pb := &PKGBUILD{
+		TargetArch:     "aarch64",
+		Distro:         "ubuntu",
+		FullDistroName: "ubuntu_jammy",
+	}
+	pb.Init()
+
+	// Add base source
+	err := pb.AddItem("source", []string{"base.tar.gz"})
+	if err != nil {
+		t.Errorf("AddItem(source) returned error: %v", err)
+	}
+
+	// Add base checksum
+	err = pb.AddItem("sha256sums", []string{"abc"})
+	if err != nil {
+		t.Errorf("AddItem(sha256sums) returned error: %v", err)
+	}
+
+	// Add x86_64-specific source (should be skipped since TargetArch is aarch64)
+	err = pb.AddItem("source_x86_64", []string{"https://example.com/binary-x86_64"})
+	if err != nil {
+		t.Errorf("AddItem(source_x86_64) returned error: %v", err)
+	}
+
+	// Add x86_64-specific checksum (should be skipped)
+	err = pb.AddItem("sha256sums_x86_64", []string{"xyz"})
+	if err != nil {
+		t.Errorf("AddItem(sha256sums_x86_64) returned error: %v", err)
+	}
+
+	// Assert SourceURI has only 1 entry (base only, x86_64 not appended)
+	if len(pb.SourceURI) != 1 {
+		t.Errorf("Expected 1 SourceURI entry, got %d: %v", len(pb.SourceURI), pb.SourceURI)
+	}
+
+	if pb.SourceURI[0] != "base.tar.gz" {
+		t.Errorf("Expected SourceURI[0]='base.tar.gz', got %q", pb.SourceURI[0])
+	}
+
+	// Assert HashSums has only 1 entry (base only)
+	if len(pb.HashSums) != 1 {
+		t.Errorf("Expected 1 HashSums entry, got %d: %v", len(pb.HashSums), pb.HashSums)
+	}
+
+	if pb.HashSums[0] != "abc" {
+		t.Errorf("Expected HashSums[0]='abc', got %q", pb.HashSums[0])
+	}
+}
+
+// TestPKGBUILD_BaseSourceReplaces tests that base source/checksum arrays
+// replace previous base arrays (same priority).
+func TestPKGBUILD_BaseSourceReplaces(t *testing.T) {
+	pb := &PKGBUILD{
+		TargetArch:     "",
+		Distro:         "ubuntu",
+		FullDistroName: "ubuntu_jammy",
+	}
+	pb.Init()
+
+	// Add first base source
+	err := pb.AddItem("source", []string{"first.tar.gz"})
+	if err != nil {
+		t.Errorf("AddItem(source) first returned error: %v", err)
+	}
+
+	// Add second base source (should replace first, not append)
+	err = pb.AddItem("source", []string{"second.tar.gz"})
+	if err != nil {
+		t.Errorf("AddItem(source) second returned error: %v", err)
+	}
+
+	// Assert SourceURI has only 1 entry (second replaces first)
+	if len(pb.SourceURI) != 1 {
+		t.Errorf("Expected 1 SourceURI entry, got %d: %v", len(pb.SourceURI), pb.SourceURI)
+	}
+
+	if pb.SourceURI[0] != "second.tar.gz" {
+		t.Errorf("Expected SourceURI[0]='second.tar.gz', got %q", pb.SourceURI[0])
 	}
 }
