@@ -72,7 +72,7 @@ package() {
 	}
 
 	// Test parsing
-	pkgBuild, err := parser.ParseFile("ubuntu", "focal", tempDir, tempDir)
+	pkgBuild, err := parser.ParseFile("ubuntu", "focal", tempDir, tempDir, "")
 	if err != nil {
 		t.Fatalf("ParseFile() error = %v", err)
 	}
@@ -163,7 +163,7 @@ package() {
 	parser.OverridePkgVer = "2.0.0"
 
 	// Test parsing with overrides
-	pkgBuild, err := parser.ParseFile("ubuntu", "", tempDir, tempDir)
+	pkgBuild, err := parser.ParseFile("ubuntu", "", tempDir, tempDir, "")
 	if err != nil {
 		t.Fatalf("ParseFile() error = %v", err)
 	}
@@ -187,13 +187,13 @@ func TestParseFileErrors(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Test non-existent PKGBUILD
-	_, err := parser.ParseFile("ubuntu", "", tempDir, tempDir)
+	_, err := parser.ParseFile("ubuntu", "", tempDir, tempDir, "")
 	if err == nil {
 		t.Error("ParseFile() should return error for non-existent PKGBUILD")
 	}
 
 	// Test invalid home directory
-	_, err = parser.ParseFile("ubuntu", "", tempDir, "/non/existent/path")
+	_, err = parser.ParseFile("ubuntu", "", tempDir, "/non/existent/path", "")
 	if err == nil {
 		t.Error("ParseFile() should return error for invalid home directory")
 	}
@@ -250,7 +250,7 @@ package() {
 	}
 
 	// Test parsing
-	pkgBuild, err := parser.ParseFile("arch", "", tempDir, tempDir)
+	pkgBuild, err := parser.ParseFile("arch", "", tempDir, tempDir, "")
 	if err != nil {
 		t.Fatalf("ParseFile() error = %v", err)
 	}
@@ -302,5 +302,55 @@ package() {
 
 	if !strings.Contains(pkgBuild.PostRm, "post-remove") {
 		t.Errorf("PostRm should contain 'post-remove', got '%s'", pkgBuild.PostRm)
+	}
+}
+
+// Test 5: ParseFile with TargetArch source selection
+func TestPKGBUILD_ParseFile_TargetArchSourceSelection(t *testing.T) {
+	// Create a temp dir with a PKGBUILD containing architecture-specific sources
+	tempDir := t.TempDir()
+
+	pkgbuildContent := `pkgname="cross-test"
+pkgver="1.0.0"
+pkgrel="1"
+pkgdesc="Cross-compile test"
+arch=("x86_64" "aarch64")
+license=("MIT")
+source_x86_64=("https://example.com/binary-x86_64")
+source_aarch64=("https://example.com/binary-aarch64")
+sha256sums_x86_64=("aaaa")
+sha256sums_aarch64=("bbbb")
+
+package() {
+    echo done
+}
+`
+
+	pkgbuildPath := filepath.Join(tempDir, "PKGBUILD")
+
+	err := os.WriteFile(pkgbuildPath, []byte(pkgbuildContent), 0o600)
+	if err != nil {
+		t.Fatalf("Failed to write PKGBUILD: %v", err)
+	}
+
+	// Parse with target_arch = "aarch64"
+	pkgBuild, err := parser.ParseFile("ubuntu", "focal", tempDir, tempDir, "aarch64")
+	if err != nil {
+		t.Fatalf("ParseFile() error = %v", err)
+	}
+
+	// Verify TargetArch is set
+	if pkgBuild.TargetArch != "aarch64" {
+		t.Errorf("Expected TargetArch 'aarch64', got '%s'", pkgBuild.TargetArch)
+	}
+
+	// Verify aarch64 source is selected
+	if len(pkgBuild.SourceURI) != 1 || pkgBuild.SourceURI[0] != "https://example.com/binary-aarch64" {
+		t.Errorf("Expected SourceURI ['https://example.com/binary-aarch64'], got %v", pkgBuild.SourceURI)
+	}
+
+	// Verify aarch64 checksums are selected
+	if len(pkgBuild.HashSums) != 1 || pkgBuild.HashSums[0] != "bbbb" {
+		t.Errorf("Expected HashSums ['bbbb'], got %v", pkgBuild.HashSums)
 	}
 }

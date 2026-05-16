@@ -146,7 +146,7 @@ func createMultiPackageGraph(projects []struct {
 func parsePKGBUILD(projectDir string) (pkgName, version, release string) {
 	// Use YAP's parser with dummy distro/release for graph generation
 	// This properly handles all PKGBUILD syntax including renovate comments
-	pkgBuild, err := parser.ParseFile("", "", projectDir, projectDir)
+	pkgBuild, err := parser.ParseFile("", "", projectDir, projectDir, "")
 	if err != nil {
 		// Return defaults if we can't parse the file
 		return "", defaultVersion, "1"

@@ -996,7 +996,8 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 		pkgbuildFile, err := parser.ParseFile(distro,
 			release,
 			startDir,
-			home)
+			home,
+			TargetArch)
 		if err != nil {
 			return err
 		}
@@ -1006,14 +1007,7 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 		// git repo. Exposed as $repodir in build/package scripts.
 		pkgbuildFile.RepoDir = findGitRoot(path)
 
-		// Set target architecture for cross-compilation if specified
-		if TargetArch != "" {
-			// Keep the native architecture for ArchComputed, set TargetArch for cross-compilation
-			pkgbuildFile.ComputeArchitecture() // This sets the native architecture
-			pkgbuildFile.TargetArch = TargetArch
-		} else {
-			pkgbuildFile.ComputeArchitecture()
-		}
+		pkgbuildFile.ComputeArchitecture()
 
 		if err := pkgbuildFile.ValidateMandatoryItems(); err != nil {
 			return err

@@ -3,9 +3,12 @@ package pkgbuild
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"text/template"
+
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
 
 func TestPKGBUILD_Init(t *testing.T) {
@@ -2118,5 +2121,152 @@ func TestParseSplitOverrides_NonOverrideIgnored(t *testing.T) {
 	// pkgdesc is an override var, so it should be set
 	if pb.PkgDesc != "ok" {
 		t.Errorf("PkgDesc = %q, want %q", pb.PkgDesc, "ok")
+	}
+}
+
+// Test 1: parseArchitectureOnly now uses TargetArch when set
+func TestPKGBUILD_parseArchitectureOnly_UsesTargetArch(t *testing.T) {
+	pb := &PKGBUILD{
+		TargetArch:     "aarch64",
+		ArchComputed:   "x86_64",
+		FullDistroName: "ubuntu_focal",
+		Distro:         "ubuntu",
+	}
+	pb.Init()
+
+	// Add base source
+	err := pb.AddItem("source", []string{"https://example.com/binary-generic"})
+	if err != nil {
+		t.Errorf("AddItem(source) returned error: %v", err)
+	}
+
+	// Add aarch64-specific source (should be selected because TargetArch = "aarch64")
+	err = pb.AddItem("source_aarch64", []string{"https://example.com/binary-aarch64"})
+	if err != nil {
+		t.Errorf("AddItem(source_aarch64) returned error: %v", err)
+	}
+
+	// Add x86_64-specific source (should be skipped because TargetArch != "x86_64")
+	err = pb.AddItem("source_x86_64", []string{"https://example.com/binary-x86_64"})
+	if err != nil {
+		t.Errorf("AddItem(source_x86_64) returned error: %v", err)
+	}
+
+	// Assert that aarch64 source is selected (priority 4 > priority 0)
+	if len(pb.SourceURI) != 1 || pb.SourceURI[0] != "https://example.com/binary-aarch64" {
+		t.Errorf("Expected SourceURI ['https://example.com/binary-aarch64'], got %v", pb.SourceURI)
+	}
+}
+
+// Test 2: parseArchitectureOnly with native arch (no TargetArch set)
+func TestPKGBUILD_parseArchitectureOnly_NativeArch(t *testing.T) {
+	pb := &PKGBUILD{
+		TargetArch:     "",
+		ArchComputed:   "x86_64",
+		FullDistroName: "ubuntu_focal",
+		Distro:         "ubuntu",
+	}
+	pb.Init()
+
+	// Add x86_64-specific source
+	err := pb.AddItem("source_x86_64", []string{"https://example.com/binary-x86_64"})
+	if err != nil {
+		t.Errorf("AddItem(source_x86_64) returned error: %v", err)
+	}
+
+	// Add aarch64-specific source (should be skipped on x86_64 host)
+	err = pb.AddItem("source_aarch64", []string{"https://example.com/binary-aarch64"})
+	if err != nil {
+		t.Errorf("AddItem(source_aarch64) returned error: %v", err)
+	}
+
+	// On x86_64 host, should select x86_64 source
+	// Note: This test only works correctly on x86_64 hosts
+	if platform.GetArchitecture() == "x86_64" {
+		if len(pb.SourceURI) != 1 || pb.SourceURI[0] != "https://example.com/binary-x86_64" {
+			t.Errorf("Expected SourceURI ['https://example.com/binary-x86_64'], got %v", pb.SourceURI)
+		}
+	} else {
+		t.Skip("This test only works correctly on x86_64 hosts")
+	}
+}
+
+// Test 3: SetEnvironmentVariables exports CARCH
+func TestPKGBUILD_SetEnvironmentVariables_ExportsCARCH(t *testing.T) {
+	pb := &PKGBUILD{
+		TargetArch:     "aarch64",
+		ArchComputed:   "x86_64",
+		StartDir:       t.TempDir(),
+		SourceDir:      t.TempDir(),
+		PkgName:        "test",
+		PkgVer:         "1.0",
+		PkgRel:         "1",
+		Distro:         "ubuntu",
+		FullDistroName: "ubuntu_focal",
+	}
+	pb.Init()
+
+	// Save original CARCH env var
+	originalCARCH := os.Getenv("CARCH")
+	defer func() {
+		_ = os.Setenv("CARCH", originalCARCH)
+	}()
+
+	pb.SetMainFolders()
+
+	err := pb.SetEnvironmentVariables()
+	if err != nil {
+		t.Fatalf("SetEnvironmentVariables() returned error: %v", err)
+	}
+
+	// Assert CARCH is set to TargetArch (aarch64)
+	if os.Getenv("CARCH") != "aarch64" {
+		t.Errorf("Expected CARCH='aarch64', got '%s'", os.Getenv("CARCH"))
+	}
+}
+
+// Test 4: BuildEnvironmentSlice exports CARCH
+func TestPKGBUILD_BuildEnvironmentSlice_ExportsCARCH(t *testing.T) {
+	pb := &PKGBUILD{
+		TargetArch:     "aarch64",
+		ArchComputed:   "x86_64",
+		StartDir:       t.TempDir(),
+		SourceDir:      t.TempDir(),
+		PkgName:        "test",
+		PkgVer:         "1.0",
+		PkgRel:         "1",
+		Distro:         "ubuntu",
+		FullDistroName: "ubuntu_focal",
+	}
+	pb.Init()
+
+	pb.SetMainFolders()
+	env := pb.BuildEnvironmentSlice()
+
+	// Assert that CARCH=aarch64 is in the environment slice
+	if !slices.Contains(env, "CARCH=aarch64") {
+		t.Errorf("Expected CARCH=aarch64 in BuildEnvironmentSlice, got %v", env)
+	}
+
+	// Test with empty TargetArch and ArchComputed = x86_64
+	pb2 := &PKGBUILD{
+		TargetArch:     "",
+		ArchComputed:   "x86_64",
+		StartDir:       t.TempDir(),
+		SourceDir:      t.TempDir(),
+		PkgName:        "test2",
+		PkgVer:         "1.0",
+		PkgRel:         "1",
+		Distro:         "ubuntu",
+		FullDistroName: "ubuntu_focal",
+	}
+	pb2.Init()
+
+	pb2.SetMainFolders()
+	env2 := pb2.BuildEnvironmentSlice()
+
+	// Assert that CARCH=x86_64 is in the environment slice
+	if !slices.Contains(env2, "CARCH=x86_64") {
+		t.Errorf("Expected CARCH=x86_64 in BuildEnvironmentSlice, got %v", env2)
 	}
 }

@@ -419,7 +419,7 @@ func TestParseFile_SplitPackage(t *testing.T) {
 	// Use the testdata split-package fixture
 	testdataPath := "testdata/split-package"
 
-	pkgBuild, err := parser.ParseFile("ubuntu", "focal", testdataPath, testdataPath)
+	pkgBuild, err := parser.ParseFile("ubuntu", "focal", testdataPath, testdataPath, "")
 	if err != nil {
 		t.Fatalf("ParseFile() error: %v", err)
 	}
