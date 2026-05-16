@@ -354,13 +354,14 @@ func TestCreateMultiPackageGraph(t *testing.T) {
 		t.Errorf("Expected project2 Name 'project2', got '%s'", node2.Name)
 	}
 
-	// Check that first 3 projects are marked as popular (in this case both should be)
-	if !node1.IsPopular {
-		t.Errorf("Expected project1 to be popular")
+	// IsPopular is now computed from in-degree (>= 2 dependents).
+	// With no PKGBUILD files parsed, no edges exist, so no node is popular.
+	if node1.IsPopular {
+		t.Errorf("Expected project1 not to be popular (no in-degree)")
 	}
 
-	if !node2.IsPopular {
-		t.Errorf("Expected project2 to be popular")
+	if node2.IsPopular {
+		t.Errorf("Expected project2 not to be popular (no in-degree)")
 	}
 
 	// Check theme
@@ -414,6 +415,16 @@ func TestCleanDependencyName(t *testing.T) {
 			name:     "whitespace handling",
 			dep:      " gcc >= 11.0 ",
 			expected: "gcc",
+		},
+		{
+			name:     "arch suffix stripped",
+			dep:      "bison:amd64",
+			expected: "bison",
+		},
+		{
+			name:     "arch suffix with version",
+			dep:      "perl:amd64>=5.30",
+			expected: "perl",
 		},
 	}
 

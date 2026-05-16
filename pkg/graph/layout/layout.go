@@ -1,7 +1,11 @@
 // Package layout provides graph layout algorithms for positioning nodes.
 package layout
 
-import "github.com/M0Rf30/yap/v2/pkg/graph"
+import (
+	"sort"
+
+	"github.com/M0Rf30/yap/v2/pkg/graph"
+)
 
 // CalculateOptimizedLayout chooses and applies the best layout algorithm for the graph.
 func CalculateOptimizedLayout(graphData *graph.Data) {
@@ -20,23 +24,28 @@ func CalculateOptimizedLayout(graphData *graph.Data) {
 		return
 	}
 
-	// Choose layout algorithm based on node count and dependencies
-	hasRealDependencies := len(graphData.Edges) > 0 && !areEdgesArtificial(graphData)
-
-	if nodeCount <= 8 && hasRealDependencies {
+	// Use hierarchical layout whenever there are real dependencies
+	if len(graphData.Edges) > 0 {
 		CalculateHierarchicalLayout(graphData)
 	} else {
 		CalculateGridLayout(graphData)
 	}
 }
 
+const (
+	// maxLevelWidth caps the horizontal extent of a single level row in pixels.
+	// Nodes that don't fit are wrapped into additional sub-rows.
+	maxLevelWidth = 2400.0
+)
+
 // CalculateHierarchicalLayout positions nodes in levels based on dependencies.
+// Levels with many nodes are wrapped into sub-rows to keep the canvas width
+// bounded to maxLevelWidth.
 func CalculateHierarchicalLayout(graphData *graph.Data) {
-	// Hierarchical layout based on dependency levels
+	// Group nodes by level
 	levels := make(map[int][]*graph.Node)
 	maxLevel := 0
 
-	// Group nodes by level
 	for _, node := range graphData.Nodes {
 		levels[node.Level] = append(levels[node.Level], node)
 		if node.Level > maxLevel {
@@ -44,48 +53,71 @@ func CalculateHierarchicalLayout(graphData *graph.Data) {
 		}
 	}
 
-	// Calculate dynamic spacing based on node sizes in each level
-	levelSpacing := 100.0 // Optimized vertical spacing between levels
+	// Sort nodes within each level by name for consistency
+	for level := range levels {
+		nodes := levels[level]
+		sort.Slice(nodes, func(i, j int) bool {
+			return nodes[i].Name < nodes[j].Name
+		})
+	}
 
-	// Position nodes level by level
+	// Calculate level spacing based on max node height + padding
+	maxNodeHeight := 60.0
+	for _, node := range graphData.Nodes {
+		if node.Height > maxNodeHeight {
+			maxNodeHeight = node.Height
+		}
+	}
+
+	rowSpacing := maxNodeHeight + 60.0 // vertical gap between rows
+
+	// currentY tracks the running Y offset as we place levels (and sub-rows)
+	currentY := 0.0
+
 	for level := 0; level <= maxLevel; level++ {
 		nodesInLevel := levels[level]
 		if len(nodesInLevel) == 0 {
 			continue
 		}
 
-		// Calculate maximum node width in this level for proper spacing
-		maxWidthInLevel := 0.0
-		for _, node := range nodesInLevel {
-			if node.Width > maxWidthInLevel {
-				maxWidthInLevel = node.Width
+		// Calculate horizontal spacing for this level
+		maxW := 0.0
+		for _, n := range nodesInLevel {
+			if n.Width > maxW {
+				maxW = n.Width
 			}
 		}
 
-		// Calculate minimum spacing based on widest node + padding
-		minNodeSpacing := maxWidthInLevel + 40.0 // Optimized padding between nodes
-		if minNodeSpacing < 140.0 {
-			minNodeSpacing = 140.0 // Ensure minimum spacing
+		hSpacing := maxW + 50.0
+		if hSpacing < 160.0 {
+			hSpacing = 160.0
 		}
 
-		// Calculate total width needed for this level
-		totalWidth := 0.0
-		for _, node := range nodesInLevel {
-			totalWidth += node.Width
+		// How many nodes fit in one row within maxLevelWidth?
+		nodesPerRow := max(int(maxLevelWidth/hSpacing), 1)
+
+		// Place nodes in sub-rows
+		for i, node := range nodesInLevel {
+			subRow := i / nodesPerRow
+			col := i % nodesPerRow
+
+			// Count nodes in this sub-row for centering
+			rowStart := subRow * nodesPerRow
+
+			rowEnd := min(rowStart+nodesPerRow, len(nodesInLevel))
+
+			rowCount := rowEnd - rowStart
+
+			totalRowW := float64(rowCount) * hSpacing
+			startX := -totalRowW / 2
+
+			node.X = startX + float64(col)*hSpacing + hSpacing/2
+			node.Y = currentY + float64(subRow)*rowSpacing
 		}
 
-		totalWidth += float64(len(nodesInLevel)-1) * minNodeSpacing
-
-		// Center the level horizontally
-		startX := -totalWidth / 2
-		currentX := startX
-
-		// Position each node in the level
-		for _, node := range nodesInLevel {
-			node.X = currentX + node.Width/2
-			node.Y = float64(level) * levelSpacing
-			currentX += node.Width + minNodeSpacing
-		}
+		// Advance currentY past all sub-rows of this level
+		subRows := (len(nodesInLevel) + nodesPerRow - 1) / nodesPerRow
+		currentY += float64(subRows)*rowSpacing + 20.0 // extra gap between levels
 	}
 }
 
@@ -105,14 +137,14 @@ func CalculateGridLayout(graphData *graph.Data) {
 		nodes = append(nodes, node)
 	}
 
-	// Sort nodes by name for consistent layout
-	for i := 0; i < len(nodes)-1; i++ {
-		for j := i + 1; j < len(nodes); j++ {
-			if nodes[i].Name > nodes[j].Name {
-				nodes[i], nodes[j] = nodes[j], nodes[i]
-			}
+	// Sort nodes by level then name for consistent layout
+	sort.Slice(nodes, func(i, j int) bool {
+		if nodes[i].Level != nodes[j].Level {
+			return nodes[i].Level < nodes[j].Level
 		}
-	}
+
+		return nodes[i].Name < nodes[j].Name
+	})
 
 	// Calculate dynamic spacing based on actual node sizes
 	maxNodeWidth := 0.0
@@ -151,19 +183,6 @@ func CalculateGridLayout(graphData *graph.Data) {
 		node.X = float64(col)*nodeSpacingX + nodeSpacingX/2
 		node.Y = float64(row)*nodeSpacingY + nodeSpacingY/2
 	}
-}
-
-// areEdgesArtificial checks if edges are just consecutive dependencies (artificial).
-func areEdgesArtificial(graphData *graph.Data) bool {
-	if len(graphData.Edges) == 0 {
-		return false
-	}
-
-	// If we have exactly (nodeCount - 1) edges and they form a chain, they're likely artificial
-	nodeCount := len(graphData.Nodes)
-	edgeCount := len(graphData.Edges)
-
-	return edgeCount == nodeCount-1
 }
 
 // calculateOptimalColumns determines the optimal number of columns for grid layout.
