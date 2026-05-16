@@ -110,6 +110,8 @@ type PKGBUILD struct {
 	DebTemplate     string
 	Depends         []string
 	Distro          string
+	Enhances        []string
+	Supplements     []string
 	Epoch           string
 	Files           []string
 	FullDistroName  string
@@ -926,6 +928,20 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any, priority int) {
 		}
 
 		pkgBuild.Conflicts = arrVal
+	case "enhances":
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Enhances = arrVal
+	case "supplements":
+		arrVal, ok := data.([]string)
+		if !ok {
+			return
+		}
+
+		pkgBuild.Supplements = arrVal
 	case "replaces":
 		arrVal, ok := data.([]string)
 		if !ok {
