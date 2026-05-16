@@ -2,11 +2,14 @@
 package rpm
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -16,7 +19,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 
-	rpmpack "github.com/google/rpmpack"
+	rpmpack "github.com/M0Rf30/rpmpack"
 )
 
 const rootOwner = "root"
@@ -91,6 +94,16 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, err
 		return "", err
 	}
 
+	enhances, err := r.processDepends(r.PKGBUILD.Enhances)
+	if err != nil {
+		return "", err
+	}
+
+	supplements, err := r.processDepends(r.PKGBUILD.Supplements)
+	if err != nil {
+		return "", err
+	}
+
 	rpm, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
 		Name:        r.PKGBUILD.PkgName,
 		Summary:     r.PKGBUILD.PkgDesc,
@@ -110,6 +123,8 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, err
 		Requires:    requires,
 		Conflicts:   conflicts,
 		Recommends:  recommends,
+		Enhances:    enhances,
+		Supplements: supplements,
 		BuildTime:   files.SourceDateEpochFromEnv(),
 	})
 	if err != nil {
@@ -252,12 +267,9 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 }
 
 // addChangelog adds changelog entries to the RPM package if a changelog is
-// specified in the PKGBUILD. Currently, rpmpack does not expose a direct
-// changelog API, so this is a no-op with a warning log. Future versions may
-// use AddCustomTag to inject changelog entries via RPM tags.
-//
-// The rpm parameter is reserved for future use when rpmpack adds changelog API.
-func (r *RPM) addChangelog(_ *rpmpack.RPM) {
+// specified in the PKGBUILD. It reads the changelog file, parses it into
+// ChangelogEntry objects, and sets them on the RPM metadata.
+func (r *RPM) addChangelog(rpm *rpmpack.RPM) {
 	changelogData, err := r.ReadAndValidateChangelog()
 	if err != nil {
 		logger.Warn("failed to read changelog for RPM package",
@@ -270,12 +282,8 @@ func (r *RPM) addChangelog(_ *rpmpack.RPM) {
 		return
 	}
 
-	// Note: rpmpack v0.7.1 does not expose a direct changelog API.
-	// RPM changelog entries require specific formatting and tag injection.
-	// This is a limitation of the current rpmpack library.
-	// TODO: Implement changelog support when rpmpack adds the necessary API.
-	logger.Info("changelog specified but RPM changelog support not yet available",
-		"package", r.PKGBUILD.PkgName)
+	entries := parseRPMChangelog(changelogData)
+	rpm.Changelog = entries
 }
 
 // asRPMDirectory creates an RPMFile object for a directory based on the provided Entry.
@@ -448,4 +456,110 @@ func (r *RPM) processDepends(depends []string) (rpmpack.Relations, error) {
 	}
 
 	return relations, nil
+}
+
+// parseRPMChangelog parses raw changelog data in RPM format into ChangelogEntry objects.
+// The expected format is:
+//
+//   - Wed Jan 01 2025 Author Name <email@example.com> - 1.0-1
+//
+//   - Change description
+//
+//   - Another change
+//
+//   - Mon Dec 01 2024 Author Name <email@example.com> - 0.9-1
+//
+//   - Previous change
+//
+// Each entry block starts with "* " followed by a date, author, and version.
+// Subsequent lines starting with "- " are change descriptions.
+// If date parsing fails, time.Now() is used as fallback.
+func parseRPMChangelog(data []byte) []rpmpack.ChangelogEntry {
+	var entries []rpmpack.ChangelogEntry
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+
+	var currentEntry *rpmpack.ChangelogEntry
+
+	var textLines []string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Check if this is a header line (starts with "* ")
+		if strings.HasPrefix(line, "* ") {
+			// Save the previous entry if it exists
+			if currentEntry != nil {
+				currentEntry.Text = strings.Join(textLines, "\n")
+				entries = append(entries, *currentEntry)
+				textLines = nil
+			}
+
+			// Parse the new header line
+			currentEntry = parseChangelogHeader(line)
+		} else if currentEntry != nil && strings.HasPrefix(line, "- ") {
+			// This is a change description line
+			textLines = append(textLines, line)
+		}
+	}
+
+	// Don't forget the last entry
+	if currentEntry != nil {
+		currentEntry.Text = strings.Join(textLines, "\n")
+		entries = append(entries, *currentEntry)
+	}
+
+	return entries
+}
+
+// parseChangelogHeader parses a changelog header line in the format:
+// * Wed Jan 01 2025 Author Name <email@example.com> - 1.0-1
+// Returns a ChangelogEntry with the parsed date and author.
+// If date parsing fails, uses time.Now() as fallback.
+func parseChangelogHeader(line string) *rpmpack.ChangelogEntry {
+	// Remove the leading "* "
+	line = strings.TrimPrefix(line, "* ")
+
+	// Find the " - " separator that precedes the version
+	versionSepIdx := strings.LastIndex(line, " - ")
+	if versionSepIdx == -1 {
+		// No version separator found, treat entire line as date + author
+		versionSepIdx = len(line)
+	}
+
+	dateAndAuthor := line[:versionSepIdx]
+
+	// Try to parse the date from the beginning of dateAndAuthor
+	// RPM changelog format: "Mon Jan 02 2006 Author Name <email>"
+	// We need to extract the first 4 tokens as the date
+	parts := strings.Fields(dateAndAuthor)
+	if len(parts) < 4 {
+		// Not enough parts for a valid date, use current time
+		return &rpmpack.ChangelogEntry{
+			Time:   time.Now(),
+			Author: dateAndAuthor,
+			Text:   "",
+		}
+	}
+
+	// Try to parse date with the first 4 parts: "Mon Jan 02 2006"
+	dateStr := strings.Join(parts[:4], " ")
+	author := strings.Join(parts[4:], " ")
+
+	// Try parsing with standard format
+	parsedTime, err := time.Parse("Mon Jan 02 2006", dateStr)
+	if err != nil {
+		// Try alternative format with single-digit day (Mon Jan  2 2006)
+		parsedTime, err = time.Parse("Mon Jan  2 2006", dateStr)
+		if err != nil {
+			// If both formats fail, use current time
+			parsedTime = time.Now()
+		}
+	}
+
+	return &rpmpack.ChangelogEntry{
+		Time:   parsedTime,
+		Author: author,
+		Text:   "",
+	}
 }
