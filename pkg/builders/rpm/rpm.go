@@ -69,37 +69,7 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, err
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
 	// Pre-compute all dependency relations before creating RPM metadata
-	obsoletes, err := r.processDepends(r.PKGBUILD.Replaces)
-	if err != nil {
-		return "", err
-	}
-
-	provides, err := r.processDepends(r.PKGBUILD.Provides)
-	if err != nil {
-		return "", err
-	}
-
-	requires, err := r.processDepends(r.PKGBUILD.Depends)
-	if err != nil {
-		return "", err
-	}
-
-	conflicts, err := r.processDepends(r.PKGBUILD.Conflicts)
-	if err != nil {
-		return "", err
-	}
-
-	recommends, err := r.processDepends(r.PKGBUILD.OptDepends)
-	if err != nil {
-		return "", err
-	}
-
-	enhances, err := r.processDepends(r.PKGBUILD.Enhances)
-	if err != nil {
-		return "", err
-	}
-
-	supplements, err := r.processDepends(r.PKGBUILD.Supplements)
+	rel, err := r.buildDependencyRelations()
 	if err != nil {
 		return "", err
 	}
@@ -118,13 +88,13 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, err
 		Group:       r.PKGBUILD.Section,
 		Compressor:  r.compression,
 		Licence:     license,
-		Obsoletes:   obsoletes,
-		Provides:    provides,
-		Requires:    requires,
-		Conflicts:   conflicts,
-		Recommends:  recommends,
-		Enhances:    enhances,
-		Supplements: supplements,
+		Obsoletes:   rel.obsoletes,
+		Provides:    rel.provides,
+		Requires:    rel.requires,
+		Conflicts:   rel.conflicts,
+		Recommends:  rel.recommends,
+		Enhances:    rel.enhances,
+		Supplements: rel.supplements,
 		BuildTime:   files.SourceDateEpochFromEnv(),
 	})
 	if err != nil {
@@ -275,7 +245,7 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 // specified in the PKGBUILD. It reads the changelog file, parses it into
 // ChangelogEntry objects, and sets them on the RPM metadata.
 func (r *RPM) addChangelog(rpm *rpmpack.RPM) {
-	changelogData, err := r.ReadAndValidateChangelog()
+	changelogData, err := r.PKGBUILD.ReadChangelog()
 	if err != nil {
 		logger.Warn("failed to read changelog for RPM package",
 			"error", err)
@@ -441,6 +411,44 @@ func extractFileModTimeUint32(fileInfo os.FileInfo) (uint32, error) {
 // It uses the common FormatRelease method with RPM-specific distro mappings.
 func (r *RPM) getRelease() {
 	r.FormatRelease(RPMDistros)
+}
+
+// rpmRelations bundles all dependency-relation flavors consumed by rpmpack.NewRPM.
+// Grouping them avoids 7 sequential local variables in BuildPackage and makes the
+// build-up phase trivially testable in isolation.
+type rpmRelations struct {
+	obsoletes, provides, requires, conflicts rpmpack.Relations
+	recommends, enhances, supplements        rpmpack.Relations
+}
+
+// buildDependencyRelations computes every dependency relation needed by the RPM
+// metadata in one pass, short-circuiting on the first parse error.
+func (r *RPM) buildDependencyRelations() (rpmRelations, error) {
+	var rel rpmRelations
+
+	specs := []struct {
+		dst  *rpmpack.Relations
+		deps []string
+	}{
+		{&rel.obsoletes, r.PKGBUILD.Replaces},
+		{&rel.provides, r.PKGBUILD.Provides},
+		{&rel.requires, r.PKGBUILD.Depends},
+		{&rel.conflicts, r.PKGBUILD.Conflicts},
+		{&rel.recommends, r.PKGBUILD.OptDepends},
+		{&rel.enhances, r.PKGBUILD.Enhances},
+		{&rel.supplements, r.PKGBUILD.Supplements},
+	}
+
+	for _, s := range specs {
+		rels, err := r.processDepends(s.deps)
+		if err != nil {
+			return rpmRelations{}, err
+		}
+
+		*s.dst = rels
+	}
+
+	return rel, nil
 }
 
 // processDepends converts dependency strings to rpmpack.Relations format.

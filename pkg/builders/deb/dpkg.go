@@ -311,7 +311,7 @@ func (d *Package) createDebconfFile(name, variable string) error {
 // usr/share/doc/<pkgname>/changelog.Debian.gz in the package directory.
 // Returns nil if no changelog is specified.
 func (d *Package) createChangelogFile() error {
-	changelogData, err := d.ReadAndValidateChangelog()
+	changelogData, err := d.PKGBUILD.ReadChangelog()
 	if err != nil {
 		return err
 	}

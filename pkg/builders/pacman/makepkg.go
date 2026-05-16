@@ -220,7 +220,7 @@ func (m *Pkg) writeInstallScriptIfNeeded() error {
 // writeChangelogIfPresent writes a .CHANGELOG file in the package root when
 // the PKGBUILD declares a changelog source.
 func (m *Pkg) writeChangelogIfPresent() error {
-	changelogData, err := m.ReadAndValidateChangelog()
+	changelogData, err := m.PKGBUILD.ReadChangelog()
 	if err != nil {
 		return err
 	}
