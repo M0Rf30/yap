@@ -154,6 +154,8 @@ type PKGBUILD struct {
 	PreTrans          string
 	PreUpgrade        string
 	priorities        map[string]int
+	archSourceURI     []string // arch-specific source_<arch> entries, merged into SourceURI at Finalize
+	archHashSums      []string // arch-specific sha*sums_<arch> entries, merged into HashSums at Finalize
 	Priority          string
 	Provides          []string
 	Replaces          []string
@@ -184,11 +186,20 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 		return err
 	}
 
-	if priority < pkgBuild.priorities[key] {
+	// Allow base items (priority 0) to be added even if a higher-priority item
+	// was already set. This enables order-independent accumulation of arch-specific
+	// sources/checksums: base items always go to SourceURI/HashSums, arch-specific
+	// items accumulate in archSourceURI/archHashSums and are merged by Finalize().
+	oldPriority := pkgBuild.priorities[key]
+	if priority < oldPriority && priority != priorityBase {
 		return nil
 	}
 
-	pkgBuild.priorities[key] = priority
+	// Update priority only if new priority is higher (or if this is the first time)
+	if priority > oldPriority {
+		pkgBuild.priorities[key] = priority
+	}
+
 	pkgBuild.mapVariables(key, data)
 	pkgBuild.mapArrays(key, data, priority)
 	pkgBuild.mapFunctions(key, data)
@@ -424,9 +435,23 @@ func (pkgBuild *PKGBUILD) Init() {
 		pkgBuild.FullDistroName += "_" + pkgBuild.Codename
 	}
 
+	pkgBuild.archSourceURI = nil
+	pkgBuild.archHashSums = nil
+
 	// Apply option defaults so PKGBUILDs without an options=() array still
 	// get the correct behaviour (e.g. emptydirs=true keeps empty dirs).
 	pkgBuild.processOptions()
+}
+
+// Finalize merges arch-specific source and checksum accumulators into the
+// base SourceURI and HashSums slices. Must be called after all AddItem calls
+// are complete (i.e. after parsing). Order-independent: arch entries are
+// always appended after the base entries regardless of declaration order.
+func (pkgBuild *PKGBUILD) Finalize() {
+	pkgBuild.SourceURI = append(pkgBuild.SourceURI, pkgBuild.archSourceURI...)
+	pkgBuild.HashSums = append(pkgBuild.HashSums, pkgBuild.archHashSums...)
+	pkgBuild.archSourceURI = nil
+	pkgBuild.archHashSums = nil
 }
 
 // splitOverrideKeys is the set of variable names that package_<name>() functions
@@ -968,8 +993,8 @@ func (pkgBuild *PKGBUILD) mapArrays(key string, data any, priority int) {
 		}
 
 		if priority > priorityBase {
-			// Arch-specific source_<arch>: append to base source array (makepkg semantics).
-			pkgBuild.SourceURI = append(pkgBuild.SourceURI, arrVal...)
+			// Arch-specific source_<arch>: accumulate separately; merged by Finalize().
+			pkgBuild.archSourceURI = append(pkgBuild.archSourceURI, arrVal...)
 		} else {
 			pkgBuild.SourceURI = arrVal
 		}
@@ -1024,8 +1049,8 @@ func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any, priority int)
 	case sha512sumsKey, sha384sumsKey, sha256sumsKey, sha224sumsKey, b2sumsKey, cksumsKey:
 		if arrVal, ok := data.([]string); ok {
 			if priority > priorityBase {
-				// Arch-specific: append alongside the arch-specific source entries.
-				pkgBuild.HashSums = append(pkgBuild.HashSums, arrVal...)
+				// Arch-specific: accumulate separately; merged by Finalize().
+				pkgBuild.archHashSums = append(pkgBuild.archHashSums, arrVal...)
 			} else {
 				pkgBuild.HashSums = arrVal
 			}
