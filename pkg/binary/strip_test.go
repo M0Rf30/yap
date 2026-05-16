@@ -123,3 +123,88 @@ func TestStripWithCrossCompilation(t *testing.T) {
 	_ = os.Unsetenv("STRIP")
 	_ = binary.StripFile(testFile)
 }
+
+func TestStripFallsBackToNativeWhenCrossStripMissing(t *testing.T) {
+	t.Helper()
+
+	originalStrip := os.Getenv("STRIP")
+
+	defer func() {
+		if originalStrip != "" {
+			_ = os.Setenv("STRIP", originalStrip)
+		} else {
+			_ = os.Unsetenv("STRIP")
+		}
+	}()
+
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "test_binary")
+
+	err := os.WriteFile(testFile, []byte("dummy binary content"), 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Set STRIP to a cross-strip tool that definitely does not exist.
+	// The fallback logic should silently switch to native strip instead of
+	// returning an "executable file not found" error.
+	_ = os.Setenv("STRIP", "this-cross-strip-does-not-exist")
+
+	// Native strip will still fail on a non-ELF dummy file, but the error
+	// must NOT be "executable file not found" — that would mean the fallback
+	// did not trigger.
+	err = binary.StripFile(testFile)
+	if err != nil {
+		errMsg := err.Error()
+		if contains(errMsg, "executable file not found") || contains(errMsg, "no such file or directory") && contains(errMsg, "this-cross-strip-does-not-exist") {
+			t.Errorf("expected fallback to native strip, but got cross-strip error: %v", err)
+		}
+	}
+}
+
+func TestStripUsesNativeStripWhenEnvUnset(t *testing.T) {
+	t.Helper()
+
+	originalStrip := os.Getenv("STRIP")
+
+	defer func() {
+		if originalStrip != "" {
+			_ = os.Setenv("STRIP", originalStrip)
+		} else {
+			_ = os.Unsetenv("STRIP")
+		}
+	}()
+
+	_ = os.Unsetenv("STRIP")
+
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "test_binary")
+
+	err := os.WriteFile(testFile, []byte("dummy binary content"), 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// With STRIP unset, native strip is used. It may fail on a non-ELF file,
+	// but must not fail with "executable file not found".
+	err = binary.StripFile(testFile)
+	if err != nil {
+		if contains(err.Error(), "executable file not found") {
+			t.Errorf("native strip not found in PATH: %v", err)
+		}
+	}
+}
+
+// contains is a helper to avoid importing strings in test assertions.
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || substr == "" ||
+		func() bool {
+			for i := range len(s) - len(substr) + 1 {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+
+			return false
+		}())
+}

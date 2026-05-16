@@ -5,6 +5,7 @@ import (
 	"context"
 	"debug/elf"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -124,10 +125,19 @@ func StripLTO(path string, args ...string) error {
 func strip(path string, args ...string) error {
 	args = append(args, path)
 
-	// Use cross-compilation strip if STRIP environment variable is set
-	// This allows stripping binaries compiled for foreign architectures
+	// Use cross-compilation strip if STRIP environment variable is set.
+	// This allows stripping binaries compiled for foreign architectures.
+	// If the cross-strip tool is not found in PATH, fall back to the native
+	// strip and emit a warning — this avoids hard failures when the cross
+	// toolchain is not installed on the build host (e.g. pre-built binary
+	// packages that don't require compilation).
 	stripCmd := os.Getenv("STRIP")
 	if stripCmd == "" {
+		stripCmd = "strip"
+	} else if _, err := exec.LookPath(stripCmd); err != nil {
+		logger.Warn("cross-strip not found in PATH, falling back to native strip",
+			"cross_strip", stripCmd)
+
 		stripCmd = "strip"
 	}
 
