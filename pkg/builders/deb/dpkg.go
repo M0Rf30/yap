@@ -119,11 +119,16 @@ func (d *Package) PrepareFakeroot(_ string, targetArch string) error {
 		return err
 	}
 
-	if d.PKGBUILD.StripEnabled {
-		return options.Strip(d.PKGBUILD.PackageDir)
-	}
-
-	return nil
+	return options.Apply(d.PKGBUILD.PackageDir, options.Options{
+		DebugEnabled:     d.PKGBUILD.DebugEnabled,
+		DocsEnabled:      d.PKGBUILD.DocsEnabled,
+		EmptyDirsEnabled: d.PKGBUILD.EmptyDirsEnabled,
+		LibtoolEnabled:   d.PKGBUILD.LibtoolEnabled,
+		PurgeEnabled:     d.PKGBUILD.PurgeEnabled,
+		StaticEnabled:    d.PKGBUILD.StaticEnabled,
+		StripEnabled:     d.PKGBUILD.StripEnabled,
+		ZipManEnabled:    d.PKGBUILD.ZipManEnabled,
+	})
 }
 
 // addArFile adds a file to an archive writer with the specified name, body,
