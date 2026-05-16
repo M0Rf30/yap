@@ -232,7 +232,12 @@ func (mpc *MultipleProject) BuildAll() error {
 
 	// Show verbose dependency information at debug level regardless of build mode.
 	// In sequential mode this is informational only; resolution happens in the parallel path.
-	mpc.displayVerboseDependencyInfo()
+	// Gated on verbose/debug logging: the call allocates a package map plus a runtime
+	// dependency map and iterates every project — wasted work when the logs would
+	// be discarded anyway.
+	if logger.IsVerboseEnabled() {
+		mpc.displayVerboseDependencyInfo()
+	}
 
 	// Filter projects based on --from and --to flags before building
 	projectsToProcess := mpc.getProjectsInRange()
@@ -531,10 +536,20 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 	}()
 
 	// Check for errors
+	var errs []error
+
 	for err := range errorChan {
 		if err != nil {
-			return err
+			if len(errs) == 0 {
+				cancel()
+			}
+
+			errs = append(errs, err)
 		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil
@@ -1124,15 +1139,30 @@ func (mpc *MultipleProject) validateJSON() error {
 	return jsonValidator.Struct(mpc)
 }
 
+// buildPackageMap returns a map from package name to project for the given projects.
+// If projects is nil, uses mpc.Projects. The map is freshly allocated on each call.
+func (mpc *MultipleProject) buildPackageMap(projects ...[]*Project) map[string]*Project {
+	var source []*Project
+	if len(projects) > 0 && projects[0] != nil {
+		source = projects[0]
+	} else {
+		source = mpc.Projects
+	}
+
+	packageMap := make(map[string]*Project, len(source))
+	for _, proj := range source {
+		packageMap[proj.Builder.PKGBUILD.PkgName] = proj
+	}
+
+	return packageMap
+}
+
 // displayVerboseDependencyInfo shows detailed dependency information for all projects.
 func (mpc *MultipleProject) displayVerboseDependencyInfo() {
 	logger.Debug(i18n.T("logger.dependency_analysis_starting"))
 
 	// Create dependency map for internal packages
-	packageMap := make(map[string]*Project)
-	for _, proj := range mpc.Projects {
-		packageMap[proj.Builder.PKGBUILD.PkgName] = proj
-	}
+	packageMap := mpc.buildPackageMap()
 
 	// Build runtime dependency map to determine which packages should be installed
 	runtimeDependencyMap := mpc.buildRuntimeDependencyMap()
@@ -1281,14 +1311,13 @@ func (mpc *MultipleProject) resolveDependencies(projects []*Project) ([][]*Proje
 	logger.Info(i18n.T("logger.analyzing_package_dependencies"))
 
 	// Build dependency graph
-	projectMap := make(map[string]*Project)
+	projectMap := mpc.buildPackageMap(projects)
 	dependsOn := make(map[string][]string)
 	dependedBy := make(map[string][]string)
 
 	// Index projects by package name - only for projects in range
 	for _, proj := range projects {
 		pkgName := proj.Builder.PKGBUILD.PkgName
-		projectMap[pkgName] = proj
 		dependsOn[pkgName] = nil
 		dependedBy[pkgName] = nil
 	}
@@ -1405,6 +1434,7 @@ func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 			logger.Error(i18n.T("logger.circular_dependency_detected"),
 				"remaining_packages", problematicPackages)
 
+			//nolint:err113 // sentinel error chain required for errors.Is matching
 			return nil, fmt.Errorf("%w: %v", ErrCircularDependency, problematicPackages)
 		}
 
@@ -1442,12 +1472,7 @@ func (mpc *MultipleProject) topologicalSort(projectMap map[string]*Project,
 // of other packages.
 func (mpc *MultipleProject) buildRuntimeDependencyMap() map[string]bool {
 	dependencyMap := make(map[string]bool)
-	packageMap := make(map[string]*Project)
-
-	// Index projects by package name
-	for _, proj := range mpc.Projects {
-		packageMap[proj.Builder.PKGBUILD.PkgName] = proj
-	}
+	packageMap := mpc.buildPackageMap()
 
 	// Check which packages are runtime dependencies of others
 	for _, proj := range mpc.Projects {
@@ -1466,12 +1491,11 @@ func (mpc *MultipleProject) buildRuntimeDependencyMap() map[string]bool {
 // This helps identify "fundamental" packages that should be built first.
 func (mpc *MultipleProject) calculateDependencyPopularity() map[string]int {
 	popularity := make(map[string]int)
-	packageMap := make(map[string]*Project)
+	packageMap := mpc.buildPackageMap()
 
-	// Index projects by package name
+	// Initialize popularity for all packages
 	for _, proj := range mpc.Projects {
-		packageMap[proj.Builder.PKGBUILD.PkgName] = proj
-		popularity[proj.Builder.PKGBUILD.PkgName] = 0 // Initialize
+		popularity[proj.Builder.PKGBUILD.PkgName] = 0
 	}
 
 	// Count how many packages depend on each package (both runtime and make dependencies)
@@ -1759,6 +1783,7 @@ func (mpc *MultipleProject) topologicalSortRuntimeDeps(projectMap map[string]*Pr
 		// so that callers (and tests) can distinguish build-order cycles from
 		// runtime-dependency cycles via errors.Is / errors.As.
 		if errors.Is(err, ErrCircularDependency) {
+			//nolint:err113 // sentinel error chain required for errors.Is matching
 			return nil, fmt.Errorf("%w: %w", ErrCircularRuntimeDependency, err)
 		}
 
