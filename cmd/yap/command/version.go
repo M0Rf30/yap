@@ -5,10 +5,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/buildinfo"
+	"github.com/M0Rf30/yap/v2/pkg/color"
 )
 
 var versionCmd = &cobra.Command{
@@ -48,10 +48,7 @@ func printVersion() {
 	data = append(data, []string{"Field", "Value"})
 	data = append(data, rows...)
 
-	_ = pterm.DefaultTable.
-		WithHasHeader().
-		WithData(data).
-		Render()
+	fmt.Print(color.Table(data, true))
 }
 
 //nolint:gochecknoinits // Required for cobra command registration

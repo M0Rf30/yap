@@ -148,14 +148,18 @@ func updateSubCommandDescriptions(cmd *cobra.Command) {
 			subCmd.Short = i18n.T("commands.prepare.short")
 		case commandPull:
 			subCmd.Short = i18n.T("commands.pull.short")
+			subCmd.Long = i18n.T("commands.pull.long")
+			subCmd.Example = i18n.T("commands.pull.examples")
 		case commandStatus:
 			subCmd.Short = i18n.T("commands.status.short")
 		case commandVersion:
 			subCmd.Short = i18n.T("commands.version.short")
 		case commandZap:
 			subCmd.Short = i18n.T("commands.zap.short")
-		case commandHelp:
+		case "completion":
 			subCmd.Short = i18n.T("commands.completion.short")
+			subCmd.Long = i18n.T("commands.completion.long")
+			subCmd.Example = i18n.T("commands.completion.examples")
 		}
 	}
 }

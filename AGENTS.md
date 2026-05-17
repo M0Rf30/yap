@@ -14,6 +14,9 @@
 - **Dependency Resolution** (`pkg/graph/`) - Build order calculation and dependency management
 - **Source Handling** (`pkg/source/`) - Download and validation of source files
 - **PKGBUILD Parsing** (`pkg/pkgbuild/`, `pkg/parser/`) - Extended PKGBUILD format support
+- **APT Cache** (`pkg/aptcache/`) - Pure-Go deb822 parser for `/var/lib/apt/lists` and `/var/lib/dpkg/status`; replaces `apt-cache`/`dpkg` subprocess calls during cross-compilation dep partitioning
+- **Color** (`pkg/color/`) - Zero-dependency ANSI color helpers used by logger, progress bar, and CLI output
+- **Build Info** (`pkg/buildinfo/`) - Build-time metadata (Version, Commit, BuildTime) injected via `-ldflags`
 
 ### Architecture
 ```
@@ -151,14 +154,14 @@ type Config struct {
 
 ### Logging
 - Use structured logging with `pkg/logger`
-- Include component and operation context
+- Pass key-value pairs as flat variadic args after the message
 - Use appropriate log levels (DEBUG, INFO, WARN, ERROR)
+- Long lines auto-wrap into a tree layout (├/└) at terminal width
 
 ```go
-logger.Info("Building package").
-    WithField("package", pkgName).
-    WithField("distribution", distro).
-    WithComponent("builder")
+logger.Info("Building package", "package", pkgName, "distro", distro)
+logger.Warn("Skipping strip", "binary", path, "reason", "foreign arch")
+logger.Error("Build failed", "error", err, "duration", elapsed)
 ```
 
 ### Error Wrapping
@@ -436,9 +439,8 @@ yap build arch examples/yap           # Arch Linux
 ## Current Development Focus
 
 ### Active Investigations
-1. **APK Format Compliance** - Bringing APK builder to full Alpine Linux compatibility
-2. **Multi-Stream Gzip Support** - Critical for APK package installation
-3. **Package Signing Infrastructure** - RSA signature integration
+1. **RPM Changelog** — Deferred pending rpmpack API support
+2. **Test Coverage Expansion** — `pkg/signing` and `pkg/sbom` targets 85%
 
 ### Recent Achievements
 - ✅ **Package signing infrastructure: APK RSA + DEB/RPM/Pacman GPG (2026-05-04)** — Pure-Go via ProtonMail/go-crypto. APK packages now installable without --allow-untrusted; DEB/RPM/Pacman emit detached signature sidecars (.deb.asc/.rpm.asc/.pkg.tar.zst.sig). RPM also supports in-package signatures via rpmpack.SetPGPSigner. Priority: CLI > format env > global env > yap.json > ~/.config/yap/keys/.
@@ -455,6 +457,10 @@ yap build arch examples/yap           # Arch Linux
 - ✅ **Sequential build as default; `--parallel` / `-P` flag for opt-in parallel dep resolution (2026-02-18)**
 - ✅ **Code quality pass 2: fixed malformed nolint, migrated ~30 fmt.Errorf to pkg/errors, threaded context.Context through archive/shell/download APIs (2026-02-19)**
 - ✅ **Unified `/etc/os-release` auto-detection across `build`, `zap`, and `prepare` (`prepare` distro arg now optional, supports `distro-release` form) — `ResolveDistroRelease` helper (2026-05-04)**
+- ✅ **Pure-Go apt/dpkg metadata parser — `pkg/aptcache` (2026-05-17)** — Replaces `apt-cache show` + `dpkg -s` subprocess calls in cross-compilation dep partitioning with a single in-process deb822 index scan. O(1) lookups per package; also handles virtual package resolution (`apt-cache policy` + `showpkg` replaced by reverse-provides index).
+- ✅ **pterm removed — zero external UI dependencies (2026-05-17)** — Replaced `github.com/pterm/pterm` (and 8 transitive deps: atomicgo/cursor, atomicgo/keyboard, atomicgo/schedule, containerd/console, gookit/color, lithammer/fuzzysearch, xo/terminfo, mattn/go-runewidth) with `pkg/color` (stdlib ANSI helpers) and `pkg/logger` (slog + custom handler). Progress bar replaced with 120-line stdlib implementation. Net: ~12 MB of source deps removed, 15 packages gone from module graph.
+- ✅ **CLI output overhaul (2026-05-17)** — `version`/`status` use plain table output; `build --help` flags fully i18n'd; `-l`/`--language` flag now works for `--help` via pre-parse in `main()`; footer shown on root help only; emoji stripped from command Short descriptions; `pkg/buildinfo` wires ldflags correctly.
+- ✅ **Structured log tree rendering (2026-05-17)** — Logger auto-wraps key-value pairs onto indented `├`/`└` tree lines when the full line exceeds terminal width, matching the previous pterm behaviour. Newlines in values collapsed to ` ↵ `.
 
 ### Architectural Decisions
 
@@ -564,6 +570,10 @@ The `Builder.BuildPackage` interface returns `(string, error)` so the pipeline c
 - **Format validation**: Run `make fmt lint` before committing
 - **Test requirements**: Sequential execution (`-p 1`) for all tests
 - **APK work**: Requires `github.com/M0Rf30/archives` (morfeo branch)
+- **ldflags**: Version/Commit/BuildTime are injected into `pkg/buildinfo` vars, not `main.*`
+- **Logging**: Use `logger.Info/Warn/Error/Debug(msg, "key", val, ...)` — flat variadic k/v pairs
+- **Colors**: Use `pkg/color` helpers — never import external color/UI libraries
+- **apt metadata**: Use `pkg/aptcache.Load()` instead of spawning `apt-cache`/`dpkg` subprocesses
 
 ### For Documentation
 - Keep `AGENTS.md` updated with current project status

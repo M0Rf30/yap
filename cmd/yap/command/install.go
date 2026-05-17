@@ -26,7 +26,7 @@ const (
 // installCmd represents the install command.
 var installCmd = &cobra.Command{
 	Use:     commandInstall + " <artifact-file>",
-	Short:   "📦 Install a package artifact using the appropriate package manager", // Set in init()
+	Short:   "", // Set by InitializeLocalizedDescriptions
 	GroupID: commandUtility,
 	Long:    "", // Will be set in init()
 	Example: "", // Will be set in init()

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/color"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -55,60 +55,58 @@ func SetupEnhancedHelp() {
 
 	// Set up template functions
 	cobra.AddTemplateFunc("styleUsage", func(s string) string {
-		return pterm.FgLightCyan.Sprintf("Usage: %s", s)
+		return color.HiCyan(fmt.Sprintf("Usage: %s", s))
 	})
 
 	cobra.AddTemplateFunc("styleAliases", func() string {
-		return pterm.NewStyle(pterm.FgMagenta, pterm.Bold).Sprint("Aliases:")
+		return color.BoldMagenta("Aliases:")
 	})
 
 	cobra.AddTemplateFunc("styleExamples", func() string {
-		return pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint("Examples:")
+		return color.BoldGreen("Examples:")
 	})
 
 	cobra.AddTemplateFunc("styleAvailableCommands", func() string {
-		return pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("Available Commands:")
+		return color.BoldBlue("Available Commands:")
 	})
 
 	cobra.AddTemplateFunc("styleGroupTitle", func(s string) string {
-		return pterm.NewStyle(pterm.FgCyan, pterm.Bold).Sprintf("%s:", s)
+		return color.BoldCyan(fmt.Sprintf("%s:", s))
 	})
 
 	cobra.AddTemplateFunc("styleAdditionalCommands", func() string {
-		return pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("Additional Commands:")
+		return color.BoldBlue("Additional Commands:")
 	})
 
 	cobra.AddTemplateFunc("styleCommand", func(s string) string {
-		return pterm.FgLightBlue.Sprint(strings.TrimSpace(s))
+		return color.HiBlue(strings.TrimSpace(s))
 	})
 
-	cobra.AddTemplateFunc("styleShort", func(s string) string {
-		return pterm.FgWhite.Sprint(s)
-	})
+	cobra.AddTemplateFunc("styleShort", color.White)
 
 	// Fix the styleFlags function to accept variable arguments to handle both cases
 	cobra.AddTemplateFunc("styleFlags", func(_ ...any) string {
-		return pterm.NewStyle(pterm.FgYellow, pterm.Bold).Sprint("Flags:")
+		return color.BoldYellow("Flags:")
 	})
 
 	cobra.AddTemplateFunc("styleGlobalFlags", func(_ ...any) string {
-		return pterm.NewStyle(pterm.FgLightYellow, pterm.Bold).Sprint("Global Flags:")
+		return color.BoldYellow("Global Flags:")
 	})
 
 	cobra.AddTemplateFunc("styleAdditionalHelp", func() string {
-		return pterm.NewStyle(pterm.FgMagenta, pterm.Bold).Sprint("Additional help topics:")
+		return color.BoldMagenta("Additional help topics:")
 	})
 
 	cobra.AddTemplateFunc("styleMoreInfo", func() string {
-		return pterm.FgGray.Sprint(i18n.T("footer.more_info"))
+		return color.Gray(i18n.T("footer.more_info"))
 	})
 
 	cobra.AddTemplateFunc("styleFooter", func() string {
 		return fmt.Sprintf("%s %s\n%s %s\n",
-			pterm.FgBlue.Sprint(i18n.T("footer.documentation")),
-			pterm.FgLightBlue.Sprint("https://github.com/M0Rf30/yap"),
-			pterm.FgRed.Sprint(i18n.T("footer.report_issues")),
-			pterm.FgLightRed.Sprint("https://github.com/M0Rf30/yap/issues"))
+			color.Blue(i18n.T("footer.documentation")),
+			color.HiBlue("https://github.com/M0Rf30/yap"),
+			color.Red(i18n.T("footer.report_issues")),
+			color.Red("https://github.com/M0Rf30/yap/issues"))
 	})
 
 	// Add required template helper functions
@@ -134,7 +132,7 @@ func SetupEnhancedHelp() {
 func CustomErrorHandler(cmd *cobra.Command, err error) error {
 	if err != nil {
 		// Style the error message
-		styledError := pterm.NewStyle(pterm.FgRed, pterm.Bold).Sprintf("Error: %s", err.Error())
+		styledError := color.Red(color.Bold(fmt.Sprintf("Error: %s", err.Error())))
 		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), styledError)
 
 		// Add helpful suggestion

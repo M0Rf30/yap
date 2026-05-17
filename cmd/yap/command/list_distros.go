@@ -1,7 +1,8 @@
 package command
 
 import (
-	"github.com/pterm/pterm"
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -23,7 +24,7 @@ var listDistrosCmd = &cobra.Command{
 // ListDistros prints all available distribution releases.
 func ListDistros() {
 	for _, release := range &constants.Releases {
-		pterm.Println(release)
+		fmt.Println(release)
 	}
 }
 

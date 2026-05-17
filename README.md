@@ -47,7 +47,8 @@ YAP eliminates the need to learn multiple packaging formats and build systems by
 - **Simple Configuration**: JSON project files with minimal setup
 - **Familiar Syntax**: PKGBUILD-based with intuitive extensions
 - **Rich CLI**: Comprehensive command-line interface with auto-completion
-- **Detailed Logging**: Component-aware logging with build progress tracking
+- **Structured Logging**: Timestamped, colored key-value log lines with tree rendering for long entries; zero external UI dependencies
+- **Download Progress**: Inline progress bar aligned with log output
 - **Error Handling**: Clear error messages and debugging information
 
 ## 📥 Installation
@@ -1270,7 +1271,6 @@ YAP is licensed under the **GNU General Public License v3.0**. See the [LICENSE]
 
 - **[Go](https://golang.org/)** - Programming language
 - **[Cobra](https://github.com/spf13/cobra)** - CLI framework
-- **[Pterm](https://github.com/pterm/pterm)** - Terminal UI components
 - **[Docker](https://www.docker.com/)** / **[Podman](https://podman.io/)** - Container runtime
 
 ---

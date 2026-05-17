@@ -14,12 +14,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pterm/pterm"
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/interp"
 	"mvdan.cc/sh/v3/syntax"
 
 	"github.com/M0Rf30/yap/v2/pkg/buffers"
+	"github.com/M0Rf30/yap/v2/pkg/color"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -120,12 +120,12 @@ func formatDecoratedLine(packageName, lineContent string) string {
 			packageName, lineContent)
 	}
 
-	return pterm.Sprintf("%s %s %s%s%s %s\n",
-		pterm.FgGray.Sprint(timestamp),
-		pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(logLevelInfo),
-		pterm.NewStyle(pterm.FgWhite).Sprint("["),
-		pterm.NewStyle(pterm.FgYellow).Sprint(packageName),
-		pterm.NewStyle(pterm.FgWhite).Sprint("]"),
+	return fmt.Sprintf("%s %s %s%s%s %s\n",
+		color.Gray(timestamp),
+		color.BoldGreen(logLevelInfo),
+		color.White("["),
+		color.Yellow(packageName),
+		color.White("]"),
 		lineContent,
 	)
 }
@@ -337,12 +337,12 @@ func logScriptContent(cmds string) {
 	}
 
 	timestamp := time.Now().Format(constants.TimestampFormat)
-	headerLine := pterm.Sprintf("%s %s %s%s%s %s\n",
-		pterm.FgGray.Sprint(timestamp),
-		pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("DEBUG"),
-		pterm.NewStyle(pterm.FgWhite).Sprint("["),
-		pterm.NewStyle(pterm.FgYellow).Sprint("yap"),
-		pterm.NewStyle(pterm.FgWhite).Sprint("]"),
+	headerLine := fmt.Sprintf("%s %s %s%s%s %s\n",
+		color.Gray(timestamp),
+		color.BoldBlue("DEBUG"),
+		color.White("["),
+		color.Yellow("yap"),
+		color.White("]"),
 		"script content:",
 	)
 	_, _ = MultiPrinter.Writer.Write([]byte(headerLine))
@@ -354,12 +354,12 @@ func logScriptContent(cmds string) {
 		trimmed := strings.TrimSpace(line)
 		if trimmed != "" {
 			timestamp := time.Now().Format(constants.TimestampFormat)
-			scriptLine := pterm.Sprintf("%s %s %s%s%s   %s\n",
-				pterm.FgGray.Sprint(timestamp),
-				pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("DEBUG"),
-				pterm.NewStyle(pterm.FgWhite).Sprint("["),
-				pterm.NewStyle(pterm.FgYellow).Sprint("yap"),
-				pterm.NewStyle(pterm.FgWhite).Sprint("]"),
+			scriptLine := fmt.Sprintf("%s %s %s%s%s   %s\n",
+				color.Gray(timestamp),
+				color.BoldBlue("DEBUG"),
+				color.White("["),
+				color.Yellow("yap"),
+				color.White("]"),
 				trimmed,
 			)
 			_, _ = MultiPrinter.Writer.Write([]byte(scriptLine))

@@ -1,12 +1,13 @@
 package command
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/color"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -38,7 +39,7 @@ func SmartErrorHandler(cmd *cobra.Command, err error) error {
 		provideArgumentHelp(cmd)
 	default:
 		// General help suggestion
-		pterm.Printfln("Use '%s --help' for more information", cmd.CommandPath())
+		fmt.Printf("Use '%s --help' for more information\n", cmd.CommandPath())
 	}
 
 	return err
@@ -72,10 +73,7 @@ func provideSimilarCommands(cmd *cobra.Command, errorStr string) {
 	}
 
 	if len(suggestions) > 0 {
-		pterm.DefaultBox.WithTitle("Did you mean?").
-			WithTitleTopLeft().
-			WithBoxStyle(pterm.NewStyle(pterm.FgYellow)).
-			Println(strings.Join(suggestions, ", "))
+		fmt.Printf("\n%s\n%s\n\n", color.BoldYellow("Did you mean?:"), strings.Join(suggestions, ", "))
 	}
 
 	// Show available commands grouped
@@ -107,13 +105,10 @@ func provideSimilarDistributions(errorStr string) {
 			suggestions = suggestions[:5]
 		}
 
-		pterm.DefaultBox.WithTitle("Similar distributions").
-			WithTitleTopLeft().
-			WithBoxStyle(pterm.NewStyle(pterm.FgBlue)).
-			Println(strings.Join(suggestions, "\n"))
+		fmt.Printf("\n%s\n%s\n\n", color.BoldBlue("Similar distributions:"), strings.Join(suggestions, "\n"))
 	}
 
-	pterm.Info.Println("Use 'yap list-distros' to see all supported distributions")
+	fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "Use 'yap list-distros' to see all supported distributions")
 }
 
 // provideProjectSetupHelp provides guidance for setting up a YAP project.
@@ -141,32 +136,30 @@ Example yap.json structure:
   ]
 }`
 
-	pterm.DefaultBox.WithTitle("Project Setup Help").
-		WithTitleTopLeft().
-		WithBoxStyle(pterm.NewStyle(pterm.FgGreen)).
-		Println(helpText)
+	fmt.Printf("\n%s\n%s\n\n", color.BoldGreen("Project Setup Help:"), helpText)
 }
 
 // provideArgumentHelp provides context-specific argument guidance.
 func provideArgumentHelp(cmd *cobra.Command) {
 	switch cmd.Name() {
 	case buildCommand:
-		pterm.Info.Println("Build command formats:")
-		pterm.Info.Println("  • yap build .                    (current directory, auto-detect distro)")
-		pterm.Info.Println("  • yap build ubuntu-jammy .       (specific distro and path)")
-		pterm.Info.Println("  • yap build fedora-38 /path/to/project")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "Build command formats:")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"),
+			"  • yap build .                    (current directory, auto-detect distro)")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "  • yap build ubuntu-jammy .       (specific distro and path)")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "  • yap build fedora-38 /path/to/project")
 	case prepareCommand:
-		pterm.Info.Println("Prepare command format:")
-		pterm.Info.Println("  • yap " + prepareCommand + " <distribution>")
-		pterm.Info.Println("  • Example: yap " + prepareCommand + " ubuntu-jammy")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "Prepare command format:")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "  • yap "+prepareCommand+" <distribution>")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "  • Example: yap "+prepareCommand+" ubuntu-jammy")
 	case commandPull:
-		pterm.Info.Println("Pull command format:")
-		pterm.Info.Println("  • yap " + commandPull + " <distribution>")
-		pterm.Info.Println("  • Example: yap " + commandPull + " alpine")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "Pull command format:")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "  • yap "+commandPull+" <distribution>")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "  • Example: yap "+commandPull+" alpine")
 	case commandZap:
-		pterm.Info.Println("Zap command format:")
-		pterm.Info.Println("  • yap " + commandZap + " <distribution> <path>")
-		pterm.Info.Println("  • Example: yap " + commandZap + " ubuntu-jammy /path/to/project")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "Zap command format:")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "  • yap "+commandZap+" <distribution> <path>")
+		fmt.Printf("%s %s\n", color.BoldBlue("INFO"), "  • Example: yap "+commandZap+" ubuntu-jammy /path/to/project")
 	}
 }
 
@@ -198,26 +191,24 @@ func showCommandGroups(rootCmd *cobra.Command) {
 		}
 	}
 
-	pterm.Println()
-	pterm.DefaultHeader.WithBackgroundStyle(pterm.NewStyle(pterm.BgBlue)).
-		WithTextStyle(pterm.NewStyle(pterm.FgWhite, pterm.Bold)).
-		Println("Available Commands")
+	fmt.Println()
+	fmt.Printf("%s\n", color.BoldCyan("Available Commands"))
 
 	for groupTitle, commands := range groups {
 		if len(commands) > 0 {
-			pterm.Printf("\n%s:\n", pterm.NewStyle(pterm.FgCyan, pterm.Bold).Sprint(groupTitle))
+			fmt.Printf("\n%s:\n", color.BoldCyan(groupTitle))
 
 			for _, cmdName := range commands {
-				pterm.Printf("  %s\n", pterm.FgLightBlue.Sprint(cmdName))
+				fmt.Printf("  %s\n", color.HiBlue(cmdName))
 			}
 		}
 	}
 
 	if len(ungrouped) > 0 {
-		pterm.Printf("\n%s:\n", pterm.NewStyle(pterm.FgMagenta, pterm.Bold).Sprint("Other Commands"))
+		fmt.Printf("\n%s:\n", color.BoldMagenta("Other Commands"))
 
 		for _, cmdName := range ungrouped {
-			pterm.Printf("  %s\n", pterm.FgLightBlue.Sprint(cmdName))
+			fmt.Printf("  %s\n", color.HiBlue(cmdName))
 		}
 	}
 }
@@ -255,10 +246,7 @@ func calculateSimilarity(str1, str2 string) float64 {
 
 // ShowWelcomeMessage displays a welcome message for first-time users.
 func ShowWelcomeMessage() {
-	pterm.DefaultBox.WithTitle("Welcome to YAP").
-		WithTitleTopCenter().
-		WithBoxStyle(pterm.NewStyle(pterm.FgGreen)).
-		Println(`Thank you for using Yet Another Packager!
+	fmt.Printf("\n%s\n%s\n\n", color.BoldGreen("Welcome to YAP:"), `Thank you for using Yet Another Packager!
 
 Quick start:
 1. Run 'yap list-distros' to see supported distributions

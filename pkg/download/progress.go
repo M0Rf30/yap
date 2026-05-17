@@ -3,15 +3,24 @@ package download
 import (
 	"fmt"
 	"io"
+	"os"
+	"strings"
 	"time"
 
-	"github.com/pterm/pterm"
-
+	"github.com/M0Rf30/yap/v2/pkg/color"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
-// ProgressBar provides a pterm native progress bar implementation.
+const (
+	barWidth    = 30
+	barFull     = "█"
+	barEmpty    = "░"
+	updateEvery = 500 * time.Millisecond
+)
+
+// ProgressBar renders a single-line in-place progress bar to stderr.
+// It uses only stdlib — no external dependencies.
 type ProgressBar struct {
 	writer      io.Writer
 	packageName string
@@ -21,40 +30,12 @@ type ProgressBar struct {
 	lastPercent int
 	startTime   time.Time
 	lastUpdate  time.Time
-	ptermBar    *pterm.ProgressbarPrinter
 }
 
-// NewProgressBar creates a new pterm native progress bar with log-style format.
-func NewProgressBar(writer io.Writer, packageName, title string,
-	total int64) *ProgressBar {
-	// Create pterm progress bar with log-style format including timestamp and INFO level
-	// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets with
-	// yellow component
-	timestamp := pterm.NewStyle(pterm.FgGray).Sprint(time.Now().Format("2006-01-02 15:04:05"))
-	info := pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(" INFO")
-	component := fmt.Sprintf("%s%s%s",
-		pterm.NewStyle(pterm.FgWhite).Sprint("["),
-		pterm.NewStyle(pterm.FgYellow).Sprint(packageName),
-		pterm.NewStyle(pterm.FgWhite).Sprint("]"))
-	logTitle := fmt.Sprintf("%s %s %s %s", timestamp, info, component, title)
-
-	ptermBar := pterm.DefaultProgressbar.
-		WithTitle(logTitle).
-		WithTotal(int(total)).
-		WithShowElapsedTime(true).
-		WithShowCount(false).
-		WithShowPercentage(true).
-		WithBarStyle(&pterm.Style{pterm.FgLightBlue}).
-		WithTitleStyle(&pterm.Style{pterm.FgLightBlue}).
-		WithBarCharacter("█").
-		WithLastCharacter("█").
-		WithElapsedTimeRoundingFactor(time.Millisecond).
-		WithBarFiller("░")
-
-	// Start the progress bar
-	ptermBar, _ = ptermBar.Start()
-
-	return &ProgressBar{
+// NewProgressBar creates a progress bar whose prefix matches the yap log line
+// format so it blends into the surrounding output.
+func NewProgressBar(writer io.Writer, packageName, title string, total int64) *ProgressBar {
+	pb := &ProgressBar{
 		writer:      writer,
 		packageName: packageName,
 		title:       title,
@@ -62,119 +43,108 @@ func NewProgressBar(writer io.Writer, packageName, title string,
 		startTime:   time.Now(),
 		lastUpdate:  time.Now(),
 		lastPercent: -1,
-		ptermBar:    ptermBar,
 	}
+
+	pb.render(0)
+
+	pb.lastPercent = 0
+
+	return pb
 }
 
-// Update updates the progress bar with new current value.
-func (epb *ProgressBar) Update(current int64) {
-	epb.current = current
-	percent := int((current * 100) / epb.total)
+// Update sets the current byte count and redraws the bar if enough has changed.
+func (pb *ProgressBar) Update(current int64) {
+	pb.current = current
 
-	// Only update if progress changed by at least 1% or if it's been more than 500ms
+	percent := pb.percent(current)
 	now := time.Now()
-	if percent != epb.lastPercent || now.Sub(epb.lastUpdate) > 500*time.Millisecond {
-		if epb.ptermBar != nil {
-			// Calculate analytical information
-			duration := time.Since(epb.startTime)
 
-			var speed string
+	if percent != pb.lastPercent || now.Sub(pb.lastUpdate) >= updateEvery {
+		pb.render(current)
 
-			if duration.Seconds() > 0 {
-				bytesPerSec := float64(epb.current) / duration.Seconds()
-				speed = formatBytes(int64(bytesPerSec)) + "/s"
-			}
-
-			// Update title with log-style format including timestamp and INFO level
-			// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets
-			// with yellow component
-			timestamp := pterm.NewStyle(pterm.FgGray).Sprint(time.Now().Format("2006-01-02 15:04:05"))
-			info := pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(" INFO")
-			component := fmt.Sprintf("%s%s%s",
-				pterm.NewStyle(pterm.FgWhite).Sprint("["),
-				pterm.NewStyle(pterm.FgYellow).Sprint(epb.packageName),
-				pterm.NewStyle(pterm.FgWhite).Sprint("]"))
-			currentSize := formatBytes(epb.current)
-			totalSize := formatBytes(epb.total)
-
-			logTitle := fmt.Sprintf("%s %s %s %s • %s/%s • %s • ETA: %s",
-				timestamp,
-				info,
-				component,
-				epb.title,
-				currentSize,
-				totalSize,
-				speed,
-				epb.calculateETA(duration, current),
-			)
-
-			// Update the progress bar title and current value
-			epb.ptermBar.UpdateTitle(logTitle)
-			epb.ptermBar.Current = int(current)
-		}
-
-		epb.lastPercent = percent
-		epb.lastUpdate = now
+		pb.lastPercent = percent
+		pb.lastUpdate = now
 	}
 }
 
-// calculateETA calculates estimated time to arrival
-func (epb *ProgressBar) calculateETA(elapsed time.Duration, current int64) string {
-	if current == 0 || elapsed.Seconds() == 0 {
-		return "calculating..."
-	}
+// Finish marks the bar complete, prints a final newline, and logs completion.
+func (pb *ProgressBar) Finish() {
+	pb.current = pb.total
+	pb.render(pb.total)
 
-	bytesPerSec := float64(current) / elapsed.Seconds()
-	remaining := epb.total - current
-	etaSeconds := float64(remaining) / bytesPerSec
+	fmt.Fprintln(os.Stderr) //nolint:errcheck // best-effort newline after bar
 
-	eta := time.Duration(etaSeconds) * time.Second
-	if eta > time.Hour {
-		return fmt.Sprintf("%.1fh", eta.Hours())
-	} else if eta > time.Minute {
-		return fmt.Sprintf("%.1fm", eta.Minutes())
-	}
+	duration := time.Since(pb.startTime)
 
-	return fmt.Sprintf("%.1fs", eta.Seconds())
-}
-
-// Finish completes the progress bar.
-func (epb *ProgressBar) Finish() {
-	epb.current = epb.total
-
-	if epb.ptermBar != nil {
-		// Final update with completion info in log-style format
-		// Match the pterm logger's color scheme: gray timestamp, green INFO, white brackets
-		// with yellow component
-		timestamp := pterm.NewStyle(pterm.FgGray).Sprint(time.Now().Format("2006-01-02 15:04:05"))
-		info := pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint(" INFO")
-		component := fmt.Sprintf("%s%s%s",
-			pterm.NewStyle(pterm.FgWhite).Sprint("["),
-			pterm.NewStyle(pterm.FgYellow).Sprint(epb.packageName),
-			pterm.NewStyle(pterm.FgWhite).Sprint("]"))
-		duration := time.Since(epb.startTime)
-		finalSize := formatBytes(epb.total)
-		avgSpeed := formatBytes(int64(float64(epb.total)/duration.Seconds())) + "/s"
-
-		completionTitle := fmt.Sprintf("%s %s %s %s • %s • %s • Completed in %v",
-			timestamp,
-			info,
-			component,
-			epb.title,
-			finalSize,
-			avgSpeed,
-			duration.Round(time.Millisecond),
-		)
-
-		// Update to final state and stop
-		epb.ptermBar.UpdateTitle(completionTitle)
-		epb.ptermBar.Current = int(epb.total)
-		_, _ = epb.ptermBar.Stop()
-	}
-
-	// Log final completion message using logger.Info for consistency
-	duration := time.Since(epb.startTime)
 	logger.Info(i18n.T("logger.finish.info.download_completed_1"),
-		"title", epb.title,
+		"title", pb.title,
 		"duration", duration)
+}
+
+// render writes one bar frame to stderr using \r to overwrite the previous one.
+func (pb *ProgressBar) render(current int64) {
+	pct := pb.percent(current)
+	filled := barWidth * pct / 100
+	bar := strings.Repeat(barFull, filled) + strings.Repeat(barEmpty, barWidth-filled)
+
+	elapsed := time.Since(pb.startTime)
+
+	var speed string
+
+	if elapsed.Seconds() > 0 {
+		speed = " (" + humanBytes(float64(current)/elapsed.Seconds()) + "/s)"
+	}
+
+	prefix := logPrefix(pb.packageName)
+	line := fmt.Sprintf("\r%s %s %3d%% [%s]%s [%s]",
+		prefix, pb.title, pct, bar, speed, fmtDuration(elapsed))
+
+	fmt.Fprint(os.Stderr, line) //nolint:errcheck // best-effort progress output
+}
+
+func (pb *ProgressBar) percent(current int64) int {
+	if pb.total <= 0 {
+		return 0
+	}
+
+	return int(current * 100 / pb.total)
+}
+
+// logPrefix returns the colored "timestamp INFO  [packageName]" prefix,
+// matching the logger output format so the bar aligns with log lines.
+func logPrefix(packageName string) string {
+	ts := color.Gray(time.Now().Format("2006-01-02 15:04:05"))
+
+	return ts + " " + color.BoldGreen("INFO ") + " " + color.Bracket(packageName)
+}
+
+func fmtDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+
+	if h > 0 {
+		return fmt.Sprintf("%dh%02dm%02ds", h, m, s)
+	}
+
+	if m > 0 {
+		return fmt.Sprintf("%dm%02ds", m, s)
+	}
+
+	return fmt.Sprintf("%ds", s)
+}
+
+func humanBytes(b float64) string {
+	switch {
+	case b >= 1<<30:
+		return fmt.Sprintf("%.1f GB", b/(1<<30))
+	case b >= 1<<20:
+		return fmt.Sprintf("%.1f MB", b/(1<<20))
+	case b >= 1<<10:
+		return fmt.Sprintf("%.1f KB", b/(1<<10))
+	default:
+		return fmt.Sprintf("%.0f B", b)
+	}
 }
