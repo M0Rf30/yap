@@ -43,7 +43,7 @@ func Download(destination, uri string, writer io.Writer) error {
 
 	// start download
 	logger.Info("downloading", "url", req.URL())
-	logger.Info(i18n.T("logger.download.info.response_status") + resp.HTTPResponse.Status)
+	logger.Info(i18n.T("logger.download.info.response_status"), "status", resp.HTTPResponse.Status)
 
 	// Create enhanced progress bar using the progress helper
 	progressBar := createProgressBar(resp, "yap", "", uri, writer)
@@ -217,7 +217,7 @@ func logDownloadStart(uri string, resp *grab.Response) {
 	}
 
 	logger.Info("downloading", "url", resp.Request.URL())
-	logger.Info(i18n.T("logger.logdownloadstart.info.response_status") + resp.HTTPResponse.Status)
+	logger.Info(i18n.T("logger.logdownloadstart.info.response_status"), "status", resp.HTTPResponse.Status)
 }
 
 // createProgressBar creates an enhanced progress bar if the response size is known.

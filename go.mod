@@ -9,7 +9,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.4.1
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/github/go-spdx/v2 v2.6.0
+	github.com/github/go-spdx/v2 v2.7.0
 	github.com/go-git/go-git/v5 v5.19.0
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/klauspost/compress v1.18.6

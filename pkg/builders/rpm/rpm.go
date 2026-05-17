@@ -188,22 +188,43 @@ func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
 
 // addContentsToRPM adds a slice of Entry objects to the specified RPM object.
 // It creates RPMFile objects from the Entry and adds them to the RPM.
+// Intermediate directories (those that are ancestors of other entries) are
+// skipped to avoid polluting the RPM file list with implicit path components.
 func addContentsToRPM(contents []*files.Entry, rpm *rpmpack.RPM) error {
-	// Iterate over each Entry in the provided slice.
+	// Build a set of all non-directory destinations for fast lookup.
+	// A directory is "intermediate" if any other entry's destination
+	// starts with that directory path + "/".
+	dirHasChildren := make(map[string]bool)
+
 	for _, content := range contents {
-		// Create an RPMFile from the Entry.
-		file, err := createRPMFile(content)
-		if err != nil {
-			return err // Return the error if creating the RPMFile fails.
+		if content.Type != files.TypeDir {
+			// Walk up the path and mark every parent as having children.
+			dir := filepath.Dir(filepath.Clean(content.Destination))
+			for dir != "/" && dir != "." {
+				dirHasChildren[dir] = true
+				dir = filepath.Dir(dir)
+			}
+		}
+	}
+
+	for _, content := range contents {
+		// Skip intermediate directories — only include empty dirs.
+		if content.Type == files.TypeDir {
+			dest := filepath.Clean(content.Destination)
+			if dirHasChildren[dest] {
+				continue
+			}
 		}
 
-		// Clean the file name to ensure it has a proper format.
+		file, err := createRPMFile(content)
+		if err != nil {
+			return err
+		}
+
 		file.Name = filepath.Clean(file.Name)
-		// Add the created RPMFile to the RPM object.
 		rpm.AddFile(*file)
 	}
 
-	// Return nil indicating that all contents were added successfully.
 	return nil
 }
 
