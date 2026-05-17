@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 // with Parallel=true, which internally uses topologicalSort.
 func BenchmarkTopologicalSort50Packages(b *testing.B) {
 	mpc := createMultipleProjectWithDeps(50)
-	project.Parallel = true
+	mpc.Opts.Parallel = true
 
 	b.ResetTimer()
 
@@ -40,7 +40,7 @@ func BenchmarkTopologicalSort50Packages(b *testing.B) {
 // with Parallel=true, which internally uses topologicalSort.
 func BenchmarkTopologicalSort200Packages(b *testing.B) {
 	mpc := createMultipleProjectWithDeps(200)
-	project.Parallel = true
+	mpc.Opts.Parallel = true
 
 	b.ResetTimer()
 

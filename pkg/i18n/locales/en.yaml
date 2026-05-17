@@ -912,6 +912,8 @@
   translation: "Removing documentation directories"
 - id: logger.options.info.removing_libtool
   translation: "Removing libtool .la files"
+- id: logger.options.info.removing_static
+  translation: "Removing static library .a files"
 - id: logger.options.info.removing_empty_dirs
   translation: "Removing empty directories"
 - id: logger.options.info.compressing_man_pages

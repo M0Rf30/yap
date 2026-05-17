@@ -64,77 +64,6 @@ type BuildOptions struct {
 	ExtraRepos              []string
 }
 
-// Apply propagates BuildOptions values to the package-level globals.
-// Call this after parsing CLI flags.
-func (o *BuildOptions) Apply() {
-	Verbose = o.Verbose
-	CleanBuild = o.CleanBuild
-	NoBuild = o.NoBuild
-	NoMakeDeps = o.NoMakeDeps
-	SkipSyncDeps = o.SkipSyncDeps
-	SkipToolchainValidation = o.SkipToolchainValidation
-	Zap = o.Zap
-	Parallel = o.Parallel
-	SBOM = o.SBOM
-	FromPkgName = o.FromPkgName
-	ToPkgName = o.ToPkgName
-	TargetArch = o.TargetArch
-	OnlyPkgNames = o.OnlyPkgNames
-	DebugDir = o.DebugDir
-	SBOMFormat = o.SBOMFormat
-	ExtraRepos = o.ExtraRepos
-}
-
-// Global variables for build configuration
-var (
-	// Verbose enables verbose output for debugging.
-	Verbose bool
-	// CleanBuild enables clean build mode.
-	CleanBuild bool
-	// NoBuild disables the build process.
-	NoBuild bool
-	// NoMakeDeps disables make dependencies installation.
-	NoMakeDeps bool
-	// SkipSyncDeps controls whether to skip dependency synchronization.
-	SkipSyncDeps bool
-	// SkipToolchainValidation controls whether to skip cross-compilation toolchain validation.
-	SkipToolchainValidation bool
-	// Zap controls whether to use zap functionality.
-	Zap bool
-	// FromPkgName specifies the source package name for transformation.
-	FromPkgName string
-	// ToPkgName specifies the target package name for transformation.
-	ToPkgName string
-	// TargetArch specifies the target architecture for cross-compilation
-	TargetArch string
-	// OnlyPkgNames is a comma-separated list of project names to build.
-	// When set, only matching projects from yap.json are built.
-	OnlyPkgNames string
-	// Parallel enables parallel dependency resolution and concurrent package building.
-	// When false (default), packages are built sequentially respecting "install" flags.
-	Parallel bool
-	// DebugDir is the output directory for separated debug symbol files.
-	// When set, debug info is extracted from ELF binaries before stripping
-	// and saved in a .build-id directory structure suitable for debuginfod.
-	DebugDir string
-	// ExtraRepos carries `--repo k=v,...` tokens supplied on the command line.
-	// They are parsed and merged with yap.json `repos` entries before the
-	// package manager runs any update or install step.
-	ExtraRepos []string
-	// SBOM enables Software Bill of Materials generation.
-	// When true, SBOM files are generated for each built package.
-	SBOM bool
-	// SBOMFormat specifies the SBOM format(s) to generate.
-	// Valid values: "cyclonedx", "spdx", "both" (default: "both").
-	SBOMFormat string
-
-	// Global state variables
-	singleProject  bool
-	packageManager packer.Packer
-	makeDepends    []string
-	runtimeDepends []string
-)
-
 // extractPackageName extracts the package name from a dependency string,
 // ignoring version constraints and other metadata.
 //
@@ -195,6 +124,13 @@ type MultipleProject struct {
 	CompressionRpm string          `json:"compressionRpm" validate:""`
 	Signing        *signing.Config `json:"signing,omitempty"`
 	Repos          []repo.Repo     `json:"repos,omitempty"`
+	// Opts holds build configuration options (not JSON-serialized; set by caller)
+	Opts BuildOptions
+	// Execution state (not JSON-serialized)
+	singleProject  bool
+	packageManager packer.Packer
+	makeDepends    []string
+	runtimeDepends []string
 }
 
 // Project represents a single project.
@@ -213,8 +149,6 @@ type Project struct {
 	Root           string
 	Name           string `json:"name"    validate:"required,startsnotwith=.,startsnotwith=./"`
 	HasToInstall   bool   `json:"install" validate:""`
-	CompressionDeb string
-	CompressionRpm string
 	Signing        *signing.Config
 }
 
@@ -224,8 +158,8 @@ type Project struct {
 // When Parallel is true, a topological sort determines build order and packages
 // are built concurrently using a worker pool.
 func (mpc *MultipleProject) BuildAll() error {
-	if !singleProject {
-		if err := mpc.checkPkgsRange(FromPkgName, ToPkgName); err != nil {
+	if !mpc.singleProject {
+		if err := mpc.checkPkgsRange(mpc.Opts.FromPkgName, mpc.Opts.ToPkgName); err != nil {
 			return err
 		}
 	}
@@ -242,7 +176,7 @@ func (mpc *MultipleProject) BuildAll() error {
 	// Filter projects based on --from and --to flags before building
 	projectsToProcess := mpc.getProjectsInRange()
 
-	if !Parallel {
+	if !mpc.Opts.Parallel {
 		// Default: sequential build in file order.
 		// Packages with "install": true are installed immediately after building.
 		return mpc.buildProjectsSequential(projectsToProcess)
@@ -266,14 +200,14 @@ func (mpc *MultipleProject) BuildAll() error {
 // returns an error if there was a problem removing the directories.
 func (mpc *MultipleProject) Clean() error {
 	for _, proj := range mpc.Projects {
-		if CleanBuild {
+		if mpc.Opts.CleanBuild {
 			err := os.RemoveAll(proj.Builder.PKGBUILD.SourceDir)
 			if err != nil {
 				return err
 			}
 		}
 
-		if Zap {
+		if mpc.Opts.Zap {
 			if err := mpc.cleanZapArtifacts(proj); err != nil {
 				return err
 			}
@@ -287,15 +221,15 @@ func (mpc *MultipleProject) Clean() error {
 // It updates the package manager, prepares make dependencies, and installs
 // external runtime dependencies.
 func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []string) error {
-	if !SkipSyncDeps {
-		err := packageManager.Update()
+	if !mpc.Opts.SkipSyncDeps {
+		err := mpc.packageManager.Update()
 		if err != nil {
 			return err
 		}
 	}
 
-	if !NoMakeDeps {
-		err := packageManager.Prepare(makeDepends, TargetArch)
+	if !mpc.Opts.NoMakeDeps {
+		err := mpc.packageManager.Prepare(makeDepends, mpc.Opts.TargetArch)
 		if err != nil {
 			return err
 		}
@@ -322,30 +256,30 @@ func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []strin
 // cross-builds it downloads and extracts them to avoid arch conflicts;
 // otherwise it delegates to the normal package manager install path.
 func (mpc *MultipleProject) installRuntimeDeps(runtimeDepends []string) error {
-	if SkipSyncDeps || len(runtimeDepends) == 0 {
+	if mpc.Opts.SkipSyncDeps || len(runtimeDepends) == 0 {
 		return nil
 	}
 
 	logger.Debug(i18n.T("logger.installing_external_runtime_dependencies"),
 		"count", len(runtimeDepends))
 
-	isCrossBuild := TargetArch != "" && TargetArch != runtime.GOARCH
+	isCrossBuild := mpc.Opts.TargetArch != "" && mpc.Opts.TargetArch != runtime.GOARCH
 	if !isCrossBuild {
-		return packageManager.Prepare(runtimeDepends, TargetArch)
+		return mpc.packageManager.Prepare(runtimeDepends, mpc.Opts.TargetArch)
 	}
 
-	extractor, ok := packageManager.(packer.CrossDepsExtractor)
+	extractor, ok := mpc.packageManager.(packer.CrossDepsExtractor)
 	if !ok {
-		return packageManager.Prepare(runtimeDepends, TargetArch)
+		return mpc.packageManager.Prepare(runtimeDepends, mpc.Opts.TargetArch)
 	}
 
-	return extractor.DownloadAndExtractCrossDeps(runtimeDepends, TargetArch)
+	return extractor.DownloadAndExtractCrossDeps(runtimeDepends, mpc.Opts.TargetArch)
 }
 
 // before any package manager update so subsequent installs can resolve the new
 // sources.
 func (mpc *MultipleProject) setupExtraRepos(distro string) error {
-	cliRepos, err := repo.ParseFlags(ExtraRepos)
+	cliRepos, err := repo.ParseFlags(mpc.Opts.ExtraRepos)
 	if err != nil {
 		return err
 	}
@@ -390,7 +324,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	packageManager, err = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
+	mpc.packageManager, err = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
 	if err != nil {
 		return err
 	}
@@ -404,7 +338,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	if CleanBuild || Zap {
+	if mpc.Opts.CleanBuild || mpc.Opts.Zap {
 		err := mpc.Clean()
 		if err != nil {
 			logger.Fatal(i18n.T("logger.fatal_error"),
@@ -417,10 +351,10 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	makeDepends = mpc.getMakeDeps()
-	runtimeDepends = mpc.getRuntimeDeps()
+	mpc.makeDepends = mpc.getMakeDeps()
+	mpc.runtimeDepends = mpc.getRuntimeDeps()
 
-	err = mpc.syncDependencies(makeDepends, runtimeDepends)
+	err = mpc.syncDependencies(mpc.makeDepends, mpc.runtimeDepends)
 	if err != nil {
 		return err
 	}
@@ -449,7 +383,7 @@ func (mpc *MultipleProject) runWorker(ctx context.Context, cancel context.Cancel
 		"worker_id", workerIDStr)
 
 	// Step 1: Build the package
-	err := proj.Builder.Compile(NoBuild)
+	err := proj.Builder.Compile(mpc.Opts.NoBuild)
 	if err != nil {
 		cancel()
 
@@ -458,7 +392,7 @@ func (mpc *MultipleProject) runWorker(ctx context.Context, cancel context.Cancel
 		return
 	}
 
-	if !NoBuild {
+	if !mpc.Opts.NoBuild {
 		// Step 2: Create the package file
 		err := mpc.createPackage(proj)
 		if err != nil {
@@ -481,7 +415,7 @@ func (mpc *MultipleProject) runWorker(ctx context.Context, cancel context.Cancel
 		}
 	}
 
-	if ToPkgName != "" && pkgName == ToPkgName {
+	if mpc.Opts.ToPkgName != "" && pkgName == mpc.Opts.ToPkgName {
 		return
 	}
 }
@@ -568,11 +502,11 @@ func (mpc *MultipleProject) buildProjectsSequential(projects []*Project) error {
 			"version", proj.Builder.PKGBUILD.PkgVer,
 			"release", proj.Builder.PKGBUILD.PkgRel)
 
-		if err := proj.Builder.Compile(NoBuild); err != nil {
+		if err := proj.Builder.Compile(mpc.Opts.NoBuild); err != nil {
 			return err
 		}
 
-		if !NoBuild {
+		if !mpc.Opts.NoBuild {
 			if err := mpc.createPackage(proj); err != nil {
 				return err
 			}
@@ -586,9 +520,9 @@ func (mpc *MultipleProject) buildProjectsSequential(projects []*Project) error {
 
 		// ToPkgName is also enforced by getProjectsInRange, but we check here to log
 		// the stopping event, consistent with other build loop implementations.
-		if ToPkgName != "" && pkgName == ToPkgName {
+		if mpc.Opts.ToPkgName != "" && pkgName == mpc.Opts.ToPkgName {
 			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
-				"target_package", ToPkgName)
+				"target_package", mpc.Opts.ToPkgName)
 
 			return nil
 		}
@@ -609,7 +543,7 @@ func (mpc *MultipleProject) doInstallOrExtract(proj *Project) error {
 			WithOperation("doInstallOrExtract")
 	}
 
-	return installer.InstallOrExtract(mpc.Output, mpc.BuildDir, TargetArch)
+	return installer.InstallOrExtract(mpc.Output, mpc.BuildDir, mpc.Opts.TargetArch)
 }
 
 // installPackageForWorker handles package extraction for a worker.
@@ -765,8 +699,8 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 	}
 
 	// Configure debug symbol separation before stripping occurs in PrepareFakeroot.
-	if DebugDir != "" {
-		absDebugDir, absErr := filepath.Abs(DebugDir)
+	if mpc.Opts.DebugDir != "" {
+		absDebugDir, absErr := filepath.Abs(mpc.Opts.DebugDir)
 		if absErr != nil {
 			return absErr
 		}
@@ -802,7 +736,7 @@ func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
 		}
 	}()
 
-	if err := proj.PackageManager.PrepareFakeroot(mpc.Output, TargetArch); err != nil {
+	if err := proj.PackageManager.PrepareFakeroot(mpc.Output, mpc.Opts.TargetArch); err != nil {
 		return err
 	}
 
@@ -811,7 +745,7 @@ func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
 		"version", proj.Builder.PKGBUILD.PkgVer,
 		"release", proj.Builder.PKGBUILD.PkgRel)
 
-	artifactPath, err := proj.PackageManager.BuildPackage(mpc.Output, TargetArch)
+	artifactPath, err := proj.PackageManager.BuildPackage(mpc.Output, mpc.Opts.TargetArch)
 	if err != nil {
 		return err
 	}
@@ -829,7 +763,7 @@ func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
 
 		pkgDir := proj.Builder.PKGBUILD.PackageDir
 
-		if err := proj.PackageManager.PrepareFakeroot(mpc.Output, TargetArch); err != nil {
+		if err := proj.PackageManager.PrepareFakeroot(mpc.Output, mpc.Opts.TargetArch); err != nil {
 			return err
 		}
 
@@ -838,7 +772,7 @@ func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
 			"version", proj.Builder.PKGBUILD.PkgVer,
 			"release", proj.Builder.PKGBUILD.PkgRel)
 
-		artifactPath, err := proj.PackageManager.BuildPackage(mpc.Output, TargetArch)
+		artifactPath, err := proj.PackageManager.BuildPackage(mpc.Output, mpc.Opts.TargetArch)
 		if err != nil {
 			return err
 		}
@@ -866,7 +800,7 @@ func (mpc *MultipleProject) runPostBuildHooks(proj *Project, artifactPath string
 		}
 	}
 
-	if SBOM && artifactPath != "" {
+	if mpc.Opts.SBOM && artifactPath != "" {
 		if err := mpc.generateSBOM(proj, artifactPath); err != nil {
 			logger.Warn(i18n.T("logger.sbom_generation_failed"),
 				"package", proj.Builder.PKGBUILD.PkgName,
@@ -1012,7 +946,7 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			release,
 			startDir,
 			home,
-			TargetArch)
+			mpc.Opts.TargetArch)
 		if err != nil {
 			return err
 		}
@@ -1032,7 +966,7 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
-		packageManager, err = packer.GetPackageManager(pkgbuildFile, distro,
+		mpc.packageManager, err = packer.GetPackageManager(pkgbuildFile, distro,
 			mpc.CompressionDeb, mpc.CompressionRpm)
 		if err != nil {
 			return err
@@ -1041,10 +975,8 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 		proj := &Project{
 			Name:           child.Name,
 			Builder:        &builder.Builder{PKGBUILD: pkgbuildFile},
-			PackageManager: packageManager,
+			PackageManager: mpc.packageManager,
 			HasToInstall:   child.HasToInstall,
-			CompressionDeb: mpc.CompressionDeb,
-			CompressionRpm: mpc.CompressionRpm,
 		}
 
 		projects = append(projects, proj)
@@ -1053,8 +985,8 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 	mpc.Projects = projects
 
 	// Filter projects when --only is specified
-	if OnlyPkgNames != "" {
-		mpc.filterProjects(OnlyPkgNames)
+	if mpc.Opts.OnlyPkgNames != "" {
+		mpc.filterProjects(mpc.Opts.OnlyPkgNames)
 	}
 
 	return nil
@@ -1085,7 +1017,7 @@ func (mpc *MultipleProject) readProject(path string) error {
 	}
 
 	filePath, err := files.Open(projectFilePath)
-	if err != nil || singleProject {
+	if err != nil || mpc.singleProject {
 		return err
 	}
 
@@ -1121,14 +1053,14 @@ func (mpc *MultipleProject) setSingleProject(path string) {
 	cleanFilePath := filepath.Clean(path)
 	proj := &Project{
 		Name:           "",
-		PackageManager: packageManager,
+		PackageManager: mpc.packageManager,
 		HasToInstall:   false,
 	}
 
 	mpc.BuildDir = cleanFilePath
 	mpc.Output = cleanFilePath
 	mpc.Projects = append(mpc.Projects, proj)
-	singleProject = true
+	mpc.singleProject = true
 }
 
 // validateJSON validates the JSON of the MultipleProject struct.
@@ -1256,23 +1188,23 @@ func (mpc *MultipleProject) displayDependencies(
 // Returns all projects if no flags are set, or only projects in the specified range.
 func (mpc *MultipleProject) getProjectsInRange() []*Project {
 	// If no filtering is specified, return all projects
-	if FromPkgName == "" && ToPkgName == "" {
+	if mpc.Opts.FromPkgName == "" && mpc.Opts.ToPkgName == "" {
 		return mpc.Projects
 	}
 
 	var filtered []*Project
 
-	startProcessing := (FromPkgName == "")
+	startProcessing := (mpc.Opts.FromPkgName == "")
 
 	for _, proj := range mpc.Projects {
 		pkgName := proj.Builder.PKGBUILD.PkgName
 
 		// Check if this is the FromPkgName - start processing from here
-		if FromPkgName != "" && !startProcessing && pkgName == FromPkgName {
+		if mpc.Opts.FromPkgName != "" && !startProcessing && pkgName == mpc.Opts.FromPkgName {
 			startProcessing = true
 
 			logger.Debug(i18n.T("logger.project.found_from_package"),
-				"package", FromPkgName)
+				"package", mpc.Opts.FromPkgName)
 		}
 
 		// If we should be processing, include this package
@@ -1280,9 +1212,9 @@ func (mpc *MultipleProject) getProjectsInRange() []*Project {
 			filtered = append(filtered, proj)
 
 			// Check if this is the ToPkgName - stop after this package
-			if ToPkgName != "" && pkgName == ToPkgName {
+			if mpc.Opts.ToPkgName != "" && pkgName == mpc.Opts.ToPkgName {
 				logger.Debug(i18n.T("logger.project.found_to_package"),
-					"package", ToPkgName)
+					"package", mpc.Opts.ToPkgName)
 
 				break
 			}
@@ -1569,7 +1501,7 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 
 	// Install packages that are marked for installation
 	for _, proj := range regularPackages {
-		if !NoBuild && proj.HasToInstall {
+		if !mpc.Opts.NoBuild && proj.HasToInstall {
 			err := mpc.installPackage(proj)
 			if err != nil {
 				return err
@@ -1577,9 +1509,9 @@ func (mpc *MultipleProject) buildAndInstallRegularPackages(
 		}
 
 		// Stop if the target package has been built
-		if ToPkgName != "" && proj.Builder.PKGBUILD.PkgName == ToPkgName {
+		if mpc.Opts.ToPkgName != "" && proj.Builder.PKGBUILD.PkgName == mpc.Opts.ToPkgName {
 			logger.Info(i18n.T("logger.stopping_build_at_target_package"),
-				"target_package", ToPkgName)
+				"target_package", mpc.Opts.ToPkgName)
 
 			return nil // Use a sentinel error or other mechanism if specific exit is needed
 		}
@@ -1719,7 +1651,7 @@ func (mpc *MultipleProject) cleanZapArtifacts(proj *Project) error {
 	// For single projects, StartDir is the actual project directory containing
 	// source files and PKGBUILD, so we should NOT remove it. Only remove
 	// build artifacts within it.
-	if singleProject {
+	if mpc.singleProject {
 		return mpc.cleanSingleProjectArtifacts(proj)
 	}
 
@@ -1847,6 +1779,8 @@ func (mpc *MultipleProject) buildProjectsInOrder(buildOrder [][]*Project, maxWor
 		if err != nil {
 			return err
 		}
+
+		processedPackages += len(batch)
 	}
 
 	return nil
@@ -1909,7 +1843,7 @@ func (mpc *MultipleProject) generateSBOM(proj *Project, artifactPath string) err
 	// Parse SBOM format flag
 	var formats []sbom.Format
 
-	switch strings.ToLower(SBOMFormat) {
+	switch strings.ToLower(mpc.Opts.SBOMFormat) {
 	case "cyclonedx":
 		formats = []sbom.Format{sbom.FormatCycloneDX}
 	case "spdx":
@@ -1918,9 +1852,9 @@ func (mpc *MultipleProject) generateSBOM(proj *Project, artifactPath string) err
 		formats = []sbom.Format{sbom.FormatCycloneDX, sbom.FormatSPDX}
 	default:
 		return yerrors.New(yerrors.ErrTypeConfiguration,
-			fmt.Sprintf("invalid SBOM format: %s", SBOMFormat)).
+			fmt.Sprintf("invalid SBOM format: %s", mpc.Opts.SBOMFormat)).
 			WithOperation("generateSBOM").
-			WithContext("format", SBOMFormat)
+			WithContext("format", mpc.Opts.SBOMFormat)
 	}
 
 	opts := sbom.Options{Formats: formats}

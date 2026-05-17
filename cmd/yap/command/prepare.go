@@ -8,7 +8,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-	"github.com/M0Rf30/yap/v2/pkg/project"
 	"github.com/M0Rf30/yap/v2/pkg/repo"
 )
 
@@ -18,6 +17,15 @@ var (
 
 	// TargetArch specifies the target architecture for cross-compilation.
 	TargetArch string
+
+	// prepareSkipSyncDeps is the local holder for --skip-sync in the prepare command.
+	prepareSkipSyncDeps bool
+
+	// prepareSkipToolchainValidation is the local holder for --skip-toolchain-validation in prepare.
+	prepareSkipToolchainValidation bool
+
+	// prepareExtraRepos is the local holder for --repo flags in the prepare command.
+	prepareExtraRepos []string
 
 	// prepareCmd represents the prepare command.
 	prepareCmd = &cobra.Command{
@@ -31,7 +39,7 @@ var (
 		PreRun:  PreRunValidation,
 		Run: func(_ *cobra.Command, args []string) {
 			// Set the skip toolchain validation flag
-			common.SkipToolchainValidation = project.SkipToolchainValidation
+			common.SkipToolchainValidation = prepareSkipToolchainValidation
 
 			// Parse optional distro arg (supports "distro" or "distro-release"),
 			// then auto-detect from /etc/os-release when missing — matching
@@ -51,7 +59,7 @@ var (
 				return
 			}
 
-			cliRepos, err := repo.ParseFlags(project.ExtraRepos)
+			cliRepos, err := repo.ParseFlags(prepareExtraRepos)
 			if err != nil {
 				logger.Error(err.Error(), "error", err)
 
@@ -64,7 +72,7 @@ var (
 				return
 			}
 
-			if !project.SkipSyncDeps {
+			if !prepareSkipSyncDeps {
 				err := packageManager.Update()
 				if err != nil {
 					logger.Error(err.Error(),
@@ -104,9 +112,9 @@ func init() {
 	// Add completion for distribution argument
 	prepareCmd.ValidArgsFunction = ValidDistrosCompletion
 
-	prepareCmd.Flags().BoolVarP(&project.SkipSyncDeps,
+	prepareCmd.Flags().BoolVarP(&prepareSkipSyncDeps,
 		flagSkipSync, "s", false, "")
-	prepareCmd.Flags().BoolVarP(&project.SkipToolchainValidation,
+	prepareCmd.Flags().BoolVarP(&prepareSkipToolchainValidation,
 		"skip-toolchain-validation", "", false, "")
 	prepareCmd.Flags().BoolVarP(&GoLang,
 		"golang", "g", false, "")
@@ -115,7 +123,7 @@ func init() {
 	// StringArrayVar (not StringSliceVar) so commas inside the spec are not
 	// treated as multi-value separators — every --repo invocation maps to one
 	// repository definition.
-	prepareCmd.Flags().StringArrayVar(&project.ExtraRepos,
+	prepareCmd.Flags().StringArrayVar(&prepareExtraRepos,
 		"repo", nil,
 		"Extra repository spec (repeatable): name=<n>,url=<u>,suite=<s>,components=<a+b>,"+
 			"keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>")

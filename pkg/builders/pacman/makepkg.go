@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -22,7 +21,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -51,18 +49,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Pkg {
 func (m *Pkg) BuildPackage(artifactsPath string, targetArch string) (string, error) {
 	m.SetTargetArchitecture(targetArch)
 
-	completeVersion := m.PKGBUILD.PkgVer
-
-	if m.PKGBUILD.Epoch != "" {
-		completeVersion = fmt.Sprintf("%s:%s", m.PKGBUILD.Epoch, m.PKGBUILD.PkgVer)
-	}
-
-	// Build package name with the complete version for Pacman format
-	pkgName := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst",
-		m.PKGBUILD.PkgName,
-		completeVersion,
-		m.PKGBUILD.PkgRel,
-		m.PKGBUILD.ArchComputed)
+	pkgName := m.BuildPackageName(constants.ExtPacmanZst)
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
 	err := archive.CreateTarZst(context.Background(), m.PKGBUILD.PackageDir, pkgFilePath, false)
@@ -99,16 +86,7 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 		return err
 	}
 
-	if err := options.Apply(m.PKGBUILD.PackageDir, options.Options{
-		DebugEnabled:     m.PKGBUILD.DebugEnabled,
-		DocsEnabled:      m.PKGBUILD.DocsEnabled,
-		EmptyDirsEnabled: m.PKGBUILD.EmptyDirsEnabled,
-		LibtoolEnabled:   m.PKGBUILD.LibtoolEnabled,
-		PurgeEnabled:     m.PKGBUILD.PurgeEnabled,
-		StaticEnabled:    m.PKGBUILD.StaticEnabled,
-		StripEnabled:     m.PKGBUILD.StripEnabled,
-		ZipManEnabled:    m.PKGBUILD.ZipManEnabled,
-	}); err != nil {
+	if err := m.ApplyOptions(); err != nil {
 		return err
 	}
 

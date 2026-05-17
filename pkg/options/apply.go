@@ -33,6 +33,12 @@ func Apply(packageDir string, o Options) error {
 		}
 	}
 
+	if !o.StaticEnabled {
+		if err := RemoveStatic(packageDir); err != nil {
+			return err
+		}
+	}
+
 	if o.PurgeEnabled {
 		if err := Purge(packageDir); err != nil {
 			return err
@@ -51,6 +57,12 @@ func Apply(packageDir string, o Options) error {
 			return err
 		}
 	}
+
+	// NOTE: DebugEnabled is intentionally not handled here. Debug symbol separation
+	// is handled separately via the --debug-dir flag and the Strip() function in
+	// strip.go, which calls binutil.SeparateDebugInfo() when a debug directory is
+	// configured. The DebugEnabled flag controls whether debug symbols are preserved
+	// during stripping, not whether they are separated into a separate directory.
 
 	return nil
 }

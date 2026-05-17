@@ -16,6 +16,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
@@ -110,6 +111,8 @@ func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
 }
 
 // BuildPackageName constructs standardized package names for different formats.
+// Used by: APK, DEB, Pacman
+// Not used by: RPM (RPM does not include epoch in the filename, only in metadata)
 func (bb *BaseBuilder) BuildPackageName(extension string) string {
 	name := fmt.Sprintf("%s-%s-%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.PkgVer, bb.PKGBUILD.PkgRel)
 
@@ -204,7 +207,7 @@ func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
 
 // CreateFileWalker creates a configured file walker for the package format.
 func (bb *BaseBuilder) CreateFileWalker() *files.Walker {
-	options := files.WalkOptions{
+	walkOpts := files.WalkOptions{
 		BackupFiles: bb.PKGBUILD.Backup,
 	}
 
@@ -212,13 +215,13 @@ func (bb *BaseBuilder) CreateFileWalker() *files.Walker {
 	switch bb.Format {
 	case formatPacman:
 		// Pacman skips dot files
-		options.SkipDotFiles = true
+		walkOpts.SkipDotFiles = true
 	case formatApk:
 		// APK skips control files starting with '.'
-		options.SkipPatterns = []string{".*"}
+		walkOpts.SkipPatterns = []string{".*"}
 	}
 
-	return files.NewWalker(bb.PKGBUILD.PackageDir, options)
+	return files.NewWalker(bb.PKGBUILD.PackageDir, walkOpts)
 }
 
 // LogPackageCreated logs successful package creation with consistent formatting.
@@ -240,9 +243,11 @@ func (bb *BaseBuilder) LogPackageCreated(artifactPath string) {
 }
 
 // FormatRelease formats the package release string with distribution-specific suffixes.
-// For DEB packages: appends codename or distro name
-// For RPM packages: appends RPM distro suffix and codename
+// For RPM packages: appends RPM distro suffix and codename (only when codename is set)
 // For other formats: returns release unchanged
+// Note: DEB has its own getRelease() method in pkg/builders/deb/dpkg.go with different
+// fallback behavior—it always appends a distro suffix (codename or distro name) for
+// proper repository targeting, while this method only appends when codename is set.
 func (bb *BaseBuilder) FormatRelease(distroSuffixMap map[string]string) {
 	if bb.PKGBUILD.Codename == "" {
 		return
@@ -554,4 +559,20 @@ func (bb *BaseBuilder) PrepareScriptletWithHelpers(body string) string {
 	}
 
 	return preamble + body
+}
+
+// ApplyOptions runs the PKGBUILD option handlers (strip, docs, libtool, etc.)
+// against the package directory. This consolidates the duplicated options.Apply
+// call across DEB, RPM, and Pacman builders.
+func (bb *BaseBuilder) ApplyOptions() error {
+	return options.Apply(bb.PKGBUILD.PackageDir, options.Options{
+		DebugEnabled:     bb.PKGBUILD.DebugEnabled,
+		DocsEnabled:      bb.PKGBUILD.DocsEnabled,
+		EmptyDirsEnabled: bb.PKGBUILD.EmptyDirsEnabled,
+		LibtoolEnabled:   bb.PKGBUILD.LibtoolEnabled,
+		PurgeEnabled:     bb.PKGBUILD.PurgeEnabled,
+		StaticEnabled:    bb.PKGBUILD.StaticEnabled,
+		StripEnabled:     bb.PKGBUILD.StripEnabled,
+		ZipManEnabled:    bb.PKGBUILD.ZipManEnabled,
+	})
 }

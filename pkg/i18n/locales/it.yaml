@@ -913,6 +913,8 @@
   translation: "Rimozione delle directory di documentazione"
 - id: logger.options.info.removing_libtool
   translation: "Rimozione dei file libtool .la"
+- id: logger.options.info.removing_static
+  translation: "Rimozione delle librerie statiche .a"
 - id: logger.options.info.removing_empty_dirs
   translation: "Rimozione delle directory vuote"
 - id: logger.options.info.compressing_man_pages

@@ -4,7 +4,6 @@ package deb
 import (
 	"compress/gzip"
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,11 +15,11 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -119,16 +118,7 @@ func (d *Package) PrepareFakeroot(_ string, targetArch string) error {
 		return err
 	}
 
-	return options.Apply(d.PKGBUILD.PackageDir, options.Options{
-		DebugEnabled:     d.PKGBUILD.DebugEnabled,
-		DocsEnabled:      d.PKGBUILD.DocsEnabled,
-		EmptyDirsEnabled: d.PKGBUILD.EmptyDirsEnabled,
-		LibtoolEnabled:   d.PKGBUILD.LibtoolEnabled,
-		PurgeEnabled:     d.PKGBUILD.PurgeEnabled,
-		StaticEnabled:    d.PKGBUILD.StaticEnabled,
-		StripEnabled:     d.PKGBUILD.StripEnabled,
-		ZipManEnabled:    d.PKGBUILD.ZipManEnabled,
-	})
+	return d.ApplyOptions()
 }
 
 // addArFile adds a file to an archive writer with the specified name, body,
@@ -369,10 +359,7 @@ func (d *Package) createChangelogFile() error {
 // the path to the created DEB file and an error if there was an issue generating the Deb package files.
 func (d *Package) createDeb(artifactPath, control, data string) (string, error) {
 	// Create the .deb package
-	artifactFilePath := filepath.Join(artifactPath,
-		fmt.Sprintf("%s_%s-%s_%s.deb",
-			d.PKGBUILD.PkgName, d.PKGBUILD.PkgVer, d.PKGBUILD.PkgRel,
-			d.PKGBUILD.ArchComputed))
+	artifactFilePath := filepath.Join(artifactPath, d.BuildPackageName(constants.ExtDEB))
 
 	cleanFilePath := filepath.Clean(artifactFilePath)
 	debianBinary := []byte(binaryContent)
@@ -494,7 +481,10 @@ func (d *Package) createDebResources() error {
 }
 
 // getRelease updates the package release with distribution-specific suffix.
-// This delegates to the common FormatRelease method.
+// Unlike FormatRelease in BaseBuilder, this method always appends a distro suffix
+// (either codename or distro name) to ensure proper Debian repository targeting.
+// This divergence is intentional: DEB requires a distro suffix for repo selection,
+// while RPM only appends when codename is explicitly set.
 func (d *Package) getRelease() {
 	if d.PKGBUILD.Codename != "" {
 		d.PKGBUILD.PkgRel += d.PKGBUILD.Codename

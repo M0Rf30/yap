@@ -10,6 +10,12 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/project"
 )
 
+// zapFromPkgName is the local holder for the --from flag value in the zap command.
+var zapFromPkgName string
+
+// zapToPkgName is the local holder for the --to flag value in the zap command.
+var zapToPkgName string
+
 // zapCmd represents the command to deeply clean build environments.
 var zapCmd = &cobra.Command{
 	Use:     commandZap + " [distro] <path>",
@@ -40,11 +46,15 @@ var zapCmd = &cobra.Command{
 		// Show project path
 		logger.Info(i18n.T("logger.zap.project_path"), "path", fullJSONPath)
 
-		mpc := project.MultipleProject{}
-
-		project.NoMakeDeps = true
-		project.SkipSyncDeps = true
-		project.Zap = true
+		mpc := project.MultipleProject{
+			Opts: project.BuildOptions{
+				NoMakeDeps:   true,
+				SkipSyncDeps: true,
+				Zap:          true,
+				FromPkgName:  zapFromPkgName,
+				ToPkgName:    zapToPkgName,
+			},
+		}
 
 		err = mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
@@ -100,8 +110,8 @@ func init() {
 	}
 
 	// BUILD RANGE CONTROL FLAGS - same as build command for target support
-	zapCmd.Flags().StringVarP(&project.FromPkgName,
+	zapCmd.Flags().StringVarP(&zapFromPkgName,
 		flagFrom, "", "", "")
-	zapCmd.Flags().StringVarP(&project.ToPkgName,
+	zapCmd.Flags().StringVarP(&zapToPkgName,
 		"to", "", "", "")
 }
