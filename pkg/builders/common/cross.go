@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -752,6 +753,27 @@ var archTargetTable = map[string]archTargets{
 		goArch:     constants.ArchRiscv64,
 		gnuTriplet: constants.TripletRiscv64Linux,
 	},
+}
+
+// ValidateTargetArch returns an error if arch is not a recognised cross-compilation
+// target. Returns nil when arch is empty (native build) or known.
+func ValidateTargetArch(arch string) error {
+	if arch == "" {
+		return nil
+	}
+
+	if _, ok := archTargetTable[arch]; ok {
+		return nil
+	}
+
+	known := make([]string, 0, len(archTargetTable))
+	for k := range archTargetTable {
+		known = append(known, k)
+	}
+
+	sort.Strings(known)
+
+	return fmt.Errorf("unsupported target architecture %q — known: %s", arch, strings.Join(known, ", "))
 }
 
 // getRustTargetArchitecture maps YAP architecture names to Rust target triples.
