@@ -66,11 +66,25 @@ func isHostOnlyPackage(name string) bool {
 		return true
 	}
 
+	// Python interpreters — run on the build host (e.g. as build-system
+	// scripts); never needed as a target-arch binary.
+	if name == "python3" || name == "python" ||
+		strings.HasPrefix(name, "python3-") ||
+		strings.HasPrefix(name, "python-") {
+		return true
+	}
+
 	// Common build tools that are always host-arch
 	switch name {
 	case "make", "re2c", "bison", "byacc", "flex", "gawk",
 		"autoconf", "automake", "libtool", "cmake", "meson",
-		"pkg-config", "git", "patch", "m4":
+		"pkg-config", "git", "patch", "m4",
+		// Document formatters / converters used during build
+		"groff-base", "groff",
+		// RPM↔deb converter; runs on host
+		"alien",
+		// Password-quality runtime tool (cracklib-check); runs on host
+		"cracklib-runtime":
 		return true
 	}
 
