@@ -133,6 +133,10 @@ type MultipleProject struct {
 	packageManager packer.Packer
 	makeDepends    []string
 	runtimeDepends []string
+	// allProjects holds the complete project list before any --only/--skip/--from/--to
+	// filtering. Used by getRuntimeDeps to correctly identify internal packages so
+	// that filtered-out packages are not mistakenly downloaded from apt.
+	allProjects []*Project
 }
 
 // Project represents a single project.
@@ -863,9 +867,17 @@ func (mpc *MultipleProject) getMakeDeps() []string {
 // collects external dependencies that need to be installed via package manager.
 // Returns the collected external dependencies.
 func (mpc *MultipleProject) getRuntimeDeps() []string {
-	// Create a set of internal package names for filtering
+	// Build the internal package set from the FULL project list (allProjects),
+	// not the filtered build set (Projects). This ensures that packages excluded
+	// via --skip/--only/--from/--to are still recognised as internal and not
+	// mistakenly downloaded from apt.
+	source := mpc.allProjects
+	if len(source) == 0 {
+		source = mpc.Projects // fallback for single-project or test paths
+	}
+
 	internalPackages := make(map[string]bool)
-	for _, proj := range mpc.Projects {
+	for _, proj := range source {
 		internalPackages[proj.Builder.PKGBUILD.PkgName] = true
 	}
 
@@ -991,6 +1003,11 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 	}
 
 	mpc.Projects = projects
+
+	// Snapshot the full project list before any filtering so getRuntimeDeps
+	// can correctly exclude all yap.json packages from the apt download list,
+	// regardless of which subset is selected for building.
+	mpc.allProjects = append([]*Project(nil), projects...)
 
 	// Filter projects when --only or --skip is specified
 	if mpc.Opts.OnlyPkgNames != "" {

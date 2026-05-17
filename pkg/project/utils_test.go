@@ -373,3 +373,159 @@ func TestGetRuntimeDepsDeduplication(t *testing.T) {
 		}
 	}
 }
+
+func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
+	// Setup: 3 packages in yap.json — pkga, pkgb, pkgc.
+	// pkgb depends on pkga (internal).
+	// pkgc depends on pkgb (internal) and libexternal (external).
+
+	t.Run("skipped package still excluded from runtime deps", func(t *testing.T) {
+		// When --skip removes pkga from the build set, pkga should still be
+		// treated as internal and NOT included in the runtime deps to download.
+		mpc := &MultipleProject{
+			Projects: []*Project{
+				{
+					Builder: &builder.Builder{
+						PKGBUILD: &pkgbuild.PKGBUILD{
+							PkgName: "pkga",
+							Depends: []string{},
+						},
+					},
+				},
+				{
+					Builder: &builder.Builder{
+						PKGBUILD: &pkgbuild.PKGBUILD{
+							PkgName: "pkgb",
+							Depends: []string{"pkga"},
+						},
+					},
+				},
+				{
+					Builder: &builder.Builder{
+						PKGBUILD: &pkgbuild.PKGBUILD{
+							PkgName: "pkgc",
+							Depends: []string{"pkgb", "libexternal"},
+						},
+					},
+				},
+			},
+		}
+
+		// Snapshot the full project list before filtering (simulating populateProjects behavior)
+		mpc.allProjects = append([]*Project(nil), mpc.Projects...)
+
+		// Simulate --skip pkga: remove pkga from Projects but keep it in allProjects
+		mpc.Projects = mpc.Projects[1:] // Remove pkga, keep pkgb and pkgc
+
+		// Get runtime dependencies
+		runtimeDeps := mpc.getRuntimeDeps()
+
+		// pkga should NOT be in runtimeDepends even though pkgb depends on it
+		// and pkga is now skipped/removed from Projects.
+		// This is because allProjects still contains pkga, so it's recognized as internal.
+		for _, dep := range runtimeDeps {
+			depName := extractPackageName(dep)
+			if depName == "pkga" {
+				t.Errorf("skipped package pkga should not be in runtimeDepends")
+			}
+		}
+
+		// libexternal SHOULD be in runtimeDepends
+		found := false
+		for _, dep := range runtimeDeps {
+			if extractPackageName(dep) == "libexternal" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("libexternal should be in runtimeDepends")
+		}
+
+		// pkgb and pkgc should NOT be in runtimeDepends (they are internal)
+		for _, dep := range runtimeDeps {
+			depName := extractPackageName(dep)
+			if depName == "pkgb" {
+				t.Errorf("internal package pkgb should not be in runtimeDepends")
+			}
+			if depName == "pkgc" {
+				t.Errorf("internal package pkgc should not be in runtimeDepends")
+			}
+		}
+	})
+
+	t.Run("only selected packages, deps of unselected still excluded", func(t *testing.T) {
+		// When --only selects only pkgc, pkgb (which pkgc depends on) should still
+		// be treated as internal and NOT included in the runtime deps to download.
+		mpc := &MultipleProject{
+			Projects: []*Project{
+				{
+					Builder: &builder.Builder{
+						PKGBUILD: &pkgbuild.PKGBUILD{
+							PkgName: "pkga",
+							Depends: []string{},
+						},
+					},
+				},
+				{
+					Builder: &builder.Builder{
+						PKGBUILD: &pkgbuild.PKGBUILD{
+							PkgName: "pkgb",
+							Depends: []string{"pkga"},
+						},
+					},
+				},
+				{
+					Builder: &builder.Builder{
+						PKGBUILD: &pkgbuild.PKGBUILD{
+							PkgName: "pkgc",
+							Depends: []string{"pkgb", "libexternal"},
+						},
+					},
+				},
+			},
+		}
+
+		// Snapshot the full project list before filtering (simulating populateProjects behavior)
+		mpc.allProjects = append([]*Project(nil), mpc.Projects...)
+
+		// Simulate --only pkgc: keep only pkgc in Projects
+		mpc.Projects = mpc.Projects[2:] // Keep only pkgc
+
+		// Get runtime dependencies
+		runtimeDeps := mpc.getRuntimeDeps()
+
+		// pkgb should NOT be in runtimeDepends even though pkgc depends on it
+		// and pkgb is not being built. This is because allProjects still contains pkgb,
+		// so it's recognized as internal.
+		for _, dep := range runtimeDeps {
+			depName := extractPackageName(dep)
+			if depName == "pkgb" {
+				t.Errorf("internal package pkgb should not be in runtimeDepends")
+			}
+		}
+
+		// libexternal SHOULD be in runtimeDepends
+		found := false
+		for _, dep := range runtimeDeps {
+			if extractPackageName(dep) == "libexternal" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("libexternal should be in runtimeDepends")
+		}
+
+		// pkga and pkgc should NOT be in runtimeDepends (they are internal)
+		for _, dep := range runtimeDeps {
+			depName := extractPackageName(dep)
+			if depName == "pkga" {
+				t.Errorf("internal package pkga should not be in runtimeDepends")
+			}
+			if depName == "pkgc" {
+				t.Errorf("internal package pkgc should not be in runtimeDepends")
+			}
+		}
+	})
+}
