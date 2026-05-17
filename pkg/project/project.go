@@ -17,6 +17,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/otiai10/copy"
 
+	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 	"github.com/M0Rf30/yap/v2/pkg/builder"
 	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -227,6 +228,11 @@ func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []strin
 		if err != nil {
 			return err
 		}
+
+		// Invalidate the aptcache singleton so that packages from newly added
+		// repositories (e.g. --repo flags) are visible to subsequent partition
+		// decisions in DownloadAndExtractCrossDeps.
+		aptcache.Reload()
 	}
 
 	if !mpc.Opts.NoMakeDeps {
