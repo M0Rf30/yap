@@ -836,6 +836,8 @@
   translation: "Runtime dependency installed"
 - id: logger.project.runtime_dependency_map
   translation: "Runtime dependency map"
+- id: logger.project.filtering_projects
+  translation: "Filtering projects for parallel build"
 - id: logger.project.skipping_batch_filtered_out
   translation: "Skipping batch (filtered out)"
 - id: logger.project.starting_dependencyaware_build_process

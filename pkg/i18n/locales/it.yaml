@@ -850,6 +850,8 @@
   translation: "Dipendenza runtime installata"
 - id: logger.project.runtime_dependency_map
   translation: "Mappa delle dipendenze runtime"
+- id: logger.project.filtering_projects
+  translation: "Filtraggio dei progetti per la compilazione parallela"
 - id: logger.project.skipping_batch_filtered_out
   translation: "Salto del batch (filtrato)"
 - id: logger.project.starting_dependencyaware_build_process

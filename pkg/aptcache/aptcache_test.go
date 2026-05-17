@@ -210,6 +210,58 @@ func TestPackageInfo_MultiArchForeign(t *testing.T) {
 	}
 }
 
+// TestMultiArchClassification verifies that the Multi-Arch field correctly
+// classifies packages that were previously handled by the hardcoded
+// isHostOnlyPackage() list. Every entry here must map to the expected
+// MultiArchForeign() / MultiArchSame() result so that partitionArchAllDeps
+// keeps host tools unqualified and qualifies dev libraries with :arm64.
+func TestMultiArchClassification(t *testing.T) {
+	// Data derived from `apt-cache show` on Ubuntu Jammy.
+	cases := []struct {
+		pkg         string
+		arch        string
+		multiArch   string
+		wantForeign bool // should be kept unqualified (host tool)
+		wantSame    bool // should be qualified :arm64 (dev lib)
+	}{
+		// Build tools — Multi-Arch: foreign or allowed → host-only
+		{"make", "amd64", "allowed", true, false},
+		{"cmake", "amd64", "foreign", true, false},
+		{"git", "amd64", "foreign", true, false},
+		{"bison", "amd64", "foreign", true, false},
+		{"flex", "amd64", "foreign", true, false},
+		{"autoconf", "all", "foreign", true, false},
+		{"automake", "all", "foreign", true, false},
+		{"libtool", "all", "foreign", true, false},
+		{"pkg-config", "amd64", "foreign", true, false},
+		{"patch", "amd64", "foreign", true, false},
+		{"m4", "amd64", "foreign", true, false},
+		{"groff-base", "amd64", "foreign", true, false},
+		{"systemd", "amd64", "foreign", true, false},
+		{"perl", "amd64", "allowed", true, false},
+		{"python3", "amd64", "allowed", true, false},
+		// Dev libraries — Multi-Arch: same → qualify with :arm64
+		{"libssl-dev", "amd64", "same", false, true},
+		{"libsystemd-dev", "amd64", "same", false, true},
+		{"libbz2-dev", "amd64", "same", false, true},
+		{"zlib1g-dev", "amd64", "same", false, true},
+		{"libpcre2-dev", "amd64", "same", false, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.pkg, func(t *testing.T) {
+			p := aptcache.PackageInfo{
+				Architecture: tc.arch,
+				MultiArch:    tc.multiArch,
+			}
+			assert.Equal(t, tc.wantForeign, p.MultiArchForeign(),
+				"%s: MultiArchForeign() (Multi-Arch=%q)", tc.pkg, tc.multiArch)
+			assert.Equal(t, tc.wantSame, p.MultiArchSame(),
+				"%s: MultiArchSame() (Multi-Arch=%q)", tc.pkg, tc.multiArch)
+		})
+	}
+}
+
 func TestEmptyInput(t *testing.T) {
 	c := newCacheFromStrings(t, "", "")
 	_, ok := c.Lookup("anything")
