@@ -679,14 +679,70 @@ func RunScriptInFakeroot(cmds, packageName string, extraEnv ...[]string) error {
 	return logScriptResult(err, packageName, duration, &outputBuf, "RunScriptInFakeroot")
 }
 
+// extractErrorLines filters a captured script output buffer down to lines that
+// look like actual errors. It discards:
+//   - blank lines
+//   - shell xtrace lines ("+ cmd")
+//   - progress/status lines from common build tools that write to stderr but
+//     are not errors (e.g. "go: downloading …", "npm: warn …", "cargo:  …",
+//     "Downloading …", "Fetching …", "Resolving …", "Compiling …", etc.)
+//
+// If nothing meaningful remains, fallback (err.Error()) is returned unchanged.
+func extractErrorLines(raw, fallback string) string {
+	// Prefixes that indicate informational/progress output, not errors.
+	// Checked case-insensitively after trimming leading whitespace.
+	progressPrefixes := []string{
+		"+ ",           // shell xtrace
+		"go: ",         // go toolchain progress
+		"downloading ", // generic
+		"fetching ",
+		"resolving ",
+		"compiling ",
+		"installing ",
+		"updating ",
+		"warning: ", // warnings are not the root cause
+		"note: ",
+		"info: ",
+		"hint: ",
+	}
+
+	var relevant []string
+
+	for line := range strings.SplitSeq(raw, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		lower := strings.ToLower(trimmed)
+
+		skip := false
+
+		for _, pfx := range progressPrefixes {
+			if strings.HasPrefix(lower, pfx) {
+				skip = true
+
+				break
+			}
+		}
+
+		if !skip {
+			relevant = append(relevant, trimmed)
+		}
+	}
+
+	if len(relevant) == 0 {
+		return fallback
+	}
+
+	return strings.Join(relevant, "\n")
+}
+
 // logScriptResult logs the outcome of a script run and returns a wrapped error on failure.
 // Extracted to eliminate duplication between RunScriptWithPackage and RunScriptInFakeroot.
 func logScriptResult(err error, packageName string, duration time.Duration, outputBuf *bytes.Buffer, op string) error {
 	if err != nil {
-		scriptErr := err.Error()
-		if captured := strings.TrimSpace(outputBuf.String()); captured != "" {
-			scriptErr = captured
-		}
+		scriptErr := extractErrorLines(outputBuf.String(), err.Error())
 
 		if packageName != "" {
 			logger.Error(i18n.T("logger.runscriptwithpackage.error.script_execution_failed_1"),

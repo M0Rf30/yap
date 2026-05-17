@@ -151,9 +151,11 @@ func (h *CustomHandler) Handle(_ context.Context, record slog.Record) error {
 			keyColor = color.White
 		}
 
-		val := strings.ReplaceAll(a.Value.String(), "\n", " ↵ ")
-		colored := keyColor(a.Key+": ") + val
-		plain := a.Key + ": " + val
+		// For inline fitting check, collapse newlines to a single space.
+		rawVal := a.Value.String()
+		inlineVal := strings.ReplaceAll(rawVal, "\n", " ")
+		colored := keyColor(a.Key+": ") + rawVal
+		plain := a.Key + ": " + inlineVal
 		pairs = append(pairs, kv{colored, plain})
 
 		return true
@@ -204,10 +206,25 @@ func (h *CustomHandler) Handle(_ context.Context, record slog.Record) error {
 			connector = "└"
 		}
 
+		lines := strings.Split(p.colored, "\n")
+
 		sb.WriteString(indent)
 		sb.WriteString(color.Gray(connector + " "))
-		sb.WriteString(p.colored)
+		sb.WriteString(lines[0])
 		sb.WriteByte('\n')
+
+		// Continuation lines for multi-line values, indented to align under the value.
+		contIndent := indent + "  "
+
+		for _, contLine := range lines[1:] {
+			if strings.TrimSpace(contLine) == "" {
+				continue
+			}
+
+			sb.WriteString(contIndent)
+			sb.WriteString(contLine)
+			sb.WriteByte('\n')
+		}
 	}
 
 	_, err := h.writer.Write([]byte(sb.String()))
