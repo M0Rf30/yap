@@ -581,7 +581,12 @@ export -f configure_cross 2>/dev/null || true
 	_ = os.Setenv("CXX", gppExecutable)
 
 	if ccacheAvailable {
-		_ = os.Setenv("CCACHE_PREFIX", "ccache")
+		// ccache wraps the cross-compiler transparently via the
+		// /usr/lib/ccache/<cross-compiler> symlinks that are ahead of the
+		// real compiler on PATH. No extra env var is needed.
+		logger.Info("ccache active for cross-compilation",
+			"cc", gccExecutable,
+			"via", "/usr/lib/ccache/"+gccExecutable)
 	}
 
 	_ = os.Setenv("AR", binutilsPrefix+"-ar")

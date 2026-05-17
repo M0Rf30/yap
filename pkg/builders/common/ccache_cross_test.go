@@ -105,25 +105,24 @@ func TestCrossCompilationWithCcache(t *testing.T) {
 			// Check if ccache is still in the environment
 			ccAfter := os.Getenv("CC")
 			cxxAfter := os.Getenv("CXX")
-			ccachePrefix := os.Getenv("CCACHE_PREFIX")
 
 			t.Logf("Before cross-compilation: CC=%s, CXX=%s", ccBefore, cxxBefore)
-			t.Logf("After cross-compilation:  CC=%s, CXX=%s, CCACHE_PREFIX=%s", ccAfter, cxxAfter, ccachePrefix)
+			t.Logf("After cross-compilation:  CC=%s, CXX=%s", ccAfter, cxxAfter)
 
-			// Verify ccache is active via CCACHE_PREFIX (the correct approach for cross-compilation)
-			// This prevents breaking build systems that derive the cross-prefix by stripping
-			// a known suffix from CC (e.g., OpenSSL's Configure script).
-			if ccachePrefix != "ccache" {
-				t.Errorf("CCACHE_PREFIX should be 'ccache' after cross-compilation setup. Got: %s", ccachePrefix)
+			// ccache wraps the cross-compiler via /usr/lib/ccache/<cross-compiler>
+			// symlinks on PATH — no CCACHE_PREFIX env var is needed or set.
+			if os.Getenv("CCACHE_PREFIX") != "" {
+				t.Errorf("CCACHE_PREFIX should not be set (ccache wraps via PATH symlinks). Got: %s",
+					os.Getenv("CCACHE_PREFIX"))
 			}
 
-			// CC should be the bare cross-compiler (ccache wraps via CCACHE_PREFIX, not CC)
+			// CC/CXX must be the bare cross-compiler, not prefixed with ccache.
 			if strings.Contains(ccAfter, "ccache") {
-				t.Errorf("CC should not contain 'ccache' directly (use CCACHE_PREFIX instead). Got: %s", ccAfter)
+				t.Errorf("CC should not contain 'ccache' directly. Got: %s", ccAfter)
 			}
 
 			if strings.Contains(cxxAfter, "ccache") {
-				t.Errorf("CXX should not contain 'ccache' directly (use CCACHE_PREFIX instead). Got: %s", cxxAfter)
+				t.Errorf("CXX should not contain 'ccache' directly. Got: %s", cxxAfter)
 			}
 
 			// Verify the cross-compiler is present
