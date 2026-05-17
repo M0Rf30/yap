@@ -378,7 +378,6 @@ func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
 	// Setup: 3 packages in yap.json — pkga, pkgb, pkgc.
 	// pkgb depends on pkga (internal).
 	// pkgc depends on pkgb (internal) and libexternal (external).
-
 	t.Run("skipped package still excluded from runtime deps", func(t *testing.T) {
 		// When --skip removes pkga from the build set, pkga should still be
 		// treated as internal and NOT included in the runtime deps to download.
@@ -432,12 +431,14 @@ func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
 
 		// libexternal SHOULD be in runtimeDepends
 		found := false
+
 		for _, dep := range runtimeDeps {
 			if extractPackageName(dep) == "libexternal" {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			t.Errorf("libexternal should be in runtimeDepends")
 		}
@@ -448,6 +449,7 @@ func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
 			if depName == "pkgb" {
 				t.Errorf("internal package pkgb should not be in runtimeDepends")
 			}
+
 			if depName == "pkgc" {
 				t.Errorf("internal package pkgc should not be in runtimeDepends")
 			}
@@ -507,12 +509,14 @@ func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
 
 		// libexternal SHOULD be in runtimeDepends
 		found := false
+
 		for _, dep := range runtimeDeps {
 			if extractPackageName(dep) == "libexternal" {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			t.Errorf("libexternal should be in runtimeDepends")
 		}
@@ -523,6 +527,7 @@ func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
 			if depName == "pkga" {
 				t.Errorf("internal package pkga should not be in runtimeDepends")
 			}
+
 			if depName == "pkgc" {
 				t.Errorf("internal package pkgc should not be in runtimeDepends")
 			}
