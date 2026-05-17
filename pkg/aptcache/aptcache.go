@@ -55,12 +55,24 @@ func (p PackageInfo) ArchitectureAll() bool {
 	return strings.EqualFold(p.Architecture, "all")
 }
 
-// MultiArchForeign reports whether the package supports multi-arch installation
-// alongside a host-arch copy (foreign, allowed, or same).
+// MultiArchForeign reports whether a single host-arch copy of this package
+// satisfies dependencies from any architecture (Multi-Arch: foreign or allowed).
+// These are tools and daemons that run on the build host — they must NOT be
+// qualified with a target arch during cross-compilation.
+//
+// Multi-Arch: same (dev libraries) is intentionally excluded: those packages
+// must be installed separately for each architecture.
 func (p PackageInfo) MultiArchForeign() bool {
 	ma := strings.ToLower(p.MultiArch)
 
-	return ma == "foreign" || ma == "allowed" || ma == "same"
+	return ma == "foreign" || ma == "allowed"
+}
+
+// MultiArchSame reports whether this package must be installed separately for
+// each architecture (Multi-Arch: same). These are typically -dev libraries
+// that need to be qualified with the target arch during cross-compilation.
+func (p PackageInfo) MultiArchSame() bool {
+	return strings.EqualFold(p.MultiArch, "same")
 }
 
 // Cache is an in-memory index of package metadata keyed by package name.

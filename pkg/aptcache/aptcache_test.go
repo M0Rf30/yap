@@ -104,7 +104,8 @@ func TestLookup_AptIndex(t *testing.T) {
 		assert.False(t, info.Essential)
 		assert.False(t, info.Installed)
 		assert.False(t, info.ArchitectureAll())
-		assert.True(t, info.MultiArchForeign())
+		assert.False(t, info.MultiArchForeign())
+		assert.True(t, info.MultiArchSame())
 	})
 
 	t.Run("arch-all package", func(t *testing.T) {
@@ -198,7 +199,7 @@ func TestPackageInfo_MultiArchForeign(t *testing.T) {
 		{"foreign", true},
 		{"Foreign", true}, // case-insensitive
 		{"allowed", true},
-		{"same", true},
+		{"same", false}, // same = dev lib, not foreign/allowed
 		{"no", false},
 		{"", false},
 	}
