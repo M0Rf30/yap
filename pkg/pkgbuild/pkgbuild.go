@@ -2,11 +2,9 @@
 package pkgbuild
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -16,6 +14,7 @@ import (
 	mvdanshell "mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -357,60 +356,17 @@ func resolveVirtualPackages(deps []string) []string {
 
 // resolveVirtualPackage checks if a package is a virtual package and returns
 // the first concrete provider if so, or the original package name otherwise.
+// It uses the in-process apt cache to avoid spawning apt-cache subprocesses.
 func resolveVirtualPackage(pkg string) string {
-	ctx := context.Background()
+	cache := aptcache.Load()
 
-	cmd := exec.CommandContext(ctx,
-		"apt-cache", "policy", pkg) // #nosec G204
-
-	var out bytes.Buffer
-
-	cmd.Stdout = &out
-
-	err := cmd.Run()
-	if err != nil {
-		return pkg
+	resolved := cache.ResolveVirtual(pkg)
+	if resolved != pkg {
+		logger.Info("resolved virtual package",
+			"virtual", pkg, "provider", resolved)
 	}
 
-	if !strings.Contains(out.String(), "Candidate: (none)") {
-		return pkg
-	}
-
-	cmd = exec.CommandContext(ctx,
-		"apt-cache", "showpkg", pkg) // #nosec G204
-
-	out.Reset()
-	cmd.Stdout = &out
-
-	err = cmd.Run()
-	if err != nil {
-		return pkg
-	}
-
-	output := out.String()
-
-	idx := strings.Index(output, "Reverse Provides:")
-	if idx == -1 {
-		return pkg
-	}
-
-	lines := strings.Split(output[idx:], "\n")
-	for _, line := range lines[1:] {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		fields := strings.Fields(line)
-		if len(fields) >= 1 {
-			logger.Info("resolved virtual package",
-				"virtual", pkg, "provider", fields[0])
-
-			return fields[0]
-		}
-	}
-
-	return pkg
+	return resolved
 }
 
 // GetUpdates reads the package manager name and its arguments to perform

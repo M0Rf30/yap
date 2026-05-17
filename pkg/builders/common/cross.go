@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -53,6 +54,8 @@ func isHostOnlyPackage(name string) bool {
 }
 
 func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
+	cache := aptcache.Load()
+
 	for _, dep := range deps {
 		// Strip version constraint for the lookup: "libssl-dev (>= 1.0)" → "libssl-dev"
 		name, _, _ := strings.Cut(dep, " (")
@@ -68,14 +71,13 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 			continue
 		}
 
-		out, err := exec.CommandContext(context.Background(), "apt-cache", "show", name).Output() // #nosec G204
-		if err != nil {
+		info, found := cache.Lookup(name)
+		if !found {
 			// Package not in apt cache (e.g. custom repo packages).
 			// If it is already installed for the host arch, qualifying it with the
 			// target arch would cause a conflict (same package, two architectures,
 			// Multi-Arch not set). Treat it as arch-all to avoid the conflict.
-			dpkgOut, dpkgErr := exec.CommandContext(context.Background(), "dpkg", "-s", name).Output() // #nosec G204
-			if dpkgErr == nil && strings.Contains(string(dpkgOut), "Status: install ok installed") {
+			if info.Installed {
 				archAll = append(archAll, dep)
 			} else {
 				archSpecific = append(archSpecific, dep)
@@ -84,31 +86,23 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 			continue
 		}
 
-		info := string(out)
-
 		// Architecture: all — no arch-specific variant.
-		if strings.Contains(info, "Architecture: all") {
+		if info.ArchitectureAll() {
 			archAll = append(archAll, dep)
 			continue
 		}
 
 		// Essential packages (e.g. bash) conflict when installed for a foreign arch
 		// alongside the host-arch version.
-		if strings.Contains(info, "Essential: yes") {
+		if info.Essential {
 			archAll = append(archAll, dep)
 			continue
 		}
 
 		// Multi-Arch: no (or absent) + already installed → would conflict.
-		multiArchForeign := strings.Contains(info, "Multi-Arch: foreign") ||
-			strings.Contains(info, "Multi-Arch: allowed") ||
-			strings.Contains(info, "Multi-Arch: same")
-		if !multiArchForeign {
-			dpkgOut, dpkgErr := exec.CommandContext(context.Background(), "dpkg", "-s", name).Output() // #nosec G204
-			if dpkgErr == nil && strings.Contains(string(dpkgOut), "Status: install ok installed") {
-				archAll = append(archAll, dep)
-				continue
-			}
+		if !info.MultiArchForeign() && info.Installed {
+			archAll = append(archAll, dep)
+			continue
 		}
 
 		archSpecific = append(archSpecific, dep)
@@ -126,6 +120,8 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 // Packages already installed for the host arch are still qualified with the
 // target arch because extraction overwrites files without dpkg conflict checks.
 func partitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []string) {
+	cache := aptcache.Load()
+
 	for _, dep := range deps {
 		name, _, _ := strings.Cut(dep, " (")
 		name, _, _ = strings.Cut(name, ":")
@@ -135,16 +131,14 @@ func partitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []stri
 			continue
 		}
 
-		out, err := exec.CommandContext(context.Background(), "apt-cache", "show", name).Output() // #nosec G204
-		if err != nil {
+		info, found := cache.Lookup(name)
+		if !found {
 			// Not in apt cache — assume arch-specific so apt can surface a clear error.
 			archSpecific = append(archSpecific, dep)
 			continue
 		}
 
-		info := string(out)
-
-		if strings.Contains(info, "Architecture: all") {
+		if info.ArchitectureAll() {
 			archAll = append(archAll, dep)
 			continue
 		}
@@ -152,7 +146,7 @@ func partitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []stri
 		// Essential packages still conflict even with extraction because
 		// overwriting host binaries (e.g. /bin/bash) with target-arch
 		// binaries would break the build environment.
-		if strings.Contains(info, "Essential: yes") {
+		if info.Essential {
 			archAll = append(archAll, dep)
 			continue
 		}
