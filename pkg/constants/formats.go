@@ -107,7 +107,7 @@ func GetInstallArgs(format string) []string {
 	case FormatAPK:
 		return []string{"add", "--allow-untrusted"}
 	case FormatDEB:
-		return []string{"--allow-downgrades", "--assume-yes", installArg}
+		return []string{"--allow-downgrades", "--assume-yes", "--no-install-recommends", installArg}
 	case FormatRPM:
 		return []string{"-y", installArg}
 	case FormatPacman:

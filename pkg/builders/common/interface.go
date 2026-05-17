@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -436,15 +435,6 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(golang bool, targetArch 
 	// Refresh ccache compiler symlinks so freshly installed cross-compilers are
 	// wrapped automatically when /usr/lib/ccache (or /usr/lib64/ccache) is in PATH.
 	bb.refreshCcacheSymlinks()
-
-	// Set up cross-compilation environment after dependencies are installed
-	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
-		err = bb.SetupCrossCompilationEnvironment(targetArch)
-		if err != nil {
-			return errors.Wrap(err, errors.ErrTypeBuild, "failed to setup cross-compilation environment").
-				WithOperation("prepareEnvironmentWithValidation")
-		}
-	}
 
 	return nil
 }
