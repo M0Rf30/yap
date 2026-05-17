@@ -18,7 +18,7 @@ GOFMT=gofmt
 GOLINT=golangci-lint
 
 # Build flags
-LDFLAGS=-ldflags="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.Commit=${COMMIT}"
+LDFLAGS=-ldflags="-s -w -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Version=${VERSION} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.BuildTime=${BUILD_TIME} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Commit=${COMMIT}"
 BUILD_FLAGS=-trimpath $(LDFLAGS)
 
 # Docker parameters

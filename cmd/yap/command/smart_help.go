@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -71,7 +72,7 @@ func provideSimilarCommands(cmd *cobra.Command, errorStr string) {
 	}
 
 	if len(suggestions) > 0 {
-		pterm.DefaultBox.WithTitle("💡 Did you mean?").
+		pterm.DefaultBox.WithTitle("Did you mean?").
 			WithTitleTopLeft().
 			WithBoxStyle(pterm.NewStyle(pterm.FgYellow)).
 			Println(strings.Join(suggestions, ", "))
@@ -106,18 +107,18 @@ func provideSimilarDistributions(errorStr string) {
 			suggestions = suggestions[:5]
 		}
 
-		pterm.DefaultBox.WithTitle("🎯 Similar distributions").
+		pterm.DefaultBox.WithTitle("Similar distributions").
 			WithTitleTopLeft().
 			WithBoxStyle(pterm.NewStyle(pterm.FgBlue)).
 			Println(strings.Join(suggestions, "\n"))
 	}
 
-	pterm.Info.Println("💡 Use 'yap list-distros' to see all supported distributions")
+	pterm.Info.Println("Use 'yap list-distros' to see all supported distributions")
 }
 
 // provideProjectSetupHelp provides guidance for setting up a YAP project.
 func provideProjectSetupHelp() {
-	helpText := `📁 YAP Project Setup Guide:
+	helpText := `YAP Project Setup Guide:
 
 For Multi-Project (recommended for multiple packages):
 1. Create a yap.json file in your project directory
@@ -140,7 +141,7 @@ Example yap.json structure:
   ]
 }`
 
-	pterm.DefaultBox.WithTitle("🛠️  Project Setup Help").
+	pterm.DefaultBox.WithTitle("Project Setup Help").
 		WithTitleTopLeft().
 		WithBoxStyle(pterm.NewStyle(pterm.FgGreen)).
 		Println(helpText)
@@ -150,20 +151,20 @@ Example yap.json structure:
 func provideArgumentHelp(cmd *cobra.Command) {
 	switch cmd.Name() {
 	case buildCommand:
-		pterm.Info.Println("💡 Build command formats:")
+		pterm.Info.Println("Build command formats:")
 		pterm.Info.Println("  • yap build .                    (current directory, auto-detect distro)")
 		pterm.Info.Println("  • yap build ubuntu-jammy .       (specific distro and path)")
 		pterm.Info.Println("  • yap build fedora-38 /path/to/project")
 	case prepareCommand:
-		pterm.Info.Println("💡 Prepare command format:")
+		pterm.Info.Println("Prepare command format:")
 		pterm.Info.Println("  • yap " + prepareCommand + " <distribution>")
 		pterm.Info.Println("  • Example: yap " + prepareCommand + " ubuntu-jammy")
 	case commandPull:
-		pterm.Info.Println("💡 Pull command format:")
+		pterm.Info.Println("Pull command format:")
 		pterm.Info.Println("  • yap " + commandPull + " <distribution>")
 		pterm.Info.Println("  • Example: yap " + commandPull + " alpine")
 	case commandZap:
-		pterm.Info.Println("💡 Zap command format:")
+		pterm.Info.Println("Zap command format:")
 		pterm.Info.Println("  • yap " + commandZap + " <distribution> <path>")
 		pterm.Info.Println("  • Example: yap " + commandZap + " ubuntu-jammy /path/to/project")
 	}
@@ -254,7 +255,7 @@ func calculateSimilarity(str1, str2 string) float64 {
 
 // ShowWelcomeMessage displays a welcome message for first-time users.
 func ShowWelcomeMessage() {
-	pterm.DefaultBox.WithTitle("🎉 Welcome to YAP!").
+	pterm.DefaultBox.WithTitle("Welcome to YAP").
 		WithTitleTopCenter().
 		WithBoxStyle(pterm.NewStyle(pterm.FgGreen)).
 		Println(`Thank you for using Yet Another Packager!
@@ -273,11 +274,9 @@ func ShowCommandTips(cmd *cobra.Command) {
 	switch cmd.Name() {
 	case buildCommand:
 		if !verbose {
-			logger.Tips("💡 Use --verbose (-v) for detailed build output")
+			logger.Tips(i18n.T("logger.tips.use_verbose"))
 		}
 	case prepareCommand:
-		logger.Tips("💡 Use --golang (-g) to also install Go development tools")
-	case commandListDistro:
-		logger.Tips("💡 Use these identifiers with other YAP commands")
+		logger.Tips(i18n.T("logger.tips.use_verbose"))
 	}
 }
