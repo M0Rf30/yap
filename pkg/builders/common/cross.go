@@ -55,47 +55,6 @@ var formatToRepresentativeDistro = map[string]string{
 	constants.FormatPacman: distroArch,
 }
 
-// isHostOnlyPackage returns true for packages that must run on the build host
-// and should never be qualified with the target architecture during cross-builds.
-// Installing these as :arm64 would pull in conflicting transitive dependencies
-// (e.g. perl:arm64 alongside host perl, or make:arm64 alongside host make).
-func isHostOnlyPackage(name string) bool {
-	// Perl modules and interpreters
-	if strings.HasSuffix(name, "-perl") || name == "perl" || name == "perl-base" ||
-		name == "perl-modules" {
-		return true
-	}
-
-	// Python interpreters — run on the build host (e.g. as build-system
-	// scripts); never needed as a target-arch binary.
-	if name == "python3" || name == "python" ||
-		strings.HasPrefix(name, "python3-") ||
-		strings.HasPrefix(name, "python-") {
-		return true
-	}
-
-	// Common build tools that are always host-arch
-	switch name {
-	case "make", "re2c", "bison", "byacc", "flex", "gawk",
-		"autoconf", "automake", "libtool", "cmake", "meson",
-		"pkg-config", "git", "patch", "m4",
-		// Document formatters / converters used during build
-		"groff-base", "groff",
-		// RPM↔deb converter; runs on host
-		"alien",
-		// Password-quality runtime tool (cracklib-check); runs on host
-		"cracklib-runtime",
-		// systemd is a system daemon — never a cross-compilation target.
-		// It appears in makedepends only so cmake's FindSYSTEMD.cmake can
-		// locate the unit install directory on the build host; installing
-		// systemd:arm64 on an amd64 host is not meaningful.
-		"systemd":
-		return true
-	}
-
-	return false
-}
-
 func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 	cache := aptcache.Load()
 
@@ -105,21 +64,11 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 		// Strip any existing arch qualifier
 		name, _, _ = strings.Cut(name, ":")
 
-		// Perl modules (*-perl), interpreters (perl, perl-base), and common
-		// build tools run on the build host, not the target. Qualifying them
-		// with the target arch pulls in conflicting transitive dependencies
-		// (e.g. perl:arm64 conflicts with host perl). Keep them unqualified.
-		if isHostOnlyPackage(name) {
-			archAll = append(archAll, dep)
-			continue
-		}
-
 		info, found := cache.Lookup(name)
 		if !found {
 			// Package not in apt cache (e.g. custom repo packages).
-			// If it is already installed for the host arch, qualifying it with the
-			// target arch would cause a conflict (same package, two architectures,
-			// Multi-Arch not set). Treat it as arch-all to avoid the conflict.
+			// If already installed for the host arch, qualifying with the target
+			// arch would cause a conflict. Treat as arch-all to avoid it.
 			if info.Installed {
 				archAll = append(archAll, dep)
 			} else {
@@ -129,21 +78,36 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 			continue
 		}
 
-		// Architecture: all — no arch-specific variant.
+		// Architecture: all — no arch-specific variant exists.
 		if info.ArchitectureAll() {
 			archAll = append(archAll, dep)
 			continue
 		}
 
-		// Essential packages (e.g. bash) conflict when installed for a foreign arch
-		// alongside the host-arch version.
+		// Essential packages (e.g. bash) conflict when installed for a foreign
+		// arch alongside the host-arch version.
 		if info.Essential {
 			archAll = append(archAll, dep)
 			continue
 		}
 
-		// Multi-Arch: no (or absent) + already installed → would conflict.
-		if !info.MultiArchForeign() && info.Installed {
+		// Multi-Arch: foreign / allowed — a single host-arch copy satisfies
+		// dependencies from any architecture. These are tools and daemons
+		// (cmake, git, systemd, perl, python3, …) that run on the build host.
+		// They must NOT be qualified with the target arch.
+		//
+		// Multi-Arch: same — dev libraries that must be installed separately
+		// per architecture. These DO get the :arm64 qualifier.
+		//
+		// Multi-Arch: absent / no — qualify only if not already installed
+		// (installing the same package for two arches without Multi-Arch: same
+		// causes dpkg conflicts).
+		if info.MultiArchForeign() {
+			archAll = append(archAll, dep)
+			continue
+		}
+
+		if !info.MultiArchSame() && info.Installed {
 			archAll = append(archAll, dep)
 			continue
 		}
@@ -158,7 +122,8 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 // used by DownloadAndExtractCrossDeps. Since extraction bypasses dpkg, there
 // are no multi-arch conflicts. The only packages left unqualified are:
 //   - Architecture: all — no arch-specific variant exists.
-//   - Host-only tools (perl, make, etc.) — must run on the build host.
+//   - Multi-Arch: foreign/allowed — host tools (cmake, git, systemd, perl…).
+//   - Essential packages — overwriting host binaries would break the env.
 //
 // Packages already installed for the host arch are still qualified with the
 // target arch because extraction overwrites files without dpkg conflict checks.
@@ -168,11 +133,6 @@ func partitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []stri
 	for _, dep := range deps {
 		name, _, _ := strings.Cut(dep, " (")
 		name, _, _ = strings.Cut(name, ":")
-
-		if isHostOnlyPackage(name) {
-			archAll = append(archAll, dep)
-			continue
-		}
 
 		info, found := cache.Lookup(name)
 		if !found {
@@ -190,6 +150,13 @@ func partitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []stri
 		// overwriting host binaries (e.g. /bin/bash) with target-arch
 		// binaries would break the build environment.
 		if info.Essential {
+			archAll = append(archAll, dep)
+			continue
+		}
+
+		// Multi-Arch: foreign/allowed — host tools that must not be
+		// qualified with the target arch (same reasoning as partitionArchAllDeps).
+		if info.MultiArchForeign() {
 			archAll = append(archAll, dep)
 			continue
 		}
