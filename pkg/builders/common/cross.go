@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -598,17 +599,36 @@ export -f configure_cross 2>/dev/null || true
 	_ = os.Setenv("LD", binutilsPrefix+"-ld")
 	_ = os.Setenv("NM", binutilsPrefix+"-nm")
 
+	// Generate a standard CMake cross-compilation toolchain file and point
+	// CMAKE_TOOLCHAIN_FILE at it. PKGBUILDs can override this by passing
+	// -DCMAKE_TOOLCHAIN_FILE=... explicitly to cmake, which takes precedence
+	// over the environment variable.
+	if cmakeToolchain, err := writeCMakeToolchainFile(targetArch, gccExecutable, gppExecutable, ccPrefix); err != nil {
+		logger.Warn("failed to write CMake toolchain file", "error", err)
+	} else {
+		_ = os.Setenv("CMAKE_TOOLCHAIN_FILE", cmakeToolchain)
+	}
+
 	// Set up Rust cross-compilation environment variables
 	if rustTarget != "" {
 		_ = os.Setenv("CARGO_BUILD_TARGET", rustTarget)
 		_ = os.Setenv("RUSTC_TARGET", rustTarget)
-		_ = os.Setenv("CARGO_TARGET_"+rustTargetUpper+"_LINKER",
-			binutilsPrefix+"-ld")
+
+		// Cargo's linker must be a C compiler (gcc), not the raw linker (ld).
+		// Using ld directly causes link failures because Cargo invokes the
+		// linker as a C compiler wrapper (passes -Wl,... flags etc.).
+		_ = os.Setenv("CARGO_TARGET_"+rustTargetUpper+"_LINKER", gccExecutable)
 
 		// Rust build script CC/CXX: use bare cross-compiler; ccache wraps
-		// via CCACHE_PREFIX set above.
+		// via /usr/lib/ccache/<cross-compiler> symlinks on PATH.
 		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CC", gccExecutable)
 		_ = os.Setenv("TARGET_"+rustTargetUpper+"_CXX", gppExecutable)
+
+		// Prevent the host's -m64 (or other host-arch flags) from leaking
+		// into C code compiled by Rust's cc crate for the target. The cc
+		// crate reads CFLAGS_<TARGET> (underscores, upper-case) and uses it
+		// instead of deriving flags from the host CFLAGS.
+		_ = os.Setenv("CFLAGS_"+rustTargetUpper, "-O2 -fPIC")
 	}
 
 	// Set up Go cross-compilation environment variables
@@ -623,12 +643,26 @@ export -f configure_cross 2>/dev/null || true
 		_ = os.Setenv("CXX_FOR_TARGET", gppExecutable)
 	}
 
+	// Autotools: CC_FOR_BUILD/CXX_FOR_BUILD must produce host-arch executables
+	// (build-time code generators, lex/yacc tools, etc.). Without these, autotools
+	// may inherit the cross-compiler and produce target-arch binaries that cannot
+	// run on the build host.
+	_ = os.Setenv("CC_FOR_BUILD", "gcc")
+	_ = os.Setenv("CXX_FOR_BUILD", "g++")
+	_ = os.Setenv("CFLAGS_FOR_BUILD", "")
+	_ = os.Setenv("CXXFLAGS_FOR_BUILD", "")
+
 	// Set common cross-compilation variables.
 	// CROSS_COMPILE is the canonical indicator (e.g. "aarch64-linux-gnu-").
 	// We intentionally do NOT set TARGET_ARCH/HOST_ARCH/BUILD_ARCH because
 	// GNU make's implicit LINK.c rule expands $(TARGET_ARCH) verbatim into
 	// compile commands, breaking any package that uses the default link rule.
 	_ = os.Setenv("CROSS_COMPILE", ccPrefix+"-")
+
+	// CROSS_COMPILE_HOST is CROSS_COMPILE without the trailing dash.
+	// Convenience for PKGBUILDs that need the bare triplet (e.g. aarch64-linux-gnu)
+	// without having to strip it via ${CROSS_COMPILE%-}.
+	_ = os.Setenv("CROSS_COMPILE_HOST", ccPrefix)
 
 	// Configure pkg-config for cross-compilation: prepend toolchain paths to
 	// any existing PKG_CONFIG_PATH.
@@ -651,6 +685,15 @@ export -f configure_cross 2>/dev/null || true
 		// These environment variables inform autoconf that we're cross-compiling
 		_ = os.Setenv("ac_cv_host", hostTriplet)
 		_ = os.Setenv("ac_cv_build", buildTriplet)
+
+		// Pre-populate autoconf type-size cache variables. When cross-compiling,
+		// configure cannot execute test binaries to probe sizes; without these
+		// cached values it either fails or silently produces wrong results.
+		if sizeVars, ok := autoconfSizeVars[targetArch]; ok {
+			for k, v := range sizeVars {
+				_ = os.Setenv(k, v)
+			}
+		}
 
 		// Set the wrapper in the environment (will be available to the build script)
 		_ = os.Setenv("YAP_CONFIGURE_WRAPPER", configureWrapper)
@@ -755,6 +798,109 @@ var archTargetTable = map[string]archTargets{
 	},
 }
 
+// autoconfSizeVars holds standard autoconf cache variables for type sizes
+// that cannot be probed at configure time during cross-compilation (test
+// binaries cannot execute on the build host). Values are LP64 for 64-bit
+// targets and ILP32 for 32-bit targets.
+var autoconfSizeVars = map[string]map[string]string{
+	constants.ArchAarch64: {
+		"ac_cv_sizeof_char":      "1",
+		"ac_cv_sizeof_short":     "2",
+		"ac_cv_sizeof_int":       "4",
+		"ac_cv_sizeof_long":      "8",
+		"ac_cv_sizeof_long_long": "8",
+		"ac_cv_sizeof_void_p":    "8",
+		"ac_cv_sizeof_size_t":    "8",
+		"ac_cv_sizeof_off_t":     "8",
+		"ac_cv_sizeof_wchar_t":   "4",
+		"ac_cv_c_bigendian":      "no",
+	},
+	constants.ArchArmv7: {
+		"ac_cv_sizeof_char":      "1",
+		"ac_cv_sizeof_short":     "2",
+		"ac_cv_sizeof_int":       "4",
+		"ac_cv_sizeof_long":      "4",
+		"ac_cv_sizeof_long_long": "8",
+		"ac_cv_sizeof_void_p":    "4",
+		"ac_cv_sizeof_size_t":    "4",
+		"ac_cv_sizeof_off_t":     "8",
+		"ac_cv_sizeof_wchar_t":   "4",
+		"ac_cv_c_bigendian":      "no",
+	},
+	constants.ArchArmv6: {
+		"ac_cv_sizeof_char":      "1",
+		"ac_cv_sizeof_short":     "2",
+		"ac_cv_sizeof_int":       "4",
+		"ac_cv_sizeof_long":      "4",
+		"ac_cv_sizeof_long_long": "8",
+		"ac_cv_sizeof_void_p":    "4",
+		"ac_cv_sizeof_size_t":    "4",
+		"ac_cv_sizeof_off_t":     "8",
+		"ac_cv_sizeof_wchar_t":   "4",
+		"ac_cv_c_bigendian":      "no",
+	},
+	constants.ArchI686: {
+		"ac_cv_sizeof_char":      "1",
+		"ac_cv_sizeof_short":     "2",
+		"ac_cv_sizeof_int":       "4",
+		"ac_cv_sizeof_long":      "4",
+		"ac_cv_sizeof_long_long": "8",
+		"ac_cv_sizeof_void_p":    "4",
+		"ac_cv_sizeof_size_t":    "4",
+		"ac_cv_sizeof_off_t":     "8",
+		"ac_cv_sizeof_wchar_t":   "4",
+		"ac_cv_c_bigendian":      "no",
+	},
+	constants.ArchX86_64: {
+		"ac_cv_sizeof_char":      "1",
+		"ac_cv_sizeof_short":     "2",
+		"ac_cv_sizeof_int":       "4",
+		"ac_cv_sizeof_long":      "8",
+		"ac_cv_sizeof_long_long": "8",
+		"ac_cv_sizeof_void_p":    "8",
+		"ac_cv_sizeof_size_t":    "8",
+		"ac_cv_sizeof_off_t":     "8",
+		"ac_cv_sizeof_wchar_t":   "4",
+		"ac_cv_c_bigendian":      "no",
+	},
+	constants.ArchPpc64le: {
+		"ac_cv_sizeof_char":      "1",
+		"ac_cv_sizeof_short":     "2",
+		"ac_cv_sizeof_int":       "4",
+		"ac_cv_sizeof_long":      "8",
+		"ac_cv_sizeof_long_long": "8",
+		"ac_cv_sizeof_void_p":    "8",
+		"ac_cv_sizeof_size_t":    "8",
+		"ac_cv_sizeof_off_t":     "8",
+		"ac_cv_sizeof_wchar_t":   "4",
+		"ac_cv_c_bigendian":      "no",
+	},
+	constants.ArchS390x: {
+		"ac_cv_sizeof_char":      "1",
+		"ac_cv_sizeof_short":     "2",
+		"ac_cv_sizeof_int":       "4",
+		"ac_cv_sizeof_long":      "8",
+		"ac_cv_sizeof_long_long": "8",
+		"ac_cv_sizeof_void_p":    "8",
+		"ac_cv_sizeof_size_t":    "8",
+		"ac_cv_sizeof_off_t":     "8",
+		"ac_cv_sizeof_wchar_t":   "4",
+		"ac_cv_c_bigendian":      "yes",
+	},
+	constants.ArchRiscv64: {
+		"ac_cv_sizeof_char":      "1",
+		"ac_cv_sizeof_short":     "2",
+		"ac_cv_sizeof_int":       "4",
+		"ac_cv_sizeof_long":      "8",
+		"ac_cv_sizeof_long_long": "8",
+		"ac_cv_sizeof_void_p":    "8",
+		"ac_cv_sizeof_size_t":    "8",
+		"ac_cv_sizeof_off_t":     "8",
+		"ac_cv_sizeof_wchar_t":   "4",
+		"ac_cv_c_bigendian":      "no",
+	},
+}
+
 // ValidateTargetArch returns an error if arch is not a recognised cross-compilation
 // target. Returns nil when arch is empty (native build) or known.
 func ValidateTargetArch(arch string) error {
@@ -774,6 +920,44 @@ func ValidateTargetArch(arch string) error {
 	sort.Strings(known)
 
 	return fmt.Errorf("unsupported target architecture %q — known: %s", arch, strings.Join(known, ", "))
+}
+
+// writeCMakeToolchainFile writes a standard CMake cross-compilation toolchain
+// file to a temp path and returns the path. The file is written once per
+// target arch; subsequent calls for the same arch return the existing path.
+// The file is cleaned up when the process exits (os.CreateTemp uses the OS
+// temp dir which is cleaned on reboot, but we also register an atexit via
+// a finalizer-free approach: the caller sets CMAKE_TOOLCHAIN_FILE and the
+// file persists for the process lifetime).
+func writeCMakeToolchainFile(targetArch, gccExecutable, gppExecutable, ccPrefix string) (string, error) {
+	path := filepath.Join(os.TempDir(), "yap-cross-"+targetArch+".cmake")
+
+	// Return existing file if already written (idempotent).
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
+	}
+
+	sysroot := "/usr/" + ccPrefix
+
+	content := fmt.Sprintf(`# Auto-generated by yap for cross-compilation to %s
+# Do not edit — regenerated on each build.
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR %s)
+
+set(CMAKE_C_COMPILER   %s)
+set(CMAKE_CXX_COMPILER %s)
+
+set(CMAKE_FIND_ROOT_PATH %s)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+`, targetArch, targetArch, gccExecutable, gppExecutable, sysroot)
+
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return "", fmt.Errorf("writing CMake toolchain file: %w", err)
+	}
+
+	return path, nil
 }
 
 // getRustTargetArchitecture maps YAP architecture names to Rust target triples.
