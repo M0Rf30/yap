@@ -750,6 +750,18 @@ const (
 	rustArmHfTarget       = "arm-unknown-linux-gnueabihf"
 	rustRiscv64GcTarget   = "riscv64gc" + "-unknown-linux-gnu"
 	rustPowerpc64leTarget = "powerpc64le" + "-unknown-linux-gnu"
+
+	// autoconf cache variable names for type sizes.
+	acCvSizeofChar     = "ac_cv_sizeof_char"
+	acCvSizeofShort    = "ac_cv_sizeof_short"
+	acCvSizeofInt      = "ac_cv_sizeof_int"
+	acCvSizeofLong     = "ac_cv_sizeof_long"
+	acCvSizeofLongLong = "ac_cv_sizeof_long_long"
+	acCvSizeofVoidP    = "ac_cv_sizeof_void_p"
+	acCvSizeofSizeT    = "ac_cv_sizeof_size_t"
+	acCvSizeofOffT     = "ac_cv_sizeof_off_t"
+	acCvSizeofWcharT   = "ac_cv_sizeof_wchar_t"
+	acCvCBigendian     = "ac_cv_c_bigendian"
 )
 
 // archTargetTable is the single source of truth for architecture metadata
@@ -804,100 +816,100 @@ var archTargetTable = map[string]archTargets{
 // targets and ILP32 for 32-bit targets.
 var autoconfSizeVars = map[string]map[string]string{
 	constants.ArchAarch64: {
-		"ac_cv_sizeof_char":      "1",
-		"ac_cv_sizeof_short":     "2",
-		"ac_cv_sizeof_int":       "4",
-		"ac_cv_sizeof_long":      "8",
-		"ac_cv_sizeof_long_long": "8",
-		"ac_cv_sizeof_void_p":    "8",
-		"ac_cv_sizeof_size_t":    "8",
-		"ac_cv_sizeof_off_t":     "8",
-		"ac_cv_sizeof_wchar_t":   "4",
-		"ac_cv_c_bigendian":      "no",
+		acCvSizeofChar:     "1",
+		acCvSizeofShort:    "2",
+		acCvSizeofInt:      "4",
+		acCvSizeofLong:     "8",
+		acCvSizeofLongLong: "8",
+		acCvSizeofVoidP:    "8",
+		acCvSizeofSizeT:    "8",
+		acCvSizeofOffT:     "8",
+		acCvSizeofWcharT:   "4",
+		acCvCBigendian:     "no",
 	},
 	constants.ArchArmv7: {
-		"ac_cv_sizeof_char":      "1",
-		"ac_cv_sizeof_short":     "2",
-		"ac_cv_sizeof_int":       "4",
-		"ac_cv_sizeof_long":      "4",
-		"ac_cv_sizeof_long_long": "8",
-		"ac_cv_sizeof_void_p":    "4",
-		"ac_cv_sizeof_size_t":    "4",
-		"ac_cv_sizeof_off_t":     "8",
-		"ac_cv_sizeof_wchar_t":   "4",
-		"ac_cv_c_bigendian":      "no",
+		acCvSizeofChar:     "1",
+		acCvSizeofShort:    "2",
+		acCvSizeofInt:      "4",
+		acCvSizeofLong:     "4",
+		acCvSizeofLongLong: "8",
+		acCvSizeofVoidP:    "4",
+		acCvSizeofSizeT:    "4",
+		acCvSizeofOffT:     "8",
+		acCvSizeofWcharT:   "4",
+		acCvCBigendian:     "no",
 	},
 	constants.ArchArmv6: {
-		"ac_cv_sizeof_char":      "1",
-		"ac_cv_sizeof_short":     "2",
-		"ac_cv_sizeof_int":       "4",
-		"ac_cv_sizeof_long":      "4",
-		"ac_cv_sizeof_long_long": "8",
-		"ac_cv_sizeof_void_p":    "4",
-		"ac_cv_sizeof_size_t":    "4",
-		"ac_cv_sizeof_off_t":     "8",
-		"ac_cv_sizeof_wchar_t":   "4",
-		"ac_cv_c_bigendian":      "no",
+		acCvSizeofChar:     "1",
+		acCvSizeofShort:    "2",
+		acCvSizeofInt:      "4",
+		acCvSizeofLong:     "4",
+		acCvSizeofLongLong: "8",
+		acCvSizeofVoidP:    "4",
+		acCvSizeofSizeT:    "4",
+		acCvSizeofOffT:     "8",
+		acCvSizeofWcharT:   "4",
+		acCvCBigendian:     "no",
 	},
 	constants.ArchI686: {
-		"ac_cv_sizeof_char":      "1",
-		"ac_cv_sizeof_short":     "2",
-		"ac_cv_sizeof_int":       "4",
-		"ac_cv_sizeof_long":      "4",
-		"ac_cv_sizeof_long_long": "8",
-		"ac_cv_sizeof_void_p":    "4",
-		"ac_cv_sizeof_size_t":    "4",
-		"ac_cv_sizeof_off_t":     "8",
-		"ac_cv_sizeof_wchar_t":   "4",
-		"ac_cv_c_bigendian":      "no",
+		acCvSizeofChar:     "1",
+		acCvSizeofShort:    "2",
+		acCvSizeofInt:      "4",
+		acCvSizeofLong:     "4",
+		acCvSizeofLongLong: "8",
+		acCvSizeofVoidP:    "4",
+		acCvSizeofSizeT:    "4",
+		acCvSizeofOffT:     "8",
+		acCvSizeofWcharT:   "4",
+		acCvCBigendian:     "no",
 	},
 	constants.ArchX86_64: {
-		"ac_cv_sizeof_char":      "1",
-		"ac_cv_sizeof_short":     "2",
-		"ac_cv_sizeof_int":       "4",
-		"ac_cv_sizeof_long":      "8",
-		"ac_cv_sizeof_long_long": "8",
-		"ac_cv_sizeof_void_p":    "8",
-		"ac_cv_sizeof_size_t":    "8",
-		"ac_cv_sizeof_off_t":     "8",
-		"ac_cv_sizeof_wchar_t":   "4",
-		"ac_cv_c_bigendian":      "no",
+		acCvSizeofChar:     "1",
+		acCvSizeofShort:    "2",
+		acCvSizeofInt:      "4",
+		acCvSizeofLong:     "8",
+		acCvSizeofLongLong: "8",
+		acCvSizeofVoidP:    "8",
+		acCvSizeofSizeT:    "8",
+		acCvSizeofOffT:     "8",
+		acCvSizeofWcharT:   "4",
+		acCvCBigendian:     "no",
 	},
 	constants.ArchPpc64le: {
-		"ac_cv_sizeof_char":      "1",
-		"ac_cv_sizeof_short":     "2",
-		"ac_cv_sizeof_int":       "4",
-		"ac_cv_sizeof_long":      "8",
-		"ac_cv_sizeof_long_long": "8",
-		"ac_cv_sizeof_void_p":    "8",
-		"ac_cv_sizeof_size_t":    "8",
-		"ac_cv_sizeof_off_t":     "8",
-		"ac_cv_sizeof_wchar_t":   "4",
-		"ac_cv_c_bigendian":      "no",
+		acCvSizeofChar:     "1",
+		acCvSizeofShort:    "2",
+		acCvSizeofInt:      "4",
+		acCvSizeofLong:     "8",
+		acCvSizeofLongLong: "8",
+		acCvSizeofVoidP:    "8",
+		acCvSizeofSizeT:    "8",
+		acCvSizeofOffT:     "8",
+		acCvSizeofWcharT:   "4",
+		acCvCBigendian:     "no",
 	},
 	constants.ArchS390x: {
-		"ac_cv_sizeof_char":      "1",
-		"ac_cv_sizeof_short":     "2",
-		"ac_cv_sizeof_int":       "4",
-		"ac_cv_sizeof_long":      "8",
-		"ac_cv_sizeof_long_long": "8",
-		"ac_cv_sizeof_void_p":    "8",
-		"ac_cv_sizeof_size_t":    "8",
-		"ac_cv_sizeof_off_t":     "8",
-		"ac_cv_sizeof_wchar_t":   "4",
-		"ac_cv_c_bigendian":      "yes",
+		acCvSizeofChar:     "1",
+		acCvSizeofShort:    "2",
+		acCvSizeofInt:      "4",
+		acCvSizeofLong:     "8",
+		acCvSizeofLongLong: "8",
+		acCvSizeofVoidP:    "8",
+		acCvSizeofSizeT:    "8",
+		acCvSizeofOffT:     "8",
+		acCvSizeofWcharT:   "4",
+		acCvCBigendian:     "yes",
 	},
 	constants.ArchRiscv64: {
-		"ac_cv_sizeof_char":      "1",
-		"ac_cv_sizeof_short":     "2",
-		"ac_cv_sizeof_int":       "4",
-		"ac_cv_sizeof_long":      "8",
-		"ac_cv_sizeof_long_long": "8",
-		"ac_cv_sizeof_void_p":    "8",
-		"ac_cv_sizeof_size_t":    "8",
-		"ac_cv_sizeof_off_t":     "8",
-		"ac_cv_sizeof_wchar_t":   "4",
-		"ac_cv_c_bigendian":      "no",
+		acCvSizeofChar:     "1",
+		acCvSizeofShort:    "2",
+		acCvSizeofInt:      "4",
+		acCvSizeofLong:     "8",
+		acCvSizeofLongLong: "8",
+		acCvSizeofVoidP:    "8",
+		acCvSizeofSizeT:    "8",
+		acCvSizeofOffT:     "8",
+		acCvSizeofWcharT:   "4",
+		acCvCBigendian:     "no",
 	},
 }
 
@@ -953,7 +965,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 `, targetArch, targetArch, gccExecutable, gppExecutable, sysroot)
 
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		return "", fmt.Errorf("writing CMake toolchain file: %w", err)
 	}
 
