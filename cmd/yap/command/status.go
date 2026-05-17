@@ -3,15 +3,16 @@ package command
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/buildinfo"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/i18n"
-	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
 
@@ -20,96 +21,62 @@ var statusCmd = &cobra.Command{
 	Use:     commandStatus,
 	GroupID: commandUtility,
 	Aliases: []string{"info", "env"},
-	Short:   "📊 Display system status and environment information",
-	Long: `Show comprehensive system information including:
-  • Current operating system and architecture
-  • YAP installation details and version
-  • Available container runtime information
-  • Build environment status
-  • Configuration locations
-
-This command is useful for troubleshooting and verifying your YAP setup.`,
-	Example: `  # Show basic system status
-  yap status
-
-  # Show detailed environment info
-  yap status --verbose`,
+	Short:   "Display system status and environment information",
 	Run: func(_ *cobra.Command, _ []string) {
 		showSystemStatus()
 	},
 }
 
 func showSystemStatus() {
-	// Header with logo
-	pterm.DefaultHeader.WithFullWidth().
-		WithBackgroundStyle(pterm.NewStyle(pterm.BgDarkGray)).
-		WithTextStyle(pterm.NewStyle(pterm.FgLightCyan, pterm.Bold)).
-		WithMargin(10).
-		Println("🚀 YAP System Status")
+	osRelease, _ := platform.ParseOSRelease()
 
-	pterm.Println()
-
-	// System Information
-	systemInfo := pterm.DefaultSection.WithLevel(2).Sprint("💻 System Information")
-	pterm.Println(systemInfo)
-
-	osRelease, err := platform.ParseOSRelease()
-	if err == nil {
-		pterm.Printf("  %s %s\n",
-			pterm.FgGreen.Sprint("Operating System:"),
-			pterm.FgWhite.Sprint(osRelease.ID))
+	goVer := runtime.Version()
+	if idx := strings.IndexByte(goVer, '-'); idx != -1 {
+		goVer = goVer[:idx]
 	}
 
-	pterm.Printf("  %s %s %s\n",
-		pterm.FgGreen.Sprint("Architecture:"),
-		pterm.FgWhite.Sprint(runtime.GOARCH),
-		pterm.FgGray.Sprintf("(%s)", runtime.GOOS))
+	// System section
+	pterm.DefaultSection.Println("System")
 
-	pterm.Printf("  %s %s\n",
-		pterm.FgGreen.Sprint("Go Runtime:"),
-		pterm.FgWhite.Sprint(runtime.Version()))
+	sysRows := [][]string{
+		{"Distro", osRelease.ID},
+		{"Arch", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)},
+		{"Go", goVer},
+	}
+
+	_ = pterm.DefaultTable.WithData(sysRows).Render()
 
 	pterm.Println()
 
-	// YAP Information
-	yapInfo := pterm.DefaultSection.WithLevel(2).Sprint("📦 YAP Information")
-	pterm.Println(yapInfo)
+	// YAP section
+	pterm.DefaultSection.Println("YAP")
 
-	pterm.Printf("  %s %s\n",
-		pterm.FgBlue.Sprint("Version:"),
-		pterm.FgWhite.Sprint(constants.YAPVersion))
+	ver := strings.TrimPrefix(buildinfo.Version, "v")
 
-	// Check for yap.json in current directory
 	currentDir, _ := os.Getwd()
-	yapJSONPath := filepath.Join(currentDir, "yap.json")
+	projectStatus := "no yap.json in current directory"
 
-	_, statErr := os.Stat(yapJSONPath)
-	if statErr == nil {
-		pterm.Printf("  %s %s ✓\n",
-			pterm.FgBlue.Sprint("Project Found:"),
-			pterm.FgGreen.Sprint("yap.json detected in current directory"))
-	} else {
-		pterm.Printf("  %s %s\n",
-			pterm.FgBlue.Sprint("Project Status:"),
-			pterm.FgYellow.Sprint("No yap.json found in current directory"))
+	if _, err := os.Stat(filepath.Join(currentDir, "yap.json")); err == nil {
+		projectStatus = currentDir
 	}
+
+	yapRows := [][]string{
+		{"Version", ver},
+		{"Project", projectStatus},
+	}
+
+	_ = pterm.DefaultTable.WithData(yapRows).Render()
 
 	pterm.Println()
 
-	// Supported Distributions
-	distroInfo := pterm.DefaultSection.WithLevel(2).Sprint("🌍 Supported Distributions")
-	pterm.Println(distroInfo)
+	// Distributions section
+	pterm.DefaultSection.Println("Distributions")
 
-	distroCount := len(constants.Releases)
-	pterm.Printf("  %s %d distributions supported\n",
-		pterm.FgMagenta.Sprint("Total:"),
-		distroCount)
+	distroRows := [][]string{
+		{"Supported", fmt.Sprintf("%d", len(constants.Releases))},
+	}
 
 	if verbose {
-		// Show all distributions in a nice format
-		pterm.Printf("  %s\n", pterm.FgMagenta.Sprint("Available:"))
-
-		// Group distributions by family
 		families := make(map[string][]string)
 
 		for _, release := range &constants.Releases {
@@ -118,97 +85,50 @@ func showSystemStatus() {
 		}
 
 		for family, distros := range families {
-			pterm.Printf("    %s: %s\n",
-				pterm.NewStyle(pterm.FgCyan, pterm.Bold).Sprint(family),
-				pterm.FgWhite.Sprint(fmt.Sprintf("%d variants", len(distros))))
+			distroRows = append(distroRows, []string{family, strings.Join(distros, ", ")})
 		}
-	} else {
-		logger.Tips(i18n.T("logger.tips.use_verbose"))
 	}
+
+	_ = pterm.DefaultTable.WithData(distroRows).Render()
 
 	pterm.Println()
 
-	// Environment Status
-	envInfo := pterm.DefaultSection.WithLevel(2).Sprint("⚙️  Environment Status")
-	pterm.Println(envInfo)
+	// Environment section
+	pterm.DefaultSection.Println("Environment")
 
-	// Check for container runtime
-	containerRuntime := checkContainerRuntime()
-	if containerRuntime != "" {
-		pterm.Printf("  %s %s ✓\n",
-			pterm.FgYellow.Sprint("Container Runtime:"),
-			pterm.FgGreen.Sprint(containerRuntime))
-	} else {
-		pterm.Printf("  %s %s\n",
-			pterm.FgYellow.Sprint("Container Runtime:"),
-			pterm.FgRed.Sprint("Not detected"))
+	envRows := [][]string{
+		{"Container runtime", checkContainerRuntime()},
 	}
 
-	pterm.Println()
-
-	// Footer with helpful commands
-	pterm.DefaultBox.WithTitle("💡 Quick Commands").
-		WithTitleTopLeft().
-		WithBoxStyle(pterm.NewStyle(pterm.FgBlue)).
-		Println(`yap list-distros    - Show all supported distributions
-yap prepare <distro> - Set up build environment
-yap version         - Show detailed version information
-yap build --help    - Get help with building packages`)
+	_ = pterm.DefaultTable.WithData(envRows).Render()
 }
 
 func getDistroFamily(release string) string {
 	switch {
-	case contains(release, "ubuntu") || contains(release, distroFamilyDebian):
+	case strings.Contains(release, "ubuntu") || strings.Contains(release, distroFamilyDebian):
 		return distroFamilyDebian
-	case contains(release, "fedora") || contains(release, "rhel") ||
-		contains(release, "centos") || contains(release, "rocky"):
+	case strings.Contains(release, "fedora") || strings.Contains(release, "rhel") ||
+		strings.Contains(release, "centos") || strings.Contains(release, "rocky"):
 		return distroFamilyRedhat
-	case contains(release, "opensuse") || contains(release, "suse"):
+	case strings.Contains(release, "opensuse") || strings.Contains(release, "suse"):
 		return "suse"
-	case contains(release, archDistro):
+	case strings.Contains(release, archDistro):
 		return archDistro
-	case contains(release, alpineDistro):
+	case strings.Contains(release, alpineDistro):
 		return alpineDistro
 	default:
 		return distroFamilyUnknown
 	}
 }
 
-func contains(s, substr string) bool {
-	if substr == "" {
-		return true
-	}
-
-	if len(s) < len(substr) {
-		return false
-	}
-
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-
-	return false
-}
-
 func checkContainerRuntime() string {
-	// Check for common container runtimes
-	runtimes := []string{"docker", "podman", "containerd"}
-
-	for _, runtime := range runtimes {
-		_, err := os.Stat("/usr/bin/" + runtime)
-		if err == nil {
-			return runtime
-		}
-
-		_, err = os.Stat("/usr/local/bin/" + runtime)
-		if err == nil {
-			return runtime
+	for _, rt := range []string{"podman", "docker"} {
+		if _, err := exec.LookPath(rt); err == nil {
+			return rt
 		}
 	}
 
-	return ""
+	return "not detected"
 }
 
 //nolint:gochecknoinits // Required for cobra command registration

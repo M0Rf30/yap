@@ -50,8 +50,8 @@ func SetupEnhancedHelp() {
   .HasAvailableSubCommands}}
 
 {{styleMoreInfo}}{{end}}
-
-{{styleFooter}}`
+{{if not .HasParent}}
+{{styleFooter}}{{end}}`
 
 	// Set up template functions
 	cobra.AddTemplateFunc("styleUsage", func(s string) string {
@@ -104,9 +104,7 @@ func SetupEnhancedHelp() {
 	})
 
 	cobra.AddTemplateFunc("styleFooter", func() string {
-		return fmt.Sprintf(`%s %s
-%s %s
-`,
+		return fmt.Sprintf("%s %s\n%s %s\n",
 			pterm.FgBlue.Sprint(i18n.T("footer.documentation")),
 			pterm.FgLightBlue.Sprint("https://github.com/M0Rf30/yap"),
 			pterm.FgRed.Sprint(i18n.T("footer.report_issues")),

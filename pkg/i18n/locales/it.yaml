@@ -179,6 +179,14 @@
   translation: "Passphrase per la chiave privata (preferire la variabile d'ambiente YAP_SIGN_PASSPHRASE)"
 - id: flags.build.sign_key_name
   translation: "Nome della chiave per la firma APK (es. 'mykey')"
+- id: flags.build.compression_deb
+  translation: "Algoritmo di compressione DEB: zstd|gzip|xz"
+- id: flags.build.compression_rpm
+  translation: "Algoritmo di compressione RPM: zstd|gzip|xz"
+- id: flags.build.repo
+  translation: "Specifica repository extra (ripetibile): name=<n>,url=<u>,suite=<s>,components=<a+b>,keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>"
+- id: flags.build.debug_dir
+  translation: "Directory di output per i simboli di debug separati (struttura .build-id per debuginfod)"
 
 # Flag graph
 - id: flags.graph.format

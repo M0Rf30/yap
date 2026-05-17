@@ -47,10 +47,10 @@ var buildCmd = &cobra.Command{
 	Use:     buildCommand + " [distro] <path>",
 	GroupID: buildGroup,
 	Aliases: []string{"b"},
-	Short:   "🔨 Build packages from yap.json project definition", // Will be set in init()
-	Long:    "",                                                  // Will be set in init()
-	Example: "",                                                  // Will be set in init()
-	Args:    cobra.RangeArgs(1, 2),                               // Allow 1-2 arguments
+	Short:   "Build packages from yap.json project definition", // Will be set in init()
+	Long:    "",                                                // Will be set in init()
+	Example: "",                                                // Will be set in init()
+	Args:    cobra.RangeArgs(1, 2),                             // Allow 1-2 arguments
 	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
 		// Propagate ssh-password flag value to the source package.
@@ -267,6 +267,8 @@ func InitializeBuildDescriptions() {
 		"sbom-format":               "flags.build.sbom_format",
 		"compression-deb":           "flags.build.compression_deb",
 		"compression-rpm":           "flags.build.compression_rpm",
+		"repo":                      "flags.build.repo",
+		"debug-dir":                 "flags.build.debug_dir",
 		"sign":                      "flags.build.sign",
 		"sign-key":                  "flags.build.sign_key",
 		"sign-passphrase":           "flags.build.sign_passphrase",
@@ -345,7 +347,7 @@ func init() {
 
 	// DEBUG SYMBOL FLAGS
 	buildCmd.Flags().StringVarP(&buildOpts.DebugDir,
-		"debug-dir", "", "", "Output directory for separated debug symbols (.build-id structure for debuginfod)")
+		"debug-dir", "", "", "")
 
 	// SBOM GENERATION FLAGS
 	buildCmd.Flags().BoolVarP(&buildOpts.SBOM,
@@ -355,26 +357,24 @@ func init() {
 
 	// COMPRESSION FLAGS
 	buildCmd.Flags().StringVarP(&compressionDeb,
-		"compression-deb", "", "zstd", "Compression algorithm for DEB packages (zstd, gzip, xz)")
+		"compression-deb", "", "zstd", "")
 	buildCmd.Flags().StringVarP(&compressionRpm,
-		"compression-rpm", "", "zstd", "Compression algorithm for RPM packages (zstd, gzip, xz)")
+		"compression-rpm", "", "zstd", "")
 
 	// SIGNING FLAGS
 	buildCmd.Flags().BoolVarP(&sign,
-		"sign", "", false, "Enable package signing")
+		"sign", "", false, "")
 	buildCmd.Flags().StringVarP(&signKey,
-		"sign-key", "", "", "Path to private key for signing (PEM for RSA, ASCII-armored for GPG)")
+		"sign-key", "", "", "")
 	buildCmd.Flags().StringVarP(&signPassphrase,
-		"sign-passphrase", "", "", "Passphrase for private key (prefer env var YAP_SIGN_PASSPHRASE)")
+		"sign-passphrase", "", "", "")
 	buildCmd.Flags().StringVarP(&signKeyName,
-		"sign-key-name", "", "", "Key name for APK signing (e.g., 'mykey')")
+		"sign-key-name", "", "", "")
 
 	// EXTRA REPOSITORY FLAGS
 	// StringArrayVar (not StringSliceVar) so commas inside the spec are not
 	// treated as multi-value separators — every --repo invocation maps to one
 	// repository definition.
 	buildCmd.Flags().StringArrayVar(&buildOpts.ExtraRepos,
-		"repo", nil,
-		"Extra repository spec (repeatable): name=<n>,url=<u>,suite=<s>,components=<a+b>,"+
-			"keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>")
+		"repo", nil, "")
 }

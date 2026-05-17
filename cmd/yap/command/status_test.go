@@ -30,10 +30,6 @@ func TestStatusCommandDefinition(t *testing.T) {
 		t.Error("Status command should have a short description")
 	}
 
-	if statusCmd.Long == "" {
-		t.Error("Status command should have a long description")
-	}
-
 	if statusCmd.Run == nil {
 		t.Error("Status command should have a Run function")
 	}
@@ -71,31 +67,6 @@ func TestGetDistroFamily(t *testing.T) {
 			result := getDistroFamily(tt.distro)
 			if result != tt.expected {
 				t.Errorf("Expected %q for distro %q, got %q", tt.expected, tt.distro, result)
-			}
-		})
-	}
-}
-
-func TestContains(t *testing.T) {
-	tests := []struct {
-		name     string
-		str      string
-		substr   string
-		expected bool
-	}{
-		{name: "substring exists", str: "hello world", substr: "world", expected: true},
-		{name: "substring not exists", str: "hello world", substr: "foo", expected: false},
-		{name: "empty substring", str: "hello world", substr: "", expected: true},
-		{name: "empty string", str: "", substr: "hello", expected: false},
-		{name: "equal strings", str: "hello", substr: "hello", expected: true},
-		{name: "substring longer than string", str: "hi", substr: "hello", expected: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := contains(tt.str, tt.substr)
-			if result != tt.expected {
-				t.Errorf("Expected %v for contains(%q, %q), got %v", tt.expected, tt.str, tt.substr, result)
 			}
 		})
 	}
