@@ -150,9 +150,11 @@ func GOSetup() error {
 			WithOperation("GOSetup")
 	}
 
-	if err := download.Download(
+	if err := download.WithResumeContext(
 		goArchivePath,
 		constants.GoArchiveURL,
+		0,
+		"yap", "go-toolchain",
 		shell.MultiPrinter.Writer); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild,
 			i18n.T("errors.platform.download_go_archive_failed")).
