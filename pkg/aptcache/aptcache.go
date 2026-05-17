@@ -15,12 +15,17 @@ package aptcache
 
 import (
 	"bufio"
+	"compress/bzip2"
 	"compress/gzip"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/klauspost/compress/zstd"
+	lz4 "github.com/pierrec/lz4/v4"
+	"github.com/ulikunitz/xz"
 )
 
 const (
@@ -86,6 +91,16 @@ func Load() *Cache {
 	return globalCache
 }
 
+// Reload discards the cached result and re-reads the apt/dpkg metadata from
+// disk. Call this after running apt-get update so that packages from newly
+// added repositories are visible to subsequent Lookup calls.
+func Reload() *Cache {
+	globalOnce = sync.Once{}
+	globalCache = nil
+
+	return Load()
+}
+
 // Lookup returns the PackageInfo for the named package and whether it was found.
 // The name must be the bare package name without version constraints or arch qualifiers.
 func (c *Cache) Lookup(name string) (PackageInfo, bool) {
@@ -139,7 +154,8 @@ func loadFromDisk() *Cache {
 	return c
 }
 
-// loadAptLists scans dir for *_Packages and *_Packages.gz files and parses them.
+// loadAptLists scans dir for *_Packages files in all compression variants
+// that apt may write: uncompressed, .gz, .bz2, .xz, .lz4, .zst.
 func (c *Cache) loadAptLists(dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -153,7 +169,13 @@ func (c *Cache) loadAptLists(dir string) error {
 
 		name := entry.Name()
 		// Only binary package index files are relevant.
-		if !strings.HasSuffix(name, "_Packages") && !strings.HasSuffix(name, "_Packages.gz") {
+		// Apt can store them uncompressed or with .gz/.bz2/.xz/.lz4/.zst.
+		if !strings.HasSuffix(name, "_Packages") &&
+			!strings.HasSuffix(name, "_Packages.gz") &&
+			!strings.HasSuffix(name, "_Packages.bz2") &&
+			!strings.HasSuffix(name, "_Packages.xz") &&
+			!strings.HasSuffix(name, "_Packages.lz4") &&
+			!strings.HasSuffix(name, "_Packages.zst") {
 			continue
 		}
 
@@ -183,7 +205,8 @@ func (c *Cache) parseFile(path string, dpkgStatus bool) error {
 
 	var r io.Reader = f
 
-	if strings.HasSuffix(path, ".gz") {
+	switch {
+	case strings.HasSuffix(path, ".gz"):
 		gz, err := gzip.NewReader(f)
 		if err != nil {
 			return err
@@ -192,6 +215,26 @@ func (c *Cache) parseFile(path string, dpkgStatus bool) error {
 		defer func() { _ = gz.Close() }()
 
 		r = gz
+	case strings.HasSuffix(path, ".bz2"):
+		r = bzip2.NewReader(f)
+	case strings.HasSuffix(path, ".xz"):
+		xzr, err := xz.NewReader(f)
+		if err != nil {
+			return err
+		}
+
+		r = xzr
+	case strings.HasSuffix(path, ".lz4"):
+		r = lz4.NewReader(f)
+	case strings.HasSuffix(path, ".zst"):
+		zr, err := zstd.NewReader(f)
+		if err != nil {
+			return err
+		}
+
+		defer zr.Close()
+
+		r = zr
 	}
 
 	return c.parseDeb822(r, dpkgStatus)

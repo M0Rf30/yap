@@ -16,6 +16,28 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/repo"
 )
 
+// aptGetDownload runs "apt-get download" for the given packages into dir.
+func aptGetDownload(dir string, pkgs []string) error {
+	args := append([]string{"download", "--allow-unauthenticated", "-o", "Dir::Cache::Archives=" + dir}, pkgs...)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "apt-get", args...) // #nosec G204
+	cmd.Dir = dir
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if len(out) > 0 {
+			logger.Warn("apt-get download failed", "output", strings.TrimSpace(string(out)))
+		}
+
+		return err
+	}
+
+	return nil
+}
+
 // Note: fmt is still used for fmt.Sprintf in SetupCrossCompilationEnvironment
 
 // SkipToolchainValidation controls whether cross-compilation toolchain validation is performed.
@@ -263,21 +285,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch str
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download all packages in one apt-get download call.
-	args := append([]string{"download", "--allow-unauthenticated", "-o", "Dir::Cache::Archives=" + tmpDir}, all...)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "apt-get", args...) // #nosec G204
-	cmd.Dir = tmpDir
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if len(out) > 0 {
-			logger.Warn("apt-get download failed",
-				"output", strings.TrimSpace(string(out)))
-		}
-
+	if err := aptGetDownload(tmpDir, all); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "apt-get download cross deps").
 			WithOperation("DownloadAndExtractCrossDeps")
 	}
