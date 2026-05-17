@@ -191,6 +191,30 @@
     # Clean range of distributions
     yap zap --from ubuntu --to fedora /path/to/project
 
+# Gensum command
+- id: commands.gensum.short
+  translation: "Update PKGBUILD checksums by downloading sources"
+- id: commands.gensum.long
+  translation: |
+    Download each source listed in source=() and rewrite the corresponding
+    checksum array (sha256sums, sha512sums, b2sums, …) in-place.
+
+    Architecture-specific source arrays (source_x86_64=, source_aarch64=, …)
+    and their matching checksum arrays are handled automatically.
+
+    VCS sources (git+https://, svn+, hg+, bzr+) are always set to SKIP.
+    The original formatting — single-line vs multi-line, quote style,
+    indentation — is preserved exactly.
+- id: commands.gensum.examples
+  translation: |
+    # Update checksums for a package in the current directory
+    yap gensum .
+
+    # Update checksums for a package in a specific directory
+    yap gensum /path/to/my-package
+- id: errors.gensum.failed
+  translation: "Failed to update checksums"
+
 # Build flags
 - id: flags.build.cleanbuild
   translation: "Remove source directory before building"

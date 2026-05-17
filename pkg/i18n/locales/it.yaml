@@ -192,6 +192,31 @@
     # Pulisce un intervallo di distribuzioni
     yap zap --from ubuntu --to fedora /percorso/al/progetto
 
+# Comando gensum
+- id: commands.gensum.short
+  translation: "Aggiorna i checksum del PKGBUILD scaricando le sorgenti"
+- id: commands.gensum.long
+  translation: |
+    Scarica ogni sorgente elencata in source=() e riscrive il corrispondente
+    array di checksum (sha256sums, sha512sums, b2sums, …) nel file.
+
+    Gli array di sorgenti specifici per architettura (source_x86_64=,
+    source_aarch64=, …) e i loro array di checksum corrispondenti vengono
+    gestiti automaticamente.
+
+    Le sorgenti VCS (git+https://, svn+, hg+, bzr+) vengono sempre impostate
+    su SKIP. La formattazione originale — riga singola o multiriga, stile delle
+    virgolette, indentazione — viene preservata esattamente.
+- id: commands.gensum.examples
+  translation: |
+    # Aggiorna i checksum per un pacchetto nella directory corrente
+    yap gensum .
+
+    # Aggiorna i checksum per un pacchetto in una directory specifica
+    yap gensum /percorso/al/mio-pacchetto
+- id: errors.gensum.failed
+  translation: "Aggiornamento dei checksum fallito"
+
 # Flag build
 - id: flags.build.cleanbuild
   translation: "Rimuove la directory sorgente prima della compilazione"
