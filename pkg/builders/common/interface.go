@@ -328,28 +328,6 @@ func getUpdateCommand(format string) string {
 	}
 }
 
-// installCrossToolchain installs the cross-compiler toolchain (gcc/g++/binutils
-// and libc6-dev-*-cross on DEB) as a dedicated apt/dnf/pacman call.
-//
-// This is a *separate* call from makedepends installation because GetDepends
-// short-circuits when its makeDepends slice is empty (e.g. Go-only PKGBUILDs).
-// Folding the toolchain packages into installArgs and relying on the
-// makedepends call to flush them would silently drop them in that case,
-// leaving binutils-<target>-strip absent from PATH and breaking later strip
-// passes on foreign-arch ELFs.
-func (bb *BaseBuilder) installCrossToolchain(targetArch string, installArgs []string) error {
-	crossDeps := bb.getCrossCompilerDependencies(targetArch)
-	if len(crossDeps) == 0 {
-		return nil
-	}
-
-	logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
-		"target_arch", targetArch,
-		"packages", strings.Join(crossDeps, ", "))
-
-	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, crossDeps)
-}
-
 // Prepare installs build dependencies using the appropriate package manager.
 // This consolidates duplicated Prepare methods across all builders.
 func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
@@ -367,11 +345,9 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 	// Register the foreign architecture and its ports repository before any
 	// :<arch> qualifier is sent to apt; without this the install would fail
 	// because archive.ubuntu.com only carries the build-host arch.
+	// Note: ensureCrossArchRepo is idempotent — safe to call even when
+	// `yap prepare -t` already ran and registered the arch.
 	if err := bb.ensureCrossArchRepo(targetArch); err != nil {
-		return err
-	}
-
-	if err := bb.installCrossToolchain(targetArch, installArgs); err != nil {
 		return err
 	}
 
