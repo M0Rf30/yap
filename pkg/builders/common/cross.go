@@ -84,7 +84,12 @@ func isHostOnlyPackage(name string) bool {
 		// RPM↔deb converter; runs on host
 		"alien",
 		// Password-quality runtime tool (cracklib-check); runs on host
-		"cracklib-runtime":
+		"cracklib-runtime",
+		// systemd is a system daemon — never a cross-compilation target.
+		// It appears in makedepends only so cmake's FindSYSTEMD.cmake can
+		// locate the unit install directory on the build host; installing
+		// systemd:arm64 on an amd64 host is not meaningful.
+		"systemd":
 		return true
 	}
 
