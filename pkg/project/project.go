@@ -59,6 +59,7 @@ type BuildOptions struct {
 	ToPkgName               string
 	TargetArch              string
 	OnlyPkgNames            string
+	SkipPkgNames            string
 	DebugDir                string
 	SBOMFormat              string
 	ExtraRepos              []string
@@ -889,13 +890,13 @@ func (mpc *MultipleProject) getRuntimeDeps() []string {
 	return result
 }
 
-// filterProjects filters mpc.Projects to only include projects whose PKGBUILD
-// pkgname matches one of the comma-separated names in the only parameter.
-// This is consistent with --from and --to which also match against pkgname.
-func (mpc *MultipleProject) filterProjects(only string) {
+// filterProjects filters mpc.Projects by a comma-separated name list.
+// When keep is true (--only), only matching projects are retained.
+// When keep is false (--skip), matching projects are excluded.
+func (mpc *MultipleProject) filterProjects(names string, keep bool) {
 	nameSet := make(map[string]bool)
 
-	for name := range strings.SplitSeq(only, ",") {
+	for name := range strings.SplitSeq(names, ",") {
 		name = strings.TrimSpace(name)
 		if name != "" {
 			nameSet[name] = true
@@ -906,10 +907,11 @@ func (mpc *MultipleProject) filterProjects(only string) {
 		return
 	}
 
-	filtered := make([]*Project, 0)
+	filtered := make([]*Project, 0, len(mpc.Projects))
 
 	for _, proj := range mpc.Projects {
-		if nameSet[proj.Builder.PKGBUILD.PkgName] {
+		matches := nameSet[proj.Builder.PKGBUILD.PkgName]
+		if matches == keep {
 			filtered = append(filtered, proj)
 		}
 	}
@@ -984,9 +986,13 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 
 	mpc.Projects = projects
 
-	// Filter projects when --only is specified
+	// Filter projects when --only or --skip is specified
 	if mpc.Opts.OnlyPkgNames != "" {
-		mpc.filterProjects(mpc.Opts.OnlyPkgNames)
+		mpc.filterProjects(mpc.Opts.OnlyPkgNames, true)
+	}
+
+	if mpc.Opts.SkipPkgNames != "" {
+		mpc.filterProjects(mpc.Opts.SkipPkgNames, false)
 	}
 
 	return nil

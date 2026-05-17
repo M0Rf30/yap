@@ -242,6 +242,8 @@
   translation: "Architettura di destinazione per il cross-compile"
 - id: flags.build.only
   translation: "Lista separata da virgole di nomi di progetto da compilare (filtra yap.json)"
+- id: flags.build.skip
+  translation: "Lista separata da virgole di nomi di progetto da saltare"
 - id: flags.build.to
   translation: "Ferma la compilazione a questa distribuzione"
 - id: flags.build.zap
