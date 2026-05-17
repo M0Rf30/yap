@@ -19,6 +19,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 	"github.com/M0Rf30/yap/v2/pkg/builder"
+	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -325,6 +326,11 @@ func (mpc *MultipleProject) resolveOutputPath() error {
 //
 // It returns an error.
 func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
+	if err := common.ValidateTargetArch(mpc.Opts.TargetArch); err != nil {
+		return yerrors.New(yerrors.ErrTypeConfiguration, err.Error()).
+			WithOperation("MultiProject")
+	}
+
 	err := mpc.readProject(path)
 	if err != nil {
 		return err
