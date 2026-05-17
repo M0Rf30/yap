@@ -5,32 +5,33 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/M0Rf30/yap/v2/pkg/color"
 )
 
 // CustomUsageFunc provides enhanced usage information with organized flag groups.
 func CustomUsageFunc(cmd *cobra.Command) error {
 	// Print usage line
-	pterm.Printf("%s\n", pterm.FgCyan.Sprintf("Usage: %s", cmd.UseLine()))
+	fmt.Printf("%s\n", color.Cyan(fmt.Sprintf("Usage: %s", cmd.UseLine())))
 
 	if len(cmd.Aliases) > 0 {
-		pterm.Printf("\n%s\n  %s\n",
-			pterm.NewStyle(pterm.FgMagenta, pterm.Bold).Sprint("Aliases:"),
+		fmt.Printf("\n%s\n  %s\n",
+			color.BoldMagenta("Aliases:"),
 			strings.Join(cmd.Aliases, ", "))
 	}
 	// Print description
 	if cmd.Long != "" {
-		pterm.Printf("\n%s\n%s\n",
-			pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("Description:"),
+		fmt.Printf("\n%s\n%s\n",
+			color.BoldBlue("Description:"),
 			cmd.Long)
 	}
 
 	// Print examples
 	if cmd.Example != "" {
-		pterm.Printf("\n%s\n%s\n",
-			pterm.NewStyle(pterm.FgGreen, pterm.Bold).Sprint("Examples:"),
+		fmt.Printf("\n%s\n%s\n",
+			color.BoldGreen("Examples:"),
 			cmd.Example)
 	}
 
@@ -39,7 +40,7 @@ func CustomUsageFunc(cmd *cobra.Command) error {
 
 	// Print inherited flags
 	if cmd.HasInheritedFlags() {
-		pterm.Printf("\n%s\n", pterm.NewStyle(pterm.FgYellow, pterm.Bold).Sprint("Global Flags:"))
+		fmt.Printf("\n%s\n", color.BoldYellow("Global Flags:"))
 		cmd.InheritedFlags().VisitAll(func(flag *pflag.Flag) {
 			printFlag(flag)
 		})
@@ -47,21 +48,21 @@ func CustomUsageFunc(cmd *cobra.Command) error {
 
 	// Print subcommands if any
 	if cmd.HasAvailableSubCommands() {
-		pterm.Printf("\n%s\n", pterm.NewStyle(pterm.FgBlue, pterm.Bold).Sprint("Available Commands:"))
+		fmt.Printf("\n%s\n", color.BoldBlue("Available Commands:"))
 
 		for _, subCmd := range cmd.Commands() {
 			if subCmd.IsAvailableCommand() {
-				pterm.Printf("  %s  %s\n",
-					pterm.FgLightBlue.Sprintf("%-12s", subCmd.Name()),
+				fmt.Printf("  %s  %s\n",
+					color.HiBlue(fmt.Sprintf("%-12s", subCmd.Name())),
 					subCmd.Short)
 			}
 		}
 	}
 
 	// Footer
-	pterm.Printf("\n%s\n",
-		pterm.FgGray.Sprintf("Use \"%s [command] --help\" for more information about a command.",
-			cmd.CommandPath()))
+	fmt.Printf("\n%s\n",
+		color.Gray(fmt.Sprintf("Use \"%s [command] --help\" for more information about a command.",
+			cmd.CommandPath())))
 
 	return nil
 }
@@ -125,7 +126,7 @@ func printOrganizedFlags(cmd *cobra.Command) {
 
 	for _, category := range categoryOrder {
 		if flags, exists := categorizedFlags[category]; exists && len(flags) > 0 {
-			pterm.Printf("\n%s:\n", pterm.NewStyle(pterm.FgCyan, pterm.Bold).Sprint(category))
+			fmt.Printf("\n%s:\n", color.BoldCyan(category))
 
 			for _, flag := range flags {
 				printFlag(flag)
@@ -135,7 +136,7 @@ func printOrganizedFlags(cmd *cobra.Command) {
 
 	// Print uncategorized flags
 	if len(uncategorizedFlags) > 0 {
-		pterm.Printf("\n%s:\n", pterm.NewStyle(pterm.FgMagenta, pterm.Bold).Sprint("Other Options"))
+		fmt.Printf("\n%s:\n", color.BoldMagenta("Other Options"))
 
 		for _, flag := range uncategorizedFlags {
 			printFlag(flag)
@@ -157,7 +158,7 @@ func printFlag(flag *pflag.Flag) {
 	}
 
 	// Color the flag name
-	coloredFlagStr := pterm.FgLightBlue.Sprint(flagStr)
+	coloredFlagStr := color.HiBlue(flagStr)
 
 	// Format description with default value
 	description := flag.Usage
@@ -165,7 +166,7 @@ func printFlag(flag *pflag.Flag) {
 		description += fmt.Sprintf(" (default: %s)", flag.DefValue)
 	}
 
-	pterm.Printf("%s\n      %s\n", coloredFlagStr, description)
+	fmt.Printf("%s\n      %s\n", coloredFlagStr, description)
 }
 
 // EnhancedHelpFunc provides a completely custom help function.

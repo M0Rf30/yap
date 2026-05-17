@@ -48,6 +48,35 @@
 # Completion command
 - id: commands.completion.short
   translation: "Generate shell completion scripts"
+- id: commands.completion.long
+  translation: |
+    Generate completion scripts for yap commands, flags, and arguments.
+
+    Shell completion enables tab-completion for yap commands, making the CLI
+    more user-friendly and reducing typing errors.
+
+    SUPPORTED SHELLS:
+      • bash - Bash shell completion
+      • zsh  - Zsh shell completion
+      • fish - Fish shell completion
+- id: commands.completion.examples
+  translation: |
+    # Generate and use completions temporarily
+    source <(yap completion bash)
+    yap completion fish | source
+
+    # Install completions permanently
+    # Bash (Linux):
+    yap completion bash | sudo tee /etc/bash_completion.d/yap
+    # Bash (macOS):
+    yap completion bash > /usr/local/etc/bash_completion.d/yap
+
+    # Fish:
+    yap completion fish > ~/.config/fish/completions/yap.fish
+
+    # Zsh (add to .zshrc if needed):
+    echo "autoload -U compinit; compinit" >> ~/.zshrc
+    yap completion zsh > "${fpath[1]}/_yap"
 
 # Graph command
 - id: commands.graph.short
@@ -110,6 +139,31 @@
 # Pull command
 - id: commands.pull.short
   translation: "Pull container images for distributions"
+- id: commands.pull.long
+  translation: |
+    Download container images used for isolated package building environments.
+
+    YAP uses containerization to provide clean, reproducible build environments
+    for each target distribution. This command pre-downloads the required
+    container images to speed up subsequent builds.
+
+    DISTRIBUTION REQUIREMENTS:
+      • Alpine and Arch: Use base names (alpine, arch)
+      • Others: Require release codename (ubuntu-jammy, rocky-9, fedora-38)
+
+    Images are pulled from official registries and stored locally.
+    Re-running this command will update to the latest image versions.
+- id: commands.pull.examples
+  translation: |
+    # Pull images for distributions with default releases
+    yap pull alpine
+    yap pull arch
+
+    # Pull images for specific distribution releases
+    yap pull ubuntu-jammy
+    yap pull fedora-38
+    yap pull debian-bookworm
+    yap pull rocky-9
 
 # Status command
 - id: commands.status.short

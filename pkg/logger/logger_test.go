@@ -1,154 +1,133 @@
 package logger
 
 import (
+	"io"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestArgsToLoggerArgs(t *testing.T) {
-	// Test with no arguments
-	result := argsToLoggerArgs()
-	assert.Nil(t, result)
-
-	// Test with one argument (odd number, should ignore the last)
-	result = argsToLoggerArgs("key1", "value1", "key2")
-	assert.Len(t, result, 1)
-	assert.Equal(t, "key1", result[0].Key)
-	assert.Equal(t, "value1", result[0].Value)
-
-	// Test with multiple key-value pairs
-	result = argsToLoggerArgs("key1", "value1", "key2", "value2")
-	assert.Len(t, result, 2)
-	assert.Equal(t, "key1", result[0].Key)
-	assert.Equal(t, "value1", result[0].Value)
-	assert.Equal(t, "key2", result[1].Key)
-	assert.Equal(t, "value2", result[1].Value)
-
-	// Test with different types
-	result = argsToLoggerArgs("number", 42, "boolean", true)
-	assert.Len(t, result, 2)
-	assert.Equal(t, "number", result[0].Key)
-	assert.Equal(t, 42, result[0].Value)
-	assert.Equal(t, "boolean", result[1].Key)
-	assert.Equal(t, true, result[1].Value)
-}
-
-func TestYapLoggerArgs(t *testing.T) {
-	logger := &YapLogger{}
-
-	// Test with no arguments
-	result := logger.Args()
-	assert.Nil(t, result)
-
-	// Test with key-value pairs
-	result = logger.Args("key1", "value1", "key2", "value2")
-	assert.Len(t, result, 2)
-	assert.Equal(t, "key1", result[0].Key)
-	assert.Equal(t, "value1", result[0].Value)
-	assert.Equal(t, "key2", result[1].Key)
-	assert.Equal(t, "value2", result[1].Value)
-}
-
 func TestYapLoggerInfo(t *testing.T) {
-	// Use the global logger instance which is properly initialized
+	old := MultiPrinter.Writer
+	defer func() { MultiPrinter.Writer = old }()
+
+	MultiPrinter.Writer = io.Discard
+
 	assert.NotPanics(t, func() {
 		Logger.Info("test message")
-		Logger.Info("test message with args", Logger.Args("key", "value"))
+		Logger.Info("test message with args", "key", "value")
 	})
 }
 
 func TestYapLoggerDebug(t *testing.T) {
-	// Use the global logger instance which is properly initialized
-	// Test when verbose is disabled (default)
+	old := MultiPrinter.Writer
+	oldVerbose := verboseEnabled
+
+	defer func() {
+		MultiPrinter.Writer = old
+		verboseEnabled = oldVerbose
+	}()
+
+	MultiPrinter.Writer = io.Discard
+
+	verboseEnabled = false
+
 	assert.NotPanics(t, func() {
 		Logger.Debug("test debug message")
-		Logger.Debug("test debug message with args", Logger.Args("key", "value"))
+		Logger.Debug("test debug message with args", "key", "value")
 	})
 
-	// Test when verbose is enabled
-	SetVerbose(true)
+	verboseEnabled = true
+
 	assert.NotPanics(t, func() {
 		Logger.Debug("test debug message with verbose enabled")
-		Logger.Debug("test debug message with args and verbose", Logger.Args("key", "value"))
+		Logger.Debug("test debug message with args and verbose", "key", "value")
 	})
-
-	// Reset verbose setting
-	SetVerbose(false)
 }
 
 func TestYapLoggerWarn(t *testing.T) {
-	// Use the global logger instance which is properly initialized
+	old := MultiPrinter.Writer
+	defer func() { MultiPrinter.Writer = old }()
+
+	MultiPrinter.Writer = io.Discard
+
 	assert.NotPanics(t, func() {
 		Logger.Warn("test warning message")
-		Logger.Warn("test warning message with args", Logger.Args("key", "value"))
+		Logger.Warn("test warning message with args", "key", "value")
 	})
 }
 
 func TestYapLoggerError(t *testing.T) {
-	// Use the global logger instance which is properly initialized
+	old := MultiPrinter.Writer
+	defer func() { MultiPrinter.Writer = old }()
+
+	MultiPrinter.Writer = io.Discard
+
 	assert.NotPanics(t, func() {
 		Logger.Error("test error message")
-		Logger.Error("test error message with args", Logger.Args("key", "value"))
+		Logger.Error("test error message with args", "key", "value")
 	})
 }
 
 func TestYapLoggerFatal(t *testing.T) {
-	// We skip testing the actual Fatal call since it calls os.Exit and terminates the process
-	// Instead, we just verify that the function exists and is accessible
+	// Fatal calls os.Exit — just verify the method is accessible.
 	assert.NotNil(t, Logger.Fatal)
 }
 
 func TestYapLoggerTips(t *testing.T) {
-	// Use the global logger instance which is properly initialized
+	old := MultiPrinter.Writer
+	defer func() { MultiPrinter.Writer = old }()
+
+	MultiPrinter.Writer = io.Discard
+
 	assert.NotPanics(t, func() {
 		Logger.Tips("test tips message")
-		Logger.Tips("test tips message with args", Logger.Args("key", "value"))
+		Logger.Tips("test tips message with args")
 	})
 }
 
 func TestSetColorDisabled(t *testing.T) {
-	// Save original environment variables
 	oldNoColor := os.Getenv("NO_COLOR")
 	oldColorTerm := os.Getenv("COLORTERM")
 	oldTerm := os.Getenv("TERM")
+	oldColorDisabled := colorDisabled
 
-	// Defer restoring environment variables
 	defer func() {
 		_ = os.Setenv("NO_COLOR", oldNoColor)
 		_ = os.Setenv("COLORTERM", oldColorTerm)
 		_ = os.Setenv("TERM", oldTerm)
 
-		SetColorDisabled(false) // Reset to default behavior
+		colorDisabled = oldColorDisabled
+
+		SetColorDisabled(false)
 	}()
 
-	// Clear environment variables that might affect color detection
 	_ = os.Unsetenv("NO_COLOR")
 	_ = os.Unsetenv("COLORTERM")
 	_ = os.Unsetenv("TERM")
 
-	// Test setting color disabled to true
 	SetColorDisabled(true)
 	assert.True(t, IsColorDisabled())
 
-	// Test setting color disabled to false
 	SetColorDisabled(false)
 	assert.False(t, IsColorDisabled())
 }
 
 func TestIsColorDisabled(t *testing.T) {
-	// Test default state
-	result := IsColorDisabled()
-	// Result can be true or false depending on environment, just ensure it doesn't panic
-	assert.NotNil(t, result)
-
-	// Test with NO_COLOR environment variable
 	oldNoColor := os.Getenv("NO_COLOR")
+	oldColorDisabled := colorDisabled
 
 	defer func() {
 		_ = os.Setenv("NO_COLOR", oldNoColor)
+		colorDisabled = oldColorDisabled
 	}()
+
+	_ = os.Unsetenv("NO_COLOR")
+
+	colorDisabled = false
+
+	assert.False(t, IsColorDisabled())
 
 	_ = os.Setenv("NO_COLOR", "1")
 
@@ -156,60 +135,63 @@ func TestIsColorDisabled(t *testing.T) {
 }
 
 func TestSetVerbose(t *testing.T) {
-	// Save original verbose state
-	originalVerbose := IsVerboseEnabled()
-	defer SetVerbose(originalVerbose)
+	orig := IsVerboseEnabled()
+	defer SetVerbose(orig)
 
-	// Test enabling verbose
 	SetVerbose(true)
 	assert.True(t, IsVerboseEnabled())
 
-	// Test disabling verbose
 	SetVerbose(false)
 	assert.False(t, IsVerboseEnabled())
 }
 
 func TestIsVerboseEnabled(t *testing.T) {
-	// Save original verbose state
-	originalVerbose := IsVerboseEnabled()
-	defer SetVerbose(originalVerbose)
+	orig := IsVerboseEnabled()
+	defer SetVerbose(orig)
 
-	// Test default state
-	result := IsVerboseEnabled()
-	assert.NotNil(t, result)
+	assert.NotNil(t, IsVerboseEnabled())
 
-	// Test after setting to true
 	SetVerbose(true)
 	assert.True(t, IsVerboseEnabled())
-
-	// Reset to original state
-	SetVerbose(originalVerbose)
 }
 
 func TestGlobalLoggerFunctions(t *testing.T) {
-	// Save original verbose state
-	originalVerbose := IsVerboseEnabled()
-	defer SetVerbose(originalVerbose)
+	orig := IsVerboseEnabled()
+	old := MultiPrinter.Writer
 
-	// Test all global logger functions
+	defer func() {
+		SetVerbose(orig)
+
+		MultiPrinter.Writer = old
+	}()
+
+	MultiPrinter.Writer = io.Discard
+
 	assert.NotPanics(t, func() {
 		Info("test global info", "key", "value")
 		Debug("test global debug", "key", "value")
 		Warn("test global warn", "key", "value")
 		Error("test global error", "key", "value")
-		Tips("test global tips", "key", "value")
+		Tips("test global tips")
 
-		// Enable verbose to test debug
 		SetVerbose(true)
 		Debug("test global debug with verbose", "key", "value")
 	})
 }
 
-func TestFormatYapPrefix(t *testing.T) {
-	// Test that formatYapPrefix doesn't panic and returns a string
-	result := formatYapPrefix("test message")
-	assert.Contains(t, result, "[")
-	assert.Contains(t, result, "yap")
-	assert.Contains(t, result, "]")
-	assert.Contains(t, result, "test message")
+func TestMultiPrinterStart(t *testing.T) {
+	writer, err := MultiPrinter.Start()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+	assert.Equal(t, MultiPrinter.Writer, writer)
+}
+
+func TestSetWriter(t *testing.T) {
+	old := MultiPrinter.Writer
+	defer func() { MultiPrinter.Writer = old }()
+
+	SetWriter(io.Discard)
+
+	assert.Equal(t, io.Discard, MultiPrinter.Writer)
 }

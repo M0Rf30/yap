@@ -20,30 +20,11 @@ var pullCmd = &cobra.Command{
 	Use:     commandPull + " <distro>",
 	GroupID: commandEnvironment,
 	Aliases: []string{"download"},
-	Short:   "📦 Pull pre-built container images for building",
-	Long: `Download container images used for isolated package building environments.
-
-YAP uses containerization to provide clean, reproducible build environments
-for each target distribution. This command pre-downloads the required
-container images to speed up subsequent builds.
-
-DISTRIBUTION REQUIREMENTS:
-  • Alpine and Arch: Use base names (alpine, arch)
-  • Others: Require release codename (ubuntu-jammy, rocky-9, fedora-38)
-
-Images are pulled from official registries and stored locally.
-Re-running this command will update to the latest image versions.`,
-	Example: `  # Pull images for distributions with default releases
-  yap pull alpine
-  yap pull arch
-
-  # Pull images for specific distribution releases
-  yap pull ubuntu-jammy
-  yap pull fedora-38
-  yap pull debian-bookworm
-  yap pull rocky-9`,
-	Args:   createValidateDistroArgs(1),
-	PreRun: PreRunValidation,
+	Short:   "", // Set by InitializeLocalizedDescriptions
+	Long:    "", // Set by InitializeLocalizedDescriptions
+	Example: "", // Set by InitializeLocalizedDescriptions
+	Args:    createValidateDistroArgs(1),
+	PreRun:  PreRunValidation,
 	Run: func(_ *cobra.Command, args []string) {
 		split := strings.Split(args[0], "-")
 

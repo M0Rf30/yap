@@ -10,38 +10,11 @@ import (
 
 // completionCmd represents the completion command.
 var completionCmd = &cobra.Command{
-	Use:     "completion <shell>",
-	GroupID: commandUtility,
-	Short:   "🔧 Generate shell completion scripts",
-	Long: `Generate completion scripts for yap commands, flags, and arguments.
-
-Shell completion enables tab-completion for yap commands, making the CLI
-more user-friendly and reducing typing errors.
-
-SUPPORTED SHELLS:
-  • bash - Bash shell completion
-  • zsh  - Zsh shell completion
-  • fish - Fish shell completion
-
-INSTALLATION:
-The generated scripts should be sourced by your shell or saved to the
-appropriate completion directory for automatic loading.`,
-	Example: `  # Generate and use completions temporarily
-  source <(yap completion bash)
-  yap completion fish | source
-
-  # Install completions permanently
-  # Bash (Linux):
-  yap completion bash | sudo tee /etc/bash_completion.d/yap
-  # Bash (macOS):
-  yap completion bash > /usr/local/etc/bash_completion.d/yap
-
-  # Fish:
-  yap completion fish > ~/.config/fish/completions/yap.fish
-
-  # Zsh (add to .zshrc if needed):
-  echo "autoload -U compinit; compinit" >> ~/.zshrc
-  yap completion zsh > "${fpath[1]}/_yap"`,
+	Use:                   "completion <shell>",
+	GroupID:               commandUtility,
+	Short:                 "", // Set by InitializeLocalizedDescriptions
+	Long:                  "", // Set by InitializeLocalizedDescriptions
+	Example:               "", // Set by InitializeLocalizedDescriptions
 	DisableFlagsInUseLine: true,
 	ValidArgs:             []string{"bash", "fish", "zsh"},
 	Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),

@@ -8,10 +8,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/buildinfo"
+	"github.com/M0Rf30/yap/v2/pkg/color"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
@@ -36,7 +36,7 @@ func showSystemStatus() {
 	}
 
 	// System section
-	pterm.DefaultSection.Println("System")
+	fmt.Print(color.Section("System"))
 
 	sysRows := [][]string{
 		{"Distro", osRelease.ID},
@@ -44,12 +44,12 @@ func showSystemStatus() {
 		{"Go", goVer},
 	}
 
-	_ = pterm.DefaultTable.WithData(sysRows).Render()
+	fmt.Print(color.Table(sysRows, false))
 
-	pterm.Println()
+	fmt.Println()
 
 	// YAP section
-	pterm.DefaultSection.Println("YAP")
+	fmt.Print(color.Section("YAP"))
 
 	ver := strings.TrimPrefix(buildinfo.Version, "v")
 
@@ -65,12 +65,12 @@ func showSystemStatus() {
 		{"Project", projectStatus},
 	}
 
-	_ = pterm.DefaultTable.WithData(yapRows).Render()
+	fmt.Print(color.Table(yapRows, false))
 
-	pterm.Println()
+	fmt.Println()
 
 	// Distributions section
-	pterm.DefaultSection.Println("Distributions")
+	fmt.Print(color.Section("Distributions"))
 
 	distroRows := [][]string{
 		{"Supported", fmt.Sprintf("%d", len(constants.Releases))},
@@ -89,18 +89,18 @@ func showSystemStatus() {
 		}
 	}
 
-	_ = pterm.DefaultTable.WithData(distroRows).Render()
+	fmt.Print(color.Table(distroRows, false))
 
-	pterm.Println()
+	fmt.Println()
 
 	// Environment section
-	pterm.DefaultSection.Println("Environment")
+	fmt.Print(color.Section("Environment"))
 
 	envRows := [][]string{
 		{"Container runtime", checkContainerRuntime()},
 	}
 
-	_ = pterm.DefaultTable.WithData(envRows).Render()
+	fmt.Print(color.Table(envRows, false))
 }
 
 func getDistroFamily(release string) string {

@@ -48,6 +48,35 @@
 # Comando completion
 - id: commands.completion.short
   translation: "Genera script di completamento per la shell"
+- id: commands.completion.long
+  translation: |
+    Genera script di completamento per i comandi, i flag e gli argomenti di yap.
+
+    Il completamento della shell abilita il completamento con tab per i comandi yap,
+    rendendo la CLI più intuitiva e riducendo gli errori di digitazione.
+
+    SHELL SUPPORTATE:
+      • bash - Completamento per Bash
+      • zsh  - Completamento per Zsh
+      • fish - Completamento per Fish
+- id: commands.completion.examples
+  translation: |
+    # Genera e usa i completamenti temporaneamente
+    source <(yap completion bash)
+    yap completion fish | source
+
+    # Installa i completamenti in modo permanente
+    # Bash (Linux):
+    yap completion bash | sudo tee /etc/bash_completion.d/yap
+    # Bash (macOS):
+    yap completion bash > /usr/local/etc/bash_completion.d/yap
+
+    # Fish:
+    yap completion fish > ~/.config/fish/completions/yap.fish
+
+    # Zsh (aggiungere a .zshrc se necessario):
+    echo "autoload -U compinit; compinit" >> ~/.zshrc
+    yap completion zsh > "${fpath[1]}/_yap"
 
 # Comando graph
 - id: commands.graph.short
@@ -111,6 +140,31 @@
 # Comando pull
 - id: commands.pull.short
   translation: "Scarica le immagini container per le distribuzioni"
+- id: commands.pull.long
+  translation: |
+    Scarica le immagini container utilizzate per gli ambienti di build isolati.
+
+    YAP utilizza la containerizzazione per fornire ambienti di build puliti e
+    riproducibili per ogni distribuzione di destinazione. Questo comando
+    pre-scarica le immagini container necessarie per velocizzare le build successive.
+
+    REQUISITI DISTRIBUZIONE:
+      • Alpine e Arch: Usare i nomi base (alpine, arch)
+      • Altre: Richiedono il nome in codice della release (ubuntu-jammy, rocky-9, fedora-38)
+
+    Le immagini vengono scaricate dai registry ufficiali e salvate localmente.
+    Rieseguire questo comando aggiornerà alle versioni più recenti.
+- id: commands.pull.examples
+  translation: |
+    # Scarica immagini per distribuzioni con release predefinite
+    yap pull alpine
+    yap pull arch
+
+    # Scarica immagini per release specifiche
+    yap pull ubuntu-jammy
+    yap pull fedora-38
+    yap pull debian-bookworm
+    yap pull rocky-9
 
 # Comando status
 - id: commands.status.short
