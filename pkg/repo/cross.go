@@ -95,7 +95,7 @@ func SetupCrossAPT(opts CrossAptOptions) error {
 	}
 
 	r := Repo{
-		Name:       "yap-cross-" + targetDebArch,
+		Name:       "cross-" + targetDebArch,
 		URL:        portsURI,
 		Suite:      codename,
 		Components: []string{componentMain, "restricted", "universe", "multiverse"},

@@ -477,8 +477,17 @@ func (bb *BaseBuilder) refreshCcacheSymlinks() {
 
 // Update updates the package manager's package database.
 // This consolidates duplicated Update methods across all builders.
+// For DEB, --allow-insecure-repositories is passed so that apt writes
+// Packages index files for unsigned extra repos (e.g. --repo flags) to
+// /var/lib/apt/lists/. Without it, apt silently skips those repos and
+// aptcache.Reload() cannot see their packages for arch classification.
 func (bb *BaseBuilder) Update() error {
-	return bb.PKGBUILD.GetUpdates(getPackageManager(bb.Format), getUpdateCommand(bb.Format))
+	cmd := getUpdateCommand(bb.Format)
+	if bb.Format == constants.FormatDEB {
+		return bb.PKGBUILD.GetUpdates(getPackageManager(bb.Format), cmd, "--allow-insecure-repositories")
+	}
+
+	return bb.PKGBUILD.GetUpdates(getPackageManager(bb.Format), cmd)
 }
 
 // SetupCcache checks if ccache is available and configures the build environment to use it.
