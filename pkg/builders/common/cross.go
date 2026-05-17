@@ -55,6 +55,13 @@ var formatToRepresentativeDistro = map[string]string{
 	constants.FormatPacman: distroArch,
 }
 
+// isPerlModule returns true for Perl module packages (suffix "-perl").
+// These are host-only build tools despite having Multi-Arch: same in the
+// apt index (they ship arch-specific .so files but run on the build host).
+func isPerlModule(name string) bool {
+	return strings.HasSuffix(name, "-perl")
+}
+
 func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 	cache := aptcache.Load()
 
@@ -63,6 +70,14 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 		name, _, _ := strings.Cut(dep, " (")
 		// Strip any existing arch qualifier
 		name, _, _ = strings.Cut(name, ":")
+
+		// Perl modules (*-perl) ship arch-specific .so files so apt marks them
+		// Multi-Arch: same, but they are host-side build tools (e.g. used by
+		// autoconf/automake) and must never be qualified with the target arch.
+		if isPerlModule(name) {
+			archAll = append(archAll, dep)
+			continue
+		}
 
 		info, found := cache.Lookup(name)
 		if !found {
@@ -133,6 +148,12 @@ func partitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []stri
 	for _, dep := range deps {
 		name, _, _ := strings.Cut(dep, " (")
 		name, _, _ = strings.Cut(name, ":")
+
+		// Perl modules: same exception as partitionArchAllDeps.
+		if isPerlModule(name) {
+			archAll = append(archAll, dep)
+			continue
+		}
 
 		info, found := cache.Lookup(name)
 		if !found {
