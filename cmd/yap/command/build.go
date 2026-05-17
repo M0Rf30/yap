@@ -53,15 +53,11 @@ var buildCmd = &cobra.Command{
 	Args:    cobra.RangeArgs(1, 2),                               // Allow 1-2 arguments
 	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
-		// Apply build options from CLI flags to package-level globals
-		buildOpts.Verbose = verbose
-		buildOpts.Apply()
-
 		// Propagate ssh-password flag value to the source package.
 		source.SetSSHPassword(sshPassword)
 
 		// Set the skip toolchain validation flag
-		common.SkipToolchainValidation = project.SkipToolchainValidation
+		common.SkipToolchainValidation = buildOpts.SkipToolchainValidation
 
 		// Set verbose flag from global flag
 		shell.SetVerbose(verbose)
@@ -92,22 +88,11 @@ var buildCmd = &cobra.Command{
 			logger.Info(i18n.T("logger.build.building_for_distribution"), logArgs...)
 		}
 
-		// Initialize MultipleProject
-		mpc := project.MultipleProject{}
+		// Initialize MultipleProject and attach build options
+		buildOpts.Verbose = verbose
+		mpc := project.MultipleProject{Opts: buildOpts}
 
-		err = mpc.MultiProject(distro, release, fullJSONPath)
-		if err != nil {
-			var yapErr *yapErrors.YapError
-			if errors.As(err, &yapErr) {
-				logStructuredError(yapErr)
-			} else {
-				logger.Fatal(i18n.T("logger.build.project_init_failed"), "error", err)
-			}
-
-			return err
-		}
-
-		// Apply CLI compression flags if provided
+		// Apply CLI compression flags BEFORE MultiProject() so populateProjects() picks them up
 		if compressionDeb != "" {
 			if err := validateCompression(compressionDeb); err != nil {
 				return err
@@ -124,10 +109,16 @@ var buildCmd = &cobra.Command{
 			mpc.CompressionRpm = compressionRpm
 		}
 
-		// Propagate compression settings to all projects
-		for _, proj := range mpc.Projects {
-			proj.CompressionDeb = mpc.CompressionDeb
-			proj.CompressionRpm = mpc.CompressionRpm
+		err = mpc.MultiProject(distro, release, fullJSONPath)
+		if err != nil {
+			var yapErr *yapErrors.YapError
+			if errors.As(err, &yapErr) {
+				logStructuredError(yapErr)
+			} else {
+				logger.Fatal(i18n.T("logger.build.project_init_failed"), "error", err)
+			}
+
+			return err
 		}
 
 		// Apply CLI signing flags if provided
@@ -193,10 +184,11 @@ func resolveSigning(mpc *project.MultipleProject) (*signing.Config, error) {
 		configPass = mpc.Signing.Passphrase
 	}
 
-	// Use signing.Resolve() for full priority chain resolution.
-	// We use FormatDEB as a generic format here; format-specific resolution
-	// happens in signArtifact() which knows the actual artifact format.
-	resolved, err := signing.Resolve(signing.FormatDEB, signKey,
+	// Use signing.ResolveGeneric() for project-level resolution.
+	// This skips format-specific env vars (YAP_DEB_KEY, YAP_APK_KEY, etc.)
+	// since the actual artifact format is not yet known.
+	// Format-specific resolution happens in signArtifact() for each artifact.
+	resolved, err := signing.ResolveGeneric(signKey,
 		signPassphrase, configKey, configPass)
 	if err != nil {
 		return nil, err

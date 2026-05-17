@@ -138,10 +138,12 @@ func TestBuildMultipleProjectFromJSON(t *testing.T) {
 		}
 	}()
 
-	project.SkipSyncDeps = true
-	project.NoBuild = true
-
-	mpc := project.MultipleProject{}
+	mpc := project.MultipleProject{
+		Opts: project.BuildOptions{
+			SkipSyncDeps: true,
+			NoBuild:      true,
+		},
+	}
 
 	err = mpc.MultiProject("ubuntu", "", testDir)
 	// We expect this to work without panics even if some dependencies fail
@@ -151,17 +153,26 @@ func TestBuildMultipleProjectFromJSON(t *testing.T) {
 	})
 }
 
-func TestGlobalVariables(t *testing.T) {
-	// Test that global variables can be set and accessed
+func TestBuildOptions(t *testing.T) {
+	// Test that BuildOptions can be set and accessed
 	assert.NotPanics(t, func() {
-		project.Verbose = true
-		project.CleanBuild = false
-		project.NoBuild = true
-		project.NoMakeDeps = false
-		project.SkipSyncDeps = true
-		project.Zap = false
-		project.FromPkgName = "test-from"
-		project.ToPkgName = "test-to"
+		opts := project.BuildOptions{
+			Verbose:      true,
+			CleanBuild:   false,
+			NoBuild:      true,
+			NoMakeDeps:   false,
+			SkipSyncDeps: true,
+			Zap:          false,
+			FromPkgName:  "test-from",
+			ToPkgName:    "test-to",
+		}
+		mpc := project.MultipleProject{
+			Opts: opts,
+		}
+		// Verify the options are set correctly
+		assert.Equal(t, true, mpc.Opts.Verbose)
+		assert.Equal(t, "test-from", mpc.Opts.FromPkgName)
+		assert.Equal(t, "test-to", mpc.Opts.ToPkgName)
 	})
 }
 
@@ -345,19 +356,18 @@ func TestMultipleProject_Clean(t *testing.T) {
 			require.NoError(t, os.WriteFile(testFile1, []byte("test"), 0o644))
 			require.NoError(t, os.WriteFile(testFile2, []byte("test"), 0o644))
 
-			// Set global variables
-			originalCleanBuild := project.CleanBuild
-			originalZap := project.Zap
+			// Create a MultipleProject with the test options
+			testMpc := &project.MultipleProject{
+				BuildDir: mpc.BuildDir,
+				Output:   mpc.Output,
+				Projects: mpc.Projects,
+				Opts: project.BuildOptions{
+					CleanBuild: tt.cleanBuild,
+					Zap:        tt.zap,
+				},
+			}
 
-			defer func() {
-				project.CleanBuild = originalCleanBuild
-				project.Zap = originalZap
-			}()
-
-			project.CleanBuild = tt.cleanBuild
-			project.Zap = tt.zap
-
-			err := mpc.Clean()
+			err := testMpc.Clean()
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -431,25 +441,19 @@ package() {
 	yapJSONPath := filepath.Join(testDir, "yap.json")
 	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
 
-	// Set global variables to avoid dependencies and cleanup
-	originalSkipSyncDeps := project.SkipSyncDeps
-	originalNoBuild := project.NoBuild
-
-	defer func() {
-		project.SkipSyncDeps = originalSkipSyncDeps
-		project.NoBuild = originalNoBuild
-	}()
-
-	project.SkipSyncDeps = true
-	project.NoBuild = true
-
 	// Test MultiProject and BuildAll
-	mpc := &project.MultipleProject{}
+	mpc := &project.MultipleProject{
+		Opts: project.BuildOptions{
+			SkipSyncDeps: true,
+			NoBuild:      true,
+		},
+	}
 
 	err := mpc.MultiProject("ubuntu", "", testDir)
 	if err != nil {
 		// Expected due to missing dependencies, but should not panic
 		t.Logf("MultiProject returned error (expected): %v", err)
+		return
 	}
 
 	// Test BuildAll (should not panic even if there are errors)
@@ -488,50 +492,45 @@ func TestMultipleProjectWithMissingJSON(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGlobalVariableModification(t *testing.T) {
-	// Test that we can modify global variables without issues
-	originalValues := map[string]any{
-		"Verbose":      project.Verbose,
-		"CleanBuild":   project.CleanBuild,
-		"NoBuild":      project.NoBuild,
-		"NoMakeDeps":   project.NoMakeDeps,
-		"SkipSyncDeps": project.SkipSyncDeps,
-		"Zap":          project.Zap,
-		"FromPkgName":  project.FromPkgName,
-		"ToPkgName":    project.ToPkgName,
+func TestBuildOptionsModification(t *testing.T) {
+	// Test that BuildOptions can be modified without issues
+	opts := project.BuildOptions{
+		Verbose:      false,
+		CleanBuild:   false,
+		NoBuild:      false,
+		NoMakeDeps:   false,
+		SkipSyncDeps: false,
+		Zap:          false,
+		FromPkgName:  "test-from",
+		ToPkgName:    "test-to",
 	}
 
-	// Restore original values after test
-	defer func() {
-		project.Verbose = originalValues["Verbose"].(bool)
-		project.CleanBuild = originalValues["CleanBuild"].(bool)
-		project.NoBuild = originalValues["NoBuild"].(bool)
-		project.NoMakeDeps = originalValues["NoMakeDeps"].(bool)
-		project.SkipSyncDeps = originalValues["SkipSyncDeps"].(bool)
-		project.Zap = originalValues["Zap"].(bool)
-		project.FromPkgName = originalValues["FromPkgName"].(string)
-		project.ToPkgName = originalValues["ToPkgName"].(string)
-	}()
-
-	// Modify all global variables
-	project.Verbose = !project.Verbose
-	project.CleanBuild = !project.CleanBuild
-	project.NoBuild = !project.NoBuild
-	project.NoMakeDeps = !project.NoMakeDeps
-	project.SkipSyncDeps = !project.SkipSyncDeps
-	project.Zap = !project.Zap
-	project.FromPkgName = "test-from-modified"
-	project.ToPkgName = "test-to-modified"
+	// Modify all options
+	opts.Verbose = !opts.Verbose
+	opts.CleanBuild = !opts.CleanBuild
+	opts.NoBuild = !opts.NoBuild
+	opts.NoMakeDeps = !opts.NoMakeDeps
+	opts.SkipSyncDeps = !opts.SkipSyncDeps
+	opts.Zap = !opts.Zap
+	opts.FromPkgName = "test-from-modified"
+	opts.ToPkgName = "test-to-modified"
 
 	// Verify the changes
-	assert.NotEqual(t, originalValues["Verbose"], project.Verbose)
-	assert.NotEqual(t, originalValues["CleanBuild"], project.CleanBuild)
-	assert.NotEqual(t, originalValues["NoBuild"], project.NoBuild)
-	assert.NotEqual(t, originalValues["NoMakeDeps"], project.NoMakeDeps)
-	assert.NotEqual(t, originalValues["SkipSyncDeps"], project.SkipSyncDeps)
-	assert.NotEqual(t, originalValues["Zap"], project.Zap)
-	assert.Equal(t, "test-from-modified", project.FromPkgName)
-	assert.Equal(t, "test-to-modified", project.ToPkgName)
+	assert.Equal(t, true, opts.Verbose)
+	assert.Equal(t, true, opts.CleanBuild)
+	assert.Equal(t, true, opts.NoBuild)
+	assert.Equal(t, true, opts.NoMakeDeps)
+	assert.Equal(t, true, opts.SkipSyncDeps)
+	assert.Equal(t, true, opts.Zap)
+	assert.Equal(t, "test-from-modified", opts.FromPkgName)
+	assert.Equal(t, "test-to-modified", opts.ToPkgName)
+
+	// Test that MultipleProject can use these options
+	mpc := &project.MultipleProject{
+		Opts: opts,
+	}
+	assert.Equal(t, true, mpc.Opts.Verbose)
+	assert.Equal(t, "test-from-modified", mpc.Opts.FromPkgName)
 }
 
 func TestProjectStructCreation(t *testing.T) {
@@ -740,24 +739,18 @@ depends=("mylib")
 	yapJSONPath := filepath.Join(testDir, "yap.json")
 	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
 
-	// Set up test environment
-	originalSkipSyncDeps := project.SkipSyncDeps
-	originalNoBuild := project.NoBuild
-
-	defer func() {
-		project.SkipSyncDeps = originalSkipSyncDeps
-		project.NoBuild = originalNoBuild
-	}()
-
-	project.SkipSyncDeps = true
-	project.NoBuild = true
-
 	// Test the complex scenario
-	mpc := &project.MultipleProject{}
+	mpc := &project.MultipleProject{
+		Opts: project.BuildOptions{
+			SkipSyncDeps: true,
+			NoBuild:      true,
+		},
+	}
 
 	err := mpc.MultiProject("ubuntu", "", testDir)
 	if err != nil {
 		t.Logf("MultiProject returned error (may be expected): %v", err)
+		return
 	}
 
 	// Verify the projects were loaded
@@ -804,26 +797,15 @@ func TestMultipleProjectWithFromToPkgName(t *testing.T) {
 	yapJSONPath := filepath.Join(testDir, "yap.json")
 	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
 
-	// Set global variables to avoid dependencies and cleanup
-	originalSkipSyncDeps := project.SkipSyncDeps
-	originalNoBuild := project.NoBuild
-	originalFromPkgName := project.FromPkgName
-	originalToPkgName := project.ToPkgName
-
-	defer func() {
-		project.SkipSyncDeps = originalSkipSyncDeps
-		project.NoBuild = originalNoBuild
-		project.FromPkgName = originalFromPkgName
-		project.ToPkgName = originalToPkgName
-	}()
-
-	project.SkipSyncDeps = true
-	project.NoBuild = true
-	project.FromPkgName = "project1"
-	project.ToPkgName = "project1"
-
 	// Test MultiProject with FromPkgName and ToPkgName
-	mpc := &project.MultipleProject{}
+	mpc := &project.MultipleProject{
+		Opts: project.BuildOptions{
+			SkipSyncDeps: true,
+			NoBuild:      true,
+			FromPkgName:  "project1",
+			ToPkgName:    "project1",
+		},
+	}
 
 	err := mpc.MultiProject("ubuntu", "", testDir)
 	if err != nil {
@@ -869,19 +851,13 @@ func TestMultipleProjectCleanWithZap(t *testing.T) {
 	yapJSONPath := filepath.Join(testDir, "yap.json")
 	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
 
-	// Set global variables to test Zap functionality
-	originalSkipSyncDeps := project.SkipSyncDeps
-
-	defer func() {
-		project.SkipSyncDeps = originalSkipSyncDeps
-		project.Zap = false
-	}()
-
-	project.SkipSyncDeps = true
-	project.Zap = true
-
 	// Test MultiProject with Zap enabled
-	mpc := &project.MultipleProject{}
+	mpc := &project.MultipleProject{
+		Opts: project.BuildOptions{
+			SkipSyncDeps: true,
+			Zap:          true,
+		},
+	}
 
 	err := mpc.MultiProject("ubuntu", "", testDir)
 	if err != nil {
@@ -932,20 +908,13 @@ makedepends=("gcc" "make")
 	yapJSONPath := filepath.Join(testDir, "yap.json")
 	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
 
-	// Set global variables to test make dependencies
-	originalSkipSyncDeps := project.SkipSyncDeps
-	originalNoMakeDeps := project.NoMakeDeps
-
-	defer func() {
-		project.SkipSyncDeps = originalSkipSyncDeps
-		project.NoMakeDeps = originalNoMakeDeps
-	}()
-
-	project.SkipSyncDeps = true
-	project.NoMakeDeps = false
-
 	// Test MultiProject with make dependencies
-	mpc := &project.MultipleProject{}
+	mpc := &project.MultipleProject{
+		Opts: project.BuildOptions{
+			SkipSyncDeps: true,
+			NoMakeDeps:   true,
+		},
+	}
 
 	err := mpc.MultiProject("ubuntu", "", testDir)
 	if err != nil {
@@ -984,20 +953,13 @@ func TestMultipleProjectWithCleanBuild(t *testing.T) {
 	yapJSONPath := filepath.Join(testDir, "yap.json")
 	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
 
-	// Set global variables to test clean build
-	originalSkipSyncDeps := project.SkipSyncDeps
-	originalCleanBuild := project.CleanBuild
-
-	defer func() {
-		project.SkipSyncDeps = originalSkipSyncDeps
-		project.CleanBuild = originalCleanBuild
-	}()
-
-	project.SkipSyncDeps = true
-	project.CleanBuild = true
-
 	// Test MultiProject with clean build
-	mpc := &project.MultipleProject{}
+	mpc := &project.MultipleProject{
+		Opts: project.BuildOptions{
+			SkipSyncDeps: true,
+			CleanBuild:   true,
+		},
+	}
 
 	err := mpc.MultiProject("ubuntu", "", testDir)
 	if err != nil {
@@ -1044,20 +1006,13 @@ func TestMultipleProjectWithVerbose(t *testing.T) {
 	yapJSONPath := filepath.Join(testDir, "yap.json")
 	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
 
-	// Set global variables to test verbose mode
-	originalSkipSyncDeps := project.SkipSyncDeps
-	originalVerbose := project.Verbose
-
-	defer func() {
-		project.SkipSyncDeps = originalSkipSyncDeps
-		project.Verbose = originalVerbose
-	}()
-
-	project.SkipSyncDeps = true
-	project.Verbose = true
-
 	// Test MultiProject with verbose enabled
-	mpc := &project.MultipleProject{}
+	mpc := &project.MultipleProject{
+		Opts: project.BuildOptions{
+			SkipSyncDeps: true,
+			Verbose:      true,
+		},
+	}
 
 	err := mpc.MultiProject("ubuntu", "", testDir)
 	if err != nil {
@@ -1126,24 +1081,18 @@ makedepends=("gcc" "make")
 	yapJSONPath := filepath.Join(testDir, "yap.json")
 	require.NoError(t, os.WriteFile(yapJSONPath, []byte(yapJSON), 0o644))
 
-	// Set up test environment
-	originalSkipSyncDeps := project.SkipSyncDeps
-	originalNoBuild := project.NoBuild
-
-	defer func() {
-		project.SkipSyncDeps = originalSkipSyncDeps
-		project.NoBuild = originalNoBuild
-	}()
-
-	project.SkipSyncDeps = true
-	project.NoBuild = true
-
 	// Test the complex scenario
-	mpc := &project.MultipleProject{}
+	mpc := &project.MultipleProject{
+		Opts: project.BuildOptions{
+			SkipSyncDeps: true,
+			NoBuild:      true,
+		},
+	}
 
 	err := mpc.MultiProject("ubuntu", "", testDir)
 	if err != nil {
 		t.Logf("MultiProject returned error (may be expected): %v", err)
+		return
 	}
 
 	// Test BuildAll with complex dependencies
@@ -1197,27 +1146,18 @@ package() {
 	}`
 	require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
 
-	// Save and restore all modified globals via t.Cleanup
-	origParallel := project.Parallel
-	origNoBuild := project.NoBuild
-	origSkipSyncDeps := project.SkipSyncDeps
-
-	t.Cleanup(func() {
-		project.Parallel = origParallel
-		project.NoBuild = origNoBuild
-		project.SkipSyncDeps = origSkipSyncDeps
-	})
-
 	// Explicitly set sequential mode (Parallel = false is the default, but we set it
 	// explicitly to document the intent and to ensure the branch is exercised)
-	project.Parallel = false
-	project.NoBuild = true
-	project.SkipSyncDeps = true
+	mpc := &project.MultipleProject{
+		Opts: project.BuildOptions{
+			Parallel:     false,
+			NoBuild:      true,
+			SkipSyncDeps: true,
+		},
+	}
 
-	// Verify Parallel is false — sequential path should not mutate this global.
-	assert.False(t, project.Parallel, "Parallel must be false to exercise sequential path")
-
-	mpc := &project.MultipleProject{}
+	// Verify Parallel is false — sequential path should not mutate this flag.
+	assert.False(t, mpc.Opts.Parallel, "Parallel must be false to exercise sequential path")
 
 	err := mpc.MultiProject("ubuntu", "", testDir)
 	if err != nil {
@@ -1233,7 +1173,7 @@ package() {
 	})
 
 	// Verify Parallel is still false after BuildAll (sequential path must not mutate the flag)
-	assert.False(t, project.Parallel,
+	assert.False(t, mpc.Opts.Parallel,
 		"Parallel must remain false: sequential path must not mutate the flag")
 }
 
@@ -1293,24 +1233,14 @@ package() {
 	}`
 	require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
 
-	// Save and restore globals.
-	origParallel := project.Parallel
-	origNoBuild := project.NoBuild
-	origSkipSyncDeps := project.SkipSyncDeps
-
-	t.Cleanup(func() {
-		project.Parallel = origParallel
-		project.NoBuild = origNoBuild
-		project.SkipSyncDeps = origSkipSyncDeps
-	})
-
-	project.NoBuild = true
-	project.SkipSyncDeps = true
-
 	t.Run("sequential ignores circular deps", func(t *testing.T) {
-		project.Parallel = false
-
-		mpc := &project.MultipleProject{}
+		mpc := &project.MultipleProject{
+			Opts: project.BuildOptions{
+				Parallel:     false,
+				NoBuild:      true,
+				SkipSyncDeps: true,
+			},
+		}
 
 		err := mpc.MultiProject("ubuntu", "", testDir)
 		if err != nil {
@@ -1330,9 +1260,13 @@ package() {
 	})
 
 	t.Run("parallel detects circular deps", func(t *testing.T) {
-		project.Parallel = true
-
-		mpc := &project.MultipleProject{}
+		mpc := &project.MultipleProject{
+			Opts: project.BuildOptions{
+				Parallel:     true,
+				NoBuild:      true,
+				SkipSyncDeps: true,
+			},
+		}
 
 		err := mpc.MultiProject("ubuntu", "", testDir)
 		if err != nil {
@@ -1390,21 +1324,13 @@ package() {
 	require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
 
 	t.Run("filters to matching projects only", func(t *testing.T) {
-		originalOnly := project.OnlyPkgNames
-		originalSkipSync := project.SkipSyncDeps
-		originalNoMakeDeps := project.NoMakeDeps
-
-		defer func() {
-			project.OnlyPkgNames = originalOnly
-			project.SkipSyncDeps = originalSkipSync
-			project.NoMakeDeps = originalNoMakeDeps
-		}()
-
-		project.OnlyPkgNames = "pkga,pkgc"
-		project.SkipSyncDeps = true
-		project.NoMakeDeps = true
-
-		mpc := &project.MultipleProject{}
+		mpc := &project.MultipleProject{
+			Opts: project.BuildOptions{
+				OnlyPkgNames: "pkga,pkgc",
+				SkipSyncDeps: true,
+				NoMakeDeps:   true,
+			},
+		}
 
 		err := mpc.MultiProject("ubuntu", "", testDir)
 		if err != nil {
@@ -1418,21 +1344,13 @@ package() {
 	})
 
 	t.Run("empty only returns all projects", func(t *testing.T) {
-		originalOnly := project.OnlyPkgNames
-		originalSkipSync := project.SkipSyncDeps
-		originalNoMakeDeps := project.NoMakeDeps
-
-		defer func() {
-			project.OnlyPkgNames = originalOnly
-			project.SkipSyncDeps = originalSkipSync
-			project.NoMakeDeps = originalNoMakeDeps
-		}()
-
-		project.OnlyPkgNames = ""
-		project.SkipSyncDeps = true
-		project.NoMakeDeps = true
-
-		mpc := &project.MultipleProject{}
+		mpc := &project.MultipleProject{
+			Opts: project.BuildOptions{
+				OnlyPkgNames: "",
+				SkipSyncDeps: true,
+				NoMakeDeps:   true,
+			},
+		}
 
 		err := mpc.MultiProject("ubuntu", "", testDir)
 		if err != nil {
@@ -1444,21 +1362,13 @@ package() {
 	})
 
 	t.Run("non-matching names returns empty", func(t *testing.T) {
-		originalOnly := project.OnlyPkgNames
-		originalSkipSync := project.SkipSyncDeps
-		originalNoMakeDeps := project.NoMakeDeps
-
-		defer func() {
-			project.OnlyPkgNames = originalOnly
-			project.SkipSyncDeps = originalSkipSync
-			project.NoMakeDeps = originalNoMakeDeps
-		}()
-
-		project.OnlyPkgNames = "nonexistent"
-		project.SkipSyncDeps = true
-		project.NoMakeDeps = true
-
-		mpc := &project.MultipleProject{}
+		mpc := &project.MultipleProject{
+			Opts: project.BuildOptions{
+				OnlyPkgNames: "nonexistent",
+				SkipSyncDeps: true,
+				NoMakeDeps:   true,
+			},
+		}
 
 		err := mpc.MultiProject("ubuntu", "", testDir)
 		if err != nil {

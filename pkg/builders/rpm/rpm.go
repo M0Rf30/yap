@@ -16,7 +16,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 
 	rpmpack "github.com/M0Rf30/rpmpack"
@@ -49,13 +48,13 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string) *RPM {
 // BuildPackage creates an RPM package based on the provided PKGBUILD information.
 // Returns the path to the created RPM file.
 func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, error) {
-	arch := r.PKGBUILD.ArchComputed
+	r.SetTargetArchitecture(targetArch)
 
 	pkgName := fmt.Sprintf("%s-%s-%s.%s.rpm",
 		r.PKGBUILD.PkgName,
 		r.PKGBUILD.PkgVer,
 		r.PKGBUILD.PkgRel,
-		arch)
+		r.PKGBUILD.ArchComputed)
 
 	epoch, _ := strconv.ParseUint(r.PKGBUILD.Epoch, 10, 32)
 	if epoch == 0 {
@@ -81,7 +80,7 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, err
 		Epoch:       uint32(epoch),
 		Version:     r.PKGBUILD.PkgVer,
 		Release:     r.PKGBUILD.PkgRel,
-		Arch:        arch,
+		Arch:        r.PKGBUILD.ArchComputed,
 		Vendor:      copyright,
 		URL:         r.PKGBUILD.URL,
 		Packager:    r.PKGBUILD.Maintainer,
@@ -148,16 +147,7 @@ func (r *RPM) PrepareFakeroot(_ string, targetArch string) error {
 	r.LogCrossCompilation(targetArch)
 	r.SetTargetArchitecture(targetArch)
 
-	return options.Apply(r.PKGBUILD.PackageDir, options.Options{
-		DebugEnabled:     r.PKGBUILD.DebugEnabled,
-		DocsEnabled:      r.PKGBUILD.DocsEnabled,
-		EmptyDirsEnabled: r.PKGBUILD.EmptyDirsEnabled,
-		LibtoolEnabled:   r.PKGBUILD.LibtoolEnabled,
-		PurgeEnabled:     r.PKGBUILD.PurgeEnabled,
-		StaticEnabled:    r.PKGBUILD.StaticEnabled,
-		StripEnabled:     r.PKGBUILD.StripEnabled,
-		ZipManEnabled:    r.PKGBUILD.ZipManEnabled,
-	})
+	return r.ApplyOptions()
 }
 
 // createFilesInsideRPM prepares and adds files to the specified RPM object.

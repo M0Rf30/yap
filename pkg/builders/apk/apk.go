@@ -51,7 +51,7 @@ func (a *Apk) BuildPackage(artifactsPath string, targetArch string) (string, err
 	pkgName := a.BuildPackageName(".apk")
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-	err := a.createAPKPackage(pkgFilePath, artifactsPath)
+	err := a.createTarGzWithChecksums(a.PKGBUILD.PackageDir, pkgFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -102,13 +102,6 @@ func (a *Apk) PrepareFakeroot(artifactsPath string, targetArch string) error {
 	// Changelog support is skipped for APK packages.
 
 	return nil
-}
-
-// createAPKPackage creates an APK package archive.
-// APK packages are gzip-compressed tar archives containing the package files
-// and metadata (.PKGINFO).
-func (a *Apk) createAPKPackage(pkgFilePath, _ string) error {
-	return a.createTarGzWithChecksums(a.PKGBUILD.PackageDir, pkgFilePath)
 }
 
 // createPkgInfo generates the .PKGINFO metadata file for APK packages.
@@ -175,14 +168,10 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 	gzData.ModTime = time.Unix(0, 0)
 	twData := tar.NewWriter(gzData)
 
-	dataFileCount := 0
-
 	for _, file := range fileList {
 		if isControlFile(file.NameInArchive) {
 			continue
 		}
-
-		dataFileCount++
 
 		if err := a.writeFileWithChecksum(ctx, twData, file); err != nil {
 			_ = twData.Close()
@@ -232,14 +221,10 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 	gzControl.ModTime = time.Unix(0, 0)
 	twControl := tar.NewWriter(gzControl)
 
-	controlFileCount := 0
-
 	for _, file := range fileList2 {
 		if !isControlFile(file.NameInArchive) {
 			continue
 		}
-
-		controlFileCount++
 
 		if err := a.writeFileWithChecksum(ctx, twControl, file); err != nil {
 			_ = twControl.Close()

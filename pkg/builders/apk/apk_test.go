@@ -250,9 +250,9 @@ func TestCreateAPKPackage(t *testing.T) {
 
 	pkgFilePath := filepath.Join(tempDir, "test.apk")
 
-	err = builder.createAPKPackage(pkgFilePath, tempDir)
+	err = builder.createTarGzWithChecksums(builder.PKGBUILD.PackageDir, pkgFilePath)
 	if err != nil {
-		t.Errorf("createAPKPackage failed: %v", err)
+		t.Errorf("createTarGzWithChecksums failed: %v", err)
 	}
 
 	// Check that package file was created

@@ -80,9 +80,7 @@ func GetPackageManager(
 		return deb.NewBuilder(pkgBuild, compressionDeb), nil
 	case "pacman":
 		return pacman.NewBuilder(pkgBuild), nil
-	case "yum":
-		return rpm.NewBuilder(pkgBuild, compressionRpm), nil
-	case "zypper":
+	case "yum", "zypper":
 		return rpm.NewBuilder(pkgBuild, compressionRpm), nil
 	default:
 		return nil, errors.New(errors.ErrTypeConfiguration,

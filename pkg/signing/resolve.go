@@ -78,6 +78,148 @@ func Resolve(
 	return cfg, nil
 }
 
+// ResolveGeneric produces a final Config without format-specific resolution.
+// This is used at the project level where the actual artifact format is not yet known.
+// Format-specific resolution happens later in signArtifact() for each artifact.
+//
+// For keys, the resolution order is:
+//  1. flagKey (CLI --sign-key)
+//  2. YAP_SIGN_KEY env var (global only, no format-specific vars)
+//  3. configKey (from yap.json signing.keyPath)
+//  4. Default search in ~/.config/yap/keys/ (tries both default.rsa and default.gpg)
+//
+// For passphrases, the resolution order is:
+//  1. flagPass (CLI --sign-passphrase)
+//  2. YAP_SIGN_PASSPHRASE env var (global only, no format-specific vars)
+//  3. configPass (from yap.json signing.passphrase)
+//  4. Empty string (no passphrase)
+//
+// If no key is found, signing is disabled and passphrase is cleared.
+func ResolveGeneric(
+	flagKey, flagPass, configKey, configPass string,
+) (Config, error) {
+	cfg := Config{}
+
+	// Resolve key path (generic, no format-specific env vars)
+	keyPath, err := resolveGenericKeyPath(flagKey, configKey)
+	if err != nil {
+		return cfg, err
+	}
+
+	cfg.KeyPath = keyPath
+	cfg.Enabled = keyPath != ""
+
+	// Only resolve passphrase if signing is enabled
+	if cfg.Enabled {
+		passphrase := resolveGenericPassphrase(flagPass, configPass)
+		cfg.Passphrase = passphrase
+	}
+
+	return cfg, nil
+}
+
+// resolveGenericKeyPath applies the priority order for generic key path resolution
+// (no format-specific env vars).
+func resolveGenericKeyPath(flagKey, configKey string) (string, error) {
+	// Priority 1: CLI flag
+	if flagKey != "" {
+		return resolveAndValidateKeyPath(flagKey, "CLI flag", "CLI flag")
+	}
+
+	// Priority 2: Global env var (YAP_SIGN_KEY) - skip format-specific vars
+	if envVal := os.Getenv("YAP_SIGN_KEY"); envVal != "" {
+		return resolveAndValidateKeyPath(envVal, "YAP_SIGN_KEY", "global env var")
+	}
+
+	// Priority 3: Project config
+	if configKey != "" {
+		return resolveAndValidateKeyPath(configKey, "yap.json", "project config")
+	}
+
+	// Priority 4: Default search in ~/.config/yap/keys/
+	// Try both default.rsa and default.gpg since we don't know the format yet
+	defaultPath, found := findGenericDefaultKey()
+	if found {
+		logger.Debug("Resolved signing key from default location",
+			"key_path", defaultPath)
+
+		return defaultPath, nil
+	}
+
+	// No key found; signing is disabled
+	return "", nil
+}
+
+// resolveGenericPassphrase applies the priority order for generic passphrase resolution
+// (no format-specific env vars).
+func resolveGenericPassphrase(flagPass, configPass string) string {
+	// Priority 1: CLI flag
+	if flagPass != "" {
+		logger.Debug("Resolved passphrase from CLI flag")
+		return flagPass
+	}
+
+	// Priority 2: Global env var (YAP_SIGN_PASSPHRASE) - skip format-specific vars
+	if envVal := os.Getenv("YAP_SIGN_PASSPHRASE"); envVal != "" {
+		logger.Debug("Resolved passphrase from global env var",
+			"env_var", "YAP_SIGN_PASSPHRASE")
+
+		return envVal
+	}
+
+	// Priority 3: Project config
+	if configPass != "" {
+		logger.Debug("Resolved passphrase from project config")
+		return configPass
+	}
+
+	// No passphrase found
+	return ""
+}
+
+// findGenericDefaultKey searches ~/.config/yap/keys/ for a default key.
+// Since format is unknown, it tries both default.rsa and default.gpg.
+func findGenericDefaultKey() (string, bool) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		logger.Debug("Failed to get home directory", "error", err)
+		return "", false
+	}
+
+	keysDir := filepath.Join(homeDir, ".config", "yap", "keys")
+
+	// Check if keys directory exists
+	if _, err := os.Stat(keysDir); err != nil {
+		logger.Debug("Default keys directory not found",
+			"path", keysDir)
+
+		return "", false
+	}
+
+	// Try default.rsa first (APK uses RSA)
+	defaultRSA := filepath.Join(keysDir, "default.rsa")
+	if _, err := os.Stat(defaultRSA); err == nil {
+		logger.Debug("Found default RSA key file",
+			"path", defaultRSA)
+
+		return defaultRSA, true
+	}
+
+	// Fall back to default.gpg (DEB/RPM/Pacman use GPG)
+	defaultGPG := filepath.Join(keysDir, "default.gpg")
+	if _, err := os.Stat(defaultGPG); err == nil {
+		logger.Debug("Found default GPG key file",
+			"path", defaultGPG)
+
+		return defaultGPG, true
+	}
+
+	logger.Debug("No default key found",
+		"keys_dir", keysDir)
+
+	return "", false
+}
+
 // resolveKeyPath applies the priority order for key path resolution.
 func resolveKeyPath(format Format, flagKey, configKey string) (string, error) {
 	// Priority 1: CLI flag
