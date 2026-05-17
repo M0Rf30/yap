@@ -42,4 +42,5 @@ const (
 const (
 	flagSkipSync = "skip-sync"
 	flagFrom     = "from"
+	flagSkip     = "skip"
 )

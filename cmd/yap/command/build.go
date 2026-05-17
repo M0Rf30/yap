@@ -262,6 +262,7 @@ func InitializeBuildDescriptions() {
 		flagFrom:                    "flags.build.from",
 		"to":                        "flags.build.to",
 		"only":                      "flags.build.only",
+		flagSkip:                    "flags.build.skip",
 		"target-arch":               "flags.build.target_arch",
 		"sbom":                      "flags.build.sbom",
 		"sbom-format":               "flags.build.sbom_format",
@@ -340,6 +341,8 @@ func init() {
 	// PROJECT FILTER FLAGS
 	buildCmd.Flags().StringVarP(&buildOpts.OnlyPkgNames,
 		"only", "", "", "Comma-separated list of project names to build (filters yap.json)")
+	buildCmd.Flags().StringVarP(&buildOpts.SkipPkgNames,
+		flagSkip, "", "", "Comma-separated list of project names to skip")
 
 	// CROSS-COMPILATION FLAGS
 	buildCmd.Flags().StringVarP(&buildOpts.TargetArch,

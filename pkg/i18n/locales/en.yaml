@@ -240,6 +240,8 @@
   translation: "Target architecture for cross-compilation"
 - id: flags.build.only
   translation: "Comma-separated list of project names to build (filters yap.json)"
+- id: flags.build.skip
+  translation: "Comma-separated list of project names to skip"
 - id: flags.build.to
   translation: "Stop building at this distribution"
 - id: flags.build.zap
