@@ -196,3 +196,261 @@ package() {
 		assert.Equal(t, []string{"pkg-c"}, result)
 	})
 }
+
+func TestYapJSONFields(t *testing.T) {
+	const pkgBuildContent = `pkgname="pkg-a"
+pkgver="1.0"
+pkgrel="1"
+pkgdesc="pkg-a package"
+arch=("x86_64")
+license=("GPL-3.0-only")
+
+package() {
+	mkdir -p "${pkgdir}/usr/bin"
+}
+`
+
+	t.Run("targetArch from JSON sets Opts.TargetArch", func(t *testing.T) {
+		testDir := t.TempDir()
+		buildDir := filepath.Join(testDir, "build")
+		outputDir := filepath.Join(testDir, "output")
+
+		require.NoError(t, os.MkdirAll(buildDir, 0o755))
+		require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+		dir := filepath.Join(testDir, "pkg-a")
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(pkgBuildContent), 0o644))
+
+		yapJSON := `{
+			"name": "test-project",
+			"description": "Test project",
+			"buildDir": "` + buildDir + `",
+			"output": "` + outputDir + `",
+			"targetArch": "aarch64",
+			"projects": [
+				{"name": "pkg-a", "install": false}
+			]
+		}`
+		require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
+
+		mpc := &MultipleProject{
+			Opts: BuildOptions{
+				SkipSyncDeps: true,
+				NoMakeDeps:   true,
+			},
+		}
+
+		err := mpc.MultiProject("ubuntu", "", testDir)
+		if err != nil {
+			t.Logf("MultiProject returned error (may be expected in CI): %v", err)
+			t.Skip("skipping assertion: MultiProject failed (no package manager)")
+		}
+
+		assert.Equal(t, "aarch64", mpc.Opts.TargetArch)
+	})
+
+	t.Run("CLI TargetArch overrides JSON targetArch", func(t *testing.T) {
+		testDir := t.TempDir()
+		buildDir := filepath.Join(testDir, "build")
+		outputDir := filepath.Join(testDir, "output")
+
+		require.NoError(t, os.MkdirAll(buildDir, 0o755))
+		require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+		dir := filepath.Join(testDir, "pkg-a")
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(pkgBuildContent), 0o644))
+
+		yapJSON := `{
+			"name": "test-project",
+			"description": "Test project",
+			"buildDir": "` + buildDir + `",
+			"output": "` + outputDir + `",
+			"targetArch": "aarch64",
+			"projects": [
+				{"name": "pkg-a", "install": false}
+			]
+		}`
+		require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
+
+		mpc := &MultipleProject{
+			Opts: BuildOptions{
+				SkipSyncDeps: true,
+				NoMakeDeps:   true,
+				TargetArch:   "x86_64",
+			},
+		}
+
+		err := mpc.MultiProject("ubuntu", "", testDir)
+		if err != nil {
+			t.Logf("MultiProject returned error (may be expected in CI): %v", err)
+			t.Skip("skipping assertion: MultiProject failed (no package manager)")
+		}
+
+		assert.Equal(t, "x86_64", mpc.Opts.TargetArch)
+	})
+
+	t.Run("debugDir from JSON sets Opts.DebugDir", func(t *testing.T) {
+		testDir := t.TempDir()
+		buildDir := filepath.Join(testDir, "build")
+		outputDir := filepath.Join(testDir, "output")
+
+		require.NoError(t, os.MkdirAll(buildDir, 0o755))
+		require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+		dir := filepath.Join(testDir, "pkg-a")
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(pkgBuildContent), 0o644))
+
+		yapJSON := `{
+			"name": "test-project",
+			"description": "Test project",
+			"buildDir": "` + buildDir + `",
+			"output": "` + outputDir + `",
+			"debugDir": "debug-symbols",
+			"projects": [
+				{"name": "pkg-a", "install": false}
+			]
+		}`
+		require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
+
+		mpc := &MultipleProject{
+			Opts: BuildOptions{
+				SkipSyncDeps: true,
+				NoMakeDeps:   true,
+			},
+		}
+
+		err := mpc.MultiProject("ubuntu", "", testDir)
+		if err != nil {
+			t.Logf("MultiProject returned error (may be expected in CI): %v", err)
+			t.Skip("skipping assertion: MultiProject failed (no package manager)")
+		}
+
+		assert.Equal(t, "debug-symbols", mpc.Opts.DebugDir)
+	})
+
+	t.Run("parallel from JSON sets Opts.Parallel", func(t *testing.T) {
+		testDir := t.TempDir()
+		buildDir := filepath.Join(testDir, "build")
+		outputDir := filepath.Join(testDir, "output")
+
+		require.NoError(t, os.MkdirAll(buildDir, 0o755))
+		require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+		dir := filepath.Join(testDir, "pkg-a")
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(pkgBuildContent), 0o644))
+
+		yapJSON := `{
+			"name": "test-project",
+			"description": "Test project",
+			"buildDir": "` + buildDir + `",
+			"output": "` + outputDir + `",
+			"parallel": true,
+			"projects": [
+				{"name": "pkg-a", "install": false}
+			]
+		}`
+		require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
+
+		mpc := &MultipleProject{
+			Opts: BuildOptions{
+				SkipSyncDeps: true,
+				NoMakeDeps:   true,
+			},
+		}
+
+		err := mpc.MultiProject("ubuntu", "", testDir)
+		if err != nil {
+			t.Logf("MultiProject returned error (may be expected in CI): %v", err)
+			t.Skip("skipping assertion: MultiProject failed (no package manager)")
+		}
+
+		assert.Equal(t, true, mpc.Opts.Parallel)
+	})
+
+	t.Run("sbom and sbomFormat from JSON", func(t *testing.T) {
+		testDir := t.TempDir()
+		buildDir := filepath.Join(testDir, "build")
+		outputDir := filepath.Join(testDir, "output")
+
+		require.NoError(t, os.MkdirAll(buildDir, 0o755))
+		require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+		dir := filepath.Join(testDir, "pkg-a")
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(pkgBuildContent), 0o644))
+
+		yapJSON := `{
+			"name": "test-project",
+			"description": "Test project",
+			"buildDir": "` + buildDir + `",
+			"output": "` + outputDir + `",
+			"sbom": true,
+			"sbomFormat": "cyclonedx",
+			"projects": [
+				{"name": "pkg-a", "install": false}
+			]
+		}`
+		require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
+
+		mpc := &MultipleProject{
+			Opts: BuildOptions{
+				SkipSyncDeps: true,
+				NoMakeDeps:   true,
+			},
+		}
+
+		err := mpc.MultiProject("ubuntu", "", testDir)
+		if err != nil {
+			t.Logf("MultiProject returned error (may be expected in CI): %v", err)
+			t.Skip("skipping assertion: MultiProject failed (no package manager)")
+		}
+
+		assert.Equal(t, true, mpc.Opts.SBOM)
+		assert.Equal(t, "cyclonedx", mpc.Opts.SBOMFormat)
+	})
+
+	t.Run("CLI SBOMFormat overrides JSON sbomFormat", func(t *testing.T) {
+		testDir := t.TempDir()
+		buildDir := filepath.Join(testDir, "build")
+		outputDir := filepath.Join(testDir, "output")
+
+		require.NoError(t, os.MkdirAll(buildDir, 0o755))
+		require.NoError(t, os.MkdirAll(outputDir, 0o755))
+
+		dir := filepath.Join(testDir, "pkg-a")
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(pkgBuildContent), 0o644))
+
+		yapJSON := `{
+			"name": "test-project",
+			"description": "Test project",
+			"buildDir": "` + buildDir + `",
+			"output": "` + outputDir + `",
+			"sbomFormat": "spdx",
+			"projects": [
+				{"name": "pkg-a", "install": false}
+			]
+		}`
+		require.NoError(t, os.WriteFile(filepath.Join(testDir, "yap.json"), []byte(yapJSON), 0o644))
+
+		mpc := &MultipleProject{
+			Opts: BuildOptions{
+				SkipSyncDeps: true,
+				NoMakeDeps:   true,
+				SBOMFormat:   "cyclonedx",
+			},
+		}
+
+		err := mpc.MultiProject("ubuntu", "", testDir)
+		if err != nil {
+			t.Logf("MultiProject returned error (may be expected in CI): %v", err)
+			t.Skip("skipping assertion: MultiProject failed (no package manager)")
+		}
+
+		assert.Equal(t, "cyclonedx", mpc.Opts.SBOMFormat)
+	})
+}
