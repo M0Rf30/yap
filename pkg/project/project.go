@@ -53,6 +53,7 @@ type BuildOptions struct {
 	NoBuild                 bool
 	NoMakeDeps              bool
 	SkipSyncDeps            bool
+	SkipDeps                []string
 	SkipToolchainValidation bool
 	Zap                     bool
 	Parallel                bool
@@ -127,6 +128,7 @@ type MultipleProject struct {
 	CompressionRpm string          `json:"compressionRpm" validate:""`
 	Signing        *signing.Config `json:"signing,omitempty"`
 	Repos          []repo.Repo     `json:"repos,omitempty"`
+	SkipDeps       []string        `json:"skipDeps,omitempty"`
 	// Opts holds build configuration options (not JSON-serialized; set by caller)
 	Opts BuildOptions
 	// Execution state (not JSON-serialized)
@@ -224,10 +226,54 @@ func (mpc *MultipleProject) Clean() error {
 	return nil
 }
 
+// buildSkipSet merges the yap.json skipDeps and --skip-deps CLI values into
+// a single lookup set.
+func (mpc *MultipleProject) buildSkipSet() map[string]struct{} {
+	total := len(mpc.SkipDeps) + len(mpc.Opts.SkipDeps)
+	if total == 0 {
+		return nil
+	}
+
+	set := make(map[string]struct{}, total)
+
+	for _, d := range mpc.SkipDeps {
+		set[d] = struct{}{}
+	}
+
+	for _, d := range mpc.Opts.SkipDeps {
+		set[d] = struct{}{}
+	}
+
+	return set
+}
+
+// filterSkipDeps removes any package present in the merged skipDeps set from deps.
+func (mpc *MultipleProject) filterSkipDeps(deps []string) []string {
+	skip := mpc.buildSkipSet()
+	if len(skip) == 0 {
+		return deps
+	}
+
+	filtered := deps[:0:0]
+
+	for _, d := range deps {
+		if _, excluded := skip[d]; excluded {
+			logger.Info("skipping dependency", "package", d)
+		} else {
+			filtered = append(filtered, d)
+		}
+	}
+
+	return filtered
+}
+
 // syncDependencies handles dependency synchronization and preparation.
 // It updates the package manager, prepares make dependencies, and installs
 // external runtime dependencies.
 func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []string) error {
+	makeDepends = mpc.filterSkipDeps(makeDepends)
+	runtimeDepends = mpc.filterSkipDeps(runtimeDepends)
+
 	if !mpc.Opts.SkipSyncDeps {
 		err := mpc.packageManager.Update()
 		if err != nil {
@@ -251,10 +297,9 @@ func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []strin
 	//
 	// During cross-builds, runtime deps are downloaded and extracted directly
 	// to the root filesystem (dpkg -x equivalent) instead of apt-installed.
-	// This avoids circular dependency conflicts: arch-all meta-packages (e.g.
-	// carbonio-core) depend on arch-specific packages (e.g. carbonio-openldap)
-	// for the host arch, which conflict with the target-arch variants needed
-	// for cross-compilation linking.
+	// This avoids circular dependency conflicts: arch-all meta-packages
+	// depend on arch-specific packages for the host arch, which conflict
+	// with the target-arch variants needed for cross-compilation linking.
 	if err := mpc.installRuntimeDeps(runtimeDepends); err != nil {
 		return err
 	}
@@ -262,8 +307,6 @@ func (mpc *MultipleProject) syncDependencies(makeDepends, runtimeDepends []strin
 	return nil
 }
 
-// setupExtraRepos installs custom apt/dnf repositories declared in yap.json
-// (mpc.Repos) and via the repeatable --repo CLI flag (ExtraRepos). It runs
 // installRuntimeDeps installs external runtime dependencies. During
 // cross-builds it downloads and extracts them to avoid arch conflicts;
 // otherwise it delegates to the normal package manager install path.
@@ -288,6 +331,8 @@ func (mpc *MultipleProject) installRuntimeDeps(runtimeDepends []string) error {
 	return extractor.DownloadAndExtractCrossDeps(runtimeDepends, mpc.Opts.TargetArch)
 }
 
+// setupExtraRepos installs custom apt/dnf repositories declared in yap.json
+// (mpc.Repos) and via the repeatable --repo CLI flag (ExtraRepos). It runs
 // before any package manager update so subsequent installs can resolve the new
 // sources.
 func (mpc *MultipleProject) setupExtraRepos(distro string) error {
@@ -918,12 +963,12 @@ func (mpc *MultipleProject) getRuntimeDeps() []string {
 // When keep is true (--only), only matching projects are retained.
 // When keep is false (--skip), matching projects are excluded.
 func (mpc *MultipleProject) filterProjects(names string, keep bool) {
-	nameSet := make(map[string]bool)
+	nameSet := make(map[string]struct{})
 
 	for name := range strings.SplitSeq(names, ",") {
 		name = strings.TrimSpace(name)
 		if name != "" {
-			nameSet[name] = true
+			nameSet[name] = struct{}{}
 		}
 	}
 
@@ -934,7 +979,7 @@ func (mpc *MultipleProject) filterProjects(names string, keep bool) {
 	filtered := make([]*Project, 0, len(mpc.Projects))
 
 	for _, proj := range mpc.Projects {
-		matches := nameSet[proj.Builder.PKGBUILD.PkgName]
+		_, matches := nameSet[proj.Builder.PKGBUILD.PkgName]
 		if matches == keep {
 			filtered = append(filtered, proj)
 		}
