@@ -242,6 +242,8 @@
   translation: "Comma-separated list of project names to build (filters yap.json)"
 - id: flags.build.skip
   translation: "Comma-separated list of project names to skip"
+- id: flags.build.skip_deps
+  translation: "Comma-separated list of dependency names to skip installing (e.g. libfoo,libbar)"
 - id: flags.build.to
   translation: "Stop building at this distribution"
 - id: flags.build.zap

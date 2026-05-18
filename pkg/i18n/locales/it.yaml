@@ -244,6 +244,8 @@
   translation: "Lista separata da virgole di nomi di progetto da compilare (filtra yap.json)"
 - id: flags.build.skip
   translation: "Lista separata da virgole di nomi di progetto da saltare"
+- id: flags.build.skip_deps
+  translation: "Lista separata da virgole di dipendenze da non installare (es. libfoo,libbar)"
 - id: flags.build.to
   translation: "Ferma la compilazione a questa distribuzione"
 - id: flags.build.zap
