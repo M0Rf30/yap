@@ -129,6 +129,11 @@ type MultipleProject struct {
 	Signing        *signing.Config `json:"signing,omitempty"`
 	Repos          []repo.Repo     `json:"repos,omitempty"`
 	SkipDeps       []string        `json:"skipDeps,omitempty"`
+	TargetArch     string          `json:"targetArch,omitempty"`
+	DebugDir       string          `json:"debugDir,omitempty"`
+	Parallel       bool            `json:"parallel,omitempty"`
+	SBOM           bool            `json:"sbom,omitempty"`
+	SBOMFormat     string          `json:"sbomFormat,omitempty"`
 	// Opts holds build configuration options (not JSON-serialized; set by caller)
 	Opts BuildOptions
 	// Execution state (not JSON-serialized)
@@ -331,6 +336,38 @@ func (mpc *MultipleProject) installRuntimeDeps(runtimeDepends []string) error {
 	return extractor.DownloadAndExtractCrossDeps(runtimeDepends, mpc.Opts.TargetArch)
 }
 
+// applyJSONDefaults merges yap.json fields into BuildOptions.
+// CLI flags take precedence: a JSON value is applied only when the
+// corresponding Opts field is still at its zero value.
+func (mpc *MultipleProject) applyJSONDefaults() error {
+	if mpc.Opts.TargetArch == "" && mpc.TargetArch != "" {
+		mpc.Opts.TargetArch = mpc.TargetArch
+	}
+
+	if mpc.Opts.DebugDir == "" && mpc.DebugDir != "" {
+		mpc.Opts.DebugDir = mpc.DebugDir
+	}
+
+	if !mpc.Opts.Parallel && mpc.Parallel {
+		mpc.Opts.Parallel = mpc.Parallel
+	}
+
+	if !mpc.Opts.SBOM && mpc.SBOM {
+		mpc.Opts.SBOM = mpc.SBOM
+	}
+
+	if mpc.Opts.SBOMFormat == "" && mpc.SBOMFormat != "" {
+		mpc.Opts.SBOMFormat = mpc.SBOMFormat
+	}
+
+	if err := common.ValidateTargetArch(mpc.Opts.TargetArch); err != nil {
+		return yerrors.New(yerrors.ErrTypeConfiguration, err.Error()).
+			WithOperation("applyJSONDefaults")
+	}
+
+	return nil
+}
+
 // setupExtraRepos installs custom apt/dnf repositories declared in yap.json
 // (mpc.Repos) and via the repeatable --repo CLI flag (ExtraRepos). It runs
 // before any package manager update so subsequent installs can resolve the new
@@ -371,13 +408,12 @@ func (mpc *MultipleProject) resolveOutputPath() error {
 //
 // It returns an error.
 func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
-	if err := common.ValidateTargetArch(mpc.Opts.TargetArch); err != nil {
-		return yerrors.New(yerrors.ErrTypeConfiguration, err.Error()).
-			WithOperation("MultiProject")
-	}
-
 	err := mpc.readProject(path)
 	if err != nil {
+		return err
+	}
+
+	if err := mpc.applyJSONDefaults(); err != nil {
 		return err
 	}
 
