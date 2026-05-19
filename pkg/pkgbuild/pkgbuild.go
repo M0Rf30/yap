@@ -154,8 +154,9 @@ type PKGBUILD struct {
 	PreTrans          string
 	PreUpgrade        string
 	priorities        map[string]int
-	archSourceURI     []string // arch-specific source_<arch> entries, merged into SourceURI at Finalize
-	archHashSums      []string // arch-specific sha*sums_<arch> entries, merged into HashSums at Finalize
+	archSourceURI     []string  // arch-specific source_<arch> entries, merged into SourceURI at Finalize
+	archHashSums      []string  // arch-specific sha*sums_<arch> entries, merged into HashSums at Finalize
+	topLevelSnap      *PKGBUILD // snapshot of overrideable fields before any package_<name>() runs
 	Priority          string
 	Provides          []string
 	Replaces          []string
@@ -409,6 +410,14 @@ func (pkgBuild *PKGBUILD) Finalize() {
 	pkgBuild.HashSums = append(pkgBuild.HashSums, pkgBuild.archHashSums...)
 	pkgBuild.archSourceURI = nil
 	pkgBuild.archHashSums = nil
+
+	// For split packages, capture the top-level overrideable fields now —
+	// before any package_<name>() function runs — so both compileSplitPackages
+	// and createSplitPackages can restore clean values per sub-package.
+	if pkgBuild.IsSplitPackage() {
+		snap := pkgBuild.SnapshotSplitOverrides()
+		pkgBuild.topLevelSnap = &snap
+	}
 }
 
 // splitOverrideKeys is the set of variable names that package_<name>() functions
@@ -418,6 +427,57 @@ var splitOverrideKeys = map[string]struct{}{
 	pkgdescKey: {}, archDistro: {}, "url": {}, licenseKey: {}, "groups": {},
 	dependsKey: {}, "optdepends": {}, "provides": {}, "conflicts": {}, "replaces": {},
 	"backup": {}, "options": {}, "install": {}, "changelog": {},
+}
+
+// copySplitOverrideFields copies the scalar and slice fields that
+// package_<name>() functions may override from src into dst, and resets the
+// priority entries for those keys so AddItem will accept new values.
+// This is the single source of truth for which fields are overrideable.
+func copySplitOverrideFields(dst, src *PKGBUILD) {
+	dst.PkgDesc = src.PkgDesc
+	dst.URL = src.URL
+	dst.License = append([]string(nil), src.License...)
+	dst.Depends = append([]string(nil), src.Depends...)
+	dst.OptDepends = append([]string(nil), src.OptDepends...)
+	dst.Provides = append([]string(nil), src.Provides...)
+	dst.Conflicts = append([]string(nil), src.Conflicts...)
+	dst.Replaces = append([]string(nil), src.Replaces...)
+	dst.Backup = append([]string(nil), src.Backup...)
+	dst.Options = append([]string(nil), src.Options...)
+
+	// Restore the priority entries for overrideable keys so that AddItem
+	// will accept the next sub-package's overrides rather than treating
+	// the previous sub-package's higher-priority value as already winning.
+	for key := range splitOverrideKeys {
+		dst.priorities[key] = src.priorities[key]
+	}
+}
+
+// SnapshotSplitOverrides returns a copy of the PKGBUILD capturing the
+// top-level values of all fields that package_<name>() functions may override.
+// Call once before the split-package loop; pass to RestoreSplitOverrides before
+// each sub-package to prevent overrides from bleeding between sub-packages.
+func (pkgBuild *PKGBUILD) SnapshotSplitOverrides() PKGBUILD {
+	var snap PKGBUILD
+
+	snap.priorities = make(map[string]int)
+	copySplitOverrideFields(&snap, pkgBuild)
+
+	return snap
+}
+
+// RestoreSplitOverrides resets all overrideable fields to the snapshot values.
+func (pkgBuild *PKGBUILD) RestoreSplitOverrides(snap *PKGBUILD) {
+	copySplitOverrideFields(pkgBuild, snap)
+}
+
+// RestoreTopLevelOverrides resets all overrideable fields to the top-level
+// values captured by Finalize, preventing one sub-package's overrides from
+// bleeding into the next. No-op for non-split packages.
+func (pkgBuild *PKGBUILD) RestoreTopLevelOverrides() {
+	if pkgBuild.topLevelSnap != nil {
+		copySplitOverrideFields(pkgBuild, pkgBuild.topLevelSnap)
+	}
 }
 
 // ParseSplitOverrides parses the body of a package_<name>() function and applies

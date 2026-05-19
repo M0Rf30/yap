@@ -861,6 +861,17 @@ func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
 
 		pkgDir := proj.Builder.PKGBUILD.PackageDir
 
+		// Restore top-level values, then re-apply this sub-package's overrides
+		// so PrepareFakeroot sees the correct metadata (pkgdesc, depends, etc.).
+		proj.Builder.PKGBUILD.RestoreTopLevelOverrides()
+
+		if funcBody, ok := proj.Builder.PKGBUILD.SplitPackageFuncs[subName]; ok {
+			if err := proj.Builder.PKGBUILD.ParseSplitOverrides(funcBody); err != nil {
+				logger.Warn("failed to parse split-package overrides for packaging",
+					"subpackage", subName, "error", err)
+			}
+		}
+
 		if err := proj.PackageManager.PrepareFakeroot(mpc.Output, mpc.Opts.TargetArch); err != nil {
 			return err
 		}
