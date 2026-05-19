@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/blakesmith/ar"
+	rpmutils "github.com/sassoftware/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -42,8 +43,9 @@ func (bb *BaseBuilder) ExtractToRoot(packagePath string) error {
 		// DEB packages need special handling to extract data.tar from AR archive
 		extractErr = extractDEB(packagePath, "/")
 	case constants.FormatRPM:
-		// RPM format: extract directly to root
-		extractErr = archive.Extract(context.Background(), packagePath, "/")
+		// RPM format: header + cpio payload — the generic archive identifier
+		// does not recognize RPM, so we must decode the payload ourselves.
+		extractErr = extractRPM(packagePath, "/")
 	case constants.FormatAPK, constants.FormatPacman:
 		// APK and Pacman: extract to root, then clean up metadata files
 		extractErr = archive.Extract(context.Background(), packagePath, "/")
@@ -185,6 +187,46 @@ func extractDEB(packagePath, destDir string) error {
 
 	// Use archive.Extract to handle the tar extraction (with compression auto-detection)
 	return archive.Extract(context.Background(), dataTarPath, destDir)
+}
+
+// extractRPM extracts an RPM package payload (cpio.{gz,xz,zst,...}) to the
+// destination directory using github.com/sassoftware/go-rpmutils. We can't use
+// the generic archive.Extract path because the mholt/archives Identify routine
+// does not recognize the RPM lead+header envelope and returns no extractor,
+// which would silently no-op the install.
+func extractRPM(packagePath, destDir string) error {
+	file, err := os.Open(packagePath) // #nosec G304 - packagePath is from trusted build artifacts
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open RPM package").
+			WithContext("path", packagePath).
+			WithOperation("extractRPM")
+	}
+
+	defer func() {
+		_ = file.Close()
+	}()
+
+	rpm, err := rpmutils.ReadRpm(file)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypePackaging, "failed to read RPM header").
+			WithContext("path", packagePath).
+			WithOperation("extractRPM")
+	}
+
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create destination").
+			WithContext("path", destDir).
+			WithOperation("extractRPM")
+	}
+
+	if err := rpm.ExpandPayload(destDir); err != nil {
+		return errors.Wrap(err, errors.ErrTypePackaging, "failed to expand RPM payload").
+			WithContext("package", packagePath).
+			WithContext("dest", destDir).
+			WithOperation("extractRPM")
+	}
+
+	return nil
 }
 
 // InstallOrExtract extracts the built package to the root filesystem (/).
