@@ -378,13 +378,29 @@ func writeAPKRegularFile(path string, hdr *tar.Header, tr io.Reader) error {
 	return nil
 }
 
+// RPM cpio file-type bits (top bits of the mode field). Mirrors stdlib
+// syscall.S_IF* constants without depending on platform-specific packages.
+const (
+	rpmFileTypeMask = 0o170000
+	rpmFileTypeReg  = 0o100000
+	rpmFileTypeDir  = 0o040000
+	rpmFileTypeLink = 0o120000
+)
+
 // extractRPM extracts an RPM package payload (cpio.{gz,xz,zst,...}) to the
-// destination directory using github.com/sassoftware/go-rpmutils. We can't use
-// the generic archive.Extract path because the mholt/archives Identify routine
-// does not recognize the RPM lead+header envelope and returns no extractor,
-// which would silently no-op the install.
+// destination directory using github.com/sassoftware/go-rpmutils.
+//
+// We iterate the cpio payload via PayloadReaderExtended rather than calling
+// ExpandPayload because the bundled cpio.Extract refuses entries whose names
+// begin with "/" once destDir is "/" (its containment check compares against
+// dest+"/", which becomes "//"). YAP's rpmpack emits absolute paths like
+// "/opt/zextras/common/bin/x264", so ExpandPayload errors out with
+// 'invalid cpio path "/opt/..."' on every package targeted to /.
+//
+// Streaming entries ourselves also lets us reuse archive.SafeJoin for
+// traversal protection and skip risky entry types (char/block/FIFO).
 func extractRPM(packagePath, destDir string) error {
-	file, err := os.Open(packagePath) // #nosec G304 - packagePath is from trusted build artifacts
+	file, err := os.Open(packagePath) // #nosec G304,G703 -- packagePath is from trusted build artifacts
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open RPM package").
 			WithContext("path", packagePath).
@@ -402,14 +418,134 @@ func extractRPM(packagePath, destDir string) error {
 			WithOperation("extractRPM")
 	}
 
-	// destDir is expected to exist (callers pass "/" or a test temp dir).
-	// ExpandPayload -> cpio.Extract creates subdirectories from the payload
-	// itself, using per-entry modes baked into the RPM.
-	if err := rpm.ExpandPayload(destDir); err != nil {
-		return errors.Wrap(err, errors.ErrTypePackaging, "failed to expand RPM payload").
+	pr, err := rpm.PayloadReaderExtended()
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypePackaging, "failed to open RPM payload").
 			WithContext("package", packagePath).
-			WithContext("dest", destDir).
 			WithOperation("extractRPM")
+	}
+
+	dirMap := make(map[string]bool)
+
+	for {
+		fi, err := pr.Next()
+		if err == io.EOF { //nolint:errorlint // io.EOF is the sentinel
+			return nil
+		}
+
+		if err != nil {
+			return errors.Wrap(err, errors.ErrTypePackaging, "failed to read RPM payload entry").
+				WithContext("package", packagePath).
+				WithOperation("extractRPM")
+		}
+
+		if err := extractRPMEntry(pr, fi, destDir, dirMap); err != nil {
+			return errors.Wrap(err, errors.ErrTypePackaging, "failed to extract RPM entry").
+				WithContext("package", packagePath).
+				WithContext("entry", fi.Name()).
+				WithOperation("extractRPM")
+		}
+	}
+}
+
+// extractRPMEntry writes one payload entry to destDir, normalising absolute
+// cpio paths (".//opt/..." or "/opt/...") to relative joins under destDir and
+// rejecting traversal via archive.SafeJoin.
+func extractRPMEntry(
+	pr rpmutils.PayloadReader,
+	fi rpmutils.FileInfo,
+	destDir string,
+	dirMap map[string]bool,
+) error {
+	// rpmpack writes absolute names ("/opt/...") while the historical cpio
+	// convention is "./opt/...". Strip either form so SafeJoin treats the
+	// remainder as a relative entry under destDir.
+	name := strings.TrimPrefix(fi.Name(), "./")
+	name = strings.TrimPrefix(name, "/")
+
+	if name == "" {
+		return nil
+	}
+
+	target, err := archive.SafeJoin(destDir, name)
+	if err != nil {
+		logger.Warn(i18n.T("logger.archive.warn.path_traversal_rejected"),
+			"entry", fi.Name(), "destination", destDir)
+
+		return err
+	}
+
+	mode := fi.Mode()
+	// #nosec G115 -- POSIX mode is a 32-bit field; masking with os.ModePerm
+	// (0o777) discards the type bits and any out-of-range data before use.
+	perm := os.FileMode(uint32(mode)) & os.ModePerm
+
+	switch mode & rpmFileTypeMask {
+	case rpmFileTypeDir:
+		dirMap[target] = true
+
+		// #nosec G703 -- target is constrained by archive.SafeJoin above.
+		return os.MkdirAll(target, perm|0o100) // ensure exec bit so we can descend
+
+	case rpmFileTypeLink:
+		if err := archive.SafeSymlinkTarget(fi.Linkname()); err != nil {
+			logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
+				"entry", fi.Name(), "target", fi.Linkname())
+
+			return err
+		}
+
+		parent := filepath.Dir(target)
+		if _, seen := dirMap[parent]; !seen {
+			dirMap[parent] = true
+			_ = os.MkdirAll(parent, 0o755) // #nosec G301,G703 -- intermediate dirs need read+exec; path is SafeJoin-constrained
+		}
+
+		_ = os.Remove(target) // #nosec G703 -- target is constrained by archive.SafeJoin above.
+
+		return os.Symlink(fi.Linkname(), target) // #nosec G703 -- target is constrained by archive.SafeJoin above.
+
+	case rpmFileTypeReg:
+		// Hardlinks: payload only ships content for the last entry of a link
+		// group; preceding entries are empty placeholders. Skip them — the
+		// final entry will materialise on disk.
+		if pr.IsLink() {
+			return nil
+		}
+
+		parent := filepath.Dir(target)
+		if _, seen := dirMap[parent]; !seen {
+			dirMap[parent] = true
+			_ = os.MkdirAll(parent, 0o755) // #nosec G301,G703 -- intermediate dirs need read+exec; path is SafeJoin-constrained
+		}
+
+		return writeRPMRegularFile(pr, target, perm)
+
+	default:
+		// Skip FIFOs, char/block devices, sockets — neither produced by YAP
+		// nor safe to extract under / outside a controlled chroot.
+		return nil
+	}
+}
+
+// writeRPMRegularFile streams the current payload entry's content to path.
+func writeRPMRegularFile(pr rpmutils.PayloadReader, path string, perm os.FileMode) error {
+	// #nosec G304,G703 -- path is constrained by archive.SafeJoin to stay inside destDir.
+	out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "open file failed").
+			WithContext("path", path).
+			WithOperation("writeRPMRegularFile")
+	}
+
+	defer func() {
+		_ = out.Close()
+	}()
+
+	if _, err := io.Copy(out, pr); err != nil { //nolint:gosec // size bounded by cpio header
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "write file failed").
+			WithContext("path", path).
+			WithOperation("writeRPMRegularFile")
 	}
 
 	return nil
