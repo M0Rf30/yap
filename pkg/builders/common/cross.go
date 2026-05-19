@@ -81,14 +81,19 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 
 		info, found := cache.Lookup(name)
 		if !found {
-			// Package not in apt cache (e.g. custom repo packages).
-			// If already installed for the host arch, qualifying with the target
-			// arch would cause a conflict. Treat as arch-all to avoid it.
-			if info.Installed {
-				archAll = append(archAll, dep)
-			} else {
-				archSpecific = append(archSpecific, dep)
-			}
+			// Package not in apt cache at all (no apt list entry and no dpkg
+			// status entry). This is rare: a custom-repo package that is also
+			// not installed host-side. We can't know its Multi-Arch policy, so
+			// fall through to arch-specific qualification. If a dpkg conflict
+			// surfaces here, the user needs to either add their repo to the
+			// apt lists or pre-install the host-arch variant before building.
+			//
+			// Note: a previous version of this branch checked info.Installed,
+			// but aptcache.Lookup returns a zero-value PackageInfo when not
+			// found, so that flag could never be true here. Lookup-and-found
+			// covers the dpkg-installed case via the merged status overlay
+			// (see pkg/aptcache.Cache.loadDpkgStatus).
+			archSpecific = append(archSpecific, dep)
 
 			continue
 		}
