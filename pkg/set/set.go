@@ -88,8 +88,7 @@ func StringifyArray(node *syntax.Assign) []string {
 	out := &strings.Builder{}
 
 	if len(node.Array.Elems) == 0 {
-		logger.Fatal(i18n.T("errors.set.empty_array"),
-			"path", node.Name.Value)
+		return fields
 	}
 
 	for index := range node.Array.Elems {
