@@ -2618,3 +2618,48 @@ func TestPKGBUILD_ArchChecksumOrderIndependent(t *testing.T) {
 		}
 	})
 }
+
+// TestPKGBUILD_SplitPackageFuncDistroResolution verifies that distro-qualified
+// split-package functions (package_<name>__<distro>) are resolved via the same
+// AddItem/parseDirective priority system as all other directives — highest
+// priority wins, no special-case code required.
+func TestPKGBUILD_SplitPackageFuncDistroResolution(t *testing.T) {
+	addFuncs := func(pb *PKGBUILD) {
+		_ = pb.AddItem("package_mybase-lib", FuncBody("install -d $pkgdir/usr/lib"))
+		_ = pb.AddItem("package_mybase-lib__apt", FuncBody("install -d $pkgdir/usr/lib # apt"))
+		_ = pb.AddItem("package_mybase-lib__ubuntu_focal", FuncBody("install -d $pkgdir/usr/lib # focal"))
+	}
+
+	t.Run("full_distro_wins", func(t *testing.T) {
+		pb := &PKGBUILD{Distro: "ubuntu", Codename: "focal"}
+		pb.Init()
+		addFuncs(pb)
+
+		body := pb.SplitPackageFuncs["mybase-lib"]
+		if body != "install -d $pkgdir/usr/lib # focal" {
+			t.Errorf("expected focal body, got %q", body)
+		}
+	})
+
+	t.Run("packager_wins_over_base", func(t *testing.T) {
+		pb := &PKGBUILD{Distro: "ubuntu", Codename: "jammy"}
+		pb.Init()
+		addFuncs(pb)
+
+		body := pb.SplitPackageFuncs["mybase-lib"]
+		if body != "install -d $pkgdir/usr/lib # apt" {
+			t.Errorf("expected apt body, got %q", body)
+		}
+	})
+
+	t.Run("base_wins_when_no_distro_match", func(t *testing.T) {
+		pb := &PKGBUILD{Distro: "rocky", Codename: "9"}
+		pb.Init()
+		addFuncs(pb)
+
+		body := pb.SplitPackageFuncs["mybase-lib"]
+		if body != "install -d $pkgdir/usr/lib" {
+			t.Errorf("expected base body, got %q", body)
+		}
+	})
+}
