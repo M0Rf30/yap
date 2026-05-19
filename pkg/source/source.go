@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	stderrors "errors"
 	"fmt"
 	"hash"
 	"io"
@@ -153,8 +154,7 @@ func (src *Source) Get() error {
 	}
 
 	if !src.shouldSkipExtract() {
-		err = archive.Extract(context.Background(), sourceFilePath, src.SrcDir)
-		if err != nil {
+		if err := extractIfArchive(sourceFilePath, src.SrcDir); err != nil {
 			return err
 		}
 	}
@@ -380,4 +380,17 @@ func (src *Source) validateSource(sourceFilePath string) error {
 // extraction, matching makepkg's noextract semantics: exact basename match only.
 func (src *Source) shouldSkipExtract() bool {
 	return slices.Contains(src.NoExtract, filepath.Base(src.SourceItemPath))
+}
+
+// extractIfArchive runs archive.Extract on sourceFilePath, tolerating the
+// ErrUnrecognizedArchive sentinel. Non-archive sources (plain patches,
+// scripts, .sig files, …) are legitimately not extractable and are left in
+// place; symlinkSources has already made them available in destDir.
+func extractIfArchive(sourceFilePath, destDir string) error {
+	err := archive.Extract(context.Background(), sourceFilePath, destDir)
+	if err == nil || stderrors.Is(err, archive.ErrUnrecognizedArchive) {
+		return nil
+	}
+
+	return err
 }
