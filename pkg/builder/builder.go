@@ -203,6 +203,10 @@ func (builder *Builder) compileSplitPackages() error {
 		preamble := builder.PKGBUILD.BuildScriptPreamble()
 		pkgEnv := builder.PKGBUILD.BuildEnvironmentSlice()
 
+		// Reset to top-level values before parsing this sub-package's overrides,
+		// preventing fields set by a previous sub-package from bleeding through.
+		builder.PKGBUILD.RestoreTopLevelOverrides()
+
 		// Statically parse the function body to extract per-package variable overrides
 		// (pkgdesc, depends, conflicts, etc.) before running the script.
 		// This uses the same AddItem/parseDirective path as top-level PKGBUILD parsing,
