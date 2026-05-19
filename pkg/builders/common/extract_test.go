@@ -337,6 +337,60 @@ func TestExtractRPM(t *testing.T) {
 	}
 }
 
+// TestExtractRPM_AbsoluteEntryNames is the regression guard for the
+// 'invalid cpio path "/opt/..."' failure: rpmpack writes absolute entry names
+// like "/opt/zextras/common/bin/x264", but go-rpmutils' bundled ExpandPayload
+// rejects them whenever destDir is "/" (its containment check builds
+// dest+"/" → "//" which fails to prefix-match the absolute target).
+//
+// We can't write to / in a unit test, but we can verify that absolute names
+// are correctly stripped and re-joined under a tempdir. The same code path
+// applies for destDir = "/" in production.
+func TestExtractRPM_AbsoluteEntryNames(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	rpm, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+		Name: "abs-entry-test", Version: "1.0", Release: "1", Arch: "x86_64",
+	})
+	if err != nil {
+		t.Fatalf("rpmpack.NewRPM: %v", err)
+	}
+
+	// Mimic the exact carbonio-x264 entry that triggered the bug.
+	rpm.AddFile(rpmpack.RPMFile{
+		Name: "/opt/zextras/common/bin/x264",
+		Body: []byte("stub binary"),
+		Mode: 0o100755,
+	})
+
+	rpmPath := filepath.Join(tmpDir, "abs.rpm")
+
+	f, err := os.Create(rpmPath)
+	if err != nil {
+		t.Fatalf("create rpm: %v", err)
+	}
+
+	if err := rpm.Write(f); err != nil {
+		t.Fatalf("rpm.Write: %v", err)
+	}
+
+	_ = f.Close()
+
+	destDir := filepath.Join(tmpDir, "dest")
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		t.Fatalf("mkdir dest: %v", err)
+	}
+
+	if err := extractRPM(rpmPath, destDir); err != nil {
+		t.Fatalf("extractRPM with absolute entry failed: %v", err)
+	}
+
+	want := filepath.Join(destDir, "opt", "zextras", "common", "bin", "x264")
+	if _, err := os.Stat(want); err != nil {
+		t.Fatalf("expected payload not extracted at %s: %v", want, err)
+	}
+}
+
 // TestExtractRPM_InvalidFile guards against a different silent-success mode:
 // a non-RPM input must surface an error, not be treated as a successful empty
 // install.
