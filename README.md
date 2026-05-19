@@ -1135,6 +1135,12 @@ Real-world example of packaging YAP itself:
 - **Features**: Go module building, binary installation, systemd integration
 - **Run**: `yap build examples/yap`
 
+### [Split Package](examples/split-package)
+One build producing multiple installable packages with distro-specific overrides:
+- **Purpose**: Demonstrates `pkgbase` / `pkgname=(...)` split-package support
+- **Features**: `package_<name>()` per sub-package, `package_<name>__<distro>()` distro overrides using the same priority system as all other directives (full-distro > distro > packager > base)
+- **Run**: `yap build examples/split-package`
+
 Each example includes detailed README files explaining the concepts, expected behavior, and learning objectives.
 
 ## 🐛 Troubleshooting

@@ -1,0 +1,66 @@
+# Split-Package PKGBUILD Example
+# Demonstrates YAP's split-package support: one build produces multiple packages,
+# each with its own package_<name>() function.
+#
+# Distro-qualified overrides (package_<name>__<distro>) follow the same priority
+# system as all other directives:
+#
+#   package_<name>__<distro>_<codename>  priority 3  (e.g. ubuntu_jammy)
+#   package_<name>__<distro>             priority 2  (e.g. ubuntu)
+#   package_<name>__<packager>           priority 1  (e.g. apt, yum)
+#   package_<name>                       priority 0  (default)
+
+pkgbase="mylib"
+pkgname=("${pkgbase}" "${pkgbase}-dev")
+pkgver="1.0.0"
+pkgrel="1"
+pkgdesc="Example split package"
+arch=('x86_64' 'aarch64')
+url="https://example.com"
+license=('MIT')
+makedepends=('gcc' 'make')
+source=("https://example.com/mylib-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "${srcdir}/mylib-${pkgver}"
+    make
+}
+
+# ── Runtime package ────────────────────────────────────────────────────────────
+
+# Default: all distros not matched below.
+package_mylib() {
+    pkgdesc="mylib runtime library"
+    depends=('glibc')
+    cd "${srcdir}/mylib-${pkgver}"
+    make DESTDIR="${pkgdir}" install-lib
+}
+
+# apt-based distros (ubuntu, debian) — installs an extra compat symlink.
+package_mylib__apt() {
+    pkgdesc="mylib runtime library"
+    depends=('libc6')
+    cd "${srcdir}/mylib-${pkgver}"
+    make DESTDIR="${pkgdir}" install-lib
+    ln -s libmylib.so.1 "${pkgdir}/usr/lib/libmylib.so"
+}
+
+# Ubuntu Jammy specifically ships libfoo1 instead of libfoo.
+package_mylib__ubuntu_jammy() {
+    pkgdesc="mylib runtime library"
+    depends=('libc6' 'libfoo1')
+    cd "${srcdir}/mylib-${pkgver}"
+    make DESTDIR="${pkgdir}" install-lib
+    ln -s libmylib.so.1 "${pkgdir}/usr/lib/libmylib.so"
+}
+
+# ── Development package ────────────────────────────────────────────────────────
+
+# No distro variants needed — headers are the same everywhere.
+package_mylib-dev() {
+    pkgdesc="mylib development headers"
+    depends=("${pkgbase}")
+    cd "${srcdir}/mylib-${pkgver}"
+    make DESTDIR="${pkgdir}" install-headers
+}
