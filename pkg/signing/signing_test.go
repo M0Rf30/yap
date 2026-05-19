@@ -56,3 +56,42 @@ func TestNewSignerEnabledNoKey(t *testing.T) {
 	_, err := signing.NewSigner(signing.FormatDEB, cfg)
 	assert.Error(t, err) // Expected to fail with missing key
 }
+
+// TestConfig_StringRedactsPassphrase guards against accidental passphrase
+// leakage via fmt.Print/Sprintf/log.Printf calls that format a Config value.
+func TestConfig_StringRedactsPassphrase(t *testing.T) {
+	cfg := signing.Config{
+		Enabled:    true,
+		KeyPath:    "/tmp/key.gpg",
+		Passphrase: "super-secret-passphrase",
+		KeyName:    "mykey",
+	}
+
+	s := cfg.String()
+	assert.NotContains(t, s, "super-secret-passphrase",
+		"Config.String must redact the passphrase")
+	assert.Contains(t, s, "<redacted>",
+		"Config.String should mark redacted passphrases")
+	assert.Contains(t, s, "/tmp/key.gpg",
+		"Config.String should still expose KeyPath for diagnostics")
+
+	// Empty passphrase renders as <none>, not <redacted>.
+	cfg.Passphrase = ""
+	assert.Contains(t, cfg.String(), "<none>")
+}
+
+// TestConfig_Clear verifies that Clear zeroes out sensitive fields.
+func TestConfig_Clear(t *testing.T) {
+	cfg := signing.Config{
+		Enabled:    true,
+		KeyPath:    "/tmp/key.gpg",
+		Passphrase: "super-secret-passphrase",
+		KeyName:    "mykey",
+	}
+
+	cfg.Clear()
+	assert.False(t, cfg.Enabled)
+	assert.Empty(t, cfg.KeyPath)
+	assert.Empty(t, cfg.Passphrase)
+	assert.Empty(t, cfg.KeyName)
+}

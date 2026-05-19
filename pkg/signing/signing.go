@@ -10,6 +10,7 @@ package signing
 
 import (
 	"context"
+	"fmt"
 )
 
 // Format identifies a package format that needs signing.
@@ -44,9 +45,36 @@ type Config struct {
 	// (PEM format for RSA, ASCII-armored for GPG).
 	KeyPath string
 	// Passphrase is the resolved passphrase, may be empty.
+	// Use Config.String() / %v formatters never expose this field.
 	Passphrase string
 	// KeyName is optional, used for APK key naming (e.g., "mykey").
 	KeyName string
+}
+
+// String implements fmt.Stringer so that accidentally logging or fmt-printing
+// a Config never leaks the passphrase. The redacted form preserves enough
+// detail (enabled flag, key path, key name, passphrase presence) for
+// diagnostics without exposing the secret.
+func (c Config) String() string {
+	passphrase := "<none>"
+	if c.Passphrase != "" {
+		passphrase = "<redacted>"
+	}
+
+	return fmt.Sprintf("signing.Config{Enabled:%t KeyPath:%q KeyName:%q Passphrase:%s}",
+		c.Enabled, c.KeyPath, c.KeyName, passphrase)
+}
+
+// Clear zeroes sensitive fields on the Config and marks signing disabled.
+// Call after signing completes to drop the passphrase reference promptly.
+// The underlying string memory cannot be zeroed (Go strings are immutable),
+// but dropping the reference reduces the window in which the passphrase
+// remains reachable from goroutine stacks and pinned closures.
+func (c *Config) Clear() {
+	c.Enabled = false
+	c.KeyPath = ""
+	c.Passphrase = ""
+	c.KeyName = ""
 }
 
 // Signer signs a package artifact in place or writes a detached signature.
