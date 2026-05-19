@@ -486,9 +486,15 @@ func (d *Package) createDebResources() error {
 // This divergence is intentional: DEB requires a distro suffix for repo selection,
 // while RPM only appends when codename is explicitly set.
 func (d *Package) getRelease() {
+	var suffix string
 	if d.PKGBUILD.Codename != "" {
-		d.PKGBUILD.PkgRel += d.PKGBUILD.Codename
+		suffix = d.PKGBUILD.Codename
 	} else {
-		d.PKGBUILD.PkgRel += d.PKGBUILD.Distro
+		suffix = d.PKGBUILD.Distro
+	}
+
+	// Guard against double-append when called multiple times for split packages.
+	if !strings.HasSuffix(d.PKGBUILD.PkgRel, suffix) {
+		d.PKGBUILD.PkgRel += suffix
 	}
 }
