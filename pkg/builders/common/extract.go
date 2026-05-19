@@ -213,12 +213,9 @@ func extractRPM(packagePath, destDir string) error {
 			WithOperation("extractRPM")
 	}
 
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create destination").
-			WithContext("path", destDir).
-			WithOperation("extractRPM")
-	}
-
+	// destDir is expected to exist (callers pass "/" or a test temp dir).
+	// ExpandPayload -> cpio.Extract creates subdirectories from the payload
+	// itself, using per-entry modes baked into the RPM.
 	if err := rpm.ExpandPayload(destDir); err != nil {
 		return errors.Wrap(err, errors.ErrTypePackaging, "failed to expand RPM payload").
 			WithContext("package", packagePath).
