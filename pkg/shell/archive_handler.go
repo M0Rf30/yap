@@ -1,11 +1,21 @@
 // Package shell provides process execution and shell operations.
 package shell
 
-// archiveExecHandler intercepts archive-extraction commands inside build scripts
-// (unzip, unrar, 7z, 7za, jar, gunzip) and replaces them with pure-Go
-// implementations backed by mholt/archives.  This eliminates the need for those
-// binaries inside build containers and makes extraction deterministic and
-// cross-platform.
+// archiveExecHandler intercepts archive-extraction commands inside build
+// scripts and replaces them with pure-Go implementations from pkg/archive
+// (stdlib archive/tar + archive/zip + compress/bzip2 + klauspost/compress +
+// ulikunitz/xz + bodgit/sevenzip + nwaples/rardecode). This eliminates the
+// need for the corresponding system binaries in build containers.
+//
+// All handled formats are pure-Go (no binary needed):
+//   - unzip       → stdlib archive/zip
+//   - jar         → stdlib archive/zip (JARs are zips)
+//   - gunzip/gzip → stdlib compress/gzip
+//   - unrar       → nwaples/rardecode/v2
+//   - 7z, 7za     → bodgit/sevenzip
+//
+// For any command not in the intercept list the handler falls through to the
+// next handler (which will invoke the OS binary as usual).
 //
 // Supported command forms:
 //
@@ -348,7 +358,7 @@ func parseJarArgs(args []string, defaultDir string) (archivePath, destDir string
 }
 
 // handleJar handles: jar xf <archive> [files...]
-// JAR files are ZIP archives — mholt/archives handles them transparently.
+// JAR files are ZIP archives, handled via stdlib archive/zip.
 //
 // jar uses a non-standard flag syntax where the first argument is a string of
 // mode/option characters (e.g. "xf", "-xf", "--extract").  We only support
