@@ -5,12 +5,40 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	stderrors "errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 )
+
+// TestExtract_UnrecognizedArchive verifies that Extract returns the typed
+// sentinel ErrUnrecognizedArchive (not silent nil) when the input file is not
+// a recognizable archive. This is the regression guard for the silent-no-op
+// class of bug that has bitten RPM and APK extraction.
+func TestExtract_UnrecognizedArchive(t *testing.T) {
+	tmp := t.TempDir()
+	notAnArchive := filepath.Join(tmp, "patch.diff")
+
+	if err := os.WriteFile(notAnArchive, []byte("--- a/foo\n+++ b/foo\n"), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	dest := filepath.Join(tmp, "dest")
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatalf("mkdir dest: %v", err)
+	}
+
+	err := archive.Extract(context.Background(), notAnArchive, dest)
+	if err == nil {
+		t.Fatal("Extract on non-archive returned nil; expected ErrUnrecognizedArchive")
+	}
+
+	if !stderrors.Is(err, archive.ErrUnrecognizedArchive) {
+		t.Fatalf("Extract returned %v; expected ErrUnrecognizedArchive", err)
+	}
+}
 
 // buildEvilTarGz returns a gzipped tar containing exactly one entry whose
 // header name is supplied by the caller. Used to construct zip-slip /

@@ -3,6 +3,7 @@ package archive
 
 import (
 	"context"
+	stderrors "errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,6 +16,13 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
+
+// ErrUnrecognizedArchive is returned by Extract / ExtractFiltered when the
+// input file's format is not recognized as an extractable archive. Callers
+// that legitimately accept non-archive inputs (e.g. plain patch files in
+// pkg/source.Source.Get) can detect this sentinel and treat it as a no-op;
+// callers that expect a real archive should treat it as a hard error.
+var ErrUnrecognizedArchive = stderrors.New("archive format not recognized")
 
 // CreateTarCompressed creates a compressed tar archive with the specified
 // compression algorithm from the source directory. Supported compression
@@ -218,7 +226,7 @@ func ExtractFiltered(ctx context.Context, source, destination string, patterns [
 
 	extractor, ok := format.(archives.Extractor)
 	if !ok {
-		return nil
+		return ErrUnrecognizedArchive
 	}
 
 	dirMap := make(map[string]bool)
@@ -343,11 +351,12 @@ func Extract(ctx context.Context, source, destination string) error {
 
 	dirMap := make(map[string]bool)
 
-	// Check if the format is an extractor. If not, skip the archive file.
+	// Check if the format is an extractor. If not, return ErrUnrecognizedArchive
+	// so callers that expected an archive can detect the no-op case.
 	extractor, ok := format.(archives.Extractor)
 
 	if !ok {
-		return nil
+		return ErrUnrecognizedArchive
 	}
 
 	return extractor.Extract(
