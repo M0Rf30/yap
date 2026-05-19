@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mholt/archives"
@@ -104,6 +105,81 @@ func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU b
 	return CreateTarCompressed(ctx, sourceDir, outputFile, "zstd", formatGNU)
 }
 
+// safeJoin joins destination + name and verifies the result stays inside
+// destination. Defends against "zip-slip" / path-traversal attacks where an
+// archive entry name contains "../" or an absolute path that would escape the
+// extraction root.
+//
+// Returns the cleaned absolute-ish path on success, or an error if the entry
+// would escape destination.
+func safeJoin(destination, name string) (string, error) {
+	// Reject obvious traversal early — these cannot legitimately appear in
+	// any sane archive entry name.
+	if strings.Contains(name, "..") {
+		// Reject any path segment that is exactly "..". This is stricter
+		// than filepath.Clean alone, which could neutralize traversal in
+		// some inputs but leaves the intent ambiguous.
+		segs := strings.Split(filepath.ToSlash(name), "/")
+		if slices.Contains(segs, "..") {
+			return "", errors.New(errors.ErrTypePackaging,
+				"archive entry contains path traversal").
+				WithContext("entry", name).
+				WithOperation("safeJoin")
+		}
+	}
+
+	cleanDest := filepath.Clean(destination)
+	joined := filepath.Join(cleanDest, name)
+	cleanJoined := filepath.Clean(joined)
+
+	// Special case: destination == "/" is a valid extraction root for
+	// ExtractToRoot. filepath.Clean("/") == "/", and we want any path under /
+	// to be accepted. Use HasPrefix with a trailing separator to avoid
+	// "/etc" matching "/etcfoo".
+	prefix := cleanDest
+	if !strings.HasSuffix(prefix, string(os.PathSeparator)) {
+		prefix += string(os.PathSeparator)
+	}
+
+	if cleanJoined != cleanDest && !strings.HasPrefix(cleanJoined, prefix) {
+		return "", errors.New(errors.ErrTypePackaging,
+			"archive entry escapes destination").
+			WithContext("entry", name).
+			WithContext("destination", cleanDest).
+			WithContext("resolved", cleanJoined).
+			WithOperation("safeJoin")
+	}
+
+	return cleanJoined, nil
+}
+
+// safeSymlinkTarget validates a symlink target before it is created on disk.
+// Absolute targets and targets containing ".." segments are rejected because
+// they would let an attacker plant a link that, when later dereferenced by
+// build scripts or by ExtractToRoot's follow-up writes, redirects to arbitrary
+// filesystem locations.
+func safeSymlinkTarget(target string) error {
+	if target == "" {
+		return nil
+	}
+
+	if filepath.IsAbs(target) {
+		return errors.New(errors.ErrTypePackaging,
+			"symlink target is absolute").
+			WithContext("target", target).
+			WithOperation("safeSymlinkTarget")
+	}
+
+	if slices.Contains(strings.Split(filepath.ToSlash(target), "/"), "..") {
+		return errors.New(errors.ErrTypePackaging,
+			"symlink target contains traversal").
+			WithContext("target", target).
+			WithOperation("safeSymlinkTarget")
+	}
+
+	return nil
+}
+
 // ExtractFiltered extracts an archive file to the destination directory,
 // only including entries whose NameInArchive matches at least one of the
 // provided glob patterns (using filepath.Match semantics).  If patterns is
@@ -164,29 +240,43 @@ func ExtractFiltered(ctx context.Context, source, destination string, patterns [
 				return nil
 			}
 
-			newPath := filepath.Join(destination, name)
+			cleanNewPath, err := safeJoin(destination, name)
+			if err != nil {
+				logger.Warn(i18n.T("logger.archive.warn.path_traversal_rejected"),
+					"entry", name, "destination", destination)
 
-			if archiveFile.IsDir() {
-				dirMap[newPath] = true
-
-				return os.MkdirAll(newPath, 0o755) // #nosec
+				return err
 			}
 
-			fileDir := filepath.Dir(newPath)
+			if archiveFile.IsDir() {
+				dirMap[cleanNewPath] = true
+
+				return os.MkdirAll(cleanNewPath, 0o755) // #nosec
+			}
+
+			fileDir := filepath.Dir(cleanNewPath)
 			if _, seen := dirMap[fileDir]; !seen {
 				dirMap[fileDir] = true
 
 				_ = os.MkdirAll(fileDir, 0o755) // #nosec
 			}
 
-			cleanNewPath := filepath.Clean(newPath)
-
 			// Handle symlinks: create them instead of trying to open as a regular file.
 			if archiveFile.Mode()&os.ModeSymlink != 0 {
+				if err := safeSymlinkTarget(archiveFile.LinkTarget); err != nil {
+					logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
+						"entry", name, "target", archiveFile.LinkTarget)
+
+					return err
+				}
+
 				_ = os.Remove(cleanNewPath) // remove stale symlink/file if present
+
 				return os.Symlink(archiveFile.LinkTarget, cleanNewPath)
 			}
 
+			// #nosec G304 -- cleanNewPath is constrained by safeJoin to remain
+			// inside the destination root; traversal is rejected before this point.
 			newFile, err := os.OpenFile(cleanNewPath,
 				os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
 				archiveFile.Mode())
@@ -253,15 +343,22 @@ func Extract(ctx context.Context, source, destination string) error {
 		archiveReader,
 		func(_ context.Context, archiveFile archives.FileInfo) error {
 			fileName := archiveFile.NameInArchive
-			newPath := filepath.Join(destination, fileName)
 
-			if archiveFile.IsDir() {
-				dirMap[newPath] = true
+			cleanNewPath, err := safeJoin(destination, fileName)
+			if err != nil {
+				logger.Warn(i18n.T("logger.archive.warn.path_traversal_rejected"),
+					"entry", fileName, "destination", destination)
 
-				return os.MkdirAll(newPath, 0o755) // #nosec
+				return err
 			}
 
-			fileDir := filepath.Dir(newPath)
+			if archiveFile.IsDir() {
+				dirMap[cleanNewPath] = true
+
+				return os.MkdirAll(cleanNewPath, 0o755) // #nosec
+			}
+
+			fileDir := filepath.Dir(cleanNewPath)
 			_, seenDir := dirMap[fileDir]
 
 			if !seenDir {
@@ -270,11 +367,17 @@ func Extract(ctx context.Context, source, destination string) error {
 				_ = os.MkdirAll(fileDir, 0o755) // #nosec
 			}
 
-			cleanNewPath := filepath.Clean(newPath)
-
 			// Handle symlinks: create them instead of trying to open as a regular file.
 			if archiveFile.Mode()&os.ModeSymlink != 0 {
+				if err := safeSymlinkTarget(archiveFile.LinkTarget); err != nil {
+					logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
+						"entry", fileName, "target", archiveFile.LinkTarget)
+
+					return err
+				}
+
 				_ = os.Remove(cleanNewPath) // remove stale symlink/file if present
+
 				return os.Symlink(archiveFile.LinkTarget, cleanNewPath)
 			}
 
@@ -286,6 +389,8 @@ func Extract(ctx context.Context, source, destination string) error {
 				}
 			}
 
+			// #nosec G304 -- cleanNewPath is constrained by safeJoin to remain
+			// inside the destination root; traversal is rejected before this point.
 			newFile, err := os.OpenFile(cleanNewPath,
 				os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
 				archiveFile.Mode())

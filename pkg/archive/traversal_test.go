@@ -1,0 +1,202 @@
+package archive_test
+
+import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/M0Rf30/yap/v2/pkg/archive"
+)
+
+// buildEvilTarGz returns a gzipped tar containing exactly one entry whose
+// header name is supplied by the caller. Used to construct zip-slip /
+// traversal payloads.
+func buildEvilTarGz(t *testing.T, entryName, content string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+
+	body := []byte(content)
+	if err := tw.WriteHeader(&tar.Header{
+		Name:     entryName,
+		Mode:     0o644,
+		Size:     int64(len(body)),
+		Typeflag: tar.TypeReg,
+	}); err != nil {
+		t.Fatalf("WriteHeader: %v", err)
+	}
+
+	if _, err := tw.Write(body); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if err := tw.Close(); err != nil {
+		t.Fatalf("tar.Close: %v", err)
+	}
+
+	if err := gz.Close(); err != nil {
+		t.Fatalf("gz.Close: %v", err)
+	}
+
+	return buf.Bytes()
+}
+
+// buildEvilSymlinkTarGz produces a tar.gz with a single symlink entry whose
+// linkname is the supplied (potentially-malicious) target.
+func buildEvilSymlinkTarGz(t *testing.T, entryName, target string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+
+	if err := tw.WriteHeader(&tar.Header{
+		Name:     entryName,
+		Linkname: target,
+		Mode:     0o777,
+		Typeflag: tar.TypeSymlink,
+	}); err != nil {
+		t.Fatalf("WriteHeader symlink: %v", err)
+	}
+
+	if err := tw.Close(); err != nil {
+		t.Fatalf("tar.Close: %v", err)
+	}
+
+	if err := gz.Close(); err != nil {
+		t.Fatalf("gz.Close: %v", err)
+	}
+
+	return buf.Bytes()
+}
+
+// TestExtract_RejectsTraversal is the regression guard for the zip-slip class
+// of bug. A tar entry whose name contains "../" must be refused, and no file
+// outside the destination directory may be created.
+func TestExtract_RejectsTraversal(t *testing.T) {
+	cases := []struct {
+		name      string
+		entryName string
+	}{
+		{"parent traversal", "../escape"},
+		{"deep traversal", "../../etc/passwd"},
+		{"nested traversal", "sub/../../escape"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			tarPath := filepath.Join(tmp, "evil.tar.gz")
+			dest := filepath.Join(tmp, "dest")
+
+			if err := os.MkdirAll(dest, 0o755); err != nil {
+				t.Fatalf("mkdir dest: %v", err)
+			}
+
+			payload := buildEvilTarGz(t, tc.entryName, "pwned")
+			if err := os.WriteFile(tarPath, payload, 0o644); err != nil {
+				t.Fatalf("write tar: %v", err)
+			}
+
+			err := archive.Extract(context.Background(), tarPath, dest)
+			if err == nil {
+				t.Fatalf("Extract(%q) returned nil, expected traversal rejection",
+					tc.entryName)
+			}
+
+			// Sanity: nothing escaped tmp.
+			escape := filepath.Join(tmp, "escape")
+			if _, statErr := os.Stat(escape); statErr == nil {
+				t.Fatalf("traversal succeeded: %s was created", escape)
+			}
+		})
+	}
+}
+
+// TestExtract_RejectsAbsoluteSymlinkTarget guards against tar entries that try
+// to plant a symlink pointing at an absolute path (e.g. /etc/passwd). Even if
+// the link's own name is contained, the *target* must be inside dest.
+func TestExtract_RejectsAbsoluteSymlinkTarget(t *testing.T) {
+	tmp := t.TempDir()
+	tarPath := filepath.Join(tmp, "evil-sym.tar.gz")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatalf("mkdir dest: %v", err)
+	}
+
+	payload := buildEvilSymlinkTarGz(t, "innocent-name", "/etc/passwd")
+	if err := os.WriteFile(tarPath, payload, 0o644); err != nil {
+		t.Fatalf("write tar: %v", err)
+	}
+
+	err := archive.Extract(context.Background(), tarPath, dest)
+	if err == nil {
+		t.Fatal("Extract should reject symlink with absolute target")
+	}
+
+	// Sanity: no symlink file was created.
+	if _, err := os.Lstat(filepath.Join(dest, "innocent-name")); err == nil {
+		t.Fatal("symlink was created despite rejection")
+	}
+}
+
+// TestExtract_RejectsTraversalSymlinkTarget guards against symlink targets
+// that escape via "..".
+func TestExtract_RejectsTraversalSymlinkTarget(t *testing.T) {
+	tmp := t.TempDir()
+	tarPath := filepath.Join(tmp, "evil-sym.tar.gz")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatalf("mkdir dest: %v", err)
+	}
+
+	payload := buildEvilSymlinkTarGz(t, "innocent-name", "../../escape")
+	if err := os.WriteFile(tarPath, payload, 0o644); err != nil {
+		t.Fatalf("write tar: %v", err)
+	}
+
+	err := archive.Extract(context.Background(), tarPath, dest)
+	if err == nil {
+		t.Fatal("Extract should reject symlink with .. target")
+	}
+}
+
+// TestExtract_AllowsLegitimateArchive sanity-checks that the traversal guard
+// does not break legitimate archives.
+func TestExtract_AllowsLegitimateArchive(t *testing.T) {
+	tmp := t.TempDir()
+	tarPath := filepath.Join(tmp, "good.tar.gz")
+	dest := filepath.Join(tmp, "dest")
+
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatalf("mkdir dest: %v", err)
+	}
+
+	payload := buildEvilTarGz(t, "sub/dir/legit.txt", "ok")
+	if err := os.WriteFile(tarPath, payload, 0o644); err != nil {
+		t.Fatalf("write tar: %v", err)
+	}
+
+	if err := archive.Extract(context.Background(), tarPath, dest); err != nil {
+		t.Fatalf("Extract of legitimate archive failed: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(dest, "sub", "dir", "legit.txt"))
+	if err != nil {
+		t.Fatalf("expected file missing: %v", err)
+	}
+
+	if string(got) != "ok" {
+		t.Fatalf("content mismatch: %q", string(got))
+	}
+}
