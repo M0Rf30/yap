@@ -354,6 +354,182 @@ func TestExtractRPM_InvalidFile(t *testing.T) {
 	}
 }
 
+// buildAPKMember returns a single gzip-compressed tar containing the given
+// files (name -> body), with sensible PAX/USTAR tar headers.
+func buildAPKMember(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+
+	for name, body := range files {
+		hdr := &tar.Header{
+			Name:     name,
+			Mode:     0o644,
+			Size:     int64(len(body)),
+			Typeflag: tar.TypeReg,
+			ModTime:  time.Now(),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatalf("WriteHeader %s: %v", name, err)
+		}
+
+		if _, err := tw.Write([]byte(body)); err != nil {
+			t.Fatalf("Write %s: %v", name, err)
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		t.Fatalf("tar close: %v", err)
+	}
+
+	if err := gz.Close(); err != nil {
+		t.Fatalf("gz close: %v", err)
+	}
+
+	return buf.Bytes()
+}
+
+// createTestAPK builds a minimal APK in tmpDir: a concatenation of a control
+// gzip member (.PKGINFO, .SIGN.RSA.test.rsa.pub) and a data gzip member
+// (a pkgconfig file and a stub shared object).
+func createTestAPK(t *testing.T, tmpDir string) string {
+	t.Helper()
+
+	control := buildAPKMember(t, map[string]string{
+		".PKGINFO":               "name: test\nversion: 1.0\n",
+		".SIGN.RSA.test.rsa.pub": "stub sig",
+	})
+	data := buildAPKMember(t, map[string]string{
+		"opt/zextras/common/lib/pkgconfig/test.pc": "Name: test\nVersion: 1.0\n",
+		"opt/zextras/common/lib/libtest.so":        "stub library",
+	})
+
+	apkPath := filepath.Join(tmpDir, "test.apk")
+
+	concat := append([]byte{}, control...)
+	concat = append(concat, data...)
+
+	if err := os.WriteFile(apkPath, concat, 0o644); err != nil {
+		t.Fatalf("write apk: %v", err)
+	}
+
+	return apkPath
+}
+
+// TestExtractAPK is the regression guard for the silent-no-op extraction bug
+// on APK packages: the generic archive.Extract stops at the first concatenated
+// gzip member, dropping the data payload. extractAPK must walk all members.
+func TestExtractAPK(t *testing.T) {
+	tmpDir := t.TempDir()
+	apkPath := createTestAPK(t, tmpDir)
+
+	destDir := filepath.Join(tmpDir, "dest-root")
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		t.Fatalf("mkdir dest: %v", err)
+	}
+
+	if err := extractAPK(apkPath, destDir); err != nil {
+		t.Fatalf("extractAPK failed: %v", err)
+	}
+
+	// Data payload must be extracted.
+	expected := []string{
+		filepath.Join(destDir, "opt", "zextras", "common", "lib", "pkgconfig", "test.pc"),
+		filepath.Join(destDir, "opt", "zextras", "common", "lib", "libtest.so"),
+	}
+
+	for _, path := range expected {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Errorf("expected data payload file missing: %s: %v", path, err)
+			continue
+		}
+
+		if info.Size() == 0 {
+			t.Errorf("payload file is empty (regression: silent no-op?): %s", path)
+		}
+	}
+
+	// Control entries must NOT have been written.
+	forbidden := []string{
+		filepath.Join(destDir, ".PKGINFO"),
+		filepath.Join(destDir, ".SIGN.RSA.test.rsa.pub"),
+	}
+
+	for _, path := range forbidden {
+		if _, err := os.Stat(path); err == nil {
+			t.Errorf("APK control entry was extracted: %s", path)
+		}
+	}
+}
+
+// TestExtractAPK_RejectsTraversal verifies extractAPK refuses entries that
+// escape the destination via "../" segments.
+func TestExtractAPK_RejectsTraversal(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	control := buildAPKMember(t, map[string]string{
+		".PKGINFO": "name: evil\n",
+	})
+	data := buildAPKMember(t, map[string]string{
+		"../escape": "pwned",
+	})
+
+	apkPath := filepath.Join(tmpDir, "evil.apk")
+
+	concat := append([]byte{}, control...)
+	concat = append(concat, data...)
+
+	if err := os.WriteFile(apkPath, concat, 0o644); err != nil {
+		t.Fatalf("write apk: %v", err)
+	}
+
+	destDir := filepath.Join(tmpDir, "dest")
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		t.Fatalf("mkdir dest: %v", err)
+	}
+
+	if err := extractAPK(apkPath, destDir); err == nil {
+		t.Fatal("extractAPK should reject traversal entries")
+	}
+
+	if _, err := os.Stat(filepath.Join(tmpDir, "escape")); err == nil {
+		t.Fatal("traversal succeeded: file written outside dest")
+	}
+}
+
+// TestIsAPKControlEntry verifies the metadata filter matches Alpine's APK
+// control naming conventions.
+func TestIsAPKControlEntry(t *testing.T) {
+	cases := []struct {
+		name string
+		want bool
+	}{
+		{".PKGINFO", true},
+		{"./.PKGINFO", true},
+		{".SIGN.RSA.alpine-devel@lists.alpinelinux.org-616adfeb.rsa.pub", true},
+		{".pre-install", true},
+		{".post-install", true},
+		{".install", true},
+		{".trigger", true},
+		{"opt/zextras/common/lib/libtest.so", false},
+		{"./usr/bin/foo", false},
+		{".PKGINFO.bak", true}, // prefix match — acceptable false-positive
+		{"PKGINFO", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isAPKControlEntry(tc.name); got != tc.want {
+				t.Fatalf("isAPKControlEntry(%q) = %v want %v", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestExtractToRoot_RPM exercises the BaseBuilder.ExtractToRoot dispatch path
 // for FormatRPM end-to-end, by pointing the extractor at a temp dir via a
 // chroot-style relative layout. We can't actually extract to "/" in a unit

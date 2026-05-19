@@ -105,6 +105,18 @@ func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU b
 	return CreateTarCompressed(ctx, sourceDir, outputFile, "zstd", formatGNU)
 }
 
+// SafeJoin is the exported wrapper around safeJoin, exposed for callers in
+// sibling packages (e.g. pkg/builders/common.extractAPK) that need the same
+// containment guarantee when extracting custom archive formats.
+func SafeJoin(destination, name string) (string, error) {
+	return safeJoin(destination, name)
+}
+
+// SafeSymlinkTarget is the exported wrapper around safeSymlinkTarget.
+func SafeSymlinkTarget(target string) error {
+	return safeSymlinkTarget(target)
+}
+
 // safeJoin joins destination + name and verifies the result stays inside
 // destination. Defends against "zip-slip" / path-traversal attacks where an
 // archive entry name contains "../" or an absolute path that would escape the
