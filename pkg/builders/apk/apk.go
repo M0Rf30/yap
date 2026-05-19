@@ -10,13 +10,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/klauspost/compress/gzip"
-	"github.com/mholt/archives"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -27,6 +27,84 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
+
+// apkFile is a tiny replacement for archives.FileInfo, carrying only the
+// fields writeFileWithChecksum needs. It avoids pulling in mholt/archives just
+// for a directory walker.
+type apkFile struct {
+	fs.FileInfo
+
+	diskPath      string // absolute path on disk (empty for synthetic entries)
+	nameInArchive string // canonicalised name (forward slashes, no leading sep)
+	linkTarget    string // populated for symlinks
+}
+
+func (a apkFile) NameInArchive() string { return a.nameInArchive }
+func (a apkFile) LinkTarget() string    { return a.linkTarget }
+
+// Open returns a reader for the file's contents. Symlinks and directories
+// have no body and return an empty reader.
+func (a apkFile) Open() (io.ReadCloser, error) {
+	if !a.Mode().IsRegular() {
+		return io.NopCloser(strings.NewReader("")), nil
+	}
+
+	return os.Open(filepath.Clean(a.diskPath)) // #nosec G304 -- walker-provided path under sourceDir
+}
+
+// walkAPKFiles walks sourceDir and emits an apkFile for each entry with names
+// relative to sourceDir. Mirrors archives.FilesFromDisk(FollowSymlinks: false).
+func walkAPKFiles(sourceDir string) ([]apkFile, error) {
+	sourceDir = filepath.Clean(sourceDir)
+
+	var result []apkFile
+
+	err := filepath.WalkDir(sourceDir, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		if path == sourceDir {
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+
+		rel, err := filepath.Rel(sourceDir, path)
+		if err != nil {
+			return err
+		}
+
+		name := filepath.ToSlash(rel)
+
+		entry := apkFile{
+			FileInfo:      info,
+			diskPath:      path,
+			nameInArchive: name,
+		}
+
+		if info.Mode()&os.ModeSymlink != 0 {
+			t, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+
+			entry.linkTarget = t
+		}
+
+		result = append(result, entry)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
 
 // Apk represents the APK package builder.
 // It embeds the common.BaseBuilder to inherit shared functionality.
@@ -144,20 +222,16 @@ func isControlFile(name string) bool {
 //nolint:gocyclo,cyclop // APK format requires specific two-stream construction
 func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 	ctx := context.Background()
-	options := &archives.FromDiskOptions{
-		FollowSymlinks: false,
-	}
 
-	fileList, err := archives.FilesFromDisk(ctx, options, map[string]string{
-		sourceDir + string(os.PathSeparator): "",
-	})
+	fileList, err := walkAPKFiles(sourceDir)
 	if err != nil {
 		return err
 	}
 
+	// Pacman-style: append "/" to directory entry names.
 	for i := range fileList {
-		if fileList[i].IsDir() && !strings.HasSuffix(fileList[i].NameInArchive, "/") {
-			fileList[i].NameInArchive += "/"
+		if fileList[i].IsDir() && !strings.HasSuffix(fileList[i].nameInArchive, "/") {
+			fileList[i].nameInArchive += "/"
 		}
 	}
 
@@ -169,7 +243,7 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 	twData := tar.NewWriter(gzData)
 
 	for _, file := range fileList {
-		if isControlFile(file.NameInArchive) {
+		if isControlFile(file.nameInArchive) {
 			continue
 		}
 
@@ -201,16 +275,14 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 	}
 
 	// Step 4: Reload file list to get updated .PKGINFO
-	fileList2, err := archives.FilesFromDisk(ctx, options, map[string]string{
-		sourceDir + string(os.PathSeparator): "",
-	})
+	fileList2, err := walkAPKFiles(sourceDir)
 	if err != nil {
 		return err
 	}
 
 	for i := range fileList2 {
-		if fileList2[i].IsDir() && !strings.HasSuffix(fileList2[i].NameInArchive, "/") {
-			fileList2[i].NameInArchive += "/"
+		if fileList2[i].IsDir() && !strings.HasSuffix(fileList2[i].nameInArchive, "/") {
+			fileList2[i].nameInArchive += "/"
 		}
 	}
 
@@ -222,7 +294,7 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 	twControl := tar.NewWriter(gzControl)
 
 	for _, file := range fileList2 {
-		if !isControlFile(file.NameInArchive) {
+		if !isControlFile(file.nameInArchive) {
 			continue
 		}
 
@@ -276,21 +348,21 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 //
 //nolint:gocyclo,nestif // writeFileWithChecksum handles multiple PAX/USTAR format branches inline
 func (a *Apk) writeFileWithChecksum(
-	ctx context.Context, tw *tar.Writer, file archives.FileInfo,
+	ctx context.Context, tw *tar.Writer, file apkFile,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	hdr, err := tar.FileInfoHeader(file, file.LinkTarget)
+	hdr, err := tar.FileInfoHeader(file.FileInfo, file.linkTarget)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypePackaging,
-			fmt.Sprintf("file %s: creating header", file.NameInArchive)).
+			fmt.Sprintf("file %s: creating header", file.nameInArchive)).
 			WithOperation("writeFileWithChecksum").
-			WithContext("file", file.NameInArchive)
+			WithContext("file", file.nameInArchive)
 	}
 
-	hdr.Name = file.NameInArchive
+	hdr.Name = file.nameInArchive
 	if hdr.Name == "" {
 		hdr.Name = file.Name()
 	}
@@ -322,18 +394,18 @@ func (a *Apk) writeFileWithChecksum(
 		f1, err := file.Open()
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: opening for checksum", file.NameInArchive)).
+				fmt.Sprintf("file %s: opening for checksum", file.nameInArchive)).
 				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.NameInArchive)
+				WithContext("file", file.nameInArchive)
 		}
 
 		if _, err := io.Copy(hasher, f1); err != nil {
 			_ = f1.Close()
 
 			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: computing checksum", file.NameInArchive)).
+				fmt.Sprintf("file %s: computing checksum", file.nameInArchive)).
 				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.NameInArchive)
+				WithContext("file", file.nameInArchive)
 		}
 
 		_ = f1.Close()
@@ -342,26 +414,26 @@ func (a *Apk) writeFileWithChecksum(
 
 		if err := tw.WriteHeader(hdr); err != nil {
 			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: writing header", file.NameInArchive)).
+				fmt.Sprintf("file %s: writing header", file.nameInArchive)).
 				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.NameInArchive)
+				WithContext("file", file.nameInArchive)
 		}
 
 		// Pass 2: stream file data into tar writer
 		f2, err := file.Open()
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: opening for write", file.NameInArchive)).
+				fmt.Sprintf("file %s: opening for write", file.nameInArchive)).
 				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.NameInArchive)
+				WithContext("file", file.nameInArchive)
 		}
 		defer func() { _ = f2.Close() }()
 
 		if _, err := io.Copy(tw, f2); err != nil {
 			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: writing data", file.NameInArchive)).
+				fmt.Sprintf("file %s: writing data", file.nameInArchive)).
 				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.NameInArchive)
+				WithContext("file", file.nameInArchive)
 		}
 
 		return nil
@@ -369,9 +441,9 @@ func (a *Apk) writeFileWithChecksum(
 
 	if err := tw.WriteHeader(hdr); err != nil {
 		return errors.Wrap(err, errors.ErrTypePackaging,
-			fmt.Sprintf("file %s: writing header", file.NameInArchive)).
+			fmt.Sprintf("file %s: writing header", file.nameInArchive)).
 			WithOperation("writeFileWithChecksum").
-			WithContext("file", file.NameInArchive)
+			WithContext("file", file.nameInArchive)
 	}
 
 	if hdr.Typeflag != tar.TypeReg {
@@ -381,9 +453,9 @@ func (a *Apk) writeFileWithChecksum(
 	f, err := file.Open()
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypePackaging,
-			fmt.Sprintf("file %s: opening", file.NameInArchive)).
+			fmt.Sprintf("file %s: opening", file.nameInArchive)).
 			WithOperation("writeFileWithChecksum").
-			WithContext("file", file.NameInArchive)
+			WithContext("file", file.nameInArchive)
 	}
 
 	defer func() {
@@ -392,9 +464,9 @@ func (a *Apk) writeFileWithChecksum(
 
 	if _, err := io.Copy(tw, f); err != nil {
 		return errors.Wrap(err, errors.ErrTypePackaging,
-			fmt.Sprintf("file %s: writing data", file.NameInArchive)).
+			fmt.Sprintf("file %s: writing data", file.nameInArchive)).
 			WithOperation("writeFileWithChecksum").
-			WithContext("file", file.NameInArchive)
+			WithContext("file", file.nameInArchive)
 	}
 
 	return nil
