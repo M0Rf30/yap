@@ -2,10 +2,13 @@
 package pkgbuild
 
 import (
+	"bufio"
 	"context"
+	stderrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"text/template"
@@ -14,13 +17,18 @@ import (
 	mvdanshell "mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/M0Rf30/yap/v2/pkg/apkindex"
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/yap/v2/pkg/aptinstall"
+	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/pacmandb"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
+	"github.com/M0Rf30/yap/v2/pkg/rpmdb"
 	"github.com/M0Rf30/yap/v2/pkg/set"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
@@ -67,6 +75,10 @@ const (
 	sha256sumsKey     = "sha256sums"
 	sha384sumsKey     = "sha384sums"
 	sha512sumsKey     = "sha512sums"
+	aptGetPM          = "apt-get"
+	aptPM             = "apt"
+	dpkgPM            = "dpkg"
+	apkPM             = "apk"
 )
 
 // Priority constants for PKGBUILD directive matching.
@@ -255,54 +267,207 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 }
 
 // filterInstalledPackages checks which packages are not installed and returns only those.
-// It uses the appropriate package manager query command based on the package manager name.
+// Uses pure-Go database readers where available; falls back to subprocess only
+// when no pure-Go reader is available (legacy BerkeleyDB RPM hosts).
 func filterInstalledPackages(packageManager string, packages []string) []string {
 	if len(packages) == 0 {
 		return nil
 	}
 
-	var (
-		queryCmd  string
-		queryArgs []string
-	)
-
-	// Determine the query command based on package manager
-
 	switch packageManager {
+	case aptGetPM, aptPM, dpkgPM:
+		return filterInstalledDEB(packages)
+	case apkPM:
+		return filterInstalledAPK(packages)
 	case "pacman":
-		queryCmd = "pacman"
-		queryArgs = []string{"-Q"}
-	case "dpkg":
-		queryCmd = "dpkg"
-		queryArgs = []string{"-s"}
-	case "rpm":
-		queryCmd = "rpm"
-		queryArgs = []string{"-q"}
-	case "apk":
-		queryCmd = "apk"
-		queryArgs = []string{"info", "-e"}
+		return filterInstalledPacman(packages)
+	case "rpm", "yum", "dnf", "zypper":
+		return filterInstalledRPM(packages)
 	default:
-		// Unknown package manager, return all packages
 		return packages
 	}
+}
 
-	missingPackages := make([]string, 0, len(packages))
+// filterInstalledDEB uses the in-process aptcache (reads /var/lib/dpkg/status)
+// to check which DEB packages are already installed — no subprocess needed.
+//
+// Handles :arch qualifiers correctly: a foreign-arch qualifier (e.g. "libssl-dev:arm64"
+// on an amd64 host) cannot be answered from a single Installed bit, so those are
+// reported as missing and let apt-get install decide (it is idempotent).
+func filterInstalledDEB(packages []string) []string {
+	cache := aptcache.Load()
+	hostDebArch := constants.GetArchMapping().TranslateArch(constants.FormatDEB, runtime.GOARCH)
 
-	// Check each package individually
+	missing := make([]string, 0, len(packages))
+
 	for _, pkg := range packages {
-		// Create a new slice with the query args and package name
-		args := make([]string, len(queryArgs)+1)
-		copy(args, queryArgs)
-		args[len(queryArgs)] = pkg
+		// Strip deb version constraint syntax "name (>= 1.0)" first.
+		name, _, _ := strings.Cut(pkg, " (")
+		// Separate arch qualifier if present.
+		bareName, qualifier, hasQualifier := strings.Cut(name, ":")
+		bareName = strings.TrimSpace(bareName)
+		qualifier = strings.TrimSpace(qualifier)
 
-		err := shell.Exec(context.Background(), true, "", queryCmd, args...)
-		if err != nil {
-			// Package not installed or query failed, add to missing list
-			missingPackages = append(missingPackages, pkg)
+		// Foreign-arch qualifier cannot be answered reliably; treat as missing.
+		if hasQualifier && qualifier != "" && qualifier != hostDebArch {
+			missing = append(missing, pkg)
+			continue
+		}
+
+		info, ok := cache.Lookup(bareName)
+		if !ok || !info.Installed {
+			missing = append(missing, pkg)
 		}
 	}
 
-	return missingPackages
+	return missing
+}
+
+// filterInstalledAPK reads /lib/apk/db/installed to check which APK packages are installed.
+func filterInstalledAPK(packages []string) []string {
+	const apkInstalledDB = "/lib/apk/db/installed"
+
+	installed := apkInstalledSet(apkInstalledDB)
+	if installed == nil {
+		// DB unreadable — assume nothing is installed so we don't skip deps.
+		return packages
+	}
+
+	missing := make([]string, 0, len(packages))
+
+	for _, pkg := range packages {
+		name := stripVersionConstraint(pkg)
+		if !installed[name] {
+			missing = append(missing, pkg)
+		}
+	}
+
+	return missing
+}
+
+// apkInstalledSet parses the APK installed database and returns a set of
+// installed package names. Returns nil on read error.
+func apkInstalledSet(path string) map[string]bool {
+	f, err := os.Open(path) // #nosec G304 — constant path
+	if err != nil {
+		return nil
+	}
+
+	defer func() { _ = f.Close() }()
+
+	installed := make(map[string]bool)
+	scanner := bufio.NewScanner(f)
+
+	var currentPkg string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if line == "" {
+			if currentPkg != "" {
+				installed[currentPkg] = true
+				currentPkg = ""
+			}
+
+			continue
+		}
+
+		if pkg, ok := strings.CutPrefix(line, "P:"); ok {
+			currentPkg = pkg
+		}
+	}
+
+	if currentPkg != "" {
+		installed[currentPkg] = true
+	}
+
+	return installed
+}
+
+// filterInstalledPacman checks /var/lib/pacman/local/ for installed packages.
+// Each installed package has a subdirectory named "<pkgname>-<version>-<pkgrel>/".
+func filterInstalledPacman(packages []string) []string {
+	const pacmanLocalDB = "/var/lib/pacman/local"
+
+	entries, err := os.ReadDir(pacmanLocalDB)
+	if err != nil {
+		return packages
+	}
+
+	installed := make(map[string]bool, len(entries))
+
+	for _, e := range entries {
+		if !e.IsDir() || e.Name() == "ALPM_DB_VERSION" {
+			continue
+		}
+
+		name := pacmanDirToName(e.Name())
+		if name != "" {
+			installed[name] = true
+		}
+	}
+
+	missing := make([]string, 0, len(packages))
+
+	for _, pkg := range packages {
+		name := stripVersionConstraint(pkg)
+		if !installed[name] {
+			missing = append(missing, pkg)
+		}
+	}
+
+	return missing
+}
+
+// pacmanDirToName extracts the package name from a pacman local DB directory
+// name of the form "<name>-<version>-<pkgrel>". pkgver cannot contain hyphens
+// (per Arch wiki), so stripping the last two hyphen-delimited segments is safe.
+func pacmanDirToName(dir string) string {
+	idx := strings.LastIndex(dir, "-")
+	if idx < 0 {
+		return ""
+	}
+
+	withoutPkgrel := dir[:idx]
+
+	idx = strings.LastIndex(withoutPkgrel, "-")
+	if idx < 0 {
+		return ""
+	}
+
+	return withoutPkgrel[:idx]
+}
+
+// filterInstalledRPM uses the pure-Go pkg/rpmdb SQLite reader when available
+// (Fedora 33+, RHEL 9+, Rocky 9+, Alma 9+, openSUSE 15.5+). Falls back to
+// `rpm -q` subprocess for legacy BerkeleyDB hosts.
+func filterInstalledRPM(packages []string) []string {
+	db, err := rpmdb.Open()
+	if err != nil {
+		if stderrors.Is(err, rpmdb.ErrLegacyDB) {
+			logger.Debug("rpmdb: legacy BDB host, falling back to subprocess")
+		} else {
+			logger.Warn("rpmdb: open failed, falling back to subprocess", "error", err)
+		}
+
+		return filterInstalledRPMSubprocess(packages)
+	}
+
+	return db.FilterInstalled(context.Background(), packages)
+}
+
+// filterInstalledRPMSubprocess is the legacy BerkeleyDB fallback.
+func filterInstalledRPMSubprocess(packages []string) []string {
+	missing := make([]string, 0, len(packages))
+
+	for _, pkg := range packages {
+		err := shell.Exec(context.Background(), true, "", "rpm", "-q", pkg)
+		if err != nil {
+			missing = append(missing, pkg)
+		}
+	}
+
+	return missing
 }
 
 // GetDepends reads the package manager name, its arguments and all the
@@ -332,10 +497,33 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 	}
 
 	// Resolve virtual packages to concrete providers (apt-get only)
-	if packageManager == "apt-get" {
+	if packageManager == aptGetPM {
 		missingPackages = resolveVirtualPackages(missingPackages)
 	}
 
+	// Pure-Go installers — no subprocess fallback. If installation fails,
+	// return an error so the user fixes their PKGBUILD or repos rather than
+	// silently falling back to a different code path.
+	switch packageManager {
+	case apkPM:
+		if err := apkindex.Install(context.Background(), missingPackages); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "apkindex install failed").
+				WithOperation("GetDepends")
+		}
+
+		return nil
+
+	case aptGetPM, aptPM:
+		if err := aptinstall.Install(context.Background(), missingPackages); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "aptinstall failed").
+				WithOperation("GetDepends")
+		}
+
+		return nil
+	}
+
+	// RPM (dnf/yum/zypper) and Pacman -S have no pure-Go installer yet, so
+	// they still go through the package manager subprocess.
 	args = append(args, missingPackages...)
 
 	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
@@ -370,10 +558,82 @@ func resolveVirtualPackage(pkg string) string {
 	return resolved
 }
 
-// GetUpdates reads the package manager name and its arguments to perform
-// a sync with remotes and consequently retrieve updates.
-// It returns any error if encountered.
+// stripVersionConstraint strips any version constraint suffix from a package
+// spec like "musl-dev>=1.2" or "foo!=1.0" → "musl-dev" / "foo".
+// Handles all common operators: !=, >=, <=, ~, =, >, <.
+// Order matters: !=, >=, <= must be checked before single-char operators.
+func stripVersionConstraint(spec string) string {
+	spec = strings.TrimSpace(spec)
+
+	// Multi-char operators first (longest match wins).
+	for _, op := range []string{"!=", ">=", "<="} {
+		if before, _, ok := strings.Cut(spec, op); ok {
+			return strings.TrimSpace(before)
+		}
+	}
+
+	// Single-char operators.
+	for _, op := range []string{"~", "=", ">", "<"} {
+		if before, _, ok := strings.Cut(spec, op); ok {
+			return strings.TrimSpace(before)
+		}
+	}
+
+	return spec
+}
+
+// GetUpdates refreshes package indexes for the given package manager.
+// Uses pure-Go implementations where available — no subprocess fallback:
+//   - apt-get → pkg/aptrepo (parses sources, fetches InRelease + Packages.*)
+//   - apk → pkg/apkindex (fetches APKINDEX.tar.gz from each repo)
+//   - pacman → pkg/pacmandb (parses pacman.conf, fetches *.db files)
+//
+// RPM-family package managers (dnf/yum/zypper) still use subprocess because
+// no pure-Go implementation exists yet.
 func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
+	switch packageManager {
+	case aptGetPM, aptPM:
+		n, err := aptrepo.Update(context.Background())
+		if err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "aptrepo update failed").
+				WithOperation("GetUpdates")
+		}
+
+		if n == 0 {
+			return errors.New(errors.ErrTypeBuild, "aptrepo update fetched zero indexes").
+				WithOperation("GetUpdates")
+		}
+
+		logger.Info("aptrepo: pure-Go update succeeded", "indexes", n)
+		aptcache.Reload()
+
+		return nil
+
+	case apkPM:
+		if _, err := apkindex.Update(context.Background()); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "apkindex update failed").
+				WithOperation("GetUpdates")
+		}
+
+		return nil
+
+	case "pacman":
+		n, err := pacmandb.Sync(context.Background())
+		if err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "pacmandb sync failed").
+				WithOperation("GetUpdates")
+		}
+
+		if n == 0 {
+			return errors.New(errors.ErrTypeBuild, "pacmandb sync fetched zero repos").
+				WithOperation("GetUpdates")
+		}
+
+		logger.Info("pacmandb: pure-Go sync succeeded", "repos", n)
+
+		return nil
+	}
+
 	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
 }
 

@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
 	"time"
 
+	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -46,33 +46,14 @@ type CrossAptOptions struct {
 // The function is a no-op when the host already runs on the requested target
 // architecture or when the distro is not Debian-based.
 func SetupCrossAPT(opts CrossAptOptions) error {
-	if opts.TargetArch == "" {
+	hostDebArch, targetDebArch, ok := resolveCrossArches(opts.TargetArch)
+	if !ok {
 		return nil
 	}
 
-	hostDebArch := constants.GetArchMapping().TranslateArch(constants.FormatDEB, runtime.GOARCH)
-	targetDebArch := constants.GetArchMapping().TranslateArch(constants.FormatDEB, opts.TargetArch)
-
-	if targetDebArch == "" || targetDebArch == hostDebArch {
-		return nil
-	}
-
-	distro := opts.Distro
-	codename := opts.Codename
-
-	if distro == "" || codename == "" {
-		d, c, err := readOSRelease()
-		if err != nil {
-			return err
-		}
-
-		if distro == "" {
-			distro = d
-		}
-
-		if codename == "" {
-			codename = c
-		}
+	distro, codename, err := resolveCrossDistroCodename(opts)
+	if err != nil {
+		return err
 	}
 
 	portsURI := portsURIFor(distro)
@@ -83,7 +64,66 @@ func SetupCrossAPT(opts CrossAptOptions) error {
 		return nil
 	}
 
-	if err := runTool(aptCommandTimeout, "dpkg", "--add-architecture", targetDebArch); err != nil {
+	if err := configureCrossArchAndSources(distro, codename, hostDebArch, targetDebArch, portsURI); err != nil {
+		return err
+	}
+
+	return refreshCrossAptIndexes()
+}
+
+// resolveCrossArches translates the requested target arch into a DEB arch and
+// returns it alongside the host DEB arch. The third return is false when no
+// cross-setup is needed (either the request is empty or the host already runs
+// on the target architecture).
+func resolveCrossArches(targetArch string) (hostDebArch, targetDebArch string, needed bool) {
+	if targetArch == "" {
+		return "", "", false
+	}
+
+	mapping := constants.GetArchMapping()
+	hostDebArch = mapping.TranslateArch(constants.FormatDEB, runtime.GOARCH)
+	targetDebArch = mapping.TranslateArch(constants.FormatDEB, targetArch)
+
+	if targetDebArch == "" || targetDebArch == hostDebArch {
+		return "", "", false
+	}
+
+	return hostDebArch, targetDebArch, true
+}
+
+// resolveCrossDistroCodename returns the (distro, codename) pair to use,
+// reading /etc/os-release for any unset value.
+func resolveCrossDistroCodename(opts CrossAptOptions) (distro, codename string, err error) {
+	distro = opts.Distro
+	codename = opts.Codename
+
+	if distro != "" && codename != "" {
+		return distro, codename, nil
+	}
+
+	d, c, err := readOSRelease()
+	if err != nil {
+		return "", "", err
+	}
+
+	if distro == "" {
+		distro = d
+	}
+
+	if codename == "" {
+		codename = c
+	}
+
+	return distro, codename, nil
+}
+
+// configureCrossArchAndSources registers the foreign architecture, restricts
+// the native sources, and installs the cross-arch repo entry. It owns the
+// imperative side-effects on /var/lib/dpkg/arch and /etc/apt/sources.list*.
+func configureCrossArchAndSources(
+	distro, codename, hostDebArch, targetDebArch, portsURI string,
+) error {
+	if err := addDpkgArchitecture(targetDebArch); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild,
 			fmt.Sprintf("repo: dpkg --add-architecture %s", targetDebArch)).
 			WithOperation("SetupCrossAPT").
@@ -103,14 +143,29 @@ func SetupCrossAPT(opts CrossAptOptions) error {
 
 	keyring := archiveKeyringFor(distro)
 	if keyring != "" {
-		if err := writeCrossSource(&r, targetDebArch, codename, distro, keyring); err != nil {
-			return err
-		}
-	} else if err := setupDeb(&r); err != nil {
-		return err
+		return writeCrossSource(&r, targetDebArch, codename, distro, keyring)
 	}
 
-	return runTool(aptCommandTimeout, "apt-get", "update")
+	return setupDeb(&r)
+}
+
+// refreshCrossAptIndexes refreshes the apt index via pure-Go aptrepo. There is
+// no subprocess fallback: a failure here means the cross-arch ports repo
+// could not be reached and later install steps would fail anyway.
+func refreshCrossAptIndexes() error {
+	ctx, cancel := context.WithTimeout(context.Background(), aptCommandTimeout)
+	defer cancel()
+
+	n, err := aptrepo.Update(ctx)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild,
+			"repo: cross apt update via aptrepo").
+			WithOperation("SetupCrossAPT")
+	}
+
+	logger.Info("repo: cross apt indexes refreshed via aptrepo", "indexes", n)
+
+	return nil
 }
 
 // portsURIFor returns the per-distro ports archive URI used for non-primary
@@ -273,6 +328,51 @@ func restrictLegacySourcesList(hostDebArch string) error {
 	return writeRoot(debSourcesList, []byte(patched))
 }
 
+// addDpkgArchitecture registers a foreign architecture with dpkg by appending
+// it to /var/lib/dpkg/arch. This is the pure-Go equivalent of
+// "dpkg --add-architecture <arch>": dpkg itself only reads and writes that
+// plain-text file (one arch per line). The function is idempotent — it is a
+// no-op when the arch is already listed.
+func addDpkgArchitecture(arch string) error {
+	const dpkgArchFile = "/var/lib/dpkg/arch"
+
+	// Read existing content (file may not exist on minimal images).
+	data, err := os.ReadFile(dpkgArchFile) // #nosec G304
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// Check if the arch is already registered.
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if strings.TrimSpace(line) == arch {
+			logger.Info("repo: dpkg arch already registered", "arch", arch)
+
+			return nil
+		}
+	}
+
+	// Append the new arch. Ensure the file ends with a newline.
+	content := strings.TrimRight(string(data), "\n")
+	if content != "" {
+		content += "\n"
+	}
+
+	content += arch + "\n"
+
+	if err := os.MkdirAll(filepath.Dir(dpkgArchFile), 0o755); err != nil { // #nosec G301
+		return err
+	}
+
+	// /var/lib/dpkg/arch is a dpkg-internal file; 0o644 matches dpkg's own mode.
+	if err := os.WriteFile(dpkgArchFile, []byte(content), 0o644); err != nil { // #nosec G306,G703
+		return err
+	}
+
+	logger.Info("repo: registered dpkg architecture", "arch", arch)
+
+	return nil
+}
+
 // writeRoot writes content to a path under /etc. yap is expected to run as
 // root (CI invokes it via `sudo yap ...`), so a direct write is enough — there
 // is no need for a sudo tee detour.
@@ -284,35 +384,6 @@ func writeRoot(path string, data []byte) error {
 			fmt.Sprintf("repo: write %s", path)).
 			WithOperation("writeRoot").
 			WithContext("path", path)
-	}
-
-	return nil
-}
-
-// runTool invokes the named tool directly inside a bounded context. yap is
-// expected to run as root; on non-root invocations the underlying tool will
-// return its standard EPERM error and surface it to the caller.
-// Output is captured and discarded; callers that need output should use
-// exec.Command directly.
-func runTool(timeout time.Duration, name string, args ...string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	// name and args are limited to constant strings supplied by callers in
-	// this package (dpkg, apt-get, ...); there is no flow from user input.
-	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		// Log the output only on failure so the user can diagnose the problem.
-		if len(out) > 0 {
-			logger.Warn("repo: command failed",
-				"command", name,
-				"args", args,
-				"output", strings.TrimSpace(string(out)))
-		}
-
-		return err
 	}
 
 	return nil

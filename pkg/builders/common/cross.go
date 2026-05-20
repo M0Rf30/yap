@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -18,26 +17,11 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/repo"
 )
 
-// aptGetDownload runs "apt-get download" for the given packages into dir.
-func aptGetDownload(dir string, pkgs []string) error {
-	args := append([]string{"download", "--allow-unauthenticated", "-o", "Dir::Cache::Archives=" + dir}, pkgs...)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "apt-get", args...) // #nosec G204
-	cmd.Dir = dir
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if len(out) > 0 {
-			logger.Warn("apt-get download failed", "output", strings.TrimSpace(string(out)))
-		}
-
-		return err
-	}
-
-	return nil
+// aptCacheDownload downloads packages using the pure-Go aptcache downloader.
+// It is a replacement for "apt-get download --allow-unauthenticated".
+func aptCacheDownload(ctx context.Context, dir string, pkgs []string) error {
+	cache := aptcache.Reload() // Reload to pick up freshly added repos
+	return cache.Download(ctx, dir, pkgs)
 }
 
 // Note: fmt is still used for fmt.Sprintf in SetupCrossCompilationEnvironment
@@ -298,9 +282,9 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch str
 
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	// Download all packages in one apt-get download call.
-	if err := aptGetDownload(tmpDir, all); err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild, "apt-get download cross deps").
+	// Download all packages using pure-Go aptcache downloader.
+	if err := aptCacheDownload(context.Background(), tmpDir, all); err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "download cross deps").
 			WithOperation("DownloadAndExtractCrossDeps")
 	}
 
@@ -322,7 +306,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch str
 		logger.Info("Extracting cross-build runtime dep",
 			"package", entry.Name())
 
-		if err := extractDEB(debPath, "/"); err != nil {
+		if err := ExtractDEB(debPath, "/"); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "extract cross dep").
 				WithOperation("DownloadAndExtractCrossDeps").
 				WithContext("package", entry.Name())
