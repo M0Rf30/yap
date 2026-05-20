@@ -105,8 +105,11 @@ func TestSafeSymlinkTarget(t *testing.T) {
 		{"sub/dir/target.txt", false},
 		{"./local", false},
 		{"", false},
-		{"/etc/passwd", true},
-		{"/absolute/danger", true},
+		// Absolute targets are accepted: real packages routinely ship absolute
+		// symlinks. The traversal-through-symlink attack is blocked by safeJoin
+		// on every entry's write path, not the link target.
+		{"/etc/passwd", false},
+		{"/absolute/danger", false},
 		{"../escape", true},
 		{"a/../../escape", true},
 		{"foo/../bar", true},

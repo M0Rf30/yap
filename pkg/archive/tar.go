@@ -414,20 +414,17 @@ func safeJoin(destination, name string) (string, error) {
 }
 
 // safeSymlinkTarget validates a symlink target before it is created on disk.
-// Absolute targets and targets containing ".." segments are rejected because
-// they would let an attacker plant a link that, when later dereferenced by
-// build scripts or by ExtractToRoot's follow-up writes, redirects to arbitrary
-// filesystem locations.
+// Targets containing ".." segments are rejected as defense-in-depth.
+//
+// Absolute targets are accepted: real packages routinely ship absolute
+// symlinks (e.g. /usr/lib64/libfoo.so.1 -> /usr/lib/libfoo.so.1) and
+// dpkg/rpm/apk accept them. The traversal attack of interest is a tar that
+// creates a link foo -> /etc and then writes foo/passwd; that is already
+// blocked by safeJoin on every entry path, which validates the *write* path,
+// not the symlink target. Creating the link itself is harmless.
 func safeSymlinkTarget(target string) error {
 	if target == "" {
 		return nil
-	}
-
-	if filepath.IsAbs(target) {
-		return errors.New(errors.ErrTypePackaging,
-			"symlink target is absolute").
-			WithContext("target", target).
-			WithOperation("safeSymlinkTarget")
 	}
 
 	if slices.Contains(strings.Split(filepath.ToSlash(target), "/"), "..") {

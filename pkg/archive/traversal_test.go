@@ -149,12 +149,18 @@ func TestExtract_RejectsTraversal(t *testing.T) {
 	}
 }
 
-// TestExtract_RejectsAbsoluteSymlinkTarget guards against tar entries that try
-// to plant a symlink pointing at an absolute path (e.g. /etc/passwd). Even if
-// the link's own name is contained, the *target* must be inside dest.
-func TestExtract_RejectsAbsoluteSymlinkTarget(t *testing.T) {
+// TestExtract_AllowsAbsoluteSymlinkTarget verifies that absolute symlink
+// targets are accepted: real packages (e.g. glibc) routinely ship absolute
+// symlinks like /usr/lib64/libfoo.so.1 -> /usr/lib/libfoo.so.1, and
+// dpkg/rpm/apk accept them.
+//
+// The traversal-through-symlink attack (link foo -> /etc + write foo/passwd)
+// is blocked by safeJoin on every entry's *own write path*, not the symlink
+// target. Creating the link itself is harmless: no follow-up write happens
+// inside the extraction loop that resolves through the link.
+func TestExtract_AllowsAbsoluteSymlinkTarget(t *testing.T) {
 	tmp := t.TempDir()
-	tarPath := filepath.Join(tmp, "evil-sym.tar.gz")
+	tarPath := filepath.Join(tmp, "abs-sym.tar.gz")
 	dest := filepath.Join(tmp, "dest")
 
 	if err := os.MkdirAll(dest, 0o755); err != nil {
@@ -166,14 +172,28 @@ func TestExtract_RejectsAbsoluteSymlinkTarget(t *testing.T) {
 		t.Fatalf("write tar: %v", err)
 	}
 
-	err := archive.Extract(context.Background(), tarPath, dest)
-	if err == nil {
-		t.Fatal("Extract should reject symlink with absolute target")
+	if err := archive.Extract(context.Background(), tarPath, dest); err != nil {
+		t.Fatalf("Extract should accept symlink with absolute target: %v", err)
 	}
 
-	// Sanity: no symlink file was created.
-	if _, err := os.Lstat(filepath.Join(dest, "innocent-name")); err == nil {
-		t.Fatal("symlink was created despite rejection")
+	linkPath := filepath.Join(dest, "innocent-name")
+
+	info, err := os.Lstat(linkPath)
+	if err != nil {
+		t.Fatalf("expected symlink at %s: %v", linkPath, err)
+	}
+
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("expected %s to be a symlink, got mode %v", linkPath, info.Mode())
+	}
+
+	target, err := os.Readlink(linkPath)
+	if err != nil {
+		t.Fatalf("readlink: %v", err)
+	}
+
+	if target != "/etc/passwd" {
+		t.Fatalf("unexpected symlink target: got %q want /etc/passwd", target)
 	}
 }
 
