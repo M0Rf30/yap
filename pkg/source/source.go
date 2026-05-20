@@ -386,7 +386,13 @@ func (src *Source) shouldSkipExtract() bool {
 // ErrUnrecognizedArchive sentinel. Non-archive sources (plain patches,
 // scripts, .sig files, …) are legitimately not extractable and are left in
 // place; symlinkSources has already made them available in destDir.
+// Directories (e.g. git working copies) are never archives, so we skip them
+// up front to avoid spurious "is a directory" read errors from archive.Extract.
 func extractIfArchive(sourceFilePath, destDir string) error {
+	if info, statErr := os.Stat(sourceFilePath); statErr == nil && info.IsDir() {
+		return nil
+	}
+
 	err := archive.Extract(context.Background(), sourceFilePath, destDir)
 	if err == nil || stderrors.Is(err, archive.ErrUnrecognizedArchive) {
 		return nil
