@@ -1,8 +1,9 @@
-// Package pacmandb provides a pure-Go replacement for "pacman -Sy".
+// Package pacmandb refreshes Arch repository sync databases.
 //
-// It parses /etc/pacman.conf, resolves Server URLs from mirrorlists, and
-// downloads <repo>.db files to /var/lib/pacman/sync/ so subsequent pacman
-// queries (or pure-Go pacman sync DB readers) see the updated metadata.
+// It parses /etc/pacman.conf (with Include + mirrorlist expansion),
+// resolves $repo/$arch placeholders, fetches each <repo>.db file with
+// multi-mirror failover, and writes the result atomically to
+// /var/lib/pacman/sync/.
 package pacmandb
 
 import (
@@ -43,7 +44,7 @@ func Sync(ctx context.Context) (succeeded int, err error) {
 				firstErr = err
 			}
 
-			logger.Warn("pacmandb: repo sync failed",
+			logger.Warn("pacman repo sync failed",
 				"repo", repo.Name, "error", err)
 
 			continue

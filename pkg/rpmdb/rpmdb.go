@@ -1,10 +1,10 @@
-// Package rpmdb provides a pure-Go reader for the RPM SQLite database used
-// by Fedora 33+, RHEL 9+, Rocky 9+, AlmaLinux 9+, and openSUSE 15.5+.
+// Package rpmdb reads the RPM SQLite database used by Fedora 33+, RHEL
+// 9+, Rocky 9+, AlmaLinux 9+, and openSUSE 15.5+.
 //
-// It replaces "rpm -q <pkg>" subprocess calls for installed-package checks.
-// Legacy BerkeleyDB-based systems (RHEL 8 and earlier) are unsupported and
-// callers must fall back to subprocess on those hosts; ErrLegacyDB indicates
-// the legacy format was detected.
+// Open caches one read-only handle for the lifetime of the process and
+// answers installed-package queries via indexed lookups. Legacy
+// BerkeleyDB-based hosts (RHEL 8 and earlier) return ErrLegacyDB; the
+// caller is expected to fall back to `rpm -q`.
 package rpmdb
 
 import (
@@ -14,7 +14,7 @@ import (
 	"os"
 	"sync"
 
-	_ "modernc.org/sqlite" // pure-Go SQLite driver
+	_ "modernc.org/sqlite" // CGO-free SQLite driver
 
 	rpmdbgen "github.com/M0Rf30/yap/v2/pkg/rpmdb/db"
 )
@@ -47,45 +47,69 @@ type DB struct {
 }
 
 var (
-	globalOnce sync.Once
-	globalDB   *DB
-	globalErr  error
+	globalMu sync.Mutex
+	globalDB *DB
 )
 
-// Open returns a process-wide singleton DB handle. The DB is opened in
-// read-only mode and reused across calls. Returns ErrLegacyDB when the
-// host has no SQLite RPM database.
+// Open returns a process-wide DB handle. The DB is opened in read-only
+// mode and cached. Returns ErrLegacyDB when no SQLite database exists at
+// any known path.
+//
+// Unlike sync.Once-based singletons, this implementation re-attempts the
+// open on every call when no cached handle is currently valid. A previous
+// "no DB found" result therefore won't poison the process after the host
+// runs `rpm --rebuilddb` and the SQLite file finally appears.
 func Open() (*DB, error) {
-	globalOnce.Do(func() {
-		path := findDBPath()
-		if path == "" {
-			globalErr = ErrLegacyDB
-			return
-		}
-		// mode=ro: read-only. immutable=1 is unsafe (rpm writes during installs).
-		// _txlock=deferred minimises locking with concurrent rpm processes.
-		dsn := "file:" + path + "?mode=ro&_txlock=deferred"
+	globalMu.Lock()
+	defer globalMu.Unlock()
 
-		db, err := sql.Open("sqlite", dsn)
-		if err != nil {
-			globalErr = err
-			return
-		}
+	if globalDB != nil {
+		return globalDB, nil
+	}
 
-		if err := db.PingContext(context.Background()); err != nil {
-			_ = db.Close()
-			globalErr = err
+	path := findDBPath()
+	if path == "" {
+		return nil, ErrLegacyDB
+	}
 
-			return
-		}
+	// mode=ro: read-only. immutable=1 is unsafe (rpm writes during installs).
+	// _txlock=deferred minimises locking with concurrent rpm processes.
+	dsn := "file:" + path + "?mode=ro&_txlock=deferred"
 
-		globalDB = &DB{
-			sqldb:   db,
-			queries: rpmdbgen.New(db),
-		}
-	})
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
 
-	return globalDB, globalErr
+	if err := db.PingContext(context.Background()); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	globalDB = &DB{
+		sqldb:   db,
+		queries: rpmdbgen.New(db),
+	}
+
+	return globalDB, nil
+}
+
+// Close drops the cached DB handle. Tests use this to force a reopen.
+// Production code rarely needs to call Close — the OS will release the FD
+// on exit — but a long-running daemon that detects an rpm DB rotation can
+// invoke Close to force the next Open to re-stat the disk.
+func Close() error {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+
+	if globalDB == nil {
+		return nil
+	}
+
+	err := globalDB.sqldb.Close()
+	globalDB = nil
+
+	return err
 }
 
 // IsInstalled reports whether the named package is registered in the RPM DB.

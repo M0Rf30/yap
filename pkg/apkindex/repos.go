@@ -72,7 +72,7 @@ func DetectArch() string {
 	apkArch := constants.GetArchMapping().TranslateArch(constants.FormatAPK, normalized)
 
 	if apkArch == "" {
-		logger.Warn("apkindex: could not detect APK architecture",
+		logger.Warn("could not detect APK architecture",
 			"goarch", runtime.GOARCH, "normalized", normalized)
 
 		return ""

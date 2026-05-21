@@ -1,4 +1,4 @@
-// Package apkindex provides a pure-Go reader and installer for Alpine Linux
+// Package apkindex parses Alpine APKINDEX files and installs .apk packages
 // APK packages. It replaces "apk update" and "apk add" subprocess calls.
 //
 // Typical usage:
@@ -15,6 +15,8 @@ package apkindex
 import (
 	"context"
 	"sync"
+
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
 
 // Package holds the subset of APKINDEX fields needed for install/dep resolution.
@@ -138,11 +140,19 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 // Install is a convenience function that calls Update to fetch the index,
 // then installs the requested packages. This is the main entry point for
 // replacing "apk update && apk add <pkgs>" subprocess calls.
+//
+// APK package signature verification (RSA against the trusted keyring in
+// /etc/apk/keys) is not yet implemented; the convenience wrapper accepts
+// that gap when running on a privileged host (uid 0 — the expected case
+// inside a yap build container) and refuses on a developer workstation.
+// Use InstallPackagesWithOptions for explicit control.
 func Install(ctx context.Context, names []string) error {
 	idx, err := Update(ctx)
 	if err != nil {
 		return err
 	}
 
-	return idx.InstallPackages(ctx, names)
+	return idx.InstallPackagesWithOptions(ctx, names, InstallOptions{
+		AllowUnverifiedPackages: platform.IsPrivilegedHost(),
+	})
 }

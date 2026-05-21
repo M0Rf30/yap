@@ -17,11 +17,18 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/repo"
 )
 
-// aptCacheDownload downloads packages using the pure-Go aptcache downloader.
-// It is a replacement for "apt-get download --allow-unauthenticated".
-func aptCacheDownload(ctx context.Context, dir string, pkgs []string) error {
-	cache := aptcache.Reload() // Reload to pick up freshly added repos
-	return cache.Download(ctx, dir, pkgs)
+// aptCacheDownloadClosure resolves the transitive closure of `seeds`,
+// downloads every resulting .deb into dir, and returns the resolved
+// PackageInfo slice in dependency order plus the list of unresolvable
+// names.
+//
+// Reloads the aptcache singleton first so freshly-added cross-arch repos
+// (see pkg/repo/cross.go) are visible to the resolver.
+func aptCacheDownloadClosure(
+	ctx context.Context, dir string, seeds []string,
+) ([]*aptcache.PackageInfo, []string, error) {
+	cache := aptcache.Reload()
+	return cache.DownloadClosure(ctx, dir, seeds)
 }
 
 // Note: fmt is still used for fmt.Sprintf in SetupCrossCompilationEnvironment
@@ -244,8 +251,16 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 //
 // The function partitions deps the same way as installCrossDeps: arch-all
 // packages are downloaded unqualified, arch-specific ones are qualified with
-// the target architecture (e.g. :arm64). All packages are extracted via
-// dpkg -x (pure Go equivalent) so no dependency resolution occurs.
+// the target architecture (e.g. :arm64). All packages are extracted to "/"
+// without dpkg, so there is no conflict checking.
+//
+// **Transitive resolution**: the declared PKGBUILD dependencies are walked
+// through aptcache.DownloadClosure so transitive runtime libraries that
+// the declared deps themselves need are pulled in too. Without this, a
+// PKGBUILD listing only carbonio-ffmpeg fails to cross-link because
+// libavcodec.so has DT_NEEDED entries for libvpx.so / libx264.so which
+// come from sibling packages (carbonio-libvpx, carbonio-x264) the
+// PKGBUILD did not declare.
 func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch string) error {
 	if bb.Format != constants.FormatDEB {
 		// Non-DEB formats: fall back to normal install (no cross-arch conflict).
@@ -260,15 +275,15 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch str
 	archSpecific, archAll := partitionArchAllDepsForExtract(deps)
 	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
 
-	all := make([]string, 0, len(archAll)+len(qualified))
-	all = append(all, archAll...)
-	all = append(all, qualified...)
+	seeds := make([]string, 0, len(archAll)+len(qualified))
+	seeds = append(seeds, archAll...)
+	seeds = append(seeds, qualified...)
 
-	if len(all) == 0 {
+	if len(seeds) == 0 {
 		return nil
 	}
 
-	logger.Info("Downloading and extracting cross-build runtime deps",
+	logger.Info("fetching cross-build runtime deps",
 		"target_arch", targetArch,
 		"arch_specific", strings.Join(qualified, ", "),
 		"arch_all", strings.Join(archAll, ", "))
@@ -282,38 +297,81 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch str
 
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	// Download all packages using pure-Go aptcache downloader.
-	if err := aptCacheDownload(context.Background(), tmpDir, all); err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild, "download cross deps").
+	// Resolve transitive closure, then download every .deb in the closure.
+	// aptcache skips packages already marked Installed (i.e. present in the
+	// build container's dpkg status) so we don't re-extract libc6, glibc,
+	// etc. Their dep edges are still walked so a transitive-only library
+	// reachable only through an installed package is still pulled in.
+	resolved, unresolved, err := aptCacheDownloadClosure(
+		context.Background(), tmpDir, seeds)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "download cross deps closure").
 			WithOperation("DownloadAndExtractCrossDeps")
 	}
 
-	// Extract each downloaded .deb to the root filesystem.
-	entries, err := os.ReadDir(tmpDir)
-	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "read cross deps dir").
-			WithOperation("DownloadAndExtractCrossDeps").
-			WithContext("path", tmpDir)
+	if len(unresolved) > 0 {
+		// Not fatal: virtual / file-based / arch-only deps frequently can't be
+		// resolved from a generic apt index but the link will still succeed
+		// because they live elsewhere on the system. Surface so a CI run can
+		// grep for them.
+		logger.Warn("unresolvable transitive cross-deps (continuing)",
+			"packages", strings.Join(unresolved, ", "))
 	}
 
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".deb") {
+	seedSet := make(map[string]bool, len(seeds))
+	for _, s := range seeds {
+		// Use the same name-normalisation rules as ResolveDeps so the
+		// "direct vs transitive" log classification matches.
+		name, _, _ := strings.Cut(s, ":")
+		name, _, _ = strings.Cut(name, " (")
+		seedSet[strings.TrimSpace(name)] = true
+	}
+
+	logger.Info("resolved cross-deps closure",
+		"declared", len(seeds),
+		"closure", len(resolved),
+		"transitive", len(resolved)-countDirect(resolved, seedSet))
+
+	for _, info := range resolved {
+		if info == nil || info.Filename == "" {
 			continue
 		}
 
-		debPath := tmpDir + "/" + entry.Name()
+		debPath := filepath.Join(tmpDir, filepath.Base(info.Filename))
+		origin := "direct"
 
-		logger.Info("Extracting cross-build runtime dep",
-			"package", entry.Name())
+		if !seedSet[info.Name] {
+			origin = "transitive"
+		}
+
+		logger.Debug("extracting cross-build dep",
+			"package", info.Name,
+			"arch", info.Architecture,
+			"origin", origin)
 
 		if err := ExtractDEB(debPath, "/"); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "extract cross dep").
 				WithOperation("DownloadAndExtractCrossDeps").
-				WithContext("package", entry.Name())
+				WithContext("package", info.Name)
 		}
 	}
 
 	return nil
+}
+
+// countDirect returns the number of resolved entries whose name appears in
+// the seedSet — i.e. were directly declared by the PKGBUILD rather than
+// pulled in transitively. Used purely for logger summary.
+func countDirect(resolved []*aptcache.PackageInfo, seedSet map[string]bool) int {
+	n := 0
+
+	for _, p := range resolved {
+		if p != nil && seedSet[p.Name] {
+			n++
+		}
+	}
+
+	return n
 }
 
 // installCrossDeps installs DEB cross-compilation dependencies in two passes.

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -39,19 +38,14 @@ func setupTestDB(t *testing.T) (dbPath string, cleanup func()) { //nolint:gocrit
 	_, _ = db.ExecContext(context.Background(), "INSERT INTO Name (name, hnum) VALUES ('make', 2)")
 	_ = db.Close()
 
-	// Override the singleton search path.
+	// Override the singleton search path and force a re-open.
 	origPaths := rpmDBPaths
 	rpmDBPaths = []string{path}
-	// Reset the singleton state so Open re-runs.
-	globalOnce = sync.Once{}
-	globalDB = nil
-	globalErr = nil
+	_ = Close()
 
 	return path, func() {
 		rpmDBPaths = origPaths
-		globalOnce = sync.Once{}
-		globalDB = nil
-		globalErr = nil
+		_ = Close()
 	}
 }
 
@@ -120,15 +114,11 @@ func TestListInstalled(t *testing.T) {
 func TestLegacyDB(t *testing.T) {
 	origPaths := rpmDBPaths
 	rpmDBPaths = []string{"/nonexistent/path"}
-	globalOnce = sync.Once{}
-	globalDB = nil
-	globalErr = nil
+	_ = Close()
 
 	defer func() {
 		rpmDBPaths = origPaths
-		globalOnce = sync.Once{}
-		globalDB = nil
-		globalErr = nil
+		_ = Close()
 	}()
 
 	_, err := Open()

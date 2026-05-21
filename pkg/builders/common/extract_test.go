@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/M0Rf30/rpmpack"
-	"github.com/blakesmith/ar"
+	"github.com/m0rf30/ar"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"

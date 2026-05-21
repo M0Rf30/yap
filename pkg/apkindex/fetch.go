@@ -11,10 +11,20 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 const apkCacheDir = "/var/cache/apk"
+
+// maxAPKIndexBytes caps an APKINDEX.tar.gz download. Real Alpine indexes are
+// ~5 MB; 100 MB is plenty of slack and still defends against an unbounded
+// stream.
+const maxAPKIndexBytes = 100 << 20
+
+// maxAPKPackageBytes caps an individual .apk package at 1 GiB. The largest
+// Alpine packages (e.g. linux-edge) are well under 100 MB.
+const maxAPKPackageBytes = 1 << 30
 
 // Update fetches APKINDEX.tar.gz from every repo in /etc/apk/repositories,
 // writes the parsed indexes into the cache dir, and returns an Index ready
@@ -40,16 +50,16 @@ func Update(ctx context.Context) (*Index, error) {
 		indexURL := repo.URL + "/" + arch + "/APKINDEX.tar.gz"
 		cachePath := filepath.Join(apkCacheDir, "APKINDEX."+sha1Hex(indexURL)+".tar.gz")
 
-		if err := downloadFile(ctx, indexURL, cachePath); err != nil {
+		if err := downloadFile(ctx, indexURL, cachePath, maxAPKIndexBytes); err != nil {
 			// Log warning and continue with other repos.
-			logger.Warn("apkindex: fetch failed",
+			logger.Warn("APKINDEX fetch failed",
 				"url", indexURL, "error", err)
 
 			continue
 		}
 
 		if err := loadIndexTarball(idx, cachePath, repo.URL); err != nil {
-			logger.Warn("apkindex: parse failed",
+			logger.Warn("APKINDEX parse failed",
 				"path", cachePath, "error", err)
 
 			continue
@@ -65,27 +75,29 @@ func sha1Hex(s string) string {
 	return fmt.Sprintf("%x", h)
 }
 
-// downloadFile downloads a file from url and saves it to destPath.
-// It checks Content-Length as a sanity check.
-func downloadFile(ctx context.Context, url, destPath string) error {
+// downloadFile downloads a file from url and saves it to destPath. The
+// response is streamed through an io.LimitReader bounded at maxBytes so a
+// malicious or buggy mirror cannot OOM the build.
+func downloadFile(ctx context.Context, url, destPath string, maxBytes int64) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("apkindex: new request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.Client().Do(req)
 	if err != nil {
 		return fmt.Errorf("apkindex: http get: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("apkindex: http %d", resp.StatusCode)
+	if err := httpclient.CheckStatus(resp, url); err != nil {
+		return err
 	}
 
-	// Sanity check: APKINDEX files are typically < 10 MB.
-	if resp.ContentLength > 0 && resp.ContentLength > 100*1024*1024 {
-		return fmt.Errorf("apkindex: content too large: %d bytes", resp.ContentLength)
+	// Cross-check the advertised Content-Length first (cheap fail-fast).
+	if resp.ContentLength > 0 && maxBytes > 0 && resp.ContentLength > maxBytes {
+		return fmt.Errorf("apkindex: content too large: %d bytes (cap %d)",
+			resp.ContentLength, maxBytes)
 	}
 
 	// Write to a temp file first, then rename.
@@ -98,9 +110,20 @@ func downloadFile(ctx context.Context, url, destPath string) error {
 
 	defer func() { _ = f.Close() }()
 
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	// LimitReader+1 trick: read one byte past the cap so we can detect
+	// servers that lie about Content-Length.
+	body := io.LimitReader(resp.Body, maxBytes+1)
+
+	written, err := io.Copy(f, body)
+	if err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("apkindex: copy: %w", err)
+	}
+
+	if written > maxBytes {
+		_ = os.Remove(tmpPath)
+
+		return fmt.Errorf("apkindex: body exceeded %d-byte cap", maxBytes)
 	}
 
 	if err := f.Close(); err != nil {
@@ -165,7 +188,7 @@ func (idx *Index) DownloadPackage(ctx context.Context, destDir, name string) (st
 	url := pkg.RepoBaseURL + "/" + pkg.Arch + "/" + filename
 	destPath := filepath.Join(destDir, filename)
 
-	if err := downloadFile(ctx, url, destPath); err != nil {
+	if err := downloadFile(ctx, url, destPath, maxAPKPackageBytes); err != nil {
 		return "", fmt.Errorf("apkindex: download %s: %w", filename, err)
 	}
 

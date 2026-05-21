@@ -267,8 +267,8 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 }
 
 // filterInstalledPackages checks which packages are not installed and returns only those.
-// Uses pure-Go database readers where available; falls back to subprocess only
-// when no pure-Go reader is available (legacy BerkeleyDB RPM hosts).
+// Backed by direct dpkg/apk/pacman/rpmdb readers; falls back to the
+// distro's `rpm -q` subprocess only on legacy BerkeleyDB RPM hosts.
 func filterInstalledPackages(packageManager string, packages []string) []string {
 	if len(packages) == 0 {
 		return nil
@@ -438,9 +438,9 @@ func pacmanDirToName(dir string) string {
 	return withoutPkgrel[:idx]
 }
 
-// filterInstalledRPM uses the pure-Go pkg/rpmdb SQLite reader when available
-// (Fedora 33+, RHEL 9+, Rocky 9+, Alma 9+, openSUSE 15.5+). Falls back to
-// `rpm -q` subprocess for legacy BerkeleyDB hosts.
+// filterInstalledRPM queries the SQLite rpmdb directly on modern hosts
+// (Fedora 33+, RHEL 9+, Rocky 9+, Alma 9+, openSUSE 15.5+). On legacy
+// BerkeleyDB hosts it falls back to `rpm -q`.
 func filterInstalledRPM(packages []string) []string {
 	db, err := rpmdb.Open()
 	if err != nil {
@@ -522,8 +522,8 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 		return nil
 	}
 
-	// RPM (dnf/yum/zypper) and Pacman -S have no pure-Go installer yet, so
-	// they still go through the package manager subprocess.
+	// RPM (dnf/yum/zypper) and `pacman -S` still go through the distro's
+	// own installer subprocess — no in-tree replacement for them yet.
 	args = append(args, missingPackages...)
 
 	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
@@ -583,13 +583,10 @@ func stripVersionConstraint(spec string) string {
 }
 
 // GetUpdates refreshes package indexes for the given package manager.
-// Uses pure-Go implementations where available — no subprocess fallback:
-//   - apt-get → pkg/aptrepo (parses sources, fetches InRelease + Packages.*)
-//   - apk → pkg/apkindex (fetches APKINDEX.tar.gz from each repo)
-//   - pacman → pkg/pacmandb (parses pacman.conf, fetches *.db files)
 //
-// RPM-family package managers (dnf/yum/zypper) still use subprocess because
-// no pure-Go implementation exists yet.
+// apt-get / apk / pacman use the in-tree readers (pkg/aptrepo,
+// pkg/apkindex, pkg/pacmandb). dnf/yum/zypper still defer to the
+// distro's own update subprocess.
 func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
 	switch packageManager {
 	case aptGetPM, aptPM:
@@ -604,7 +601,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 				WithOperation("GetUpdates")
 		}
 
-		logger.Info("aptrepo: pure-Go update succeeded", "indexes", n)
+		logger.Info("refreshed apt indexes", "count", n)
 		aptcache.Reload()
 
 		return nil
@@ -629,7 +626,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 				WithOperation("GetUpdates")
 		}
 
-		logger.Info("pacmandb: pure-Go sync succeeded", "repos", n)
+		logger.Info("refreshed pacman sync DBs", "count", n)
 
 		return nil
 	}

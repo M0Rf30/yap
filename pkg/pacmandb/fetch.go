@@ -6,7 +6,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 )
+
+// maxPacmanDBBytes caps a downloaded <repo>.db (or .db.sig) at 256 MiB.
+// Real Arch / extra / community DBs are well under 50 MB.
+const maxPacmanDBBytes = 256 << 20
 
 func downloadFile(ctx context.Context, url, dest string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
@@ -14,14 +20,18 @@ func downloadFile(ctx context.Context, url, dest string) error {
 		return err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.Client().Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d for %s", resp.StatusCode, url)
+	if err := httpclient.CheckStatus(resp, url); err != nil {
+		return err
+	}
+
+	if resp.ContentLength > maxPacmanDBBytes {
+		return fmt.Errorf("pacmandb: %s body too large: %d bytes", url, resp.ContentLength)
 	}
 
 	// Atomic write: write to tmp, then rename.
@@ -32,11 +42,19 @@ func downloadFile(ctx context.Context, url, dest string) error {
 		return err
 	}
 
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	written, err := io.Copy(f, io.LimitReader(resp.Body, maxPacmanDBBytes+1))
+	if err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmpDest)
 
 		return err
+	}
+
+	if written > maxPacmanDBBytes {
+		_ = f.Close()
+		_ = os.Remove(tmpDest)
+
+		return fmt.Errorf("pacmandb: %s exceeded %d-byte cap", url, maxPacmanDBBytes)
 	}
 
 	if err := f.Close(); err != nil {

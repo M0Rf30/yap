@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/blakesmith/ar"
+	"github.com/m0rf30/ar"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

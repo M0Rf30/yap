@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/blakesmith/ar"
+	"github.com/m0rf30/ar"
 	rpmutils "github.com/sassoftware/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
@@ -129,7 +129,11 @@ func ExtractDEB(packagePath, destDir string) error {
 		_ = file.Close()
 	}()
 
-	arReader := ar.NewReader(file)
+	arReader, err := ar.NewReader(file)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypePackaging, "failed to parse AR archive").
+			WithOperation("extractDEB")
+	}
 
 	// Iterate through AR archive members to find data.tar
 	var dataTarPath string

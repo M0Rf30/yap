@@ -3,13 +3,15 @@ package aptinstall
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
+	"compress/bzip2"
 	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/blakesmith/ar"
+	"github.com/m0rf30/ar"
 	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
 )
@@ -40,7 +42,10 @@ func parseDEB(debPath string) (*debContents, error) {
 
 	defer func() { _ = file.Close() }()
 
-	arReader := ar.NewReader(file)
+	arReader, err := ar.NewReader(file)
+	if err != nil {
+		return nil, fmt.Errorf("parse AR archive: %w", err)
+	}
 
 	contents := &debContents{
 		Scriptlets: make(map[string]string),
@@ -77,7 +82,13 @@ func parseDEB(debPath string) (*debContents, error) {
 }
 
 // parseControlTar extracts and parses the control.tar member of a .deb.
+//
+// Each entry body is read via an io.LimitReader so a malformed .deb cannot
+// OOM the process by claiming a multi-gigabyte control file. Real control
+// files are tiny (kilobytes); the 64 MiB cap is a generous safety net.
 func parseControlTar(r io.Reader, name string, contents *debContents) error {
+	const maxControlEntry = 64 << 20
+
 	decompressed, err := decompressStream(r, name)
 	if err != nil {
 		return err
@@ -97,7 +108,7 @@ func parseControlTar(r io.Reader, name string, contents *debContents) error {
 			return fmt.Errorf("read tar entry: %w", err)
 		}
 
-		body, err := io.ReadAll(tr)
+		body, err := io.ReadAll(io.LimitReader(tr, maxControlEntry))
 		if err != nil {
 			return fmt.Errorf("read tar file: %w", err)
 		}
@@ -158,38 +169,63 @@ func parseDataTar(r io.Reader, name string, contents *debContents) error {
 	return nil
 }
 
-// decompressStream returns a decompressed reader based on the tar member name.
+// Magic-byte prefixes used to identify compression formats. Sniffing the
+// first few bytes is more reliable than trusting a filename suffix —
+// extractDataTar buffers the data.tar member into an os.CreateTemp file
+// whose pattern substitution strips the real ".gz"/".xz"/".zst"
+// extension, so a name-based switch would always fall through to the
+// "uncompressed" default and feed compressed bytes into archive/tar.
+var (
+	magicGzip  = []byte{0x1F, 0x8B}
+	magicXz    = []byte{0xFD, '7', 'z', 'X', 'Z', 0x00}
+	magicZstd  = []byte{0x28, 0xB5, 0x2F, 0xFD}
+	magicBzip2 = []byte{'B', 'Z', 'h'}
+)
+
+// decompressStream returns a decompressed reader for a tar payload.
+// Detection is by magic bytes, not by the supplied `name` (which the
+// caller may not control — see comment on the magic-prefix vars).
 // The caller must close the returned reader.
-func decompressStream(r io.Reader, name string) (io.ReadCloser, error) {
+func decompressStream(r io.Reader, _ string) (io.ReadCloser, error) {
+	// bufio so we can Peek the magic without consuming it.
+	br := bufio.NewReader(r)
+
+	head, err := br.Peek(6)
+	if err != nil && err != io.EOF { //nolint:errorlint // io.EOF sentinel
+		return nil, fmt.Errorf("peek magic: %w", err)
+	}
+
 	switch {
-	case strings.HasSuffix(name, ".gz"):
-		gz, err := gzip.NewReader(r)
+	case bytes.HasPrefix(head, magicGzip):
+		gz, err := gzip.NewReader(br)
 		if err != nil {
 			return nil, fmt.Errorf("gzip reader: %w", err)
 		}
 
 		return gz, nil
 
-	case strings.HasSuffix(name, ".xz"):
-		xzr, err := xz.NewReader(r)
+	case bytes.HasPrefix(head, magicXz):
+		xzr, err := xz.NewReader(br)
 		if err != nil {
 			return nil, fmt.Errorf("xz reader: %w", err)
 		}
-
-		// xz.Reader doesn't implement Close, so wrap it.
+		// xz.Reader doesn't implement Close.
 		return io.NopCloser(xzr), nil
 
-	case strings.HasSuffix(name, ".zst"):
-		zr, err := zstd.NewReader(r)
+	case bytes.HasPrefix(head, magicZstd):
+		zr, err := zstd.NewReader(br)
 		if err != nil {
 			return nil, fmt.Errorf("zstd reader: %w", err)
 		}
 
 		return zr.IOReadCloser(), nil
 
+	case bytes.HasPrefix(head, magicBzip2):
+		return io.NopCloser(bzip2.NewReader(br)), nil
+
 	default:
-		// Uncompressed.
-		return io.NopCloser(r), nil
+		// No recognised magic → assume already-uncompressed tar.
+		return io.NopCloser(br), nil
 	}
 }
 

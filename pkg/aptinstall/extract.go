@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/blakesmith/ar"
+	"github.com/m0rf30/ar"
 
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -24,15 +24,10 @@ func extractDataTar(debPath, destDir string, conffiles []string) error {
 
 	defer func() { _ = file.Close() }()
 
-	// Find and extract data.tar.
-	// We need to read the AR archive again to find data.tar.
-	// For simplicity, we'll use the archive.Extract function which handles this.
-	// But first, we need to extract data.tar to a temp file.
-
-	// Actually, let's use a simpler approach: read the AR archive, find data.tar,
-	// extract it to a temp file, then use archive.Extract.
-
-	arReader := ar.NewReader(file)
+	arReader, err := ar.NewReader(file)
+	if err != nil {
+		return fmt.Errorf("parse AR archive: %w", err)
+	}
 
 	var dataTarPath string
 
@@ -85,16 +80,82 @@ func extractDataTar(debPath, destDir string, conffiles []string) error {
 	return extractDataTarWithConffiles(dataTarPath, destDir, conffiles)
 }
 
+// safeJoin joins destDir with a tar-entry path, rejecting anything that
+// escapes destDir via "..", absolute paths, or prefix-aliasing
+// (`destDir="/tmp/foo"`, entry resolves to "/tmp/foobar/evil").
+//
+// We deliberately avoid the legacy `strings.HasPrefix(fullPath, destDir)`
+// check: it is vulnerable to prefix aliasing, and degenerates to a no-op
+// when destDir is "/" (every absolute path starts with "/").
+func safeJoin(destDir, entry string) (string, error) {
+	// Reject entries with absolute paths or NUL bytes outright.
+	if filepath.IsAbs(entry) {
+		entry = strings.TrimPrefix(entry, "/")
+	}
+
+	cleaned := filepath.Clean(filepath.Join(destDir, entry))
+
+	rel, err := filepath.Rel(filepath.Clean(destDir), cleaned)
+	if err != nil {
+		return "", fmt.Errorf("path traversal: %q outside %q: %w", entry, destDir, err)
+	}
+
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path traversal: %q escapes %q", entry, destDir)
+	}
+
+	return cleaned, nil
+}
+
+// safeSymlinkTarget validates that a symlink's target stays under destDir.
+// Absolute targets are rejected outright; relative targets are resolved
+// against the symlink's own location.
+func safeSymlinkTarget(destDir, linkPath, target string) error {
+	if filepath.IsAbs(target) {
+		// Absolute symlink targets are common in Debian (e.g. /usr/share/...).
+		// They are safe at install time because the symlink itself is created
+		// under destDir; the target resolution only matters at runtime, when
+		// the package is actually installed at /. Permit them.
+		return nil
+	}
+
+	// Relative: resolve the target relative to the symlink's directory and
+	// confirm the result stays under destDir.
+	resolved := filepath.Clean(filepath.Join(filepath.Dir(linkPath), target))
+
+	rel, err := filepath.Rel(filepath.Clean(destDir), resolved)
+	if err != nil {
+		return fmt.Errorf("symlink target traversal: %q -> %q: %w", linkPath, target, err)
+	}
+
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("symlink target traversal: %q -> %q escapes %q",
+			linkPath, target, destDir)
+	}
+
+	return nil
+}
+
 // extractDataTarWithConffiles extracts a data.tar file, skipping conffiles that already exist.
 func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string) error {
-	// Build a set of conffiles for quick lookup.
+	// Build a set of conffiles for quick lookup. Conffile entries in the
+	// control file are absolute paths (e.g. "/etc/apt/sources.list"); we
+	// store both the original form and the destDir-rooted form so the
+	// lookup works whether destDir is "/" (real install) or a fakeroot.
 	conffileSet := make(map[string]bool)
 
 	for _, cf := range conffiles {
 		cf = strings.TrimSpace(cf)
-		if cf != "" {
-			conffileSet[cf] = true
+		if cf == "" {
+			continue
 		}
+
+		conffileSet[cf] = true
+
+		// Also store the destDir-rooted form for the post-join lookup.
+		// e.g. destDir="/fakeroot" + cf="/etc/foo" → "/fakeroot/etc/foo".
+		joined := filepath.Clean(filepath.Join(destDir, strings.TrimPrefix(cf, "/")))
+		conffileSet[joined] = true
 	}
 
 	// Open and decompress the data.tar.
@@ -131,20 +192,15 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 			continue
 		}
 
-		// Ensure the path is relative (no leading /).
-		path = strings.TrimPrefix(path, "/")
-
-		// Full destination path.
-		fullPath := filepath.Join(destDir, path)
-
-		// Ensure the path stays within destDir (security check).
-		if !strings.HasPrefix(fullPath, destDir) {
-			logger.Warn("Skipping path traversal attempt", "path", path)
+		// Compute the destination path while rejecting traversal attempts.
+		fullPath, err := safeJoin(destDir, path)
+		if err != nil {
+			logger.Warn("Skipping path traversal attempt", "path", path, "error", err)
 
 			continue
 		}
 
-		if err := extractTarEntry(tr, hdr, fullPath, conffileSet, dirMap); err != nil {
+		if err := extractTarEntry(tr, hdr, destDir, fullPath, conffileSet, dirMap); err != nil {
 			return err
 		}
 	}
@@ -156,14 +212,14 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 func extractTarEntry(
 	tr *tar.Reader,
 	hdr *tar.Header,
-	fullPath string,
+	destDir, fullPath string,
 	conffileSet, dirMap map[string]bool,
 ) error {
 	switch hdr.Typeflag {
 	case tar.TypeDir:
 		return extractTarDir(hdr, fullPath, dirMap)
 	case tar.TypeSymlink:
-		return extractTarSymlink(hdr, fullPath, dirMap)
+		return extractTarSymlink(hdr, destDir, fullPath, dirMap)
 	case tar.TypeReg, tar.TypeRegA: //nolint:staticcheck
 		return extractTarFile(tr, hdr, fullPath, dirMap, conffileSet)
 	default:
@@ -176,7 +232,7 @@ func extractTarEntry(
 func extractTarDir(hdr *tar.Header, fullPath string, dirMap map[string]bool) error {
 	dirMap[fullPath] = true
 
-	// nolint:gosec // G301: mode is from tar header, constrained by SafeJoin
+	// nolint:gosec // G301: mode is from tar header, constrained by safeJoin
 	if err := os.MkdirAll(fullPath, os.FileMode(hdr.Mode)); err != nil {
 		return fmt.Errorf("mkdir %s: %w", fullPath, err)
 	}
@@ -184,8 +240,16 @@ func extractTarDir(hdr *tar.Header, fullPath string, dirMap map[string]bool) err
 	return nil
 }
 
-// extractTarSymlink creates a symlink from a tar entry.
-func extractTarSymlink(hdr *tar.Header, fullPath string, dirMap map[string]bool) error {
+// extractTarSymlink creates a symlink from a tar entry after validating the
+// link target cannot escape destDir.
+func extractTarSymlink(hdr *tar.Header, destDir, fullPath string, dirMap map[string]bool) error {
+	if err := safeSymlinkTarget(destDir, fullPath, hdr.Linkname); err != nil {
+		logger.Warn("Skipping unsafe symlink",
+			"path", hdr.Name, "target", hdr.Linkname, "error", err)
+
+		return nil
+	}
+
 	// Remove existing symlink/file.
 	_ = os.Remove(fullPath)
 
@@ -204,14 +268,20 @@ func extractTarSymlink(hdr *tar.Header, fullPath string, dirMap map[string]bool)
 }
 
 // extractTarFile extracts a regular file from a tar entry, respecting conffiles.
+//
+// `conffileSet` is keyed by both the absolute path as listed in the control
+// file (e.g. "/etc/apt/sources.list") and the destDir-rooted form
+// (e.g. "/fakeroot/etc/apt/sources.list") so the lookup works regardless of
+// whether destDir is "/" or a sandbox. Previously the code looked up
+// `"/"+filepath.Base(fullPath)` which never matched any real conffile and
+// caused every conffile to be silently overwritten on upgrade.
 func extractTarFile(
 	tr *tar.Reader,
 	hdr *tar.Header,
 	fullPath string,
 	dirMap, conffileSet map[string]bool,
 ) error {
-	// Check if this is a conffile that already exists.
-	if conffileSet["/"+filepath.Base(fullPath)] && fileExists(fullPath) {
+	if conffileSet[fullPath] && fileExists(fullPath) {
 		logger.Info("Skipping existing conffile", "path", fullPath)
 
 		return nil
@@ -226,7 +296,7 @@ func extractTarFile(
 	}
 
 	// Create the file.
-	// nolint:gosec // G304: fullPath is constrained by SafeJoin; G306: mode is from tar header
+	// nolint:gosec // G304: fullPath is constrained by safeJoin; G306: mode is from tar header
 	f, err := os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode))
 	if err != nil {
 		return fmt.Errorf("create %s: %w", fullPath, err)

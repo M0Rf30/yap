@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -58,6 +59,13 @@ var buildCmd = &cobra.Command{
 
 		// Set the skip toolchain validation flag
 		common.SkipToolchainValidation = buildOpts.SkipToolchainValidation
+
+		// Propagate the apt-repo unverified-trust opt-in. The flag is
+		// honoured by pkg/aptrepo whenever a Signed-By keyring resolves
+		// to nothing, never when a present signature fails to verify.
+		if buildOpts.AllowUnverifiedRepos {
+			aptrepo.SetAllowUnverifiedRepos(true)
+		}
 
 		// Set verbose flag from global flag
 		shell.SetVerbose(verbose)
@@ -383,4 +391,16 @@ func init() {
 	// repository definition.
 	buildCmd.Flags().StringArrayVar(&buildOpts.ExtraRepos,
 		"repo", nil, "")
+
+	// TRUST FLAGS
+	// --allow-unverified-repos is an escape hatch for apt sources whose
+	// Signed-By keyring is missing on the build host (e.g. minimal
+	// containers) or which don't declare a Signed-By at all. Sources
+	// that DO produce a signature which fails to verify are rejected
+	// regardless of this flag.
+	buildCmd.Flags().BoolVarP(&buildOpts.AllowUnverifiedRepos,
+		"allow-unverified-repos", "", false,
+		"Permit apt repos with no usable OpenPGP trust anchor "+
+			"(still refuses repos whose signature is present but invalid). "+
+			"Also settable via YAP_ALLOW_UNVERIFIED_REPOS=1.")
 }
