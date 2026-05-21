@@ -652,6 +652,11 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 		return nil
 	}
 
+	// zypper and any other unhandled PMs fall through to the distro's
+	// subprocess. Log it so the user can see which command yap is delegating.
+	logger.Info("delegating package-manager update to subprocess",
+		"pm", packageManager, "args", args)
+
 	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
 }
 

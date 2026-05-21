@@ -71,11 +71,23 @@ func (idx *Index) InstallPackagesWithOptions(
 	}
 
 	if len(toInstall) == 0 {
+		logger.Info("apkindex: all packages already installed",
+			"requested", len(names),
+			"resolved", len(resolved))
+
 		return nil
 	}
 
-	logger.Info("installing APK packages",
-		"count", len(toInstall), "resolved", len(resolved))
+	var totalBytes int64
+	for _, p := range toInstall {
+		totalBytes += p.Size
+	}
+
+	logger.Info("apkindex: installing APK packages",
+		"to_install", len(toInstall),
+		"resolved", len(resolved),
+		"skipped_installed", len(resolved)-len(toInstall),
+		"total_bytes", totalBytes)
 
 	// 3. Download all .apk files to a temp dir.
 	tmpDir, err := os.MkdirTemp("", "yap-apk-*")

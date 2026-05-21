@@ -36,6 +36,10 @@ func Sync(ctx context.Context) (succeeded int, err error) {
 		arch = detectArch()
 	}
 
+	logger.Info("pacmandb: syncing repos",
+		"repos", len(cfg.Repos),
+		"arch", arch)
+
 	var firstErr error
 
 	for _, repo := range cfg.Repos {
@@ -44,7 +48,7 @@ func Sync(ctx context.Context) (succeeded int, err error) {
 				firstErr = err
 			}
 
-			logger.Warn("pacman repo sync failed",
+			logger.Warn("pacmandb: repo sync failed",
 				"repo", repo.Name, "error", err)
 
 			continue
@@ -53,21 +57,42 @@ func Sync(ctx context.Context) (succeeded int, err error) {
 		succeeded++
 	}
 
+	logger.Info("pacmandb: sync complete",
+		"succeeded", succeeded,
+		"total", len(cfg.Repos))
+
 	return succeeded, firstErr
 }
 
 func syncRepo(ctx context.Context, repo Repo, arch string) error {
 	for _, server := range repo.Servers {
 		url := substituteVars(server, repo.Name, arch) + "/" + repo.Name + ".db"
-
 		dest := filepath.Join(pacmanSyncDir, repo.Name+".db")
-		if err := downloadFile(ctx, url, dest); err == nil {
-			// Also try to fetch the .sig (optional, used for signature checking).
-			sigDest := dest + ".sig"
-			_ = downloadFile(ctx, url+".sig", sigDest) // best-effort
 
-			return nil
+		logger.Debug("pacmandb: trying mirror",
+			"repo", repo.Name, "url", url)
+
+		err := downloadFile(ctx, url, dest)
+		if err != nil {
+			logger.Debug("pacmandb: mirror failed",
+				"repo", repo.Name, "url", url, "error", err)
+
+			continue
 		}
+
+		// Also try to fetch the .sig (optional, used for signature checking).
+		sigDest := dest + ".sig"
+		_ = downloadFile(ctx, url+".sig", sigDest) // best-effort
+
+		var sizeBytes int64
+		if fi, statErr := os.Stat(dest); statErr == nil {
+			sizeBytes = fi.Size()
+		}
+
+		logger.Info("pacmandb: repo synced",
+			"repo", repo.Name, "url", url, "bytes", sizeBytes)
+
+		return nil
 	}
 
 	return fmt.Errorf("all mirrors failed for repo %q", repo.Name)

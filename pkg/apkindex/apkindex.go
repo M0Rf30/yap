@@ -16,6 +16,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
 
@@ -63,6 +64,15 @@ func (idx *Index) Lookup(name string) (*Package, bool) {
 	return pkg, ok
 }
 
+// Stats returns the number of packages and capabilities (Provides) indexed.
+// Useful for diagnostic logging after Update.
+func (idx *Index) Stats() (packages, capabilities int) {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	return len(idx.packages), len(idx.providers)
+}
+
 // ResolveVirtual returns the first concrete provider of a virtual package, or
 // nil if no provider is found.
 func (idx *Index) ResolveVirtual(name string) (*Package, bool) {
@@ -85,6 +95,11 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 
 	seen := make(map[string]bool)
 
+	var (
+		viaVirtual int
+		unresolved int
+	)
+
 	var visit func(n string) error
 
 	visit = func(n string) error {
@@ -99,9 +114,19 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 		if !ok {
 			// Try virtual package resolution.
 			if vp, ok := idx.ResolveVirtual(n); ok {
+				logger.Debug("apkindex: resolved virtual",
+					"capability", n,
+					"provider", vp.Name)
+
+				viaVirtual++
+
 				pkg = vp
 			} else {
 				// Package not found — skip it; apk will reject it later if needed.
+				logger.Debug("apkindex: unresolved", "package", n)
+
+				unresolved++
+
 				return nil
 			}
 		}
@@ -123,6 +148,11 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 			}
 		}
 
+		logger.Debug("apkindex: enqueue install",
+			"package", pkg.Name,
+			"version", pkg.Version,
+			"size", pkg.Size)
+
 		out = append(out, pkg)
 
 		return nil
@@ -133,6 +163,12 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 			return nil, err
 		}
 	}
+
+	logger.Info("apkindex: resolved transitive deps",
+		"seeds", len(names),
+		"to_install", len(out),
+		"via_virtual", viaVirtual,
+		"unresolved", unresolved)
 
 	return out, nil
 }
