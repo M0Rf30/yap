@@ -28,7 +28,8 @@ const maxAPKPackageBytes = 1 << 30
 
 // Update fetches APKINDEX.tar.gz from every repo in /etc/apk/repositories,
 // writes the parsed indexes into the cache dir, and returns an Index ready
-// for lookups. Replaces "apk update".
+// for lookups. Replaces "apk update". The returned Index is cached globally
+// so Install can reuse it without re-fetching.
 func Update(ctx context.Context) (*Index, error) {
 	repos, err := LoadRepos()
 	if err != nil {
@@ -89,6 +90,9 @@ func Update(ctx context.Context) (*Index, error) {
 		"repos_total", len(repos),
 		"packages", pkgs,
 		"capabilities", caps)
+
+	// Cache the index globally so Install can reuse it.
+	globalIndex.Store(idx)
 
 	return idx, nil
 }

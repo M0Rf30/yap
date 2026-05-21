@@ -15,10 +15,15 @@ package apkindex
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
+
+// globalIndex caches the most recent Index from Update so Install can reuse it
+// without re-fetching.
+var globalIndex atomic.Pointer[Index]
 
 // Package holds the subset of APKINDEX fields needed for install/dep resolution.
 type Package struct {
@@ -173,6 +178,12 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 	return out, nil
 }
 
+// Load returns the cached Index from the most recent Update call, or nil if
+// Update has not been called yet.
+func Load() *Index {
+	return globalIndex.Load()
+}
+
 // Install is a convenience function that calls Update to fetch the index,
 // then installs the requested packages. This is the main entry point for
 // replacing "apk update && apk add <pkgs>" subprocess calls.
@@ -183,9 +194,14 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 // inside a yap build container) and refuses on a developer workstation.
 // Use InstallPackagesWithOptions for explicit control.
 func Install(ctx context.Context, names []string) error {
-	idx, err := Update(ctx)
-	if err != nil {
-		return err
+	idx := Load()
+	if idx == nil {
+		var err error
+
+		idx, err = Update(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	return idx.InstallPackagesWithOptions(ctx, names, InstallOptions{
