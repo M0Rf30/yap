@@ -481,6 +481,10 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 		return nil
 	}
 
+	logger.Info("GetDepends: resolving dependencies",
+		"pm", packageManager,
+		"requested", len(makeDepends))
+
 	// Filter out already-installed packages to avoid sudo prompts
 	missingPackages := filterInstalledPackages(packageManager, makeDepends)
 
@@ -537,7 +541,13 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 	}
 
 	// zypper and pacman -S still go through the distro's own installer subprocess.
+	flags := args
 	args = append(args, missingPackages...)
+
+	logger.Info("delegating package install to subprocess",
+		"pm", packageManager,
+		"packages", len(missingPackages),
+		"flags", flags)
 
 	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
 }
@@ -547,11 +557,27 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 // This handles cases where a package like "service-discover" is a virtual
 // package provided by multiple concrete packages.
 func resolveVirtualPackages(deps []string) []string {
+	if len(deps) == 0 {
+		return deps
+	}
+
+	logger.Info("resolving virtual packages (apt)", "input", len(deps))
+
 	resolved := make([]string, 0, len(deps))
+	rewritten := 0
 
 	for _, dep := range deps {
+		original := dep
+
 		resolved = append(resolved, resolveVirtualPackage(dep))
+		if resolved[len(resolved)-1] != original {
+			rewritten++
+		}
 	}
+
+	logger.Info("resolved virtual packages (apt)",
+		"input", len(deps),
+		"rewritten", rewritten)
 
 	return resolved
 }

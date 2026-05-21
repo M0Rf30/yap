@@ -403,9 +403,14 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(golang bool, targetArch 
 	useSudo := bb.Format == constants.FormatAPK
 
 	// Install dependencies first
+	// Count packages: allArgs = installArgs (flags) + deps (packages)
+	installArgs := constants.GetInstallArgs(bb.Format)
+	pkgCount := len(allArgs) - len(installArgs)
+
 	logger.Info("installing environment dependencies via package manager",
 		"pm", getPackageManager(bb.Format),
-		"packages", len(allArgs))
+		"packages", pkgCount,
+		"flags", len(installArgs))
 
 	err := shell.ExecWithSudo(context.Background(), useSudo, "", getPackageManager(bb.Format), allArgs...)
 	if err != nil {
