@@ -328,29 +328,105 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 	return nil
 }
 
-// resolveMirrorList fetches a mirrorlist URL and returns the first usable
-// base URL from the response. Lines starting with '#' are comments.
+// resolveMirrorList fetches a mirrorlist or metalink URL and returns the
+// first usable base URL from the response.
+//
+// Plain mirrorlist: one URL per line, '#' lines are comments.
+// Metalink XML: extracts the first https:// URL from <url> elements,
+// strips the trailing /repodata/repomd.xml path to get the repo base URL.
+//
+// If the request returns HTTP 404 and the URL contains a dotted version
+// (e.g. "8.10"), the fetch is retried with the major-only version ("8").
+// Some Rocky Linux repos (e.g. Devel) only register major-version entries
+// in the mirror manager.
 func resolveMirrorList(ctx context.Context, mirrorListURL string) (string, error) {
 	data, err := fetchBytes(ctx, mirrorListURL)
 	if err != nil {
-		return "", err
+		// Retry with major-only releasever on 404 (e.g. Devel-8.10 → Devel-8).
+		data, err = retryMajorVersion(ctx, mirrorListURL, err)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	for line := range strings.SplitSeq(string(data), "\n") {
+	body := strings.TrimSpace(string(data))
+
+	// Metalink XML response.
+	if strings.HasPrefix(body, "<") || strings.Contains(body[:min(len(body), 100)], "<?xml") {
+		return parseMedalinkURL(body, mirrorListURL)
+	}
+
+	// Plain mirrorlist: first non-comment, non-empty line.
+	for line := range strings.SplitSeq(body, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
-		}
-
-		// Skip metalink XML responses (start with '<').
-		if strings.HasPrefix(line, "<") {
-			break
 		}
 
 		return line, nil
 	}
 
 	return "", fmt.Errorf("dnfcache: no usable mirror in mirrorlist %s", mirrorListURL)
+}
+
+// retryMajorVersion retries a mirrorlist fetch replacing "X.Y" releasever
+// with "X" when the original request failed with HTTP 404.
+func retryMajorVersion(ctx context.Context, mirrorListURL string, origErr error) ([]byte, error) {
+	releasever := readReleasever()
+	if !strings.Contains(releasever, ".") {
+		return nil, origErr
+	}
+
+	major := strings.SplitN(releasever, ".", 2)[0]
+	retryURL := strings.ReplaceAll(mirrorListURL, releasever, major)
+
+	if retryURL == mirrorListURL {
+		return nil, origErr
+	}
+
+	data, err := fetchBytes(ctx, retryURL)
+	if err != nil {
+		return nil, origErr // return original error for clarity
+	}
+
+	return data, nil
+}
+
+// parseMedalinkURL extracts the first https:// repo base URL from a
+// Fedora/EPEL metalink XML response. The <url> elements point to
+// repomd.xml files; we strip the trailing /repodata/repomd.xml.
+func parseMedalinkURL(body, sourceURL string) (string, error) {
+	// Simple scan — avoid a full XML decode for a hot path.
+	for line := range strings.SplitSeq(body, "\n") {
+		line = strings.TrimSpace(line)
+
+		// Match <url ...>https://...</url> or bare https:// inside any tag.
+		start := strings.Index(line, "https://")
+		if start < 0 {
+			continue
+		}
+
+		end := strings.IndexAny(line[start:], "<\" \t")
+		if end < 0 {
+			end = len(line[start:])
+		}
+
+		u := line[start : start+end]
+
+		// Strip /repodata/repomd.xml suffix to get the base URL.
+		if before, found := strings.CutSuffix(u, "/repodata/repomd.xml"); found {
+			return before + "/", nil
+		}
+
+		// If no repomd.xml suffix, return as-is (plain mirror URL).
+		if strings.HasSuffix(u, "/") {
+			return u, nil
+		}
+
+		return u + "/", nil
+	}
+
+	return "", fmt.Errorf("dnfcache: no usable mirror in metalink %s", sourceURL)
 }
 
 // fetchBytes fetches a URL and returns its body as bytes.

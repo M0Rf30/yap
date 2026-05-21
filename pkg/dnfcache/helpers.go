@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -43,18 +44,38 @@ func loadInstalledSet(ctx context.Context) map[string]bool {
 	return set
 }
 
-// expandRepoVars replaces $basearch and $releasever placeholders in a repo
-// URL with values derived from the current runtime.
+// expandRepoVars replaces $basearch, $releasever, and any other $var
+// placeholders found in /etc/dnf/vars/ (e.g. $infra, $contentdir used by
+// EPEL metalink URLs).
 //
 // $basearch maps the Go GOARCH to the RPM architecture string.
-// $releasever is read from /etc/os-release (VERSION_ID field); if absent,
-// the placeholder is left unexpanded so the caller can still attempt the URL.
+// $releasever is read from /etc/os-release (VERSION_ID field).
+// All other $var tokens are resolved from /etc/dnf/vars/<var>; if the file
+// is absent the placeholder is left unexpanded.
 func expandRepoVars(url string) string {
 	url = strings.ReplaceAll(url, "$basearch", goArchToRPM())
 	url = strings.ReplaceAll(url, "$releasever", readReleasever())
+	url = expandDNFVars(url)
 
 	return url
 }
+
+// expandDNFVars replaces any remaining $var tokens in url by reading
+// /etc/dnf/vars/<var>. Unknown vars are left as-is.
+func expandDNFVars(url string) string {
+	return dnfVarRe.ReplaceAllStringFunc(url, func(m string) string {
+		varName := m[1:] // strip leading '$'
+
+		val, err := os.ReadFile("/etc/dnf/vars/" + varName) // #nosec G304
+		if err != nil {
+			return m // leave unexpanded
+		}
+
+		return strings.TrimSpace(string(val))
+	})
+}
+
+var dnfVarRe = regexp.MustCompile(`\$[A-Za-z_][A-Za-z0-9_]*`)
 
 // goArchToRPM maps GOARCH values to RPM $basearch strings.
 func goArchToRPM() string {
