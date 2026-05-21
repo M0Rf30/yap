@@ -2,11 +2,15 @@ package dnfcache
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/rpmdb"
 )
 
 // StripRPMConstraint strips RPM version constraint suffixes from a dep name.
@@ -27,7 +31,39 @@ func StripRPMConstraint(name string) string {
 // according to the RPM database. On hosts where the SQLite rpmdb is not
 // available (Rocky 8 / BerkeleyDB), falls back to "rpm -qa".
 func loadInstalledSet(ctx context.Context) map[string]bool {
-	out, err := exec.CommandContext(ctx, "rpm", "-qa", "--queryformat", "%{NAME}\n").Output() // #nosec G204
+	db, err := rpmdb.Open()
+	if err == nil {
+		names, err := db.ListInstalled(ctx)
+		if err == nil {
+			set := make(map[string]bool, len(names))
+			for _, name := range names {
+				set[name] = true
+			}
+
+			return set
+		}
+	}
+
+	if !errors.Is(err, rpmdb.ErrLegacyDB) && err != nil {
+		return map[string]bool{}
+	}
+
+	logger.Debug("dnfcache: legacy BDB rpmdb, falling back to rpm -qa")
+
+	return loadInstalledSetSubprocess(ctx)
+}
+
+// loadInstalledSetSubprocess returns the set of package names currently
+// installed using the rpm -qa subprocess. Used as fallback for legacy
+// BerkeleyDB hosts.
+func loadInstalledSetSubprocess(ctx context.Context) map[string]bool {
+	out, err := exec.CommandContext(
+		ctx,
+		"rpm",
+		"-qa",
+		"--queryformat",
+		"%{NAME}\n",
+	).Output() // #nosec G204
 	if err != nil {
 		return map[string]bool{}
 	}
@@ -50,9 +86,42 @@ func loadInstalledSet(ctx context.Context) map[string]bool {
 // Used by ResolveDeps to avoid installing alternative packages that conflict
 // with what is already on the system.
 func loadInstalledProvides(ctx context.Context) map[string]bool {
-	// %{PROVIDES} on RPM emits one capability per line, with optional version
-	// constraints (e.g. "coreutils = 8.30-17.el8_10"). Strip constraints.
-	out, err := exec.CommandContext(ctx, "rpm", "-qa", "--queryformat", "[%{PROVIDENAME}\n]").Output() // #nosec G204
+	db, err := rpmdb.Open()
+	if err == nil {
+		provides, err := db.ListInstalledProvides(ctx)
+		if err == nil {
+			set := make(map[string]bool, len(provides))
+			for _, prov := range provides {
+				capName := StripRPMConstraint(prov)
+				if capName != "" {
+					set[capName] = true
+				}
+			}
+
+			return set
+		}
+	}
+
+	if !errors.Is(err, rpmdb.ErrLegacyDB) && err != nil {
+		return map[string]bool{}
+	}
+
+	logger.Debug("dnfcache: legacy BDB rpmdb, falling back to rpm -qa")
+
+	return loadInstalledProvidesSubprocess(ctx)
+}
+
+// loadInstalledProvidesSubprocess returns the set of capabilities (Provides)
+// currently satisfied by installed packages using the rpm -qa subprocess.
+// Used as fallback for legacy BerkeleyDB hosts.
+func loadInstalledProvidesSubprocess(ctx context.Context) map[string]bool {
+	out, err := exec.CommandContext(
+		ctx,
+		"rpm",
+		"-qa",
+		"--queryformat",
+		"[%{PROVIDENAME}\n]",
+	).Output() // #nosec G204
 	if err != nil {
 		return map[string]bool{}
 	}

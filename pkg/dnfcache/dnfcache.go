@@ -161,11 +161,11 @@ func (c *Cache) ResolveVirtual(name string) string {
 // Already-installed packages (detected via rpmdb) are skipped but their
 // dependency edges are still walked so transitive-only packages are pulled in.
 func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo, []string, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	installed := loadInstalledSet(ctx)
 	provides := loadInstalledProvides(ctx)
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	logger.Debug("dnfcache: resolver state loaded",
 		"installed_packages", len(installed),

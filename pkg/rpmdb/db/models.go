@@ -13,3 +13,9 @@ type Package struct {
 	Hnum int64
 	Blob []byte
 }
+
+type Providename struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
