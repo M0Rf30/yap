@@ -371,8 +371,11 @@ func SafeJoin(destination, name string) (string, error) {
 }
 
 // SafeSymlinkTarget is the exported wrapper around safeSymlinkTarget.
-func SafeSymlinkTarget(target string) error {
-	return safeSymlinkTarget(target)
+// entryName is the path of the symlink itself within the archive (e.g.
+// "opt/foo/sbin/slapacl"); target is the symlink target as stored in the
+// archive (e.g. "../libexec/slapd").
+func SafeSymlinkTarget(entryName, target string) error {
+	return safeSymlinkTarget(entryName, target)
 }
 
 // safeJoin joins destination + name and verifies the result stays inside
@@ -414,23 +417,55 @@ func safeJoin(destination, name string) (string, error) {
 }
 
 // safeSymlinkTarget validates a symlink target before it is created on disk.
-// Targets containing ".." segments are rejected as defense-in-depth.
 //
 // Absolute targets are accepted: real packages routinely ship absolute
 // symlinks (e.g. /usr/lib64/libfoo.so.1 -> /usr/lib/libfoo.so.1) and
-// dpkg/rpm/apk accept them. The traversal attack of interest is a tar that
-// creates a link foo -> /etc and then writes foo/passwd; that is already
-// blocked by safeJoin on every entry path, which validates the *write* path,
-// not the symlink target. Creating the link itself is harmless.
-func safeSymlinkTarget(target string) error {
+// dpkg/rpm/apk accept them.
+//
+// Relative targets containing ".." are accepted *if* the target resolves to
+// a path that stays inside the extraction root when interpreted relative to
+// the symlink's own location. For example, an entry
+//
+//	opt/foo/sbin/slapacl -> ../libexec/slapd
+//
+// resolves to "opt/foo/libexec/slapd" — well inside the root, and a perfectly
+// normal Debian/RPM symlink pattern. Conversely, an entry
+//
+//	a/b -> ../../../escape
+//
+// would resolve above the extraction root and is rejected.
+//
+// This is defense-in-depth against TOCTOU-style symlink+write attacks where
+// a malicious archive first creates a symlink pointing outside the root and
+// then writes a regular file through it. safeJoin handles the write-path
+// case lexically, but does not follow symlinks on disk; rejecting escaping
+// link targets closes that gap.
+func safeSymlinkTarget(entryName, target string) error {
 	if target == "" {
 		return nil
 	}
 
-	if slices.Contains(strings.Split(filepath.ToSlash(target), "/"), "..") {
+	// Absolute targets are accepted as-is; see function doc.
+	if filepath.IsAbs(target) || strings.HasPrefix(target, "/") {
+		return nil
+	}
+
+	// Resolve the target relative to the symlink's own parent directory
+	// within the archive, then verify it doesn't escape the archive root.
+	parent := filepath.ToSlash(filepath.Dir(filepath.ToSlash(entryName)))
+	if parent == "." || parent == "/" {
+		parent = ""
+	}
+
+	joined := filepath.ToSlash(filepath.Join(parent, filepath.ToSlash(target)))
+
+	// filepath.Join cleans the path; an escape manifests as a leading "..".
+	if joined == ".." || strings.HasPrefix(joined, "../") {
 		return errors.New(errors.ErrTypePackaging,
-			"symlink target contains traversal").
+			"symlink target escapes archive root").
+			WithContext("entry", entryName).
 			WithContext("target", target).
+			WithContext("resolved", joined).
 			WithOperation("safeSymlinkTarget")
 	}
 
@@ -592,7 +627,7 @@ func extractTar(ctx context.Context, tr *tar.Reader, destination string, pattern
 			}
 
 		case tar.TypeSymlink:
-			if err := safeSymlinkTarget(hdr.Linkname); err != nil {
+			if err := safeSymlinkTarget(hdr.Name, hdr.Linkname); err != nil {
 				logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
 					"entry", hdr.Name, "target", hdr.Linkname)
 
@@ -744,7 +779,7 @@ func writeSymlinkFromOpener(
 		return err
 	}
 
-	if err := safeSymlinkTarget(string(target)); err != nil {
+	if err := safeSymlinkTarget(entryName, string(target)); err != nil {
 		logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
 			"entry", entryName, "target", string(target))
 
@@ -980,7 +1015,7 @@ func writeRarSymlink(
 		return err
 	}
 
-	if err := safeSymlinkTarget(string(target)); err != nil {
+	if err := safeSymlinkTarget(hdr.Name, string(target)); err != nil {
 		logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
 			"entry", hdr.Name, "target", string(target))
 

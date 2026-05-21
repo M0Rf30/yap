@@ -98,29 +98,49 @@ func TestSafeJoin_RootDestination(t *testing.T) {
 
 func TestSafeSymlinkTarget(t *testing.T) {
 	cases := []struct {
-		target  string
+		name    string // descriptive label
+		entry   string // path of the symlink itself within the archive
+		target  string // target as stored in the archive
 		wantErr bool
 	}{
-		{"relative.txt", false},
-		{"sub/dir/target.txt", false},
-		{"./local", false},
-		{"", false},
+		{"empty", "any/where", "", false},
+		{"plain relative", "a/b", "relative.txt", false},
+		{"nested relative", "a/b", "sub/dir/target.txt", false},
+		{"dot-relative", "a/b", "./local", false},
+
 		// Absolute targets are accepted: real packages routinely ship absolute
 		// symlinks. The traversal-through-symlink attack is blocked by safeJoin
 		// on every entry's write path, not the link target.
-		{"/etc/passwd", false},
-		{"/absolute/danger", false},
-		{"../escape", true},
-		{"a/../../escape", true},
-		{"foo/../bar", true},
+		{"absolute etc", "any/where", "/etc/passwd", false},
+		{"absolute lib", "any/where", "/absolute/danger", false},
+
+		// Legitimate sibling-directory relative symlinks. This is the case
+		// that previously broke real-world Debian packages (e.g. openldap
+		// ships opt/.../sbin/slapacl -> ../libexec/slapd).
+		{
+			"sibling via parent dir",
+			"opt/zextras/common/sbin/slapacl",
+			"../libexec/slapd",
+			false,
+		},
+		{
+			"sibling two levels up",
+			"a/b/c/d", "../../sibling/file",
+			false,
+		},
+
+		// Targets that resolve above the archive root must be rejected.
+		{"escape from root", "a", "../escape", true},
+		{"escape via double-dot chain", "a/b", "../../../escape", true},
+		{"escape mid-path", "a/b", "foo/../../../escape", true},
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.target, func(t *testing.T) {
-			err := safeSymlinkTarget(tc.target)
+		t.Run(tc.name, func(t *testing.T) {
+			err := safeSymlinkTarget(tc.entry, tc.target)
 			if (err != nil) != tc.wantErr {
-				t.Fatalf("safeSymlinkTarget(%q) err=%v wantErr=%v",
-					tc.target, err, tc.wantErr)
+				t.Fatalf("safeSymlinkTarget(%q, %q) err=%v wantErr=%v",
+					tc.entry, tc.target, err, tc.wantErr)
 			}
 		})
 	}

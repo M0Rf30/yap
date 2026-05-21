@@ -307,7 +307,7 @@ func extractAPKMember(r io.Reader, destDir string, dirMap map[string]bool) error
 			}
 
 		case tar.TypeSymlink:
-			if err := archive.SafeSymlinkTarget(hdr.Linkname); err != nil {
+			if err := archive.SafeSymlinkTarget(hdr.Name, hdr.Linkname); err != nil {
 				logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
 					"entry", hdr.Name, "target", hdr.Linkname)
 
@@ -488,7 +488,7 @@ func extractRPMEntry(
 		return os.MkdirAll(target, perm|0o100) // ensure exec bit so we can descend
 
 	case rpmFileTypeLink:
-		if err := archive.SafeSymlinkTarget(fi.Linkname()); err != nil {
+		if err := archive.SafeSymlinkTarget(fi.Name(), fi.Linkname()); err != nil {
 			logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
 				"entry", fi.Name(), "target", fi.Linkname())
 
