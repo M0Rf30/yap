@@ -1,0 +1,437 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1779382007078,
+  "projectRoot": "/home/gianluca/M0Rf30/yap",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Go",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "go.mod"
+        ]
+      },
+      {
+        "name": "C/C++",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "Makefile"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "go",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "make build",
+    "testCommand": "make test",
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "assets",
+      "bin",
+      "examples",
+      "scripts"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "artifacts": {
+      "path": "artifacts",
+      "purpose": null,
+      "fileCount": 33,
+      "lastAccessed": 1779382007069,
+      "keyFiles": [
+        "carbonio-appserver-conf-4.26.0-1-x86_64.pkg.tar.zst",
+        "carbonio-appserver-db-4.26.0-1-x86_64.pkg.tar.zst",
+        "carbonio-appserver-service-4.26.0-1-x86_64.pkg.tar.zst",
+        "carbonio-ce-4.4.5-1.el8.x86_64.rpm",
+        "carbonio-ce-4.4.5-1.el9.x86_64.rpm"
+      ]
+    },
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 0,
+      "lastAccessed": 1779382007073,
+      "keyFiles": []
+    },
+    "bin": {
+      "path": "bin",
+      "purpose": "Executable scripts",
+      "fileCount": 1,
+      "lastAccessed": 1779382007074,
+      "keyFiles": [
+        "yap"
+      ]
+    },
+    "build": {
+      "path": "build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1779382007074,
+      "keyFiles": []
+    },
+    "cmd": {
+      "path": "cmd",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779382007075,
+      "keyFiles": []
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 0,
+      "lastAccessed": 1779382007075,
+      "keyFiles": []
+    },
+    "native": {
+      "path": "native",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779382007075,
+      "keyFiles": []
+    },
+    "pkg": {
+      "path": "pkg",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779382007076,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 4,
+      "lastAccessed": 1779382007076,
+      "keyFiles": [
+        "extract_messages.go",
+        "extract_messages.sh",
+        "i18n_automation.sh",
+        "validate-workflows.sh"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "session-ses_1b4a.md",
+      "accessCount": 4,
+      "lastAccessed": 1779395553669,
+      "type": "file"
+    },
+    {
+      "path": "doc.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395531942,
+      "type": "file"
+    },
+    {
+      "path": "gen-context.config.json",
+      "accessCount": 1,
+      "lastAccessed": 1779395535853,
+      "type": "file"
+    },
+    {
+      "path": ".hadolint.yml",
+      "accessCount": 1,
+      "lastAccessed": 1779395536340,
+      "type": "file"
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "accessCount": 1,
+      "lastAccessed": 1779395537383,
+      "type": "file"
+    },
+    {
+      "path": "LICENSE.md",
+      "accessCount": 1,
+      "lastAccessed": 1779395537425,
+      "type": "file"
+    },
+    {
+      "path": "sqlc.yaml",
+      "accessCount": 1,
+      "lastAccessed": 1779395538440,
+      "type": "file"
+    },
+    {
+      "path": ".markdownlint.yml",
+      "accessCount": 1,
+      "lastAccessed": 1779395542029,
+      "type": "file"
+    },
+    {
+      "path": ".markdownlint-cli2.yaml",
+      "accessCount": 1,
+      "lastAccessed": 1779395542186,
+      "type": "file"
+    },
+    {
+      "path": ".goreleaser.yml",
+      "accessCount": 1,
+      "lastAccessed": 1779395542286,
+      "type": "file"
+    },
+    {
+      "path": "AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1779395542587,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1779395554131,
+      "type": "file"
+    },
+    {
+      "path": ".golangci.yml",
+      "accessCount": 1,
+      "lastAccessed": 1779395554798,
+      "type": "file"
+    },
+    {
+      "path": ".claude/settings.local.json",
+      "accessCount": 1,
+      "lastAccessed": 1779395555488,
+      "type": "file"
+    },
+    {
+      "path": "cmd/i18n-tool/main_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395568438,
+      "type": "file"
+    },
+    {
+      "path": "cmd/i18n-tool/main.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395573058,
+      "type": "file"
+    },
+    {
+      "path": "examples/circular-deps/yap.json",
+      "accessCount": 1,
+      "lastAccessed": 1779395573594,
+      "type": "file"
+    },
+    {
+      "path": "examples/circular-deps/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1779395574131,
+      "type": "file"
+    },
+    {
+      "path": "examples/circular-deps/package-a/package-a.c",
+      "accessCount": 1,
+      "lastAccessed": 1779395574648,
+      "type": "file"
+    },
+    {
+      "path": "examples/circular-deps/package-b/package-b.c",
+      "accessCount": 1,
+      "lastAccessed": 1779395575654,
+      "type": "file"
+    },
+    {
+      "path": "examples/dependency-orchestration/yap.json",
+      "accessCount": 1,
+      "lastAccessed": 1779395576310,
+      "type": "file"
+    },
+    {
+      "path": "examples/dependency-orchestration/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1779395576695,
+      "type": "file"
+    },
+    {
+      "path": "examples/multi-architecture/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1779395577375,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/fetch.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395578458,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/safety_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395578518,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptcache/aptcache.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395581687,
+      "type": "file"
+    },
+    {
+      "path": "assets/images/logo.png",
+      "accessCount": 1,
+      "lastAccessed": 1779395581849,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/export_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395583128,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/fetch_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395583576,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/repos_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395584053,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/repos.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395584571,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/parser.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395585583,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/install.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395586149,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptinstall/aptinstall.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395586628,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/apkindex_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395586720,
+      "type": "file"
+    },
+    {
+      "path": "assets/images/logo.svg",
+      "accessCount": 1,
+      "lastAccessed": 1779395586760,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptinstall/status.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395587150,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/apkindex.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395587323,
+      "type": "file"
+    },
+    {
+      "path": "pkg/apkindex/install_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395587811,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptinstall/scriptlet.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395588213,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptinstall/deb.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395588724,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptcache/safety_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395588787,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptcache/bench_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395589006,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptinstall/extract.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395589316,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptrepo/fetch.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395589772,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptrepo/release.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395590221,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptrepo/verify.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395592701,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptrepo/aptrepo.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395596876,
+      "type": "file"
+    },
+    {
+      "path": "pkg/aptrepo/export_test.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395600815,
+      "type": "file"
+    },
+    {
+      "path": "pkg/archive/tar.go",
+      "accessCount": 1,
+      "lastAccessed": 1779395605523,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

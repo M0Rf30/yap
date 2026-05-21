@@ -2,6 +2,8 @@
 package packer
 
 import (
+	"context"
+
 	"github.com/M0Rf30/yap/v2/pkg/builders/apk"
 	"github.com/M0Rf30/yap/v2/pkg/builders/deb"
 	"github.com/M0Rf30/yap/v2/pkg/builders/pacman"
@@ -46,7 +48,7 @@ type Packer interface {
 // package database. This avoids circular dependency conflicts between arch-all
 // meta-packages and their arch-specific transitive dependencies.
 type CrossDepsExtractor interface {
-	DownloadAndExtractCrossDeps(deps []string, targetArch string) error
+	DownloadAndExtractCrossDeps(ctx context.Context, deps []string, targetArch string) error
 }
 
 // GetPackageManager returns a Packer interface based on the given package build and distribution.
