@@ -260,6 +260,8 @@
   translation: "Percorso della chiave privata per la firma (PEM per RSA, ASCII-armored per GPG)"
 - id: flags.build.sign_passphrase
   translation: "Passphrase per la chiave privata (preferire la variabile d'ambiente YAP_SIGN_PASSPHRASE)"
+- id: flags.build.skip_hash_check
+  translation: "Salta la verifica dell'integrità sha256/sha512 dei file sorgente"
 - id: flags.build.sign_key_name
   translation: "Nome della chiave per la firma APK (es. 'mykey')"
 - id: flags.build.compression_deb

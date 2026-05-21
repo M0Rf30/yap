@@ -260,6 +260,8 @@
   translation: "Passphrase for private key (prefer env var YAP_SIGN_PASSPHRASE)"
 - id: flags.build.sign_key_name
   translation: "Key name for APK signing (e.g., 'mykey')"
+- id: flags.build.skip_hash_check
+  translation: "Skip sha256/sha512 integrity verification of source files"
 - id: flags.build.compression_deb
   translation: "DEB compression algorithm: zstd|gzip|xz"
 - id: flags.build.compression_rpm
