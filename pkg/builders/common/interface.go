@@ -18,7 +18,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/options"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
-	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 const (
@@ -164,10 +163,10 @@ func (bb *BaseBuilder) LogCrossCompilation(targetArch string) {
 	}
 }
 
-// SetupEnvironmentDependencies gets the build environment dependencies for the format.
-func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
+// SetupEnvironmentDeps gets the build environment dependency package names
+// (without install flags) for the format.
+func (bb *BaseBuilder) SetupEnvironmentDeps(golang bool) []string {
 	buildDeps := constants.GetBuildDeps()
-	installArgs := constants.GetInstallArgs(bb.Format)
 
 	var deps []string
 
@@ -182,24 +181,36 @@ func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
 		deps = buildDeps.Pacman
 	}
 
-	allArgs := make([]string, len(installArgs)+len(deps))
-	copy(allArgs, installArgs)
-	copy(allArgs[len(installArgs):], deps)
-
 	if golang {
 		// APK uses different Go setup
 		if bb.Format == constants.FormatAPK {
 			platform.CheckGO()
 		} else {
-			logger.Info(i18n.T("logger.setupenvironmentdependencies.info.go_detected_version_check_1"))
+			logger.Info(i18n.T(
+				"logger.setupenvironmentdependencies.info.go_detected_version_check_1"))
 
 			err := platform.GOSetup()
 			if err != nil {
-				logger.Warn(i18n.T("logger.setupenvironmentdependencies.warn.failed_to_setup_go_1"),
+				logger.Warn(
+					i18n.T(
+						"logger.setupenvironmentdependencies.warn.failed_to_setup_go_1"),
 					"error", err)
 			}
 		}
 	}
+
+	return deps
+}
+
+// SetupEnvironmentDependencies gets the build environment dependencies for
+// the format, including install flags. Calls SetupEnvironmentDeps internally.
+func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
+	deps := bb.SetupEnvironmentDeps(golang)
+	installArgs := constants.GetInstallArgs(bb.Format)
+
+	allArgs := make([]string, len(installArgs)+len(deps))
+	copy(allArgs, installArgs)
+	copy(allArgs[len(installArgs):], deps)
 
 	return allArgs
 }
@@ -382,8 +393,12 @@ func (bb *BaseBuilder) PrepareEnvironment(golang bool, targetArch string) error 
 
 // prepareEnvironmentWithValidation sets up the build environment with optional toolchain validation.
 // This version allows callers to skip toolchain validation if needed.
-func (bb *BaseBuilder) prepareEnvironmentWithValidation(golang bool, targetArch string, skipValidation bool) error {
-	allArgs := bb.SetupEnvironmentDependencies(golang)
+func (bb *BaseBuilder) prepareEnvironmentWithValidation(
+	golang bool,
+	targetArch string,
+	skipValidation bool,
+) error {
+	deps := bb.SetupEnvironmentDeps(golang)
 
 	// Add cross-compilation dependencies if target architecture is different
 	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
@@ -395,30 +410,30 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(golang bool, targetArch 
 			return err
 		}
 
-		if err := bb.handleCrossCompilation(targetArch, skipValidation, &allArgs); err != nil {
+		if err := bb.handleCrossCompilation(targetArch, skipValidation, &deps); err != nil {
 			return err
 		}
 	}
 
-	useSudo := bb.Format == constants.FormatAPK
-
-	// Install dependencies first
-	// Count packages: allArgs = installArgs (flags) + deps (packages)
 	installArgs := constants.GetInstallArgs(bb.Format)
-	pkgCount := len(allArgs) - len(installArgs)
+	pm := getPackageManager(bb.Format)
 
 	logger.Info("installing environment dependencies via package manager",
-		"pm", getPackageManager(bb.Format),
-		"packages", pkgCount,
+		"pm", pm,
+		"packages", len(deps),
 		"flags", len(installArgs))
 
-	err := shell.ExecWithSudo(context.Background(), useSudo, "", getPackageManager(bb.Format), allArgs...)
-	if err != nil {
+	// Route through GetDepends so apk/apt/dnf-yum hit the pure-Go installers
+	// and only pacman/zypper still hit the subprocess. Mirrors what
+	// pkg/builders/common cross-deps does and avoids the prepare-time
+	// "unauthenticated packages" failure on apt-get with --repo flags.
+	if err := bb.PKGBUILD.GetDepends(pm, installArgs, deps); err != nil {
 		return err
 	}
 
 	// Refresh ccache compiler symlinks so freshly installed cross-compilers are
-	// wrapped automatically when /usr/lib/ccache (or /usr/lib64/ccache) is in PATH.
+	// wrapped automatically when /usr/lib/ccache (or /usr/lib64/ccache) is in
+	// PATH.
 	bb.refreshCcacheSymlinks()
 
 	return nil

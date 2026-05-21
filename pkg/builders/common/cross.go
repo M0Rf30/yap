@@ -453,9 +453,14 @@ func (bb *BaseBuilder) getCrossCompilerDependencies(targetArch string) []string 
 	return (&toolchain).GetAllPackages()
 }
 
-// handleCrossCompilation handles cross-compilation setup including validation and dependency collection.
-// This helper reduces nesting complexity in PrepareEnvironmentWithValidation.
-func (bb *BaseBuilder) handleCrossCompilation(targetArch string, skipValidation bool, allArgs *[]string) error {
+// handleCrossCompilation handles cross-compilation setup including validation
+// and dependency collection. This helper reduces nesting complexity in
+// prepareEnvironmentWithValidation.
+func (bb *BaseBuilder) handleCrossCompilation(
+	targetArch string,
+	skipValidation bool,
+	deps *[]string,
+) error {
 	logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
 		"target_arch", targetArch,
 		"build_arch", bb.PKGBUILD.ArchComputed)
@@ -472,12 +477,14 @@ func (bb *BaseBuilder) handleCrossCompilation(targetArch string, skipValidation 
 	// Add cross-compilation dependencies
 	crossDeps := bb.getCrossCompilerDependencies(targetArch)
 	if len(crossDeps) > 0 {
-		logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
+		logger.Info(
+			i18n.T(
+				"logger.cross_compilation.installing_cross_compiler_packages"),
 			"target_arch", targetArch,
 			"packages", strings.Join(crossDeps, ", "))
 	}
 
-	*allArgs = append(*allArgs, crossDeps...)
+	*deps = append(*deps, crossDeps...)
 
 	return nil
 }
