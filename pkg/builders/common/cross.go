@@ -264,6 +264,14 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch string) error {
 	if bb.Format != constants.FormatDEB {
 		// Non-DEB formats: fall back to normal install (no cross-arch conflict).
+		// RPM/APK/Pacman don't have a multiarch install story like dpkg, so we
+		// don't do the download+extract dance — we just let the native package
+		// manager install the deps as if it were a host build.
+		logger.Info("cross-build deps: using native install (no closure extract)",
+			"format", bb.Format,
+			"target_arch", targetArch,
+			"deps", len(deps))
+
 		installArgs := constants.GetInstallArgs(bb.Format)
 
 		return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, deps)
@@ -280,11 +288,16 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch str
 	seeds = append(seeds, qualified...)
 
 	if len(seeds) == 0 {
+		logger.Info("cross-build deps: no runtime deps to fetch",
+			"target_arch", targetArch)
+
 		return nil
 	}
 
 	logger.Info("fetching cross-build runtime deps",
 		"target_arch", targetArch,
+		"arch_specific_count", len(qualified),
+		"arch_all_count", len(archAll),
 		"arch_specific", strings.Join(qualified, ", "),
 		"arch_all", strings.Join(archAll, ", "))
 
@@ -386,6 +399,8 @@ func (bb *BaseBuilder) installCrossDeps(makeDepends, installArgs []string, targe
 	logger.Info("Qualifying makedepends for target architecture",
 		"target_arch", targetArch,
 		"format", bb.Format,
+		"arch_specific_count", len(qualified),
+		"arch_all_count", len(archAll),
 		"arch_specific", strings.Join(qualified, ", "),
 		"arch_all", strings.Join(archAll, ", "))
 
