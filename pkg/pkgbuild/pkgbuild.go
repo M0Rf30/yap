@@ -22,6 +22,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/aptinstall"
 	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -522,8 +523,18 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 		return nil
 	}
 
-	// RPM (dnf/yum/zypper) and `pacman -S` still go through the distro's
-	// own installer subprocess — no in-tree replacement for them yet.
+	// DNF/YUM: use the in-tree resolver and downloader.
+	switch packageManager {
+	case "dnf", "yum":
+		if err := dnfcache.Install(context.Background(), missingPackages); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache install failed").
+				WithOperation("GetDepends")
+		}
+
+		return nil
+	}
+
+	// zypper and pacman -S still go through the distro's own installer subprocess.
 	args = append(args, missingPackages...)
 
 	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
@@ -627,6 +638,14 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 		}
 
 		logger.Info("refreshed pacman sync DBs", "count", n)
+
+		return nil
+
+	case "dnf", "yum":
+		if err := dnfcache.Update(context.Background()); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache update failed").
+				WithOperation("GetUpdates")
+		}
 
 		return nil
 	}
