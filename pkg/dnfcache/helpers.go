@@ -44,6 +44,31 @@ func loadInstalledSet(ctx context.Context) map[string]bool {
 	return set
 }
 
+// loadInstalledProvides returns the set of capabilities (Provides) currently
+// satisfied by installed packages. This includes virtual package names like
+// "coreutils" which may be provided by "coreutils-single" on minimal images.
+// Used by ResolveDeps to avoid installing alternative packages that conflict
+// with what is already on the system.
+func loadInstalledProvides(ctx context.Context) map[string]bool {
+	// %{PROVIDES} on RPM emits one capability per line, with optional version
+	// constraints (e.g. "coreutils = 8.30-17.el8_10"). Strip constraints.
+	out, err := exec.CommandContext(ctx, "rpm", "-qa", "--queryformat", "[%{PROVIDENAME}\n]").Output() // #nosec G204
+	if err != nil {
+		return map[string]bool{}
+	}
+
+	set := make(map[string]bool)
+
+	for line := range strings.SplitSeq(string(out), "\n") {
+		capName := StripRPMConstraint(strings.TrimSpace(line))
+		if capName != "" {
+			set[capName] = true
+		}
+	}
+
+	return set
+}
+
 // expandRepoVars replaces $basearch, $releasever, and any other $var
 // placeholders found in /etc/dnf/vars/ (e.g. $infra, $contentdir used by
 // EPEL metalink URLs).

@@ -80,6 +80,8 @@ const (
 	aptPM             = "apt"
 	dpkgPM            = "dpkg"
 	apkPM             = "apk"
+	dnfPM             = "dnf"
+	yumPM             = "yum"
 )
 
 // Priority constants for PKGBUILD directive matching.
@@ -282,7 +284,7 @@ func filterInstalledPackages(packageManager string, packages []string) []string 
 		return filterInstalledAPK(packages)
 	case "pacman":
 		return filterInstalledPacman(packages)
-	case "rpm", "yum", "dnf", "zypper":
+	case "rpm", yumPM, dnfPM, "zypper":
 		return filterInstalledRPM(packages)
 	default:
 		return packages
@@ -525,7 +527,7 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 
 	// DNF/YUM: use the in-tree resolver and downloader.
 	switch packageManager {
-	case "dnf", "yum":
+	case dnfPM, yumPM:
 		if err := dnfcache.Install(context.Background(), missingPackages); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache install failed").
 				WithOperation("GetDepends")
@@ -641,7 +643,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 
 		return nil
 
-	case "dnf", "yum":
+	case dnfPM, yumPM:
 		if err := dnfcache.Update(context.Background()); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache update failed").
 				WithOperation("GetUpdates")

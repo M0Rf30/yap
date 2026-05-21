@@ -242,7 +242,11 @@ func fetchAllRepos(ctx context.Context) error {
 				"repo", res.id,
 				"error", res.err)
 
-			if firstErr == nil {
+			// HTTP 4xx errors (auth-gated, not-found) are non-fatal: the
+			// existing on-disk cache for that repo is still usable. Only
+			// propagate errors that indicate a systemic problem (network
+			// failure, disk full, etc.).
+			if firstErr == nil && !isHTTPClientError(res.err) {
 				firstErr = res.err
 			}
 		}
@@ -427,6 +431,25 @@ func parseMedalinkURL(body, sourceURL string) (string, error) {
 	}
 
 	return "", fmt.Errorf("dnfcache: no usable mirror in metalink %s", sourceURL)
+}
+
+// isHTTPClientError returns true when err is an HTTP 4xx response from
+// httpclient.CheckStatus. These are non-fatal for repo refresh: the existing
+// on-disk cache remains usable (auth-gated or temporarily unavailable repos).
+func isHTTPClientError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := err.Error()
+
+	for _, code := range []string{"HTTP 400 ", "HTTP 401 ", "HTTP 403 ", "HTTP 404 ", "HTTP 410 ", "HTTP 451 "} {
+		if strings.Contains(msg, code) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // fetchBytes fetches a URL and returns its body as bytes.

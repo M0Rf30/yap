@@ -163,6 +163,7 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 	defer c.mu.RUnlock()
 
 	installed := loadInstalledSet(ctx)
+	provides := loadInstalledProvides(ctx)
 
 	seen := make(map[string]bool)
 
@@ -180,6 +181,13 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 		}
 
 		seen[name] = true
+
+		// Capability already provided by an installed package: do not pull
+		// any alternative provider. Prevents conflicts like coreutils vs
+		// coreutils-single where both own /usr/bin/ls.
+		if installed[name] || provides[name] {
+			return
+		}
 
 		info, ok := c.packages[name]
 		if !ok {
@@ -200,10 +208,7 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 			visit(req)
 		}
 
-		// Only add to install list if not already installed.
-		if !installed[name] {
-			order = append(order, info)
-		}
+		order = append(order, info)
 	}
 
 	for _, seed := range seeds {
