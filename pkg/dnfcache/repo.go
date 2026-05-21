@@ -253,11 +253,11 @@ func fetchAllRepos(ctx context.Context) error {
 
 // fetchRepo fetches repomd.xml and the primary.xml.gz for a single repo.
 func fetchRepo(ctx context.Context, repo RepoEntry) error {
-	baseURL := repo.BaseURL
+	baseURL := expandRepoVars(repo.BaseURL)
 
 	// Resolve mirrorlist to a concrete base URL if no baseurl was set.
 	if baseURL == "" && repo.MirrorList != "" {
-		resolved, err := resolveMirrorList(ctx, repo.MirrorList)
+		resolved, err := resolveMirrorList(ctx, expandRepoVars(repo.MirrorList))
 		if err != nil {
 			return fmt.Errorf("dnfcache: resolve mirrorlist for %s: %w", repo.ID, err)
 		}
