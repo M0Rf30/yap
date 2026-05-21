@@ -258,9 +258,9 @@ func InitializeBuildDescriptions() {
 	// #nosec G101 -- map keys are CLI flag names, not credentials
 	initCommandDescriptions(buildCmd, "build", map[string]string{
 		"cleanbuild":                "flags.build.cleanbuild",
-		"nobuild":                   "flags.build.nobuild",
+		"no-build":                  "flags.build.no_build",
 		commandZap:                  "flags.build.zap",
-		"nomakedeps":                "flags.build.nomakedeps",
+		"no-makedeps":               "flags.build.no_makedeps",
 		flagSkipSync:                "flags.build.skip_sync",
 		"skip-toolchain-validation": "flags.build.skip_toolchain_validation",
 		"parallel":                  "flags.build.parallel",
@@ -284,6 +284,7 @@ func InitializeBuildDescriptions() {
 		"sign-passphrase":           "flags.build.sign_passphrase",
 		"sign-key-name":             "flags.build.sign_key_name",
 		"skip-hash-check":           "flags.build.skip_hash_check",
+		"allow-unverified-repos":    "flags.build.allow_unverified_repos",
 	})
 }
 
@@ -318,19 +319,19 @@ func init() {
 	buildCmd.Flags().BoolVarP(&buildOpts.CleanBuild,
 		"cleanbuild", "c", false, "")
 	buildCmd.Flags().BoolVarP(&buildOpts.NoBuild,
-		"nobuild", "o", false, "")
+		"no-build", "o", false, "")
 	buildCmd.Flags().BoolVarP(&buildOpts.Zap,
 		"zap", "z", false, "")
-	buildCmd.Flags().BoolVar(&buildOpts.SkipHashCheck,
-		"skip-hash-check", false, "")
+	buildCmd.Flags().BoolVarP(&buildOpts.SkipHashCheck,
+		"skip-hash-check", "H", false, "")
 
 	// DEPENDENCY MANAGEMENT FLAGS
 	buildCmd.Flags().BoolVarP(&buildOpts.NoMakeDeps,
-		"nomakedeps", "d", false, "")
+		"no-makedeps", "d", false, "")
 	buildCmd.Flags().BoolVarP(&buildOpts.SkipSyncDeps,
 		flagSkipSync, "s", false, "")
 	buildCmd.Flags().BoolVarP(&buildOpts.SkipToolchainValidation,
-		"skip-toolchain-validation", "", false, "")
+		"skip-toolchain-validation", "T", false, "")
 	buildCmd.Flags().BoolVarP(&buildOpts.Parallel,
 		"parallel", "P", false, "")
 
@@ -364,11 +365,11 @@ func init() {
 
 	// DEBUG SYMBOL FLAGS
 	buildCmd.Flags().StringVarP(&buildOpts.DebugDir,
-		"debug-dir", "", "", "")
+		"debug-dir", "D", "", "")
 
 	// SBOM GENERATION FLAGS
 	buildCmd.Flags().BoolVarP(&buildOpts.SBOM,
-		"sbom", "", false, "")
+		"sbom", "S", false, "")
 	buildCmd.Flags().StringVarP(&buildOpts.SBOMFormat,
 		"sbom-format", "", "both", "")
 
@@ -380,7 +381,7 @@ func init() {
 
 	// SIGNING FLAGS
 	buildCmd.Flags().BoolVarP(&sign,
-		"sign", "", false, "")
+		"sign", "K", false, "")
 	buildCmd.Flags().StringVarP(&signKey,
 		"sign-key", "", "", "")
 	buildCmd.Flags().StringVarP(&signPassphrase,
@@ -402,8 +403,5 @@ func init() {
 	// that DO produce a signature which fails to verify are rejected
 	// regardless of this flag.
 	buildCmd.Flags().BoolVarP(&buildOpts.AllowUnverifiedRepos,
-		"allow-unverified-repos", "", false,
-		"Permit apt repos with no usable OpenPGP trust anchor "+
-			"(still refuses repos whose signature is present but invalid). "+
-			"Also settable via YAP_ALLOW_UNVERIFIED_REPOS=1.")
+		"allow-unverified-repos", "U", false, "")
 }

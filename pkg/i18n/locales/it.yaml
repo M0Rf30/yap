@@ -222,9 +222,9 @@
   translation: "Rimuove la directory sorgente prima della compilazione"
 - id: flags.build.from
   translation: "Inizia la compilazione da questa distribuzione"
-- id: flags.build.nobuild
+- id: flags.build.no_build
   translation: "Salta la compilazione dei pacchetti (solo preparazione)"
-- id: flags.build.nomakedeps
+- id: flags.build.no_makedeps
   translation: "Salta l'installazione delle dipendenze di make"
 - id: flags.build.parallel
   translation: "Abilita risoluzione parallela delle dipendenze e build concorrente"
@@ -262,6 +262,8 @@
   translation: "Passphrase per la chiave privata (preferire la variabile d'ambiente YAP_SIGN_PASSPHRASE)"
 - id: flags.build.skip_hash_check
   translation: "Salta la verifica dell'integrità sha256/sha512 dei file sorgente"
+- id: flags.build.allow_unverified_repos
+  translation: "Permette repository apt senza trust anchor OpenPGP (rifiuta comunque repo con firma presente ma non valida). Impostabile anche con YAP_ALLOW_UNVERIFIED_REPOS=1"
 - id: flags.build.sign_key_name
   translation: "Nome della chiave per la firma APK (es. 'mykey')"
 - id: flags.build.compression_deb
