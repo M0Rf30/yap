@@ -26,6 +26,15 @@ func (c *Cache) downloadAndInstall(ctx context.Context, pkgs []*PackageInfo) err
 
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
+	var totalBytes int64
+	for _, p := range pkgs {
+		totalBytes += p.Size
+	}
+
+	logger.Info("dnfcache: downloading packages",
+		"count", len(pkgs),
+		"total_bytes", totalBytes)
+
 	paths, err := c.downloadAll(ctx, pkgs, tmpDir)
 	if err != nil {
 		return err

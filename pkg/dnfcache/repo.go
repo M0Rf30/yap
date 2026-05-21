@@ -201,18 +201,28 @@ func fetchAllRepos(ctx context.Context) error {
 
 	concurrency := min(min(runtime.GOMAXPROCS(0), 4), len(repos))
 	if concurrency == 0 {
+		logger.Info("dnfcache: no enabled repos found")
+
 		return nil
 	}
 
+	enabledCount := 0
 	jobCh := make(chan RepoEntry, len(repos))
 
 	for _, r := range repos {
 		if r.Enabled && (r.BaseURL != "" || r.MirrorList != "") {
 			jobCh <- r
+
+			enabledCount++
 		}
 	}
 
 	close(jobCh)
+
+	logger.Info("dnfcache: fetching repos",
+		"total", len(repos),
+		"enabled", enabledCount,
+		"workers", concurrency)
 
 	resCh := make(chan result, len(repos))
 
@@ -325,9 +335,16 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 		return fmt.Errorf("download primary.xml for %s: %w", repo.ID, err)
 	}
 
-	logger.Debug("dnfcache: fetched primary index",
-		"repo", repo.ID,
-		"file", destFile)
+	if fi, statErr := os.Stat(destFile); statErr == nil {
+		logger.Info("dnfcache: fetched repo",
+			"repo", repo.ID,
+			"url", baseURL,
+			"bytes", fi.Size())
+	} else {
+		logger.Info("dnfcache: fetched repo", "repo", repo.ID, "url", baseURL)
+	}
+
+	logger.Debug("dnfcache: primary index path", "repo", repo.ID, "file", destFile)
 
 	return nil
 }
@@ -557,6 +574,8 @@ func (c *Cache) loadFromDisk() {
 	jobs := collectPrimaryFiles()
 
 	if len(jobs) == 0 {
+		logger.Debug("dnfcache: no primary.xml files to load")
+
 		return
 	}
 
@@ -590,6 +609,13 @@ func (c *Cache) loadFromDisk() {
 	}
 
 	wg.Wait()
+
+	c.mu.RLock()
+	logger.Info("dnfcache: index loaded",
+		"primary_files", len(jobs),
+		"packages", len(c.packages),
+		"capabilities", len(c.providers))
+	c.mu.RUnlock()
 }
 
 // primaryFileJob holds a primary.xml file path and its repo base URL.

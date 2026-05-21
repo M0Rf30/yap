@@ -177,7 +177,15 @@ func resolveAndPrepare(
 		return nil, "", nil, nil
 	}
 
-	logger.Info("resolved dependencies", "count", len(pkgs))
+	var totalBytes int64
+	for _, p := range pkgs {
+		totalBytes += p.Size
+	}
+
+	logger.Info("aptinstall: resolved dependencies",
+		"seeds", len(names),
+		"to_install", len(pkgs),
+		"total_bytes", totalBytes)
 
 	tmpDir, err = os.MkdirTemp("", "yap-aptinstall-*")
 	if err != nil {

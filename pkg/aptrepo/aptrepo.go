@@ -93,6 +93,10 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		return 0, err
 	}
 
+	logger.Info("aptrepo: updating indexes",
+		"sources", len(sources),
+		"allow_unverified", opts.AllowUnverifiedRepos)
+
 	var firstErr error
 
 	for i := range sources {
@@ -104,11 +108,25 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		}
 
 		for _, arch := range archs {
+			logger.Debug("aptrepo: fetching source",
+				"url", src.URL,
+				"suite", src.Suite,
+				"components", src.Components,
+				"arch", arch)
+
 			n, err := updateSource(ctx, src, arch, opts)
 			succeeded += n
 
-			if err != nil && firstErr == nil {
-				firstErr = err
+			if err != nil {
+				logger.Warn("aptrepo: source fetch failed",
+					"url", src.URL, "suite", src.Suite, "arch", arch, "error", err)
+
+				if firstErr == nil {
+					firstErr = err
+				}
+			} else {
+				logger.Info("aptrepo: source fetched",
+					"url", src.URL, "suite", src.Suite, "arch", arch, "components", n)
 			}
 		}
 	}
@@ -119,6 +137,11 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 	// process.
 	if succeeded > 0 {
 		aptcache.Reload()
+
+		c := aptcache.Load()
+		logger.Info("aptrepo: cache reloaded",
+			"packages", c.PackageCount(),
+			"capabilities", c.CapabilityCount())
 	}
 
 	return succeeded, firstErr

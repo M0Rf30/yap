@@ -20,6 +20,8 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // PackageInfo holds the subset of primary.xml fields needed for dep
@@ -165,11 +167,19 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 	installed := loadInstalledSet(ctx)
 	provides := loadInstalledProvides(ctx)
 
+	logger.Debug("dnfcache: resolver state loaded",
+		"installed_packages", len(installed),
+		"installed_capabilities", len(provides),
+		"index_packages", len(c.packages),
+		"index_capabilities", len(c.providers))
+
 	seen := make(map[string]bool)
 
 	var (
-		order []*PackageInfo
-		unres []string
+		order              []*PackageInfo
+		unres              []string
+		skippedInstalled   int
+		resolvedViaVirtual int
 	)
 
 	var visit func(name string)
@@ -186,6 +196,10 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 		// any alternative provider. Prevents conflicts like coreutils vs
 		// coreutils-single where both own /usr/bin/ls.
 		if installed[name] || provides[name] {
+			logger.Debug("dnfcache: skip (already satisfied)", "package", name)
+
+			skippedInstalled++
+
 			return
 		}
 
@@ -193,11 +207,18 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 		if !ok {
 			// Try virtual/capability resolution.
 			if providers, ok2 := c.providers[name]; ok2 && len(providers) > 0 {
+				logger.Debug("dnfcache: resolved virtual",
+					"capability", name,
+					"provider", providers[0].Name)
+
+				resolvedViaVirtual++
+
 				visit(providers[0].Name)
 
 				return
 			}
 
+			logger.Debug("dnfcache: unresolved", "package", name)
 			unres = append(unres, name)
 
 			return
@@ -208,12 +229,23 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 			visit(req)
 		}
 
+		logger.Debug("dnfcache: enqueue install",
+			"package", info.Name,
+			"version", info.Version,
+			"size", info.Size)
 		order = append(order, info)
 	}
 
 	for _, seed := range seeds {
 		visit(StripRPMConstraint(seed))
 	}
+
+	logger.Info("dnfcache: resolved transitive deps",
+		"seeds", len(seeds),
+		"to_install", len(order),
+		"skipped_installed", skippedInstalled,
+		"via_virtual", resolvedViaVirtual,
+		"unresolved", len(unres))
 
 	return order, unres, nil
 }
