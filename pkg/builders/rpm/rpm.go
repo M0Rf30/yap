@@ -4,6 +4,7 @@ package rpm
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -47,7 +48,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string) *RPM {
 
 // BuildPackage creates an RPM package based on the provided PKGBUILD information.
 // Returns the path to the created RPM file.
-func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, error) {
+func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch string) (string, error) {
 	r.SetTargetArchitecture(targetArch)
 
 	pkgName := fmt.Sprintf("%s-%s-%s.%s.rpm",
@@ -141,7 +142,7 @@ func (r *RPM) BuildPackage(artifactsPath string, targetArch string) (string, err
 // cleans up the RPM directory, creates necessary directories, and gathers files.
 // It also processes package dependencies and creates the RPM spec file, returning
 // an error if any step fails.
-func (r *RPM) PrepareFakeroot(_ string, targetArch string) error {
+func (r *RPM) PrepareFakeroot(ctx context.Context, _ string, targetArch string) error {
 	r.getGroup()
 	r.getRelease()
 	r.LogCrossCompilation(targetArch)

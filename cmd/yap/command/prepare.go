@@ -1,6 +1,11 @@
 package command
 
 import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
@@ -83,15 +88,18 @@ var (
 				return
 			}
 
+			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer cancel()
+
 			if !prepareSkipSyncDeps {
-				err := packageManager.Update()
+				err := packageManager.Update(ctx)
 				if err != nil {
 					logger.Error(err.Error(),
 						"error", err)
 				}
 			}
 
-			err = packageManager.PrepareEnvironment(GoLang, TargetArch)
+			err = packageManager.PrepareEnvironment(ctx, GoLang, TargetArch)
 			if err != nil {
 				logger.Error(err.Error())
 

@@ -14,13 +14,13 @@ package aptrepo
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"runtime"
 	"strings"
 	"sync/atomic"
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -86,7 +86,8 @@ func Update(ctx context.Context) (succeeded int, err error) {
 func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err error) {
 	sources := aptcache.LoadSources()
 	if len(sources) == 0 {
-		return 0, fmt.Errorf("aptrepo: no apt sources configured")
+		return 0, errors.New(errors.ErrTypeConfiguration, "no apt sources configured").
+			WithOperation("UpdateWithOptions")
 	}
 
 	if err := os.MkdirAll(aptListsDir, 0o755); err != nil {

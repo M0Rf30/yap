@@ -13,6 +13,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 )
 
+//nolint:gochecknoinits // Required to initialise i18n before test functions run
 func init() {
 	_ = i18n.Init("en")
 }

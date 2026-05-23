@@ -1,6 +1,7 @@
 package pacman
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -68,7 +69,7 @@ func TestBuildPackage(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	_, err = pkg.BuildPackage(artifactsDir, "")
+	_, err = pkg.BuildPackage(context.Background(), artifactsDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestBuildPackageWithoutEpoch(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	_, err = pkg.BuildPackage(artifactsDir, "")
+	_, err = pkg.BuildPackage(context.Background(), artifactsDir, "")
 	if err != nil {
 		t.Errorf("BuildPackage failed: %v", err)
 	}
@@ -183,7 +184,7 @@ arch=('x86_64')
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = pkg.PrepareFakeroot(artifactsDir, "")
+	err = pkg.PrepareFakeroot(context.Background(), artifactsDir, "")
 	if err != nil {
 		t.Errorf("PrepareFakeroot failed: %v", err)
 	}
@@ -273,7 +274,7 @@ func TestPrepareFakerootWithSpecCreation(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = pkg.PrepareFakeroot(artifactsDir, "")
+	err = pkg.PrepareFakeroot(context.Background(), artifactsDir, "")
 	if err != nil {
 		t.Errorf("PrepareFakeroot failed: %v", err)
 	}
@@ -300,7 +301,7 @@ func TestPrepare(t *testing.T) {
 	pkg := NewBuilder(pkgBuild)
 
 	makeDepends := []string{"make", "gcc"}
-	err := pkg.Prepare(makeDepends, "")
+	err := pkg.Prepare(context.Background(), makeDepends, "")
 	// This will likely fail since pacman isn't available, but we test the method call
 	if err == nil {
 		t.Log("Prepare succeeded (unexpected in test environment)")
@@ -316,7 +317,7 @@ func TestPrepareEnvironment(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkg := NewBuilder(pkgBuild)
 
-	err := pkg.PrepareEnvironment(false, "")
+	err := pkg.PrepareEnvironment(context.Background(), false, "")
 	// This will likely fail since pacman isn't available, but we test the method call
 	if err == nil {
 		t.Log("PrepareEnvironment succeeded (unexpected in test environment)")
@@ -332,7 +333,7 @@ func TestPrepareEnvironmentWithGolang(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkg := NewBuilder(pkgBuild)
 
-	err := pkg.PrepareEnvironment(true, "")
+	err := pkg.PrepareEnvironment(context.Background(), true, "")
 	// This will likely fail since pacman isn't available, but we test the method call
 	if err == nil {
 		t.Log("PrepareEnvironment with golang succeeded (unexpected in test environment)")
@@ -354,7 +355,7 @@ func TestUpdate(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkg := NewBuilder(pkgBuild)
 
-	err := pkg.Update()
+	err := pkg.Update(context.Background())
 	// This will likely fail since pacman isn't available, but we test the method call
 	if err == nil {
 		t.Log("Update succeeded (unexpected in test environment)")
@@ -482,7 +483,7 @@ arch=('x86_64')
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = pkg.PrepareFakeroot(artifactsDir, "x86_64")
+	err = pkg.PrepareFakeroot(context.Background(), artifactsDir, "x86_64")
 	if err != nil {
 		t.Errorf("PrepareFakeroot failed: %v", err)
 	}
@@ -592,7 +593,7 @@ arch=('x86_64')
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = pkg.PrepareFakeroot(artifactsDir, "x86_64")
+	err = pkg.PrepareFakeroot(context.Background(), artifactsDir, "x86_64")
 	if err != nil {
 		t.Errorf("PrepareFakeroot failed: %v", err)
 	}
@@ -657,7 +658,7 @@ func TestPrepareFakeroot_WithChangelog(t *testing.T) {
 		t.Fatalf("Failed to create artifacts dir: %v", err)
 	}
 
-	err = pkg.PrepareFakeroot(artifactsDir, "x86_64")
+	err = pkg.PrepareFakeroot(context.Background(), artifactsDir, "x86_64")
 	if err != nil {
 		t.Errorf("PrepareFakeroot failed: %v", err)
 	}

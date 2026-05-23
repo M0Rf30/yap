@@ -15,6 +15,7 @@ linters:
     - durationcheck
     - errcheck
     - errorlint
+    - forbidigo
     - gochecknoinits
     - goconst
     - gocritic
@@ -45,7 +46,6 @@ linters:
   disable:
     - depguard
     - exhaustruct
-    - forbidigo
     - forcetypeassert
     - funlen
     - gochecknoglobals
@@ -83,6 +83,11 @@ linters:
         - G204 # Subprocess with variable
         - G301 # Poor file permissions
         - G302 # Poor file permissions
+
+    forbidigo:
+      forbid:
+        - p: ^fmt\.Errorf\(
+          msg: "use pkg/errors.Wrap / errors.New per AGENTS.md instead of fmt.Errorf"
 
     lll:
       line-length: 120
@@ -261,6 +266,15 @@ linters:
         text: "package should be `.*_test` instead of"
         linters:
           - testpackage
+
+      # Allow fmt.Errorf in pkg/errors/ (internal error handling) and test files
+      - path: "pkg/errors/"
+        linters:
+          - forbidigo
+
+      - path: "_test\\.go"
+        linters:
+          - forbidigo
 
 formatters:
   enable:

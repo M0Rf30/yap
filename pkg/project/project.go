@@ -286,7 +286,7 @@ func (mpc *MultipleProject) syncDependencies(ctx context.Context, makeDepends, r
 	runtimeDepends = mpc.filterSkipDeps(runtimeDepends)
 
 	if !mpc.Opts.SkipSyncDeps {
-		err := mpc.packageManager.Update()
+		err := mpc.packageManager.Update(ctx)
 		if err != nil {
 			return err
 		}
@@ -298,7 +298,7 @@ func (mpc *MultipleProject) syncDependencies(ctx context.Context, makeDepends, r
 	}
 
 	if !mpc.Opts.NoMakeDeps {
-		err := mpc.packageManager.Prepare(makeDepends, mpc.Opts.TargetArch)
+		err := mpc.packageManager.Prepare(ctx, makeDepends, mpc.Opts.TargetArch)
 		if err != nil {
 			return err
 		}
@@ -331,12 +331,12 @@ func (mpc *MultipleProject) installRuntimeDeps(ctx context.Context, runtimeDepen
 
 	isCrossBuild := mpc.Opts.TargetArch != "" && mpc.Opts.TargetArch != runtime.GOARCH
 	if !isCrossBuild {
-		return mpc.packageManager.Prepare(runtimeDepends, mpc.Opts.TargetArch)
+		return mpc.packageManager.Prepare(ctx, runtimeDepends, mpc.Opts.TargetArch)
 	}
 
 	extractor, ok := mpc.packageManager.(packer.CrossDepsExtractor)
 	if !ok {
-		return mpc.packageManager.Prepare(runtimeDepends, mpc.Opts.TargetArch)
+		return mpc.packageManager.Prepare(ctx, runtimeDepends, mpc.Opts.TargetArch)
 	}
 
 	return extractor.DownloadAndExtractCrossDeps(ctx, runtimeDepends, mpc.Opts.TargetArch)
@@ -488,6 +488,8 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 // createSinglePackage handles the PrepareFakeroot → BuildPackage → post-build
 // pipeline for a non-split (single) package.
 func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
+	ctx := context.Background()
+
 	defer func() {
 		if err := os.RemoveAll(proj.Builder.PKGBUILD.PackageDir); err != nil {
 			logger.Warn(i18n.T("logger.failed_to_remove_package_directory"),
@@ -496,7 +498,7 @@ func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
 		}
 	}()
 
-	if err := proj.PackageManager.PrepareFakeroot(mpc.Output, mpc.Opts.TargetArch); err != nil {
+	if err := proj.PackageManager.PrepareFakeroot(ctx, mpc.Output, mpc.Opts.TargetArch); err != nil {
 		return err
 	}
 
@@ -505,7 +507,7 @@ func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
 		"version", proj.Builder.PKGBUILD.PkgVer,
 		"release", proj.Builder.PKGBUILD.PkgRel)
 
-	artifactPath, err := proj.PackageManager.BuildPackage(mpc.Output, mpc.Opts.TargetArch)
+	artifactPath, err := proj.PackageManager.BuildPackage(ctx, mpc.Output, mpc.Opts.TargetArch)
 	if err != nil {
 		return err
 	}
@@ -516,6 +518,8 @@ func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
 // createSplitPackages iterates over each sub-package produced by a split PKGBUILD
 // and runs PrepareFakeroot → BuildPackage → post-build hooks for each one.
 func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
+	ctx := context.Background()
+
 	for _, subName := range proj.Builder.PKGBUILD.PkgNames {
 		// Point the PKGBUILD at this sub-package's install tree.
 		proj.Builder.PKGBUILD.PkgName = subName
@@ -534,7 +538,7 @@ func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
 			}
 		}
 
-		if err := proj.PackageManager.PrepareFakeroot(mpc.Output, mpc.Opts.TargetArch); err != nil {
+		if err := proj.PackageManager.PrepareFakeroot(ctx, mpc.Output, mpc.Opts.TargetArch); err != nil {
 			return err
 		}
 
@@ -543,7 +547,7 @@ func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
 			"version", proj.Builder.PKGBUILD.PkgVer,
 			"release", proj.Builder.PKGBUILD.PkgRel)
 
-		artifactPath, err := proj.PackageManager.BuildPackage(mpc.Output, mpc.Opts.TargetArch)
+		artifactPath, err := proj.PackageManager.BuildPackage(ctx, mpc.Output, mpc.Opts.TargetArch)
 		if err != nil {
 			return err
 		}

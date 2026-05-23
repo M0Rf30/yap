@@ -22,7 +22,9 @@
 | `pkg/aptinstall/` | Pure-Go `apt-get install` (transitive dep resolution, scriptlets) |
 | `pkg/apkindex/` | Pure-Go `apk update` + `apk add` |
 | `pkg/pacmandb/` | Pure-Go `pacman -Sy` |
-| `pkg/rpmdb/` | Pure-Go RPM SQLite reader (Fedora 33+, RHEL 9+) |
+| `pkg/rpmdb/` | Pure-Go RPM SQLite reader + optional writer (Fedora 33+, RHEL 9+) |
+| `pkg/dnfinstall/` | Pure-Go RPM install (GPG verify → CPIO extract → scriptlets → yapdb) |
+| `pkg/yapdb/` | YAP-internal SQLite state DB for installed packages (cross-format) |
 | `pkg/signing/` | APK RSA + DEB/RPM/Pacman GPG signing |
 | `pkg/sbom/` | CycloneDX 1.5 + SPDX 2.3 generation |
 | `pkg/color/` | Zero-dependency ANSI color helpers |
@@ -218,15 +220,37 @@ apk info -L package-name
 
 Dependency: `github.com/mholt/archives` (pinned in `go.mod`).
 
+### RPM E2E testing
+
+```bash
+# Run pure-Go RPM install E2E test on Rocky Linux 8
+make test-e2e-rpm
+```
+
+The E2E test validates the complete pure-Go RPM install pipeline:
+- **Pipeline**: GPG verify → CPIO extract → scriptlets → yapdb state write
+- **State storage**: `/var/lib/yap/installed.db` (SQLite), NOT `/var/lib/rpm/` (system rpmdb)
+- **Test package**: `tree` (small, real Rocky 8 package from official repos)
+- **Assertions**:
+  1. Binary installed and functional (`/usr/bin/tree`)
+  2. YAP state DB created with package metadata and file list
+  3. System rpmdb untouched (pure-Go path, no subprocess)
+- **Requirements**: Docker or Podman; auto-detects container runtime
+- **Duration**: ~2–3 minutes (includes `dnf install golang make sqlite` inside container)
+
+Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
+
 ## Current state
 
 ### Implemented (stable)
 - Pure-Go apt/dpkg metadata — `pkg/aptcache` (replaces `apt-cache`/`dpkg` subprocesses)
 - Pure-Go `apt-get update` — `pkg/aptrepo` (InRelease/Release.gpg + OpenPGP verification)
-- Pure-Go `apt-get install` — `pkg/aptinstall` (transitive deps, scriptlets, dpkg status)
+- Pure-Go `apt-get install` — `pkg/aptinstall` (transitive deps, scriptlets, yapdb state by default)
 - Pure-Go `apk update` + `apk add` — `pkg/apkindex`
 - Pure-Go `pacman -Sy` — `pkg/pacmandb`
 - Pure-Go RPM SQLite reader — `pkg/rpmdb` (Fedora 33+, RHEL 9+; subprocess fallback for legacy BDB)
+- Pure-Go RPM install — `pkg/dnfinstall` (GPG verify → CPIO extract → scriptlets → yapdb); replaces `dnf install` for both `yap install <pkg.rpm>` and build-time makedepends on RPM distros
+- YAP-internal package state — `pkg/yapdb` (cross-format SQLite registry at `<rootDir>/var/lib/yap/installed.db`); decouples YAP from system dpkg/rpm DBs (ephemeral build container friendly)
 - Transitive cross-build dep extraction — `pkg/builders/common/cross.go` `DownloadClosure`
 - Package signing — APK RSA + DEB/RPM/Pacman GPG
 - SBOM — CycloneDX 1.5 + SPDX 2.3
@@ -242,6 +266,9 @@ Dependency: `github.com/mholt/archives` (pinned in `go.mod`).
 ### Known limitations
 - RPM changelog: no-op pending rpmpack API support
 - `pacman -S` (install): still subprocess due to alpm hook complexity
+- `pkg/dnfinstall` does NOT update `/var/lib/rpm/` by default (state lives in yapdb); set `Options.WriteSystemRpmdb=true` to also write to SQLite rpmdb (Fedora 33+/RHEL 9+/Rocky 9+ only — BDB hosts skip with warn)
+- `pkg/aptinstall` does NOT update `/var/lib/dpkg/status` by default (state lives in yapdb); set `Options.WriteDpkgStatus=true` for legacy behavior
+- `pkg/dnfinstall` coverage at ~41% (rpmpack→rpmutils interop blocks happy-path integration tests); pure-unit coverage of helpers is strong, full pipeline validated via `make test-e2e-rpm` on Rocky 8
 
 ### Development priorities
 1. Wire RPM changelog when rpmpack adds the API

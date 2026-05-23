@@ -372,7 +372,7 @@ Depends: a
 	require.NoError(t, err)
 
 	// Resolve starting from c: should get [a, b, c] in dependency order
-	pkgs, unres, err := c.ResolveDepsForTesting([]string{"c"})
+	pkgs, unres, err := c.ResolveDeps([]string{"c"})
 	require.NoError(t, err)
 	require.Empty(t, unres)
 	require.Len(t, pkgs, 3)
@@ -383,7 +383,7 @@ Depends: a
 	assert.Equal(t, "c", pkgs[2].Name)
 
 	// Resolve starting from d: should get [a] only (d is already installed)
-	pkgs, unres, err = c.ResolveDepsForTesting([]string{"d"})
+	pkgs, unres, err = c.ResolveDeps([]string{"d"})
 	require.NoError(t, err)
 	require.Empty(t, unres)
 	require.Len(t, pkgs, 1)
@@ -404,7 +404,7 @@ Depends:
 	require.NoError(t, err)
 
 	// Try to resolve a package that doesn't exist
-	pkgs, unres, err := c.ResolveDepsForTesting([]string{"nonexistent"})
+	pkgs, unres, err := c.ResolveDeps([]string{"nonexistent"})
 	require.NoError(t, err)
 	require.Empty(t, pkgs)
 	require.Equal(t, []string{"nonexistent"}, unres)

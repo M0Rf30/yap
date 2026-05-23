@@ -1,0 +1,171 @@
+package dnfinstall
+
+import (
+	"context"
+	"os"
+
+	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
+)
+
+// Options controls Install's runtime behaviour.
+//
+// RootDir is the filesystem root the installation writes into.
+//
+//   - "" / "/" → install into the live system root. Refused unless
+//     AllowRootInstall is true: the typical caller is yap running inside a
+//     build container, but on a developer workstation accidentally invoking
+//     Install would clobber the host filesystem.
+//   - Any other value → install into that directory (fakeroot use).
+//
+// AllowUnverifiedRPMs: RPM packages ship with GPG signatures. Verification
+// of those signatures is not yet wired into this package. Callers that
+// accept this gap (e.g. inside a trusted CI container) must set this flag
+// explicitly.
+//
+// RunLDConfig defaults to true; set false in fakeroot scenarios where the
+// ld.so.cache would be meaningless.
+//
+// SkipScriptlets: if true, pre/post install scriptlets are not executed.
+// Useful for fakeroot scenarios where scriptlets may fail or be unnecessary.
+//
+// KeyringPath: optional override for the GPG keyring directory. Defaults to
+// /etc/pki/rpm-gpg/. Used for signature verification (Phase 4).
+//
+// WriteSystemRpmdb: if true, ALSO write to /var/lib/rpm/rpmdb.sqlite (SQLite
+// hosts only — Fedora 33+, RHEL 9+, Rocky 9+). Default is false; YAP uses
+// yapdb for state tracking instead. On BDB systems or if the SQLite rpmdb
+// doesn't exist, the write is skipped with a warning.
+type Options struct {
+	RootDir              string
+	AllowRootInstall     bool
+	AllowUnverifiedRPMs  bool
+	RunLDConfig          bool
+	SkipScriptlets       bool
+	KeyringPath          string
+	WriteSystemRpmdb     bool
+}
+
+// Install performs a full pure-Go dnf install equivalent with default options.
+//
+// Default policy: when running on a privileged host (uid 0 — the expected
+// case inside a yap build container) `AllowRootInstall` is implicitly
+// enabled. On a developer workstation running as a regular user, the
+// safety guard still trips and refuses to clobber the host filesystem.
+//
+// Callers needing explicit control (sandboxed RootDir, suppressed ldconfig,
+// etc.) should call InstallWithOptions directly.
+func Install(ctx context.Context, names []string) error {
+	return InstallWithOptions(ctx, names, Options{
+		RunLDConfig:      true,
+		AllowRootInstall: platform.IsPrivilegedHost(),
+	})
+}
+
+// InstallWithOptions is the explicit-options variant of Install.
+func InstallWithOptions(ctx context.Context, names []string, opts Options) error {
+	if len(names) == 0 {
+		return nil
+	}
+
+	rootDir, err := resolveRootDir(opts)
+	if err != nil {
+		return err
+	}
+
+	// Load the dnf cache and resolve the transitive closure of dependencies.
+	cache := dnfcache.Load()
+	resolved, unresolved, err := cache.ResolveDeps(ctx, names)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to resolve dependencies").
+			WithOperation("InstallWithOptions")
+	}
+
+	if len(unresolved) > 0 {
+		// Non-fatal: log and continue — installation will surface hard errors.
+		logger.Warn("some packages could not be resolved", "count", len(unresolved))
+		for _, name := range unresolved {
+			logger.Debug("unresolved package", "name", name)
+		}
+	}
+
+	if len(resolved) == 0 {
+		return nil
+	}
+
+	// Download and install packages in dependency order.
+	if err := installPackages(ctx, cache, resolved, rootDir, opts); err != nil {
+		return err
+	}
+
+	// Refresh dynamic linker cache exactly once per transaction (vs once
+	// per package), iff requested.
+	if opts.RunLDConfig {
+		// TODO: Phase 4 — implement ldconfig refresh
+		logger.Debug("ldconfig refresh requested but not yet implemented")
+	}
+
+	logger.Info("installation complete", "count", len(resolved))
+
+	return nil
+}
+
+// InstallFile installs a single local RPM file to the target filesystem.
+// Useful for installing pre-downloaded or custom-built packages.
+func InstallFile(ctx context.Context, rpmPath string, opts Options) error {
+	rootDir, err := resolveRootDir(opts)
+	if err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(rpmPath); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "RPM file not found").
+			WithOperation("InstallFile").
+			WithContext("path", rpmPath)
+	}
+
+	// Phase 2: extract the RPM to rootDir
+	if err := installPackage(ctx, rpmPath, rootDir, opts); err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to install RPM").
+			WithOperation("InstallFile").
+			WithContext("path", rpmPath)
+	}
+
+	logger.Info("installed RPM file", "path", rpmPath)
+
+	return nil
+}
+
+// resolveRootDir returns the destDir for the install transaction. "/"
+// requires Options.AllowRootInstall — otherwise the caller almost
+// certainly meant to pass a fakeroot directory.
+func resolveRootDir(opts Options) (string, error) {
+	rootDir := opts.RootDir
+	if rootDir == "" {
+		rootDir = "/"
+	}
+
+	if rootDir == "/" && !opts.AllowRootInstall {
+		return "", errors.New(errors.ErrTypeValidation,
+			"refusing to install to / without AllowRootInstall").
+			WithOperation("resolveRootDir")
+	}
+
+	if rootDir != "/" {
+		if _, err := os.Stat(rootDir); err != nil {
+			return "", errors.Wrap(err, errors.ErrTypeFileSystem,
+				"RootDir does not exist").
+				WithOperation("resolveRootDir").
+				WithContext("rootDir", rootDir)
+		}
+	}
+
+	return rootDir, nil
+}
+
+// installPackages downloads and installs each package in the resolved closure.
+func installPackages(ctx context.Context, cache *dnfcache.Cache, resolved []*dnfcache.PackageInfo, rootDir string, opts Options) error {
+	return downloadAndInstall(ctx, cache, resolved, rootDir, opts)
+}

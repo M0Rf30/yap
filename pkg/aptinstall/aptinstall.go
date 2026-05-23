@@ -31,7 +31,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
-)
+	)
 
 // Options controls Install's runtime behaviour.
 //
@@ -46,10 +46,17 @@ import (
 //
 // RunLDConfig defaults to true; set false in fakeroot scenarios where the
 // ld.so.cache would be meaningless.
+//
+// WriteDpkgStatus defaults to false. When false, installed packages are
+// recorded in YAP's internal state database (pkg/yapdb) only. When true,
+// packages are ALSO written to /var/lib/dpkg/status (legacy behavior).
+// Rationale: YAP runs in ephemeral build containers where dpkg is not the
+// source of truth.
 type Options struct {
 	RootDir          string
 	AllowRootInstall bool
 	RunLDConfig      bool
+	WriteDpkgStatus  bool
 }
 
 // Install performs a full pure-Go apt-get install equivalent with default
@@ -114,7 +121,7 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 	for _, p := range pkgs {
 		contents := debMetadata[p.Name]
 
-		if err := installPackage(ctx, p, contents, tmpDir, rootDir); err != nil {
+		if err := installPackage(ctx, p, contents, tmpDir, rootDir, opts); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "install package").
 				WithContext("package", p.Name).
 				WithOperation("Install")
@@ -272,6 +279,7 @@ func installPackage(
 	pkg *aptcache.PackageInfo,
 	contents *debContents,
 	tmpDir, rootDir string,
+	opts Options,
 ) error {
 	pkgName := pkg.Name
 	arch := pkg.Architecture
@@ -323,7 +331,7 @@ func installPackage(
 	}
 
 	// Update dpkg status (unpacked state).
-	if err := updateDpkgStatusForPackage(pkgName, arch, contents.Control, "install ok unpacked"); err != nil {
+	if err := updateDpkgStatusForPackage(ctx, pkgName, arch, contents.Control, "install ok unpacked", rootDir, opts, contents.Files); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "update dpkg status (unpacked)").
 			WithContext("package", pkgName).
 			WithOperation("installPackage")
@@ -352,7 +360,7 @@ func installPackage(
 		finalState = "install ok unpacked"
 	}
 
-	if err := updateDpkgStatusForPackage(pkgName, arch, contents.Control, finalState); err != nil {
+	if err := updateDpkgStatusForPackage(ctx, pkgName, arch, contents.Control, finalState, rootDir, opts, contents.Files); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "update dpkg status (final)").
 			WithContext("package", pkgName).
 			WithOperation("installPackage")
@@ -400,7 +408,8 @@ func runMaintainerScript(
 			args = []string{oldVersion}
 		}
 	default:
-		return fmt.Errorf("unknown maintainer phase %q", phase)
+		return errors.New(errors.ErrTypeInternal, "unknown maintainer phase").
+			WithOperation("runMaintainerScript").WithContext("phase", phase)
 	}
 
 	scriptPath := scriptletPathForPackage(pkgName, arch, contents.Control, phase)

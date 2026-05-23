@@ -9,17 +9,13 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
-// TestCrossCompilationWithCcache verifies that ccache is properly preserved
-// when setting up cross-compilation environment.
+// TestCrossCompilationWithCcache verifies that ccache and cross-compilation
+// environment variables are properly set in the returned slice.
 func TestCrossCompilationWithCcache(t *testing.T) {
 	// Save original environment
-	originalCC := os.Getenv("CC")
-	originalCXX := os.Getenv("CXX")
 	originalPath := os.Getenv("PATH")
 
 	defer func() {
-		_ = os.Setenv("CC", originalCC)
-		_ = os.Setenv("CXX", originalCXX)
 		_ = os.Setenv("PATH", originalPath)
 	}()
 
@@ -66,72 +62,83 @@ func TestCrossCompilationWithCcache(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear environment, including the per-process memoization sentinels
-			// (YAP_CCACHE_SETUP / YAP_CROSS_ENV_FOR) — without this, a previous
-			// subtest's setup would short-circuit this one.
-			_ = os.Setenv("CC", "")
-			_ = os.Setenv("CXX", "")
-			_ = os.Unsetenv("YAP_CCACHE_SETUP")
-			_ = os.Unsetenv("YAP_CROSS_ENV_FOR")
-
 			bb := NewBaseBuilder(pkg, tt.format)
 
-			// First setup ccache (simulating what happens in builder.go)
-			err := bb.SetupCcache()
+			// First build ccache environment slice
+			ccacheEnv := bb.BuildCcacheEnvSlice()
+			if ccacheEnv == nil {
+				t.Logf("BuildCcacheEnvSlice returned nil (ccache not available)")
+				return
+			}
+
+			// Verify ccache is in the slice
+			ccFound := false
+			cxxFound := false
+			for _, envVar := range ccacheEnv {
+				if strings.HasPrefix(envVar, "CC=") && strings.Contains(envVar, "ccache") {
+					ccFound = true
+				}
+				if strings.HasPrefix(envVar, "CXX=") && strings.Contains(envVar, "ccache") {
+					cxxFound = true
+				}
+			}
+
+			if !ccFound {
+				t.Errorf("Expected CC to contain 'ccache' in ccache env slice")
+			}
+
+			if !cxxFound {
+				t.Errorf("Expected CXX to contain 'ccache' in ccache env slice")
+			}
+
+			// Now build cross-compilation environment slice
+			crossEnv, err := bb.BuildCrossEnvSlice(tt.targetArch)
 			if err != nil {
-				t.Fatalf("SetupCcache failed: %v", err)
-			}
-
-			// Verify ccache is set
-			ccBefore := os.Getenv("CC")
-			cxxBefore := os.Getenv("CXX")
-
-			if !strings.Contains(ccBefore, "ccache") {
-				t.Errorf("Expected CC to contain 'ccache' after SetupCcache, got: %s", ccBefore)
-			}
-
-			if !strings.Contains(cxxBefore, "ccache") {
-				t.Errorf("Expected CXX to contain 'ccache' after SetupCcache, got: %s", cxxBefore)
-			}
-
-			// Now setup cross-compilation (this is the bug - it overwrites CC/CXX)
-			err = bb.SetupCrossCompilationEnvironment(tt.targetArch)
-			if err != nil {
-				t.Logf("SetupCrossCompilationEnvironment returned error: %v", err)
+				t.Logf("BuildCrossEnvSlice returned error: %v", err)
 				// Don't fail - toolchain might not be available
 				return
 			}
 
-			// Check if ccache is still in the environment
-			ccAfter := os.Getenv("CC")
-			cxxAfter := os.Getenv("CXX")
-
-			t.Logf("Before cross-compilation: CC=%s, CXX=%s", ccBefore, cxxBefore)
-			t.Logf("After cross-compilation:  CC=%s, CXX=%s", ccAfter, cxxAfter)
-
-			// ccache wraps the cross-compiler via /usr/lib/ccache/<cross-compiler>
-			// symlinks on PATH — no CCACHE_PREFIX env var is needed or set.
-			if os.Getenv("CCACHE_PREFIX") != "" {
-				t.Errorf("CCACHE_PREFIX should not be set (ccache wraps via PATH symlinks). Got: %s",
-					os.Getenv("CCACHE_PREFIX"))
+			if crossEnv == nil {
+				t.Logf("BuildCrossEnvSlice returned nil (toolchain not available)")
+				return
 			}
 
-			// CC/CXX must be the bare cross-compiler, not prefixed with ccache.
-			if strings.Contains(ccAfter, "ccache") {
-				t.Errorf("CC should not contain 'ccache' directly. Got: %s", ccAfter)
+			// Verify CC/CXX in cross-compilation slice are bare cross-compilers, not ccache-wrapped
+			ccCrossFound := false
+			cxxCrossFound := false
+			for _, envVar := range crossEnv {
+				if strings.HasPrefix(envVar, "CC=") {
+					if strings.Contains(envVar, "ccache") {
+						t.Errorf("CC in cross-compilation should not contain 'ccache' directly. Got: %s", envVar)
+					}
+					if strings.Contains(envVar, "gcc") {
+						ccCrossFound = true
+					}
+				}
+				if strings.HasPrefix(envVar, "CXX=") {
+					if strings.Contains(envVar, "ccache") {
+						t.Errorf("CXX in cross-compilation should not contain 'ccache' directly. Got: %s", envVar)
+					}
+					if strings.Contains(envVar, "g++") {
+						cxxCrossFound = true
+					}
+				}
 			}
 
-			if strings.Contains(cxxAfter, "ccache") {
-				t.Errorf("CXX should not contain 'ccache' directly. Got: %s", cxxAfter)
+			if !ccCrossFound {
+				t.Errorf("CC doesn't contain gcc in cross-compilation slice")
 			}
 
-			// Verify the cross-compiler is present
-			if !strings.Contains(ccAfter, "gcc") {
-				t.Errorf("CC doesn't contain gcc after cross-compilation: %s", ccAfter)
+			if !cxxCrossFound {
+				t.Errorf("CXX doesn't contain g++ in cross-compilation slice")
 			}
 
-			if !strings.Contains(cxxAfter, "g++") {
-				t.Errorf("CXX doesn't contain g++ after cross-compilation: %s", cxxAfter)
+			// Verify CCACHE_PREFIX is not in the cross-compilation slice
+			for _, envVar := range crossEnv {
+				if strings.HasPrefix(envVar, "CCACHE_PREFIX=") {
+					t.Errorf("CCACHE_PREFIX should not be set in cross-compilation slice. Got: %s", envVar)
+				}
 			}
 		})
 	}

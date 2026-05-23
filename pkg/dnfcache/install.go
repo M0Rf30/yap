@@ -2,7 +2,6 @@ package dnfcache
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -21,7 +21,8 @@ import (
 func (c *Cache) downloadAndInstall(ctx context.Context, pkgs []*PackageInfo) error {
 	tmpDir, err := os.MkdirTemp("", "dnfcache-*")
 	if err != nil {
-		return fmt.Errorf("dnfcache: create temp dir: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary directory").
+			WithOperation("downloadAndInstall")
 	}
 
 	defer func() { _ = os.RemoveAll(tmpDir) }()
@@ -108,7 +109,9 @@ func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string,
 	if rest, ok := strings.CutPrefix(baseURL, "mirrorlist:"); ok {
 		resolved, err := resolveMirrorList(ctx, rest)
 		if err != nil {
-			return "", fmt.Errorf("dnfcache: resolve mirrorlist for %s: %w", pkg.Name, err)
+			return "", errors.Wrap(err, errors.ErrTypeNetwork, "failed to resolve mirrorlist").
+				WithOperation("downloadRPM").
+				WithContext("package", pkg.Name)
 		}
 
 		baseURL = strings.TrimSuffix(resolved, "/") + "/"
@@ -124,7 +127,9 @@ func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string,
 
 	resp, err := httpclient.Client().Do(req)
 	if err != nil {
-		return "", fmt.Errorf("dnfcache: download %s: %w", pkg.Name, err)
+		return "", errors.Wrap(err, errors.ErrTypeNetwork, "failed to download package").
+			WithOperation("downloadRPM").
+			WithContext("package", pkg.Name)
 	}
 
 	defer func() { _ = resp.Body.Close() }()
@@ -142,7 +147,9 @@ func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string,
 		_ = f.Close()
 		_ = os.Remove(dest)
 
-		return "", fmt.Errorf("dnfcache: write %s: %w", pkg.Name, err)
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write package file").
+			WithOperation("downloadRPM").
+			WithContext("package", pkg.Name)
 	}
 
 	if err := f.Close(); err != nil {
@@ -153,7 +160,9 @@ func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string,
 		if ok, _ := fileMatchesSHA256(dest, pkg.SHA256); !ok {
 			_ = os.Remove(dest)
 
-			return "", fmt.Errorf("dnfcache: SHA256 mismatch for %s", pkg.Name)
+			return "", errors.New(errors.ErrTypeValidation, "SHA256 mismatch").
+				WithOperation("downloadRPM").
+				WithContext("package", pkg.Name)
 		}
 	}
 
@@ -178,7 +187,8 @@ func rpmInstall(ctx context.Context, paths []string) error {
 	logger.Info("dnfcache: installing RPM packages", "count", len(paths))
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("dnfcache: rpm --install: %w", err)
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to install RPM packages").
+			WithOperation("rpmInstall")
 	}
 
 	return nil

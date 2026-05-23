@@ -6,14 +6,16 @@ import (
 	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
-	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/deb822"
 	"github.com/klauspost/compress/zstd"
 	"github.com/m0rf30/ar"
 	"github.com/ulikunitz/xz"
+
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // debContents holds the parsed contents of a .deb's control.tar.
@@ -37,14 +39,16 @@ type debContents struct {
 func parseDEB(debPath string) (*debContents, error) {
 	file, err := os.Open(debPath) // #nosec G304 - debPath is from trusted apt index metadata
 	if err != nil {
-		return nil, fmt.Errorf("open DEB: %w", err)
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "open DEB").
+			WithOperation("parseDEB").WithContext("path", debPath)
 	}
 
 	defer func() { _ = file.Close() }()
 
 	arReader, err := ar.NewReader(file)
 	if err != nil {
-		return nil, fmt.Errorf("parse AR archive: %w", err)
+		return nil, errors.Wrap(err, errors.ErrTypeParser, "parse AR archive").
+			WithOperation("parseDEB").WithContext("path", debPath)
 	}
 
 	contents := &debContents{
@@ -58,24 +62,28 @@ func parseDEB(debPath string) (*debContents, error) {
 				break
 			}
 
-			return nil, fmt.Errorf("read AR header: %w", err)
+			return nil, errors.Wrap(err, errors.ErrTypeParser, "read AR header").
+				WithOperation("parseDEB")
 		}
 
 		switch {
 		case strings.HasPrefix(header.Name, "control.tar"):
 			if err := parseControlTar(arReader, header.Name, contents); err != nil {
-				return nil, fmt.Errorf("parse control.tar: %w", err)
+				return nil, errors.Wrap(err, errors.ErrTypeParser, "parse control.tar").
+					WithOperation("parseDEB")
 			}
 
 		case strings.HasPrefix(header.Name, "data.tar"):
 			if err := parseDataTar(arReader, header.Name, contents); err != nil {
-				return nil, fmt.Errorf("parse data.tar: %w", err)
+				return nil, errors.Wrap(err, errors.ErrTypeParser, "parse data.tar").
+					WithOperation("parseDEB")
 			}
 		}
 	}
 
 	if contents.Control == "" {
-		return nil, fmt.Errorf("control file not found in DEB")
+		return nil, errors.New(errors.ErrTypeParser, "control file not found in DEB").
+			WithOperation("parseDEB").WithContext("path", debPath)
 	}
 
 	return contents, nil
@@ -105,12 +113,14 @@ func parseControlTar(r io.Reader, name string, contents *debContents) error {
 				break
 			}
 
-			return fmt.Errorf("read tar entry: %w", err)
+			return errors.Wrap(err, errors.ErrTypeParser, "read tar entry").
+				WithOperation("parseControlTar")
 		}
 
 		body, err := io.ReadAll(io.LimitReader(tr, maxControlEntry))
 		if err != nil {
-			return fmt.Errorf("read tar file: %w", err)
+			return errors.Wrap(err, errors.ErrTypeParser, "read tar file").
+				WithOperation("parseControlTar")
 		}
 
 		// Strip leading "./" from tar entry names.
@@ -151,7 +161,8 @@ func parseDataTar(r io.Reader, name string, contents *debContents) error {
 				break
 			}
 
-			return fmt.Errorf("read tar entry: %w", err)
+			return errors.Wrap(err, errors.ErrTypeParser, "read tar entry").
+				WithOperation("parseDataTar")
 		}
 
 		// Skip directories and other non-regular files.
@@ -192,14 +203,16 @@ func decompressStream(r io.Reader, _ string) (io.ReadCloser, error) {
 
 	head, err := br.Peek(6)
 	if err != nil && err != io.EOF { //nolint:errorlint // io.EOF sentinel
-		return nil, fmt.Errorf("peek magic: %w", err)
+		return nil, errors.Wrap(err, errors.ErrTypeParser, "peek magic").
+			WithOperation("decompressStream")
 	}
 
 	switch {
 	case bytes.HasPrefix(head, magicGzip):
 		gz, err := gzip.NewReader(br)
 		if err != nil {
-			return nil, fmt.Errorf("gzip reader: %w", err)
+			return nil, errors.Wrap(err, errors.ErrTypeParser, "gzip reader").
+				WithOperation("decompressStream")
 		}
 
 		return gz, nil
@@ -207,7 +220,8 @@ func decompressStream(r io.Reader, _ string) (io.ReadCloser, error) {
 	case bytes.HasPrefix(head, magicXz):
 		xzr, err := xz.NewReader(br)
 		if err != nil {
-			return nil, fmt.Errorf("xz reader: %w", err)
+			return nil, errors.Wrap(err, errors.ErrTypeParser, "xz reader").
+				WithOperation("decompressStream")
 		}
 		// xz.Reader doesn't implement Close.
 		return io.NopCloser(xzr), nil
@@ -215,7 +229,8 @@ func decompressStream(r io.Reader, _ string) (io.ReadCloser, error) {
 	case bytes.HasPrefix(head, magicZstd):
 		zr, err := zstd.NewReader(br)
 		if err != nil {
-			return nil, fmt.Errorf("zstd reader: %w", err)
+			return nil, errors.Wrap(err, errors.ErrTypeParser, "zstd reader").
+				WithOperation("decompressStream")
 		}
 
 		return zr.IOReadCloser(), nil
@@ -233,44 +248,13 @@ func decompressStream(r io.Reader, _ string) (io.ReadCloser, error) {
 func parseControl(control string) map[string]string {
 	fields := make(map[string]string)
 
-	scanner := bufio.NewScanner(strings.NewReader(control))
-
-	var (
-		currentField string
-		currentValue strings.Builder
-	)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Continuation line (starts with space or tab).
-		if line != "" && (line[0] == ' ' || line[0] == '\t') {
-			currentValue.WriteString("\n")
-			currentValue.WriteString(strings.TrimPrefix(line, " "))
-
-			continue
+	_ = deb822.Parse(strings.NewReader(control), func(stanzaMap deb822.Stanza) error {
+		// Copy all fields from the stanza into the result map
+		for k, v := range stanzaMap {
+			fields[k] = v
 		}
-
-		// Flush previous field.
-		if currentField != "" {
-			fields[currentField] = currentValue.String()
-		}
-
-		// Parse new field line.
-		if field, value, ok := strings.Cut(line, ":"); ok {
-			currentField = field
-
-			currentValue.Reset()
-			currentValue.WriteString(strings.TrimSpace(value))
-		} else {
-			currentField = ""
-		}
-	}
-
-	// Flush last field.
-	if currentField != "" {
-		fields[currentField] = currentValue.String()
-	}
+		return nil
+	})
 
 	return fields
 }

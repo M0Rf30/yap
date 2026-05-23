@@ -46,7 +46,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Pkg {
 //
 // The method calls the internal pacmanBuild function to perform the actual build process.
 // Returns the path to the created package file.
-func (m *Pkg) BuildPackage(artifactsPath string, targetArch string) (string, error) {
+func (m *Pkg) BuildPackage(ctx context.Context, artifactsPath string, targetArch string) (string, error) {
 	m.SetTargetArchitecture(targetArch)
 
 	pkgName := m.BuildPackageName(constants.ExtPacmanZst)
@@ -69,7 +69,7 @@ func (m *Pkg) BuildPackage(artifactsPath string, targetArch string) (string, err
 // The method initializes the pacmanDir, resolves the package destination, and creates
 // the PKGBUILD and post-installation script files if necessary. It returns an error
 // if any stem fails.
-func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
+func (m *Pkg) PrepareFakeroot(ctx context.Context, artifactsPath string, targetArch string) error {
 	m.pacmanDir = m.PKGBUILD.StartDir
 	// Note: Don't override ArchComputed here - it should remain the native architecture
 	// The targetArch is used for package naming in BuildPackage method

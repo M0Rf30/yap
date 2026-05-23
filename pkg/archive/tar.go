@@ -23,7 +23,6 @@ import (
 	"compress/gzip"
 	"context"
 	stderrors "errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -509,11 +508,11 @@ func ExtractFiltered(ctx context.Context, source, destination string, patterns [
 
 	switch kind {
 	case kindZip:
-		return extractZip(ctx, sourceFile, destination, patterns)
+		return extractZipIterator(ctx, sourceFile, destination, patterns)
 	case kind7z:
-		return extract7z(ctx, sourceFile, destination, patterns)
+		return extract7zIterator(ctx, sourceFile, destination, patterns)
 	case kindRar:
-		return extractRar(ctx, reader, destination, patterns)
+		return extractRarIterator(ctx, reader, destination, patterns)
 	}
 
 	tarReader, closeFn, err := openTarStream(reader, kind)
@@ -521,13 +520,13 @@ func ExtractFiltered(ctx context.Context, source, destination string, patterns [
 		return err
 	}
 
-	defer func() {
-		if closeFn != nil {
-			_ = closeFn()
-		}
-	}()
+	var it entryIterator = newTarIterator(tarReader)
+	if closeFn != nil {
+		// Wrap the iterator to ensure the decompressor is closed
+		it = &tarIteratorWithCloser{it: newTarIterator(tarReader), closeFn: closeFn}
+	}
 
-	return extractTar(ctx, tarReader, destination, patterns)
+	return extractWithIterator(ctx, it, destination, patterns)
 }
 
 // openTarStream wraps reader in the appropriate decompressor for the given
@@ -569,7 +568,9 @@ func openTarStream(reader io.Reader, kind archiveKind) (*tar.Reader, func() erro
 		return tar.NewReader(bzip2.NewReader(reader)), nil, nil
 
 	default:
-		return nil, nil, fmt.Errorf("unsupported archive kind: %d", kind)
+		return nil, nil, errors.New(errors.ErrTypeParser, "unsupported archive kind").
+			WithOperation("openTarStream").
+			WithContext("kind", kind)
 	}
 }
 
@@ -593,75 +594,22 @@ func matchesAny(patterns []string, name string) bool {
 	return false
 }
 
-// extractTar reads tar entries from tr and writes them under destination,
-// honouring the optional pattern filter.
-//
-//nolint:gocyclo,cyclop // dir + file + symlink dispatch is inherently branchy
-func extractTar(ctx context.Context, tr *tar.Reader, destination string, patterns []string) error {
-	dirMap := make(map[string]bool)
+// tarIteratorWithCloser wraps a tarIterator and ensures a close function is called.
+type tarIteratorWithCloser struct {
+	it      *tarIterator
+	closeFn func() error
+}
 
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
+func (tic *tarIteratorWithCloser) Next() (archiveEntry, error) {
+	return tic.it.Next()
+}
 
-		hdr, err := tr.Next()
-		if err == io.EOF { //nolint:errorlint // io.EOF is the documented sentinel
-			return nil
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if !matchesAny(patterns, hdr.Name) {
-			continue
-		}
-
-		cleanPath, err := safeJoin(destination, hdr.Name)
-		if err != nil {
-			logger.Warn(i18n.T("logger.archive.warn.path_traversal_rejected"),
-				"entry", hdr.Name, "destination", destination)
-
-			return err
-		}
-
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			dirMap[cleanPath] = true
-			if err := os.MkdirAll(cleanPath, 0o755); err != nil { // #nosec G301
-				return err
-			}
-
-		case tar.TypeSymlink:
-			if err := safeSymlinkTarget(hdr.Name, hdr.Linkname); err != nil {
-				logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
-					"entry", hdr.Name, "target", hdr.Linkname)
-
-				return err
-			}
-
-			ensureParent(cleanPath, dirMap)
-			_ = os.Remove(cleanPath)
-
-			if err := os.Symlink(hdr.Linkname, cleanPath); err != nil {
-				return err
-			}
-
-		case tar.TypeReg, tar.TypeRegA: //nolint:staticcheck // TypeRegA appears in old tarballs
-			ensureParent(cleanPath, dirMap)
-
-			if err := writeTarFile(cleanPath, hdr, tr); err != nil {
-				return err
-			}
-
-		default:
-			// Skip FIFOs, hardlinks (rare in source tarballs), char/block
-			// devices, etc. — neither produced by YAP nor safe to materialise
-			// in a build directory.
-			continue
-		}
+func (tic *tarIteratorWithCloser) Close() error {
+	if tic.closeFn != nil {
+		return tic.closeFn()
 	}
+
+	return nil
 }
 
 // ensureParent creates the parent directory of path if not already seen.
@@ -701,6 +649,26 @@ func writeTarFile(path string, hdr *tar.Header, tr io.Reader) error {
 	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
 
 	return err
+}
+
+// extractZipIterator handles .zip / .jar inputs using the iterator interface.
+func extractZipIterator(ctx context.Context, f *os.File, destination string, patterns []string) error {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	zr, err := zip.NewReader(f, info.Size())
+	if err != nil {
+		return err
+	}
+
+	it := newZipIterator(zr)
+	return extractWithIterator(ctx, it, destination, patterns)
 }
 
 // extractZip handles .zip / .jar inputs. The zip reader needs random access,
@@ -844,6 +812,26 @@ func writeZipFile(zf *zip.File, cleanPath string) error {
 // 7z (bodgit/sevenzip)
 // ---------------------------------------------------------------------------
 
+// extract7zIterator reads .7z archives using the iterator interface.
+func extract7zIterator(ctx context.Context, f *os.File, destination string, patterns []string) error {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	zr, err := sevenzip.NewReader(f, info.Size())
+	if err != nil {
+		return err
+	}
+
+	it := newSevenZipIterator(zr)
+	return extractWithIterator(ctx, it, destination, patterns)
+}
+
 // extract7z reads .7z archives. sevenzip requires random access (io.ReaderAt
 // + size), so we operate on the underlying *os.File rather than the sniffed
 // MultiReader. The file offset is reset before use.
@@ -951,6 +939,17 @@ func write7zFile(sf *sevenzip.File, cleanPath string) error {
 // ---------------------------------------------------------------------------
 // rar (nwaples/rardecode)
 // ---------------------------------------------------------------------------
+
+// extractRarIterator reads .rar archives using the iterator interface.
+func extractRarIterator(ctx context.Context, reader io.Reader, destination string, patterns []string) error {
+	rr, err := rardecode.NewReader(reader)
+	if err != nil {
+		return err
+	}
+
+	it := newRarIterator(rr)
+	return extractWithIterator(ctx, it, destination, patterns)
+}
 
 // extractRar reads .rar archives. rardecode operates on an io.Reader so the
 // sniffed MultiReader is fine.

@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // fetchComponentIndex downloads the Packages index for a component+arch combination.
@@ -38,16 +38,22 @@ func fetchComponentIndex(ctx context.Context, src *aptcache.SourceEntry, comp, a
 
 		// Verify size + SHA256.
 		if int64(len(data)) != entry.Size {
-			return fmt.Errorf("size mismatch for %s: got %d, expected %d",
-				url, len(data), entry.Size)
+			return errors.New(errors.ErrTypeValidation, "size mismatch").
+				WithOperation("fetchComponentIndex").
+				WithContext("url", url).
+				WithContext("got", len(data)).
+				WithContext("expected", entry.Size)
 		}
 
 		sum := sha256.Sum256(data)
 
 		got := hex.EncodeToString(sum[:])
 		if got != entry.Hash {
-			return fmt.Errorf("SHA256 mismatch for %s: got %s, expected %s",
-				url, got, entry.Hash)
+			return errors.New(errors.ErrTypeValidation, "SHA256 mismatch").
+				WithOperation("fetchComponentIndex").
+				WithContext("url", url).
+				WithContext("got", got).
+				WithContext("expected", entry.Hash)
 		}
 
 		// Write to /var/lib/apt/lists/.
@@ -61,5 +67,8 @@ func fetchComponentIndex(ctx context.Context, src *aptcache.SourceEntry, comp, a
 		return nil
 	}
 
-	return fmt.Errorf("aptrepo: no Packages variant found for %s/%s", comp, arch)
+	return errors.New(errors.ErrTypeValidation, "no Packages variant found").
+		WithOperation("fetchComponentIndex").
+		WithContext("component", comp).
+		WithContext("arch", arch)
 }

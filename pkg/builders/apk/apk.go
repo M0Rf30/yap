@@ -3,7 +3,6 @@ package apk
 
 import (
 	"archive/tar"
-	"bytes"
 	"context"
 	"crypto/sha1" // #nosec G505 -- SHA1 required by APK format for checksum headers
 	"crypto/sha256"
@@ -123,13 +122,13 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Apk {
 // The package is created as a gzip-compressed tar archive containing the package
 // files and metadata (.PKGINFO and optional .install script).
 // Returns the path to the created APK file.
-func (a *Apk) BuildPackage(artifactsPath string, targetArch string) (string, error) {
+func (a *Apk) BuildPackage(ctx context.Context, artifactsPath string, targetArch string) (string, error) {
 	a.SetTargetArchitecture(targetArch)
 
 	pkgName := a.BuildPackageName(".apk")
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-	err := a.createTarGzWithChecksums(a.PKGBUILD.PackageDir, pkgFilePath)
+	err := a.createTarGzWithChecksums(ctx, a.PKGBUILD.PackageDir, pkgFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -141,7 +140,7 @@ func (a *Apk) BuildPackage(artifactsPath string, targetArch string) (string, err
 
 // PrepareFakeroot sets up the APK package metadata.
 // It generates the .PKGINFO file and optional install scripts for lifecycle hooks.
-func (a *Apk) PrepareFakeroot(artifactsPath string, targetArch string) error {
+func (a *Apk) PrepareFakeroot(ctx context.Context, artifactsPath string, targetArch string) error {
 	a.SetTargetArchitecture(targetArch)
 
 	installedSize, err := files.GetDirSize(a.PKGBUILD.PackageDir)
@@ -218,11 +217,12 @@ func isControlFile(name string) bool {
 // The datahash in .PKGINFO is the SHA256 of data.tar.gz.
 //
 // This implements the Alpine APK format with APK-TOOLS.checksum.SHA1 headers.
+// Streams tar.gz archives directly to temp files to minimize memory usage.
 //
 //nolint:gocyclo,cyclop // APK format requires specific two-stream construction
-func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
-	ctx := context.Background()
+func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFile string) error {
 
+	// Step 1: Walk source directory once
 	fileList, err := walkAPKFiles(sourceDir)
 	if err != nil {
 		return err
@@ -235,10 +235,26 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 		}
 	}
 
-	// Step 1: Create data.tar.gz with only non-control files
-	var dataBuf bytes.Buffer
+	// Step 2: Create data.tar.gz with only non-control files, streaming to temp file
+	dataTempFile, err := os.CreateTemp("", "apk-data-*.tar.gz")
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			"failed to create temp file for data.tar.gz").
+			WithOperation("createTarGzWithChecksums").
+			WithContext("sourceDir", sourceDir)
+	}
 
-	gzData := gzip.NewWriter(&dataBuf)
+	dataTempPath := dataTempFile.Name()
+
+	defer func() {
+		_ = dataTempFile.Close()
+		_ = os.Remove(dataTempPath)
+	}()
+
+	dataHasher := sha256.New()
+	dataWriter := io.MultiWriter(dataTempFile, dataHasher)
+
+	gzData := gzip.NewWriter(dataWriter)
 	gzData.ModTime = time.Unix(0, 0)
 	twData := tar.NewWriter(gzData)
 
@@ -263,18 +279,16 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 		return err
 	}
 
-	// Step 2: Compute datahash = SHA256(data.tar.gz)
-	dataHasher := sha256.New()
-	dataHasher.Write(dataBuf.Bytes())
+	// Step 3: Compute datahash = SHA256(data.tar.gz)
 	dataHash := hex.EncodeToString(dataHasher.Sum(nil))
 	a.PKGBUILD.DataHash = dataHash
 
-	// Step 3: Regenerate .PKGINFO with datahash field
+	// Step 4: Regenerate .PKGINFO with datahash field
 	if err := a.createPkgInfo(); err != nil {
 		return err
 	}
 
-	// Step 4: Reload file list to get updated .PKGINFO
+	// Step 5: Reload file list to get updated .PKGINFO
 	fileList2, err := walkAPKFiles(sourceDir)
 	if err != nil {
 		return err
@@ -286,10 +300,23 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 		}
 	}
 
-	// Step 5: Create control.tar.gz with control files only
-	var controlBuf bytes.Buffer
+	// Step 6: Create control.tar.gz with control files only, streaming to temp file
+	controlTempFile, err := os.CreateTemp("", "apk-control-*.tar.gz")
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			"failed to create temp file for control.tar.gz").
+			WithOperation("createTarGzWithChecksums").
+			WithContext("sourceDir", sourceDir)
+	}
 
-	gzControl := gzip.NewWriter(&controlBuf)
+	controlTempPath := controlTempFile.Name()
+
+	defer func() {
+		_ = controlTempFile.Close()
+		_ = os.Remove(controlTempPath)
+	}()
+
+	gzControl := gzip.NewWriter(controlTempFile)
 	gzControl.ModTime = time.Unix(0, 0)
 	twControl := tar.NewWriter(gzControl)
 
@@ -314,7 +341,7 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 		return err
 	}
 
-	// Step 6: Write final APK = control.tar.gz + data.tar.gz
+	// Step 7: Write final APK = control.tar.gz + data.tar.gz
 	cleanFilePath := filepath.Clean(outputFile)
 
 	out, err := os.Create(cleanFilePath)
@@ -330,14 +357,34 @@ func (a *Apk) createTarGzWithChecksums(sourceDir, outputFile string) error {
 		}
 	}()
 
-	// Write control.tar.gz
-	if _, err := out.Write(controlBuf.Bytes()); err != nil {
-		return err
+	// Seek to beginning of control temp file and copy to output
+	if _, err := controlTempFile.Seek(0, 0); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			"failed to seek control temp file").
+			WithOperation("createTarGzWithChecksums").
+			WithContext("tempFile", controlTempPath)
 	}
 
-	// Write data.tar.gz
-	if _, err := out.Write(dataBuf.Bytes()); err != nil {
-		return err
+	if _, err := io.Copy(out, controlTempFile); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			"failed to write control.tar.gz to output").
+			WithOperation("createTarGzWithChecksums").
+			WithContext("outputFile", cleanFilePath)
+	}
+
+	// Seek to beginning of data temp file and copy to output
+	if _, err := dataTempFile.Seek(0, 0); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			"failed to seek data temp file").
+			WithOperation("createTarGzWithChecksums").
+			WithContext("tempFile", dataTempPath)
+	}
+
+	if _, err := io.Copy(out, dataTempFile); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			"failed to write data.tar.gz to output").
+			WithOperation("createTarGzWithChecksums").
+			WithContext("outputFile", cleanFilePath)
 	}
 
 	return nil

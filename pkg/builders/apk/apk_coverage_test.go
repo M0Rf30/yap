@@ -81,7 +81,7 @@ func TestBuildPackageCreateTarGzError(t *testing.T) {
 	builder.PKGBUILD.PackageDir = "/nonexistent/pkg/dir"
 	builder.PKGBUILD.ArchComputed = "x86_64"
 
-	_, err := builder.BuildPackage(tmpDir, "")
+	_, err := builder.BuildPackage(context.Background(), tmpDir, "")
 	assert.Error(t, err)
 }
 
@@ -95,7 +95,7 @@ func TestPrepareFakerootGetDirSizeError(t *testing.T) {
 	// Point PackageDir to a non-existent directory so GetDirSize fails.
 	builder.PKGBUILD.PackageDir = "/nonexistent/pkg/dir"
 
-	err := builder.PrepareFakeroot(tmpDir, "")
+	err := builder.PrepareFakeroot(context.Background(), tmpDir, "")
 	assert.Error(t, err)
 }
 
@@ -123,7 +123,7 @@ func TestPrepareFakerootInstallScriptError(t *testing.T) {
 
 	defer func() { _ = os.Chmod(pkgDir, 0o755) }()
 
-	err := builder.PrepareFakeroot(tmpDir, "")
+	err := builder.PrepareFakeroot(context.Background(), tmpDir, "")
 	assert.Error(t, err)
 }
 
@@ -146,7 +146,7 @@ func TestCreateTarGzOutputFileError(t *testing.T) {
 	builder.PKGBUILD.PackageDir = pkgDir
 
 	// Output path inside a non-existent directory → os.Create fails
-	err := builder.createTarGzWithChecksums(pkgDir, "/nonexistent/dir/out.apk")
+	err := builder.createTarGzWithChecksums(context.Background(), pkgDir, "/nonexistent/dir/out.apk")
 	assert.Error(t, err)
 }
 
@@ -170,7 +170,7 @@ func TestCreateTarGzWithDataFile(t *testing.T) {
 	builder.PKGBUILD.PackageDir = pkgDir
 
 	outFile := filepath.Join(tmpDir, "out.apk")
-	err := builder.createTarGzWithChecksums(pkgDir, outFile)
+	err := builder.createTarGzWithChecksums(context.Background(), pkgDir, outFile)
 	require.NoError(t, err)
 
 	info, err := os.Stat(outFile)
@@ -336,7 +336,7 @@ func TestCreateTarGzWithChecksumsBadOutputDir(t *testing.T) {
 
 	builder.PKGBUILD.PackageDir = pkgDir
 
-	err := builder.createTarGzWithChecksums(pkgDir, "/no/such/dir/out.apk")
+	err := builder.createTarGzWithChecksums(context.Background(), pkgDir, "/no/such/dir/out.apk")
 	assert.Error(t, err)
 }
 
@@ -365,7 +365,7 @@ func TestCreateTarGzWithChecksumsDataWriteError(t *testing.T) {
 	builder.PKGBUILD.PackageDir = pkgDir
 
 	outFile := filepath.Join(tmpDir, "out.apk")
-	err := builder.createTarGzWithChecksums(pkgDir, outFile)
+	err := builder.createTarGzWithChecksums(context.Background(), pkgDir, outFile)
 	assert.Error(t, err)
 }
 
@@ -393,7 +393,7 @@ func TestCreateTarGzWithChecksumsControlWriteError(t *testing.T) {
 	builder.PKGBUILD.PackageDir = pkgDir
 
 	outFile := filepath.Join(tmpDir, "out.apk")
-	err := builder.createTarGzWithChecksums(pkgDir, outFile)
+	err := builder.createTarGzWithChecksums(context.Background(), pkgDir, outFile)
 	assert.Error(t, err)
 }
 

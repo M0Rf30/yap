@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -30,6 +29,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/M0Rf30/yap/v2/pkg/deb822"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/klauspost/compress/zstd"
 	lz4 "github.com/pierrec/lz4/v4"
@@ -165,11 +166,11 @@ func NewEmptyCache() *Cache {
 
 // AddEntry inserts or replaces a PackageInfo entry in the cache.
 // Intended for test setup; not safe for concurrent use during population.
-func (c *Cache) AddEntry(info PackageInfo) {
+func (c *Cache) AddEntry(info *PackageInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	cp := info
+	cp := *info
 	c.entries[info.Name] = &cp
 }
 
@@ -546,50 +547,12 @@ func parseLegacySourcesList(content string, schemes map[string]sourceInfo) {
 // parseDeb822SourcesList parses /etc/apt/sources.list.d/*.sources format (deb822).
 // Stanzas with Types: deb and URIs: https://...
 func parseDeb822SourcesList(content string, schemes map[string]sourceInfo) {
-	scanner := bufio.NewScanner(strings.NewReader(content))
-
-	var curTypes, curURIs string
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Blank line → end of stanza
-		if line == "" {
-			flushDeb822Stanza(curTypes, curURIs, schemes)
-			curTypes = ""
-			curURIs = ""
-
-			continue
-		}
-
-		// Continuation line (starts with space) — append to current field
-		if line != "" && (line[0] == ' ' || line[0] == '\t') {
-			if curURIs != "" {
-				curURIs += " " + strings.TrimSpace(line)
-			}
-
-			continue
-		}
-
-		// Field line: "FieldName: value"
-		field, value, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-
-		field = strings.TrimSpace(field)
-		value = strings.TrimSpace(value)
-
-		switch field {
-		case "Types":
-			curTypes = value
-		case "URIs":
-			curURIs = value
-		}
-	}
-
-	// Flush last stanza
-	flushDeb822Stanza(curTypes, curURIs, schemes)
+	_ = deb822.Parse(strings.NewReader(content), func(stanzaMap deb822.Stanza) error {
+		curTypes := stanzaMap["Types"]
+		curURIs := stanzaMap["URIs"]
+		flushDeb822Stanza(curTypes, curURIs, schemes)
+		return nil
+	})
 }
 
 // flushDeb822Stanza processes a completed deb822 stanza by extracting URIs and adding them to schemes.
@@ -798,16 +761,10 @@ func handleDebReposLine(line string, st *debReposState, entries *[]SourceEntry) 
 func parseDeb822SourcesListForRepo(content string) []SourceEntry {
 	var entries []SourceEntry
 
-	scanner := bufio.NewScanner(strings.NewReader(content))
-	st := debReposState{}
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		handleDebReposLine(line, &st, &entries)
-	}
-
-	// Flush last stanza
-	flushDeb822RepoStanza(&entries, st.curTypes, st.curURIs, st.curSuites, st.curComponents, st.curArchs, st.curSignedBy)
+	_ = deb822.Parse(strings.NewReader(content), func(stanzaMap deb822.Stanza) error {
+		flushDeb822RepoStanza(&entries, stanzaMap["Types"], stanzaMap["URIs"], stanzaMap["Suites"], stanzaMap["Components"], stanzaMap["Architectures"], stanzaMap["Signed-By"])
+		return nil
+	})
 
 	return entries
 }
@@ -1078,7 +1035,9 @@ func (c *Cache) loadDpkgStatus(path string) error {
 func (c *Cache) parseFile(path string, dpkgStatus bool, baseURL string) error {
 	f, err := os.Open(path) // #nosec G304 — path is constructed from trusted constants
 	if err != nil {
-		return err
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open apt list file").
+			WithContext("path", path).
+			WithOperation("parseFile")
 	}
 
 	defer func() { _ = f.Close() }()
@@ -1089,7 +1048,9 @@ func (c *Cache) parseFile(path string, dpkgStatus bool, baseURL string) error {
 	case strings.HasSuffix(path, ".gz"):
 		gz, err := gzip.NewReader(f)
 		if err != nil {
-			return err
+			return errors.Wrap(err, errors.ErrTypeParser, "failed to create gzip reader").
+				WithContext("path", path).
+				WithOperation("parseFile")
 		}
 
 		defer func() { _ = gz.Close() }()
@@ -1103,7 +1064,9 @@ func (c *Cache) parseFile(path string, dpkgStatus bool, baseURL string) error {
 		// syscall overhead — 5-8x slower than buffered I/O.
 		xzr, err := xz.NewReader(bufio.NewReader(f))
 		if err != nil {
-			return err
+			return errors.Wrap(err, errors.ErrTypeParser, "failed to create xz reader").
+				WithContext("path", path).
+				WithOperation("parseFile")
 		}
 
 		r = xzr
@@ -1115,7 +1078,9 @@ func (c *Cache) parseFile(path string, dpkgStatus bool, baseURL string) error {
 	case strings.HasSuffix(path, ".zst"):
 		zr, err := zstd.NewReader(bufio.NewReader(f))
 		if err != nil {
-			return err
+			return errors.Wrap(err, errors.ErrTypeParser, "failed to create zstd reader").
+				WithContext("path", path).
+				WithOperation("parseFile")
 		}
 
 		defer zr.Close()
@@ -1123,7 +1088,7 @@ func (c *Cache) parseFile(path string, dpkgStatus bool, baseURL string) error {
 		r = zr
 	}
 
-	return c.parseDeb822(r, dpkgStatus, baseURL)
+	return c.parseDeb822(r, path, dpkgStatus, baseURL)
 }
 
 // stanza holds the fields extracted from a single deb822 stanza.
@@ -1148,48 +1113,22 @@ type stanza struct {
 // The deb822 format is a sequence of stanzas separated by blank lines.
 // Each stanza is a set of "Field: value" lines; continuation lines start
 // with a space or tab.  We only extract the fields we care about.
+// path is the source file path for error context.
 // baseURL is the repo base URL for apt index files (empty for dpkg status).
-func (c *Cache) parseDeb822(r io.Reader, dpkgStatus bool, baseURL string) error {
-	scanner := bufio.NewScanner(r)
-	// Some Packages files have very long Description lines.
-	scanner.Buffer(make([]byte, 256*1024), 256*1024)
+func (c *Cache) parseDeb822(r io.Reader, path string, dpkgStatus bool, baseURL string) error {
+	return deb822.Parse(r, func(stanzaMap deb822.Stanza) error {
+		cur := stanza{baseURL: baseURL}
 
-	var cur stanza
-
-	cur.baseURL = baseURL
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Blank line → end of stanza.
-		if line == "" {
-			c.flushStanza(&cur, dpkgStatus)
-			cur = stanza{baseURL: baseURL}
-
-			continue
+		// Apply each field from the parsed stanza
+		for field, value := range stanzaMap {
+			applyField(&cur, field, value, dpkgStatus)
 		}
 
-		// Continuation line (starts with space or tab) — skip, we don't need
-		// multi-line field values for the fields we care about.
-		if line[0] == ' ' || line[0] == '\t' {
-			continue
-		}
+		// Flush the completed stanza into the cache
+		c.flushStanza(&cur, dpkgStatus)
 
-		// Field line: "FieldName: value"
-		field, value, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-
-		value = strings.TrimSpace(value)
-
-		applyField(&cur, field, value, dpkgStatus)
-	}
-
-	// Flush the last stanza (file may not end with a blank line).
-	c.flushStanza(&cur, dpkgStatus)
-
-	return scanner.Err()
+		return nil
+	})
 }
 
 // applyField sets the appropriate stanza field from a parsed deb822 field line.
@@ -1477,8 +1416,9 @@ func (c *Cache) Download(ctx context.Context, destDir string, pkgs []string) err
 
 	for resp := range respCh {
 		if err := resp.Err(); err != nil && firstEr == nil {
-			firstEr = fmt.Errorf("aptcache: download %q: %w",
-				filepath.Base(resp.Filename), err)
+			firstEr = errors.Wrap(err, errors.ErrTypeNetwork, "failed to download package").
+				WithOperation("Download").
+				WithContext("filename", filepath.Base(resp.Filename))
 		}
 	}
 
@@ -1501,14 +1441,15 @@ func (c *Cache) buildDownloadRequests(
 
 		info, ok := c.Lookup(name)
 		if !ok || info.Filename == "" {
-			return nil, fmt.Errorf(
-				"aptcache: package %q not found in apt index (run apt-get update first)",
-				name)
+			return nil, errors.New(errors.ErrTypeValidation, "package not found in apt index").
+				WithOperation("buildDownloadRequests").
+				WithContext("package", name)
 		}
 
 		if info.BaseURL == "" {
-			return nil, fmt.Errorf(
-				"aptcache: package %q has no BaseURL (apt sources not parsed?)", name)
+			return nil, errors.New(errors.ErrTypeValidation, "package has no BaseURL").
+				WithOperation("buildDownloadRequests").
+				WithContext("package", name)
 		}
 
 		pkgURL := strings.TrimSuffix(info.BaseURL, "/") + "/" + info.Filename
@@ -1516,7 +1457,9 @@ func (c *Cache) buildDownloadRequests(
 
 		req, err := grab.NewRequest(destFile, pkgURL)
 		if err != nil {
-			return nil, fmt.Errorf("aptcache: build request for %q: %w", name, err)
+			return nil, errors.Wrap(err, errors.ErrTypeInternal, "failed to build download request").
+				WithOperation("buildDownloadRequests").
+				WithContext("package", name)
 		}
 
 		req = req.WithContext(ctx)
@@ -1616,13 +1559,19 @@ func preflightContentLength(resp *http.Response, pkgURL string, expectedSize int
 	}
 
 	if resp.ContentLength > maxDebBytes {
-		return fmt.Errorf("aptcache: %s body too large: %d bytes (cap %d)",
-			pkgURL, resp.ContentLength, maxDebBytes)
+		return errors.New(errors.ErrTypeValidation, "response body too large").
+			WithOperation("checkContentLength").
+			WithContext("url", pkgURL).
+			WithContext("size", resp.ContentLength).
+			WithContext("cap", maxDebBytes)
 	}
 
 	if expectedSize > 0 && resp.ContentLength != expectedSize {
-		return fmt.Errorf("aptcache: Content-Length mismatch for %s: got %d, expected %d",
-			pkgURL, resp.ContentLength, expectedSize)
+		return errors.New(errors.ErrTypeValidation, "Content-Length mismatch").
+			WithOperation("checkContentLength").
+			WithContext("url", pkgURL).
+			WithContext("got", resp.ContentLength).
+			WithContext("expected", expectedSize)
 	}
 
 	return nil
@@ -1660,15 +1609,25 @@ func streamToTmp(resp *http.Response, tmpFile string) (hashHex string, written i
 // expected size, and the hash against the expected SHA-256.
 func verifySizeAndHash(n int64, gotHash string, expectedSize int64, expectedSHA256, pkgURL string) error {
 	if n > maxDebBytes {
-		return fmt.Errorf("aptcache: %s exceeded %d-byte cap", pkgURL, maxDebBytes)
+		return errors.New(errors.ErrTypeValidation, "downloaded size exceeded cap").
+			WithOperation("verifySizeAndHash").
+			WithContext("url", pkgURL).
+			WithContext("size", n).
+			WithContext("cap", maxDebBytes)
 	}
 
 	if expectedSize > 0 && n != expectedSize {
-		return fmt.Errorf("size mismatch: got %d, expected %d", n, expectedSize)
+		return errors.New(errors.ErrTypeValidation, "size mismatch").
+			WithOperation("verifySizeAndHash").
+			WithContext("got", n).
+			WithContext("expected", expectedSize)
 	}
 
 	if expectedSHA256 != "" && gotHash != expectedSHA256 {
-		return fmt.Errorf("SHA256 mismatch: got %s, expected %s", gotHash, expectedSHA256)
+		return errors.New(errors.ErrTypeValidation, "SHA256 mismatch").
+			WithOperation("verifySizeAndHash").
+			WithContext("got", gotHash).
+			WithContext("expected", expectedSHA256)
 	}
 
 	return nil

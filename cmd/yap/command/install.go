@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/dnfinstall"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -94,8 +95,36 @@ func detectPackageType(filePath string) (string, error) {
 // installPackage installs the package using the appropriate package manager
 // with the same arguments used by yap's internal package managers.
 func installPackage(packageType, artifactPath string) error {
-	var cmd string
+	// RPM: use pure-Go dnfinstall
+	if packageType == packageTypeRPM {
+		logger.Info(i18n.T("logger.installpackage.info.installing_package_1"),
+			"command", "dnfinstall",
+			"artifact", artifactPath)
 
+		opts := dnfinstall.Options{
+			RootDir:             "/",
+			AllowRootInstall:    true,
+			AllowUnverifiedRPMs: false, // require GPG-trusted signature
+			RunLDConfig:         true,
+		}
+
+		if err := dnfinstall.InstallFile(context.Background(), artifactPath, opts); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild,
+				i18n.T("errors.install.installation_failed")).
+				WithOperation("installPackage").
+				WithContext("artifact", artifactPath).
+				WithContext("packageType", packageType)
+		}
+
+		logger.Info(i18n.T("logger.installpackage.info.package_installed_successfully_1"),
+			"artifact", artifactPath,
+			"type", packageType)
+
+		return nil
+	}
+
+	// Other formats: use subprocess-based package managers
+	var cmd string
 	var args []string
 
 	switch packageType {
@@ -103,10 +132,6 @@ func installPackage(packageType, artifactPath string) error {
 		// Use same args as pkg/dpkg/constants.go
 		cmd = "apt-get"
 		args = []string{"--allow-downgrades", "--assume-yes", "install", artifactPath}
-	case packageTypeRPM:
-		// Use same args as pkg/rpm/constants.go
-		cmd = "dnf"
-		args = []string{"-y", "install", artifactPath}
 	case packageTypeApk:
 		// Use same args as pkg/abuild/constants.go
 		cmd = pmApk

@@ -30,7 +30,7 @@ DOCKER_BUILD_FLAGS = --progress=plain --no-cache
 # Available distributions (dynamically retrieved from build/deploy folder)
 DISTROS = $(shell find build/deploy -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
-.PHONY: all build clean test test-coverage bench deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats rpmdb-gen
+.PHONY: all build clean test test-coverage test-e2e-rpm bench deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats rpmdb-gen
 
 # Default target
 all: clean deps fmt lint lint-md test doc build
@@ -59,6 +59,21 @@ test-coverage:
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
+
+# Run E2E test for pure-Go RPM install on Rocky Linux 8
+test-e2e-rpm:
+	@echo "Running pure-Go RPM install E2E test on rockylinux:8..."
+	@CONTAINER_RUNTIME=$$(command -v docker || command -v podman); \
+	if [ -z "$$CONTAINER_RUNTIME" ]; then \
+		echo "Error: docker or podman not found"; \
+		echo "Please install Docker or Podman to run E2E tests"; \
+		exit 1; \
+	fi; \
+	$$CONTAINER_RUNTIME run --rm \
+	  -v $(PWD):/yap:Z \
+	  -w /yap \
+	  rockylinux:8 \
+	  bash -c 'dnf -y install --setopt=install_weak_deps=False make sqlite curl tar gzip >/tmp/setup.log 2>&1 || (cat /tmp/setup.log; exit 1); GO_VERSION=1.26.0; if ! go version 2>/dev/null | grep -q "go$${GO_VERSION}"; then echo "==> Installing Go $${GO_VERSION}..."; curl -fsSL "https://go.dev/dl/go$${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz; export PATH="/usr/local/go/bin:$$PATH"; fi; go version; make build && ./scripts/e2e-rpm.sh'
 
 # Run benchmarks
 bench:
@@ -251,6 +266,7 @@ help:
 	@echo "  clean            - Clean build artifacts"
 	@echo "  test             - Run tests"
 	@echo "  test-coverage    - Run tests with coverage report"
+	@echo "  test-e2e-rpm     - Run E2E test for pure-Go RPM install on Rocky 8"
 	@echo "  bench            - Run benchmarks"
 	@echo "  deps             - Download dependencies"
 	@echo "  fmt              - Format code"
