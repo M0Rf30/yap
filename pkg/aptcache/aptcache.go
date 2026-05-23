@@ -974,6 +974,21 @@ func (c *Cache) mergeFrom(other *Cache) {
 
 		if info.Filename != "" {
 			existing.Filename = info.Filename
+			// BaseURL must follow Filename when the incoming entry is for a
+			// different (non-all) architecture: e.g. arm64 Filename from
+			// ports.ubuntu.com must not be downloaded from archive.ubuntu.com.
+			//
+			// Exception: Architecture: all packages have the same _all.deb
+			// filename in every arch index. Overwriting BaseURL for those
+			// would replace archive.ubuntu.com with ports.ubuntu.com, causing
+			// the host-arch install of arch-all tools (patch, autoconf, …) to
+			// pull arm64 debs and overwrite host binaries.
+			//
+			// Rule: update BaseURL only when the incoming arch is non-empty
+			// and not "all" — meaning it is a genuine arch-specific entry.
+			if info.BaseURL != "" && info.Architecture != "" && info.Architecture != "all" {
+				existing.BaseURL = info.BaseURL
+			}
 		}
 
 		if info.SHA256 != "" {
@@ -982,10 +997,6 @@ func (c *Cache) mergeFrom(other *Cache) {
 
 		if info.Size > 0 {
 			existing.Size = info.Size
-		}
-
-		if info.BaseURL != "" && existing.BaseURL == "" {
-			existing.BaseURL = info.BaseURL
 		}
 
 		if len(info.Depends) > 0 {

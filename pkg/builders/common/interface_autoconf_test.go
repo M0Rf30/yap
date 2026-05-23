@@ -151,15 +151,16 @@ func TestSetupCrossCompilationEnvironment_AutoconfVariables(t *testing.T) {
 				t.Fatalf("SetupCrossCompilationEnvironment() error = %v", err)
 			}
 
-			// Verify autoconf environment variables are set
-			hostTriplet := os.Getenv("ac_cv_host")
-			if hostTriplet != tt.expectedHostTrip {
-				t.Errorf("ac_cv_host = %s; want %s", hostTriplet, tt.expectedHostTrip)
+			// ac_cv_host / ac_cv_build must NOT be set in the environment.
+			// Setting them poisons sub-configures (e.g. ICU's icu-native/)
+			// that need the host triplet, not the cross triplet.
+			// Autoconf derives these from --host/--build flags instead.
+			if got := os.Getenv("ac_cv_host"); got != "" {
+				t.Errorf("ac_cv_host should not be set in environment (got %q); use --host flag instead", got)
 			}
 
-			buildTriplet := os.Getenv("ac_cv_build")
-			if buildTriplet != tt.expectedBuildTrip {
-				t.Errorf("ac_cv_build = %s; want %s", buildTriplet, tt.expectedBuildTrip)
+			if got := os.Getenv("ac_cv_build"); got != "" {
+				t.Errorf("ac_cv_build should not be set in environment (got %q); use --build flag instead", got)
 			}
 
 			// Verify C/C++ compiler is set
