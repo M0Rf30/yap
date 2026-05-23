@@ -71,11 +71,23 @@ func (idx *Index) InstallPackagesWithOptions(
 	}
 
 	if len(toInstall) == 0 {
+		logger.Info("apkindex: all packages already installed",
+			"requested", len(names),
+			"resolved", len(resolved))
+
 		return nil
 	}
 
-	logger.Info("installing APK packages",
-		"count", len(toInstall), "resolved", len(resolved))
+	var totalBytes int64
+	for _, p := range toInstall {
+		totalBytes += p.Size
+	}
+
+	logger.Info("apkindex: installing APK packages",
+		"to_install", len(toInstall),
+		"resolved", len(resolved),
+		"skipped_installed", len(resolved)-len(toInstall),
+		"total_bytes", totalBytes)
 
 	// 3. Download all .apk files to a temp dir.
 	tmpDir, err := os.MkdirTemp("", "yap-apk-*")
@@ -149,26 +161,33 @@ func readInstalledDB() map[string]bool {
 // extractAndRegister extracts a .apk file to / and registers it in the installed database.
 // Orchestrates extraction of control and data streams, then registers the package.
 func extractAndRegister(apkPath string, pkg *Package) error {
-	// Open the .apk file (2-stream concatenated gzip: control + data).
+	// Open the .apk file (2-or-3-stream concatenated gzip: [signature] + control + data).
 	f, err := os.Open(apkPath) // #nosec G304 -- temp dir path
 	if err != nil {
 		return fmt.Errorf("open apk: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
-	// Extract control stream to get .PKGINFO. The .apk format is a
-	// concatenation of two (or three, with signature) gzip streams; the
-	// stdlib gzip.Reader stops at the first stream's end, so a second
-	// gzip.NewReader call on the same file picks up the next stream from
-	// where the first one left off. Intentional — don't "clean up" by
-	// reusing the reader.
-	pkgInfo, err := extractAPKControl(f)
+	// Use bufio.Reader so each gzip.NewReader inherits the buffered
+	// position state correctly across stream boundaries.
+	br := bufio.NewReader(f)
+
+	// Try to read .PKGINFO from the first stream (control).
+	pkgInfo, err := tryReadPkgInfoFromNextStream(br)
 	if err != nil {
 		return err
 	}
 
-	// Extract data stream to filesystem.
-	if err := extractAPKData(f); err != nil {
+	// If first stream was signature (no .PKGINFO), try the next one (control).
+	if pkgInfo == "" {
+		pkgInfo, err = tryReadPkgInfoFromNextStream(br)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Now br is positioned at the data.tar.gz stream.
+	if err := extractAPKData(br); err != nil {
 		return err
 	}
 
@@ -180,52 +199,55 @@ func extractAndRegister(apkPath string, pkg *Package) error {
 	return nil
 }
 
-// extractAPKControl reads the control.tar.gz stream from an APK file and returns the .PKGINFO content.
-func extractAPKControl(f *os.File) (string, error) {
-	gz1, err := gzip.NewReader(f)
+// tryReadPkgInfoFromNextStream reads the next gzip stream from br, looking for
+// .PKGINFO in the tar archive. Returns empty string if .PKGINFO is not found
+// (e.g., signature stream). Drains the stream so br is positioned at the next
+// member's magic bytes.
+func tryReadPkgInfoFromNextStream(br *bufio.Reader) (string, error) {
+	gz, err := gzip.NewReader(br)
 	if err != nil {
-		return "", fmt.Errorf("gzip reader 1: %w", err)
+		return "", fmt.Errorf("gzip reader: %w", err)
 	}
-	defer func() { _ = gz1.Close() }()
+	defer func() { _ = gz.Close() }()
 
-	// One gzip member per .apk control stream — don't auto-advance into
-	// the data stream.
-	gz1.Multistream(false)
+	// One gzip member per stream — don't auto-advance into the next stream.
+	gz.Multistream(false)
 
-	tr1 := tar.NewReader(gz1)
+	tr := tar.NewReader(gz)
 
-	// Scan control stream to find .PKGINFO (for installed DB).
+	var pkgInfo string
+
 	for {
-		hdr, err := tr1.Next()
+		hdr, err := tr.Next()
 		if err == io.EOF {
 			break
 		}
 
 		if err != nil {
-			return "", fmt.Errorf("tar read control: %w", err)
+			return "", fmt.Errorf("tar read: %w", err)
 		}
 
 		if hdr.Name == ".PKGINFO" {
-			data, err := io.ReadAll(io.LimitReader(tr1, 1<<20)) // 1 MiB cap on .PKGINFO
+			data, err := io.ReadAll(io.LimitReader(tr, 1<<20)) // 1 MiB cap
 			if err != nil {
 				return "", fmt.Errorf("read pkginfo: %w", err)
 			}
 
-			// Drain remainder of the control gzip member, capped so a
-			// malicious / oversize control tail can't OOM the build.
-			// Real control streams are tiny (KB); 16 MiB is generous.
-			_, _ = io.Copy(io.Discard, io.LimitReader(gz1, 16<<20))
-
-			return string(data), nil
+			pkgInfo = string(data)
 		}
 	}
 
-	return "", nil
+	// CRITICAL: drain remaining bytes of this gzip member so br is
+	// positioned at the start of the next member's magic. Cap at 16 MiB
+	// to defend against decompression bombs.
+	_, _ = io.Copy(io.Discard, io.LimitReader(gz, 16<<20))
+
+	return pkgInfo, nil
 }
 
 // extractAPKData reads the data.tar.gz stream from an APK file and extracts files to the filesystem.
-func extractAPKData(f *os.File) error {
-	gz2, err := gzip.NewReader(f)
+func extractAPKData(r io.Reader) error {
+	gz2, err := gzip.NewReader(r)
 	if err != nil {
 		return fmt.Errorf("gzip reader 2: %w", err)
 	}
@@ -305,23 +327,45 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 		// Regular file. Cap per-file size at 2 GiB.
 		const maxFileSize = 2 << 30
 
-		f, err := os.Create(targetPath) // #nosec G304 — targetPath is constrained by safeAPKPath
+		// Write to a sibling temp file then atomically rename over the
+		// target. This avoids ETXTBSY ("text file busy") when overwriting
+		// a binary that is currently being executed — the kernel allows
+		// unlinking a running binary but rejects truncate/write on it.
+		// Busybox-style images symlink many tools to /bin/busybox, and
+		// /bin/tar (the very tool we shell out to during the install
+		// pipeline elsewhere) is one of them, so this matters in practice.
+		tmpPath := targetPath + ".apk-new"
+
+		f, err := os.Create(tmpPath) // #nosec G304 — derived from safeAPKPath
 		if err != nil {
 			return fmt.Errorf("create file: %w", err)
 		}
 
 		if _, err := io.Copy(f, io.LimitReader(tr, maxFileSize)); err != nil {
 			_ = f.Close()
+			_ = os.Remove(tmpPath)
+
 			return fmt.Errorf("copy file: %w", err)
 		}
 
 		if err := f.Close(); err != nil {
+			_ = os.Remove(tmpPath)
+
 			return fmt.Errorf("close file: %w", err)
 		}
 
-		// Preserve permissions.
-		if err := os.Chmod(targetPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
+		// Preserve permissions before the rename so the file is in its
+		// final state when it becomes visible at targetPath.
+		if err := os.Chmod(tmpPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
+			_ = os.Remove(tmpPath)
+
 			return fmt.Errorf("chmod: %w", err)
+		}
+
+		if err := os.Rename(tmpPath, targetPath); err != nil {
+			_ = os.Remove(tmpPath)
+
+			return fmt.Errorf("rename file: %w", err)
 		}
 
 	case tar.TypeDir:

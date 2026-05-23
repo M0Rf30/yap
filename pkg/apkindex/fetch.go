@@ -28,7 +28,8 @@ const maxAPKPackageBytes = 1 << 30
 
 // Update fetches APKINDEX.tar.gz from every repo in /etc/apk/repositories,
 // writes the parsed indexes into the cache dir, and returns an Index ready
-// for lookups. Replaces "apk update".
+// for lookups. Replaces "apk update". The returned Index is cached globally
+// so Install can reuse it without re-fetching.
 func Update(ctx context.Context) (*Index, error) {
 	repos, err := LoadRepos()
 	if err != nil {
@@ -44,27 +45,54 @@ func Update(ctx context.Context) (*Index, error) {
 		return nil, fmt.Errorf("apkindex: mkdir cache: %w", err)
 	}
 
+	logger.Info("apkindex: updating indexes",
+		"repos", len(repos),
+		"arch", arch)
+
 	idx := NewIndex()
+	succeeded := 0
 
 	for _, repo := range repos {
 		indexURL := repo.URL + "/" + arch + "/APKINDEX.tar.gz"
 		cachePath := filepath.Join(apkCacheDir, "APKINDEX."+sha1Hex(indexURL)+".tar.gz")
 
+		logger.Debug("apkindex: fetching repo", "url", repo.URL, "arch", arch)
+
 		if err := downloadFile(ctx, indexURL, cachePath, maxAPKIndexBytes); err != nil {
 			// Log warning and continue with other repos.
-			logger.Warn("APKINDEX fetch failed",
+			logger.Warn("apkindex: fetch failed",
 				"url", indexURL, "error", err)
 
 			continue
 		}
 
+		var sizeBytes int64
+		if fi, statErr := os.Stat(cachePath); statErr == nil {
+			sizeBytes = fi.Size()
+		}
+
 		if err := loadIndexTarball(idx, cachePath, repo.URL); err != nil {
-			logger.Warn("APKINDEX parse failed",
+			logger.Warn("apkindex: parse failed",
 				"path", cachePath, "error", err)
 
 			continue
 		}
+
+		logger.Info("apkindex: repo fetched",
+			"url", repo.URL, "bytes", sizeBytes)
+
+		succeeded++
 	}
+
+	pkgs, caps := idx.Stats()
+	logger.Info("apkindex: indexes loaded",
+		"repos_succeeded", succeeded,
+		"repos_total", len(repos),
+		"packages", pkgs,
+		"capabilities", caps)
+
+	// Cache the index globally so Install can reuse it.
+	globalIndex.Store(idx)
 
 	return idx, nil
 }

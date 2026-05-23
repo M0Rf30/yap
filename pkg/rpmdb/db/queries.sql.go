@@ -46,3 +46,30 @@ func (q *Queries) ListInstalledNames(ctx context.Context) ([]string, error) {
 	}
 	return items, nil
 }
+
+const listInstalledProvides = `-- name: ListInstalledProvides :many
+SELECT DISTINCT key FROM Providename ORDER BY key
+`
+
+func (q *Queries) ListInstalledProvides(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listInstalledProvides)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		items = append(items, key)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

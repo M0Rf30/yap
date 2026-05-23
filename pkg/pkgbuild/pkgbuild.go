@@ -22,6 +22,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/aptinstall"
 	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -79,6 +80,8 @@ const (
 	aptPM             = "apt"
 	dpkgPM            = "dpkg"
 	apkPM             = "apk"
+	dnfPM             = "dnf"
+	yumPM             = "yum"
 )
 
 // Priority constants for PKGBUILD directive matching.
@@ -281,7 +284,7 @@ func filterInstalledPackages(packageManager string, packages []string) []string 
 		return filterInstalledAPK(packages)
 	case "pacman":
 		return filterInstalledPacman(packages)
-	case "rpm", "yum", "dnf", "zypper":
+	case "rpm", yumPM, dnfPM, "zypper":
 		return filterInstalledRPM(packages)
 	default:
 		return packages
@@ -473,10 +476,19 @@ func filterInstalledRPMSubprocess(packages []string) []string {
 // GetDepends reads the package manager name, its arguments and all the
 // dependencies required to build the package. It returns any error if
 // encountered.
-func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []string) error {
+func (pkgBuild *PKGBUILD) GetDepends(
+	ctx context.Context,
+	packageManager string,
+	args,
+	makeDepends []string,
+) error {
 	if len(makeDepends) == 0 {
 		return nil
 	}
+
+	logger.Info("GetDepends: resolving dependencies",
+		"pm", packageManager,
+		"requested", len(makeDepends))
 
 	// Filter out already-installed packages to avoid sudo prompts
 	missingPackages := filterInstalledPackages(packageManager, makeDepends)
@@ -506,7 +518,7 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 	// silently falling back to a different code path.
 	switch packageManager {
 	case apkPM:
-		if err := apkindex.Install(context.Background(), missingPackages); err != nil {
+		if err := apkindex.Install(ctx, missingPackages); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "apkindex install failed").
 				WithOperation("GetDepends")
 		}
@@ -514,7 +526,7 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 		return nil
 
 	case aptGetPM, aptPM:
-		if err := aptinstall.Install(context.Background(), missingPackages); err != nil {
+		if err := aptinstall.Install(ctx, missingPackages); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "aptinstall failed").
 				WithOperation("GetDepends")
 		}
@@ -522,11 +534,27 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 		return nil
 	}
 
-	// RPM (dnf/yum/zypper) and `pacman -S` still go through the distro's
-	// own installer subprocess — no in-tree replacement for them yet.
+	// DNF/YUM: use the in-tree resolver and downloader.
+	switch packageManager {
+	case dnfPM, yumPM:
+		if err := dnfcache.Install(ctx, missingPackages); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache install failed").
+				WithOperation("GetDepends")
+		}
+
+		return nil
+	}
+
+	// zypper and pacman -S still go through the distro's own installer subprocess.
+	flags := args
 	args = append(args, missingPackages...)
 
-	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
+	logger.Info("delegating package install to subprocess",
+		"pm", packageManager,
+		"packages", len(missingPackages),
+		"flags", flags)
+
+	return shell.ExecWithSudo(ctx, false, "", packageManager, args...)
 }
 
 // resolveVirtualPackages checks each dependency and replaces virtual packages
@@ -534,11 +562,27 @@ func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []
 // This handles cases where a package like "service-discover" is a virtual
 // package provided by multiple concrete packages.
 func resolveVirtualPackages(deps []string) []string {
+	if len(deps) == 0 {
+		return deps
+	}
+
+	logger.Info("resolving virtual packages (apt)", "input", len(deps))
+
 	resolved := make([]string, 0, len(deps))
+	rewritten := 0
 
 	for _, dep := range deps {
+		original := dep
+
 		resolved = append(resolved, resolveVirtualPackage(dep))
+		if resolved[len(resolved)-1] != original {
+			rewritten++
+		}
 	}
+
+	logger.Info("resolved virtual packages (apt)",
+		"input", len(deps),
+		"rewritten", rewritten)
 
 	return resolved
 }
@@ -587,10 +631,14 @@ func stripVersionConstraint(spec string) string {
 // apt-get / apk / pacman use the in-tree readers (pkg/aptrepo,
 // pkg/apkindex, pkg/pacmandb). dnf/yum/zypper still defer to the
 // distro's own update subprocess.
-func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
+func (pkgBuild *PKGBUILD) GetUpdates(
+	ctx context.Context,
+	packageManager string,
+	args ...string,
+) error {
 	switch packageManager {
 	case aptGetPM, aptPM:
-		n, err := aptrepo.Update(context.Background())
+		n, err := aptrepo.Update(ctx)
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "aptrepo update failed").
 				WithOperation("GetUpdates")
@@ -607,7 +655,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 		return nil
 
 	case apkPM:
-		if _, err := apkindex.Update(context.Background()); err != nil {
+		if _, err := apkindex.Update(ctx); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "apkindex update failed").
 				WithOperation("GetUpdates")
 		}
@@ -615,7 +663,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 		return nil
 
 	case "pacman":
-		n, err := pacmandb.Sync(context.Background())
+		n, err := pacmandb.Sync(ctx)
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "pacmandb sync failed").
 				WithOperation("GetUpdates")
@@ -629,9 +677,22 @@ func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) erro
 		logger.Info("refreshed pacman sync DBs", "count", n)
 
 		return nil
+
+	case dnfPM, yumPM:
+		if err := dnfcache.Update(ctx); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache update failed").
+				WithOperation("GetUpdates")
+		}
+
+		return nil
 	}
 
-	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
+	// zypper and any other unhandled PMs fall through to the distro's
+	// subprocess. Log it so the user can see which command yap is delegating.
+	logger.Info("delegating package-manager update to subprocess",
+		"pm", packageManager, "args", args)
+
+	return shell.ExecWithSudo(ctx, false, "", packageManager, args...)
 }
 
 // Init initializes the PKGBUILD struct.
