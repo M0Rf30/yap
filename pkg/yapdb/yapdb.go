@@ -3,6 +3,7 @@ package yapdb
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -79,6 +80,7 @@ func Open(ctx context.Context, path string) (*DB, error) {
 	// Test the connection.
 	if err := sqlDB.PingContext(ctx); err != nil {
 		_ = sqlDB.Close()
+
 		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to ping yapdb").
 			WithOperation("Open").
 			WithContext("path", path)
@@ -106,6 +108,7 @@ func DefaultPath(rootDir string) string {
 	if rootDir == "" || rootDir == "/" {
 		return "/var/lib/yap/installed.db"
 	}
+
 	return filepath.Join(rootDir, "var/lib/yap/installed.db")
 }
 
@@ -113,6 +116,7 @@ func DefaultPath(rootDir string) string {
 func (d *DB) initSchema(ctx context.Context) error {
 	// Check if meta table exists.
 	var exists bool
+
 	err := d.sqlDB.QueryRowContext(ctx,
 		"SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta')").
 		Scan(&exists)
@@ -224,6 +228,7 @@ func (d *DB) Insert(ctx context.Context, p Package) error {
 		if f.IsDir {
 			isDir = 1
 		}
+
 		isSymlink := 0
 		if f.IsSymlink {
 			isSymlink = 1
@@ -279,6 +284,7 @@ func (d *DB) Remove(ctx context.Context, name, arch string) error {
 			WithOperation("Remove").
 			WithContext("package", name)
 	}
+
 	return nil
 }
 
@@ -290,6 +296,7 @@ func (d *DB) IsInstalled(ctx context.Context, name string) (bool, error) {
 			WithOperation("IsInstalled").
 			WithContext("package", name)
 	}
+
 	return exists, nil
 }
 
@@ -306,6 +313,7 @@ func (d *DB) ProvidersOf(ctx context.Context, capName string) ([]string, error) 
 	for _, row := range rows {
 		providers = append(providers, row.Name)
 	}
+
 	return providers, nil
 }
 
@@ -330,6 +338,7 @@ func (d *DB) List(ctx context.Context) ([]Package, error) {
 			InstallTime: time.Unix(row.InstallTime, 0),
 		})
 	}
+
 	return packages, nil
 }
 
@@ -339,9 +348,10 @@ func (d *DB) LookupByName(ctx context.Context, name, arch string) (*Package, err
 		Name: name,
 		Arch: arch,
 	})
-	if err == sql.ErrNoRows {
+	if stderrors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
+
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to lookup package").
 			WithOperation("LookupByName").
@@ -366,6 +376,7 @@ func (d *DB) LookupByName(ctx context.Context, name, arch string) (*Package, err
 			WithOperation("LookupByName").
 			WithContext("package", name)
 	}
+
 	for _, f := range fileRows {
 		pkg.Files = append(pkg.Files, File{
 			Path:       f.Path,
@@ -384,6 +395,7 @@ func (d *DB) LookupByName(ctx context.Context, name, arch string) (*Package, err
 			WithOperation("LookupByName").
 			WithContext("package", name)
 	}
+
 	for _, c := range capRows {
 		pkg.Caps = append(pkg.Caps, Capability{
 			Kind:    c.Kind,
@@ -404,5 +416,6 @@ func (d *DB) Close() error {
 				WithOperation("Close")
 		}
 	}
+
 	return nil
 }

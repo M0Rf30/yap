@@ -108,6 +108,37 @@ func filterScriptletEnv() []string {
 	return filtered
 }
 
+// looksLikeLua returns true when the body appears to be an RPM Lua scriptlet
+// rather than POSIX shell. Some RPMs (notably json-c-devel on EL8) omit the
+// PROG tag for Lua bodies, so we have to detect the language from content.
+//
+// Heuristics: presence of common RPM-Lua API tokens that would never appear
+// as shell builtins/commands.
+func looksLikeLua(body string) bool {
+	// Only match tokens that are essentially impossible in a POSIX shell
+	// scriptlet but are idiomatic in rpm-Lua. The RPM-Lua API exposes
+	// `path`, `posix`, `rpm`, `hashlib`, `macros`, `fd`, etc. as global
+	// tables, so a leading-token call like "path.something(" or
+	// "rpm.execute(" is a strong signal.
+	luaMarkers := []string{
+		"path.",
+		"posix.",
+		"rpm.b64",
+		"rpm.define",
+		"rpm.execute",
+		"rpm.expand",
+		"rpm.spawn",
+		"hashlib.",
+		"macros.",
+	}
+	for _, m := range luaMarkers {
+		if strings.Contains(body, m) {
+			return true
+		}
+	}
+	return false
+}
+
 // hasEnvKey checks if an environment variable key exists in the list.
 func hasEnvKey(env []string, key string) bool {
 	prefix := key + "="
@@ -143,17 +174,28 @@ func runScriptlet(
 		return nil
 	}
 
-	// Read interpreter from header. Default to /bin/sh.
-	interpreter, _ := rpm.Header.GetString(tags.progTag)
-	if interpreter == "" {
-		interpreter = "/bin/sh"
+	// Read interpreter from header. PROG tags are commonly stored as
+	// STRING_ARRAY (e.g. ["<lua>"], ["/sbin/ldconfig"], ["/bin/sh", "-e"]),
+	// so use GetStrings and take the first non-empty entry.
+	interpreter := "/bin/sh"
+	var interpreterArgs []string
+	if progs, err := rpm.Header.GetStrings(tags.progTag); err == nil && len(progs) > 0 {
+		if progs[0] != "" {
+			interpreter = progs[0]
+			if len(progs) > 1 {
+				interpreterArgs = progs[1:]
+			}
+		}
 	}
 
 	// Get package name for logging.
 	pkgName, _ := rpm.Header.GetString(rpmutils.NAME)
 
-	// Detect Lua scriptlets and skip with warning.
-	if interpreter == "<lua>" || strings.HasPrefix(interpreter, "<lua>") {
+	// Detect Lua scriptlets and skip with warning. Some RPMs (notably
+	// json-c-devel on EL8) ship Lua bodies without setting the PROG tag,
+	// so also heuristically detect Lua syntax in the body when the
+	// declared interpreter is the default /bin/sh fallback.
+	if interpreter == "<lua>" || strings.HasPrefix(interpreter, "<lua>") || looksLikeLua(body) {
 		logger.Warn("skipping Lua scriptlet",
 			"kind", tags.kindName,
 			"package", pkgName,
@@ -170,10 +212,17 @@ func runScriptlet(
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	// Prepare command.
-	// RPM passes the script body as a file argument, but we'll use stdin
-	// for simplicity (equivalent behavior).
-	cmd := exec.CommandContext(ctx, interpreter, "-e") // #nosec G204 — interpreter is from RPM header
+	// Prepare command. Use explicit interpreter args from the header if
+	// present (e.g. ["-p", "<lua>"]); otherwise fall back to "-e" for
+	// shell interpreters so non-zero exits propagate as in rpm.
+	args := interpreterArgs
+	if len(args) == 0 && (interpreter == "/bin/sh" ||
+		interpreter == "/usr/bin/sh" ||
+		interpreter == "/bin/bash" ||
+		interpreter == "/usr/bin/bash") {
+		args = []string{"-e"}
+	}
+	cmd := exec.CommandContext(ctx, interpreter, args...) // #nosec G204 — interpreter is from RPM header
 	cmd.Stdin = strings.NewReader(body)
 
 	// Set up environment.

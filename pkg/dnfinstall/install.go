@@ -68,13 +68,20 @@ func downloadAndInstall(ctx context.Context, cache *dnfcache.Cache, resolved []*
 
 // downloadRPM downloads a single .rpm from the dnfcache to destDir.
 // Returns the local path to the downloaded file.
-func downloadRPM(ctx context.Context, cache *dnfcache.Cache, pkg *dnfcache.PackageInfo, destDir string) (string, error) {
-	// TODO: Phase 2 — implement download via dnfcache
-	// For now, this is a placeholder that will be filled in when dnfcache
-	// exports a DownloadRPM method or we add a thin wrapper.
-	return "", errors.New(errors.ErrTypeInternal, "not implemented").
-		WithOperation("downloadRPM").
-		WithContext("package", pkg.Name)
+func downloadRPM(ctx context.Context, _ *dnfcache.Cache, pkg *dnfcache.PackageInfo, destDir string) (string, error) {
+	if pkg == nil {
+		return "", errors.New(errors.ErrTypeValidation, "nil package").
+			WithOperation("downloadRPM")
+	}
+
+	path, err := dnfcache.DownloadRPM(ctx, pkg, destDir)
+	if err != nil {
+		return "", errors.Wrap(err, errors.ErrTypeNetwork, "failed to download package").
+			WithOperation("downloadRPM").
+			WithContext("package", pkg.Name)
+	}
+
+	return path, nil
 }
 
 // installPackage extracts a single RPM file to rootDir.
@@ -120,10 +127,13 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 	pkgName, _ := rpm.Header.GetString(rpmutils.NAME)
 
 	// Phase 4a: Run %pretrans scriptlet.
+	// %pretrans is typically optional setup (filesystem layout, SELinux
+	// labels). Per the same lenient policy as %post/%posttrans, log and
+	// continue on failure so a quirky third-party package doesn't abort
+	// the build environment provisioning.
 	if err := runScriptlet(ctx, scriptletPreTrans, rpm, rootDir, opts); err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild, "pretrans scriptlet failed").
-			WithOperation("installPackage").
-			WithContext("package", pkgName)
+		logger.Warn("pretrans scriptlet failed (continuing)",
+			"package", pkgName, "error", err.Error())
 	}
 
 	// Phase 4b: Run %pre scriptlet (before file extraction).
@@ -142,10 +152,10 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 	}
 
 	// Phase 4c: Run %post scriptlet (after file extraction).
+	// Per RPM convention, %post failures are non-fatal: log and continue.
 	if err := runScriptlet(ctx, scriptletPostIn, rpm, rootDir, opts); err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild, "postin scriptlet failed").
-			WithOperation("installPackage").
-			WithContext("package", pkgName)
+		logger.Warn("postin scriptlet failed (continuing)",
+			"package", pkgName, "error", err.Error())
 	}
 
 	logger.Info("installed RPM package", "path", filepath.Base(rpmPath), "files", len(entry.Files))
@@ -165,10 +175,10 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 	}
 
 	// Phase 4d: Run %posttrans scriptlet (after everything).
+	// Per RPM convention, %posttrans failures are non-fatal: log and continue.
 	if err := runScriptlet(ctx, scriptletPostTrans, rpm, rootDir, opts); err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild, "posttrans scriptlet failed").
-			WithOperation("installPackage").
-			WithContext("package", pkgName)
+		logger.Warn("posttrans scriptlet failed (continuing)",
+			"package", pkgName, "error", err.Error())
 	}
 
 	return nil

@@ -100,6 +100,14 @@ func (c *Cache) downloadAll(ctx context.Context, pkgs []*PackageInfo, destDir st
 	return paths, nil
 }
 
+// DownloadRPM downloads a single .rpm package to destDir, verifying SHA256
+// against the cached metadata. Exported wrapper around the internal helper so
+// callers outside the package (e.g. pkg/dnfinstall) can reuse the same
+// download path used by Install.
+func DownloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string, error) {
+	return downloadRPM(ctx, pkg, destDir)
+}
+
 // downloadRPM downloads a single .rpm to destDir, verifying SHA256.
 func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string, error) {
 	baseURL := pkg.BaseURL
