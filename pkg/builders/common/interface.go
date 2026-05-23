@@ -26,6 +26,14 @@ const (
 	linuxOS = "linux"
 )
 
+// Ccache environment variable values shared between BuildCcacheEnvSlice and tests.
+const (
+	ccacheEnvCC         = "CC=ccache gcc"
+	ccacheEnvCXX        = "CXX=ccache g++"
+	ccacheEnvSloppiness = "CCACHE_SLOPPINESS=time_macros,include_file_mtime"
+	ccacheEnvNoHashDir  = "CCACHE_NOHASHDIR=1"
+)
+
 const (
 	updateCommand = "update"
 	formatDeb     = "deb"
@@ -327,12 +335,13 @@ func getUpdateCommand(format string) string {
 func (bb *BaseBuilder) Prepare(ctx context.Context, makeDepends []string, targetArch string) error {
 	// Non-cross-compile path: install makedepends directly.
 	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
-		// RPM: use pure-Go dnfinstall
+		// RPM: use dnfinstall
 		if bb.Format == constants.FormatRPM {
 			return bb.installRPMDeps(ctx, makeDepends)
 		}
 
 		installArgs := constants.GetInstallArgs(bb.Format)
+
 		return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, makeDepends)
 	}
 
@@ -365,12 +374,13 @@ func (bb *BaseBuilder) Prepare(ctx context.Context, makeDepends []string, target
 		return bb.installCrossDeps(ctx, makeDepends, constants.GetInstallArgs(bb.Format), targetArch)
 	}
 
-	// RPM: use pure-Go dnfinstall
+	// RPM: use dnfinstall
 	if bb.Format == constants.FormatRPM {
 		return bb.installRPMDeps(ctx, makeDepends)
 	}
 
 	installArgs := constants.GetInstallArgs(bb.Format)
+
 	return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, makeDepends)
 }
 
@@ -417,7 +427,7 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 		"packages", len(deps),
 		"flags", len(installArgs))
 
-	// Route through GetDepends so apk/apt/dnf-yum hit the pure-Go installers
+	// Route through GetDepends so apk/apt/dnf-yum hit the in-process installers
 	// and only pacman/zypper still hit the subprocess. Mirrors what
 	// pkg/builders/common cross-deps does and avoids the prepare-time
 	// "unauthenticated packages" failure on apt-get with --repo flags.
@@ -454,7 +464,7 @@ func (bb *BaseBuilder) refreshCcacheSymlinks() {
 
 	// bin is the absolute path returned by exec.LookPath — it cannot be
 	// influenced by user input and yap is expected to run as root.
-	if err := exec.CommandContext(ctx, bin).Run(); err != nil { // #nosec G204
+	if err := exec.CommandContext(ctx, bin).Run(); err != nil {
 		logger.Warn("ccache: update-ccache-symlinks failed", "error", err)
 	}
 }
@@ -474,14 +484,14 @@ func (bb *BaseBuilder) Update(ctx context.Context) error {
 	return bb.PKGBUILD.GetUpdates(ctx, getPackageManager(bb.Format), cmd)
 }
 
-// installRPMDeps installs RPM dependencies using the pure-Go dnfinstall package.
+// installRPMDeps installs RPM dependencies using the dnfinstall package.
 // This is called by Prepare and cross-compilation paths when the format is RPM.
 func (bb *BaseBuilder) installRPMDeps(ctx context.Context, deps []string) error {
 	if len(deps) == 0 {
 		return nil
 	}
 
-	logger.Info("installing RPM dependencies via pure-Go dnfinstall",
+	logger.Info("installing RPM dependencies via dnfinstall",
 		"packages", len(deps),
 		"packages_list", strings.Join(deps, ", "))
 
@@ -511,11 +521,11 @@ func (bb *BaseBuilder) BuildCcacheEnvSlice() []string {
 	// substitutes the bare cross-compiler, relying on the /usr/lib/ccache
 	// (or /usr/lib64/ccache) symlinks to invoke ccache.
 	return []string{
-		"CC=ccache gcc",
-		"CXX=ccache g++",
+		ccacheEnvCC,
+		ccacheEnvCXX,
 		"CCACHE_BASEDIR=" + bb.PKGBUILD.StartDir,
-		"CCACHE_SLOPPINESS=time_macros,include_file_mtime",
-		"CCACHE_NOHASHDIR=1",
+		ccacheEnvSloppiness,
+		ccacheEnvNoHashDir,
 		// CCACHE_DIR is intentionally left unset so ccache resolves to its default
 		// $HOME/.cache/ccache. Persistent caches (e.g. Kubernetes volumes) mounted
 		// at that path are then shared across builds within the same user account.

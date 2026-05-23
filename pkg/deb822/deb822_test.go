@@ -15,7 +15,9 @@ func TestParse_SingleStanza(t *testing.T) {
 Version: 1.0
 Description: A simple package
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -36,7 +38,9 @@ Package: world
 Version: 2.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -56,7 +60,9 @@ Description: This is a long
 Version: 1.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -77,7 +83,9 @@ Description: First paragraph
 Version: 1.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -97,7 +105,9 @@ Package: hello
 Version: 1.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -118,7 +128,9 @@ Description: First line
 Version: 1.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -126,13 +138,16 @@ Version: 1.0
 
 	require.NoError(t, err)
 	require.Len(t, stanzas, 1)
+
 	expected := "First line\n# This is not a comment, it's part of the value\nSecond line"
 	assert.Equal(t, expected, stanzas[0]["Description"])
 }
 
 func TestParse_EmptyInput(t *testing.T) {
 	input := ""
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -145,7 +160,9 @@ func TestParse_EmptyInput(t *testing.T) {
 func TestParse_EOFWithoutTrailingNewline(t *testing.T) {
 	input := `Package: hello
 Version: 1.0`
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -162,7 +179,9 @@ func TestParse_StanzaWithTrailingBlankLine(t *testing.T) {
 Version: 1.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -180,7 +199,9 @@ Description: First line
 Version: 1.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -188,6 +209,7 @@ Version: 1.0
 
 	require.NoError(t, err)
 	require.Len(t, stanzas, 1)
+
 	expected := "First line\nSecond line with tab"
 	assert.Equal(t, expected, stanzas[0]["Description"])
 }
@@ -199,7 +221,9 @@ This line has no colon
 Version: 1.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -220,15 +244,19 @@ Package: world
 Version: 2.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	callCount := 0
 	testErr := &testError{msg: "test error"}
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
+
 		callCount++
 		if callCount > 1 {
 			return testErr
 		}
+
 		return nil
 	})
 
@@ -251,7 +279,9 @@ Version:  1.0
 Description:  A package  
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -280,7 +310,9 @@ Description: command line tool for transferring data with URLs
  transfer resume and more.
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -305,7 +337,9 @@ Package: world
 Version: 2.0
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil
@@ -326,7 +360,9 @@ Depends: libc6
 Description: A package
 
 `
+
 	var stanzas []deb822.Stanza
+
 	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
 		stanzas = append(stanzas, s)
 		return nil

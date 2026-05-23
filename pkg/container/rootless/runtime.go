@@ -6,8 +6,8 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/container/internal/runtimetype"
 )
 
-// Runtime implements the container.Runtime interface using pure-Go image pull
-// and rootlesskit for user-namespace isolation.
+// Runtime implements the container.Runtime interface using in-process image
+// pull and rootlesskit for user-namespace isolation.
 type Runtime struct{}
 
 // NewRuntime returns a new rootless Runtime.

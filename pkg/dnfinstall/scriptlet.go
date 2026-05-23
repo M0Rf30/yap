@@ -25,12 +25,26 @@ const (
 	scriptletPostTrans
 )
 
+// Scriptlet kind names (as used in RPM tags and log output).
+const (
+	kindPreTrans  = "pretrans"
+	kindPreIn     = "prein"
+	kindPostIn    = "postin"
+	kindPostTrans = "posttrans"
+)
+
+// Common interpreter paths used in RPM scriptlets.
+const (
+	interpSh   = "/bin/sh"
+	interpBash = "/bin/bash"
+)
+
 // scriptletTagPair maps a scriptlet kind to its body and interpreter tags.
 type scriptletTagPair struct {
-	bodyTag   int
-	progTag   int
-	kindName  string
-	argValue  string // "1" for fresh install (v1 only)
+	bodyTag  int
+	progTag  int
+	kindName string
+	argValue string // "1" for fresh install (v1 only)
 }
 
 // scriptletTags maps each scriptlet kind to its RPM header tags.
@@ -38,25 +52,25 @@ var scriptletTags = map[scriptletKind]scriptletTagPair{
 	scriptletPreTrans: {
 		bodyTag:  1151, // RPMTAG_PRETRANS
 		progTag:  1152, // RPMTAG_PRETRANSPROG
-		kindName: "pretrans",
+		kindName: kindPreTrans,
 		argValue: "1",
 	},
 	scriptletPreIn: {
 		bodyTag:  rpmutils.PREIN,
 		progTag:  rpmutils.PREINPROG,
-		kindName: "prein",
+		kindName: kindPreIn,
 		argValue: "1",
 	},
 	scriptletPostIn: {
 		bodyTag:  rpmutils.POSTIN,
 		progTag:  rpmutils.POSTINPROG,
-		kindName: "postin",
+		kindName: kindPostIn,
 		argValue: "1",
 	},
 	scriptletPostTrans: {
 		bodyTag:  1153, // RPMTAG_POSTTRANS
 		progTag:  1154, // RPMTAG_POSTTRANSPROG
-		kindName: "posttrans",
+		kindName: kindPostTrans,
 		argValue: "1",
 	},
 }
@@ -64,17 +78,17 @@ var scriptletTags = map[scriptletKind]scriptletTagPair{
 // scriptletEnvAllowList defines which environment variables are safe to
 // forward to RPM scriptlets. Mirrors rpm's own filtering.
 var scriptletEnvAllowList = map[string]bool{
-	"PATH":     true,
-	"HOME":     true,
-	"LANG":     true,
-	"LC_ALL":   true,
-	"LOGNAME":  true,
-	"SHELL":    true,
-	"TERM":     true,
-	"USER":     true,
-	"TMPDIR":   true,
-	"TZ":       true,
-	"COLORTERM": true,
+	"PATH":        true,
+	"HOME":        true,
+	"LANG":        true,
+	"LC_ALL":      true,
+	"LOGNAME":     true,
+	"SHELL":       true,
+	"TERM":        true,
+	"USER":        true,
+	"TMPDIR":      true,
+	"TZ":          true,
+	"COLORTERM":   true,
 	"FORCE_COLOR": true,
 }
 
@@ -115,7 +129,7 @@ func filterScriptletEnv() []string {
 // Heuristics: presence of common RPM-Lua API tokens that would never appear
 // as shell builtins/commands.
 func looksLikeLua(body string) bool {
-	// Only match tokens that are essentially impossible in a POSIX shell
+	// Only match tokens that are impossible in a POSIX shell
 	// scriptlet but are idiomatic in rpm-Lua. The RPM-Lua API exposes
 	// `path`, `posix`, `rpm`, `hashlib`, `macros`, `fd`, etc. as global
 	// tables, so a leading-token call like "path.something(" or
@@ -136,6 +150,7 @@ func looksLikeLua(body string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -147,12 +162,15 @@ func hasEnvKey(env []string, key string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 // runScriptlet executes a single scriptlet from the RPM header.
 // Returns nil if no scriptlet body for the given kind, or if SkipScriptlets is set.
 // arg = "1" for fresh install (always 1 for v1 — no upgrades).
+//
+//nolint:gocyclo,cyclop // scriptlet orchestration (env, interpreter, chroot, output) is inherently branchy
 func runScriptlet(
 	ctx context.Context,
 	kind scriptletKind,
@@ -177,8 +195,10 @@ func runScriptlet(
 	// Read interpreter from header. PROG tags are commonly stored as
 	// STRING_ARRAY (e.g. ["<lua>"], ["/sbin/ldconfig"], ["/bin/sh", "-e"]),
 	// so use GetStrings and take the first non-empty entry.
-	interpreter := "/bin/sh"
+	interpreter := interpSh
+
 	var interpreterArgs []string
+
 	if progs, err := rpm.Header.GetStrings(tags.progTag); err == nil && len(progs) > 0 {
 		if progs[0] != "" {
 			interpreter = progs[0]
@@ -200,6 +220,7 @@ func runScriptlet(
 			"kind", tags.kindName,
 			"package", pkgName,
 			"interpreter", interpreter)
+
 		return nil
 	}
 
@@ -216,13 +237,14 @@ func runScriptlet(
 	// present (e.g. ["-p", "<lua>"]); otherwise fall back to "-e" for
 	// shell interpreters so non-zero exits propagate as in rpm.
 	args := interpreterArgs
-	if len(args) == 0 && (interpreter == "/bin/sh" ||
+	if len(args) == 0 && (interpreter == interpSh ||
 		interpreter == "/usr/bin/sh" ||
-		interpreter == "/bin/bash" ||
+		interpreter == interpBash ||
 		interpreter == "/usr/bin/bash") {
 		args = []string{"-e"}
 	}
-	cmd := exec.CommandContext(ctx, interpreter, args...) // #nosec G204 — interpreter is from RPM header
+
+	cmd := exec.CommandContext(ctx, interpreter, args...)
 	cmd.Stdin = strings.NewReader(body)
 
 	// Set up environment.
@@ -234,6 +256,7 @@ func runScriptlet(
 	if version, err := rpm.Header.GetString(rpmutils.VERSION); err == nil && version != "" {
 		cmd.Env = append(cmd.Env, "RPM_PACKAGE_VERSION="+version)
 	}
+
 	if release, err := rpm.Header.GetString(rpmutils.RELEASE); err == nil && release != "" {
 		cmd.Env = append(cmd.Env, "RPM_PACKAGE_RELEASE="+release)
 	}
@@ -258,6 +281,7 @@ func runScriptlet(
 
 	// Capture output.
 	var stdout, stderr bytes.Buffer
+
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 

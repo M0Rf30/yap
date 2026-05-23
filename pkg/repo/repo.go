@@ -210,7 +210,7 @@ func splitPlus(s string) []string {
 func fetchKey(url, dst string) error {
 	// /etc/apt/keyrings and /etc/pki/rpm-gpg are system-wide directories that
 	// must remain traversable by the unprivileged _apt / dnf-update accounts.
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil { // #nosec G301
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
 
@@ -242,7 +242,7 @@ func fetchKey(url, dst string) error {
 	// dst is built from a constant directory plus a sanitized repo name; apt
 	// and dnf require world-readable keys so the unprivileged update process
 	// can verify package signatures.
-	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644) // #nosec G302,G304
+	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644) //nolint:gosec
 	if err != nil {
 		return err
 	}

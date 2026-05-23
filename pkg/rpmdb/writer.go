@@ -53,6 +53,7 @@ func OpenWriter(ctx context.Context, dbPath string) (*Writer, error) {
 
 	// Open database in read-write mode
 	dsn := "file:" + dbPath + "?mode=rwc&_txlock=deferred"
+
 	dbConn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, yapErrors.Wrap(err, yapErrors.ErrTypeFileSystem,
@@ -64,6 +65,7 @@ func OpenWriter(ctx context.Context, dbPath string) (*Writer, error) {
 	// Ping to ensure connection works
 	if err := dbConn.PingContext(ctx); err != nil {
 		_ = dbConn.Close()
+
 		return nil, yapErrors.Wrap(err, yapErrors.ErrTypeFileSystem,
 			"failed to ping rpmdb").
 			WithContext("path", dbPath).
@@ -95,6 +97,7 @@ func OpenWriter(ctx context.Context, dbPath string) (*Writer, error) {
 			_ = dbConn.Close()
 			return nil, err
 		}
+
 		if err := w.checkPopulated(ctx); err != nil {
 			_ = dbConn.Close()
 			return nil, err
@@ -109,6 +112,7 @@ func (w *Writer) Close() error {
 	if w.db == nil {
 		return nil
 	}
+
 	return w.db.Close()
 }
 
@@ -117,6 +121,8 @@ func (w *Writer) Close() error {
 //
 // The operation is atomic: either all tables are updated or none are.
 // Returns a wrapped error if the operation fails.
+//
+//nolint:gocyclo,cyclop // install pipeline orchestration
 func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []InstalledFile) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -159,6 +165,7 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 	}
 
 	var hnum int64
+
 	if maxHnumVal != nil {
 		// Convert interface{} to int64
 		switch v := maxHnumVal.(type) {
@@ -262,8 +269,10 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 	}
 
 	// Insert basenames (file list)
-	for idx, f := range files {
+	for idx := range files {
+		f := &files[idx]
 		basename := basenameFromPath(f.Path)
+
 		if err := qtx.InsertBasenames(ctx, rpmdbgen.InsertBasenamesParams{
 			Key:  basename,
 			Hnum: hnum,
@@ -279,10 +288,14 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 
 	// Insert dirnames (directory list)
 	dirMap := make(map[string]int64)
-	for _, f := range files {
+
+	for i := range files {
+		f := &files[i]
 		dir := dirFromPath(f.Path)
+
 		if _, ok := dirMap[dir]; !ok {
 			idx := int64(len(dirMap))
+
 			dirMap[dir] = idx
 			if err := qtx.InsertDirnames(ctx, rpmdbgen.InsertDirnamesParams{
 				Key:  dir,
@@ -299,7 +312,8 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 	}
 
 	// Insert file digests
-	for idx, f := range files {
+	for idx := range files {
+		f := &files[idx]
 		if f.SHA256 != "" {
 			if err := qtx.InsertFiledigests(ctx, rpmdbgen.InsertFiledigestsParams{
 				Key:  f.SHA256,
@@ -331,6 +345,7 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 // tableExists checks if a table exists in the database.
 func (w *Writer) tableExists(ctx context.Context, tableName string) (bool, error) {
 	var count int
+
 	err := w.db.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
 		tableName).Scan(&count)
@@ -340,6 +355,7 @@ func (w *Writer) tableExists(ctx context.Context, tableName string) (bool, error
 			WithContext("table", tableName).
 			WithOperation("tableExists")
 	}
+
 	return count > 0, nil
 }
 
@@ -476,6 +492,7 @@ func (w *Writer) validateSchema(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
 		if !exists {
 			return yapErrors.New(yapErrors.ErrTypeInternal,
 				fmt.Sprintf("required table %s not found", table)).

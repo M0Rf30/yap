@@ -19,7 +19,7 @@ func removeByExtension(packageDir, ext, logMsg string) error {
 		if !d.IsDir() && filepath.Ext(path) == ext {
 			logger.Debug(logMsg, "path", path)
 
-			if err := os.Remove(path); err != nil { // #nosec G122 -- trusted packageDir
+			if err := os.Remove(path); err != nil { //nolint:gosec
 				return err
 			}
 		}

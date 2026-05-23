@@ -29,12 +29,13 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/M0Rf30/yap/v2/pkg/deb822"
-	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/klauspost/compress/zstd"
 	lz4 "github.com/pierrec/lz4/v4"
 	"github.com/ulikunitz/xz"
+
+	"github.com/M0Rf30/yap/v2/pkg/deb822"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 )
@@ -126,7 +127,7 @@ var (
 
 // Load returns the process-global Cache, loading it on the first call.
 // Subsequent calls return the cached result immediately.
-// The cache is always non-nil; on non-Debian hosts it is simply empty.
+// The cache is always non-nil; on non-Debian hosts it is empty.
 func Load() *Cache {
 	if c := globalCache.Load(); c != nil {
 		return c
@@ -406,8 +407,8 @@ func readSourcesListD() []SourceEntry {
 			continue
 		}
 
-		path := filepath.Join("/etc/apt/sources.list.d", name) //nolint:gocritic // #nosec G304
-		if data, err := os.ReadFile(path); err == nil {        // #nosec G304
+		path := filepath.Join("/etc/apt/sources.list.d", name) //nolint:gocritic
+		if data, err := os.ReadFile(path); err == nil {        //nolint:gosec
 			if strings.HasSuffix(name, ".sources") {
 				entries = append(entries, parseDeb822SourcesListForRepo(string(data))...)
 			} else {
@@ -469,8 +470,8 @@ func loadSourceSchemesFromD(schemes map[string]sourceInfo) {
 			continue
 		}
 
-		path := filepath.Join("/etc/apt/sources.list.d", name) //nolint:gocritic // #nosec G304
-		if data, err := os.ReadFile(path); err == nil {        // #nosec G304
+		path := filepath.Join("/etc/apt/sources.list.d", name) //nolint:gocritic
+		if data, err := os.ReadFile(path); err == nil {        //nolint:gosec
 			if strings.HasSuffix(name, ".sources") {
 				parseDeb822SourcesList(string(data), schemes)
 			} else {
@@ -551,6 +552,7 @@ func parseDeb822SourcesList(content string, schemes map[string]sourceInfo) {
 		curTypes := stanzaMap["Types"]
 		curURIs := stanzaMap["URIs"]
 		flushDeb822Stanza(curTypes, curURIs, schemes)
+
 		return nil
 	})
 }
@@ -762,7 +764,7 @@ func parseDeb822SourcesListForRepo(content string) []SourceEntry {
 	var entries []SourceEntry
 
 	_ = deb822.Parse(strings.NewReader(content), func(stanzaMap deb822.Stanza) error {
-		flushDeb822RepoStanza(&entries, stanzaMap["Types"], stanzaMap["URIs"], stanzaMap["Suites"], stanzaMap["Components"], stanzaMap["Architectures"], stanzaMap["Signed-By"])
+		flushDeb822RepoStanza(&entries, stanzaMap["Types"], stanzaMap["URIs"], stanzaMap["Suites"], stanzaMap["Components"], stanzaMap["Architectures"], stanzaMap["Signed-By"]) //nolint:lll
 		return nil
 	})
 
@@ -1033,7 +1035,7 @@ func (c *Cache) loadDpkgStatus(path string) error {
 // checked and the Installed flag is set accordingly. baseURL is the repo
 // base URL for apt index files (empty for dpkg status).
 func (c *Cache) parseFile(path string, dpkgStatus bool, baseURL string) error {
-	f, err := os.Open(path) // #nosec G304 — path is constructed from trusted constants
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open apt list file").
 			WithContext("path", path).
@@ -1115,6 +1117,8 @@ type stanza struct {
 // with a space or tab.  We only extract the fields we care about.
 // path is the source file path for error context.
 // baseURL is the repo base URL for apt index files (empty for dpkg status).
+//
+//nolint:unparam // path kept for error context / API symmetry
 func (c *Cache) parseDeb822(r io.Reader, path string, dpkgStatus bool, baseURL string) error {
 	return deb822.Parse(r, func(stanzaMap deb822.Stanza) error {
 		cur := stanza{baseURL: baseURL}
@@ -1582,7 +1586,7 @@ func preflightContentLength(resp *http.Response, pkgURL string, expectedSize int
 // written. The LimitReader+1 trick detects servers that lie about
 // Content-Length by yielding one byte beyond the cap.
 func streamToTmp(resp *http.Response, tmpFile string) (hashHex string, written int64, err error) {
-	f, err := os.Create(tmpFile) // #nosec G304 — tmpFile is destFile+".tmp", trusted index metadata
+	f, err := os.Create(tmpFile) //nolint:gosec
 	if err != nil {
 		return "", 0, err
 	}

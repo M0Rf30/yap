@@ -31,11 +31,12 @@ func (ti *tarIterator) Next() (archiveEntry, error) {
 	}
 
 	// Handle symlinks
-	if hdr.Typeflag == tar.TypeSymlink {
+	switch hdr.Typeflag {
+	case tar.TypeSymlink:
 		entry.IsSymlink = true
 		entry.LinkTarget = hdr.Linkname
 		entry.Open = nil
-	} else if hdr.Typeflag == tar.TypeReg || hdr.Typeflag == tar.TypeRegA {
+	case tar.TypeReg, tar.TypeRegA: //nolint:staticcheck // TypeRegA kept for legacy tar compatibility
 		// Regular files: Open returns a reader for the tar stream
 		entry.Open = func() (io.ReadCloser, error) {
 			// The tar reader is already positioned at the file content.

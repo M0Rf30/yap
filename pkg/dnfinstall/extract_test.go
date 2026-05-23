@@ -1,4 +1,4 @@
-package dnfinstall
+package dnfinstall //nolint:testpackage
 
 import (
 	"context"

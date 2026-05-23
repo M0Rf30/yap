@@ -7,7 +7,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1" // #nosec G505 -- APK protocol mandates SHA1
+	"crypto/sha1" //nolint:gosec
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -112,8 +112,7 @@ func (s *RSASigner) Sign(ctx context.Context, artifactPath string) error {
 	}
 
 	// Read the entire APK file
-	// #nosec G304 -- artifactPath is the build output we just produced
-	apkData, err := os.ReadFile(artifactPath)
+	apkData, err := os.ReadFile(artifactPath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			"failed to read APK file").
@@ -134,8 +133,7 @@ func (s *RSASigner) Sign(ctx context.Context, artifactPath string) error {
 	controlTarGzCompressed := apkData[:dataStart]
 
 	// Compute SHA1 signature over control.tar.gz bytes (the compressed bytes)
-	// #nosec G401 -- SHA1 required by APK format
-	hash := sha1.Sum(controlTarGzCompressed)
+	hash := sha1.Sum(controlTarGzCompressed) //nolint:gosec
 
 	signature, err := rsa.SignPKCS1v15(rand.Reader, s.key, crypto.SHA1, hash[:])
 	if err != nil {
@@ -185,8 +183,7 @@ func (s *RSASigner) Sign(ctx context.Context, artifactPath string) error {
 
 	// Write to temporary file first, then rename (atomic)
 	tmpPath := artifactPath + ".tmp"
-	// #nosec G306 -- APK files are intentionally world-readable, matching abuild output
-	if err := os.WriteFile(tmpPath, signedAPK.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(tmpPath, signedAPK.Bytes(), 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			"failed to write signed APK").
 			WithOperation("Sign").

@@ -113,7 +113,7 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 // ExtractFromBare creates a working copy from a bare/mirror git repository,
 // then checks out the requested reference. This mirrors makepkg's extract_git()
 // behavior: open the bare cache, init a new repo in srcdir, fetch objects, and
-// checkout the requested ref — all using pure Go (no git CLI required).
+// checkout the requested ref (no git CLI required).
 func ExtractFromBare(barePath, srcDir, refKey, refValue string) error {
 	repoName := filepath.Base(barePath)
 	workDir := filepath.Join(srcDir, repoName)
@@ -141,7 +141,7 @@ func ExtractFromBare(barePath, srcDir, refKey, refValue string) error {
 	}
 
 	// Create a working copy by cloning from the bare repo using the
-	// in-memory dotgit filesystem (pure Go, no git CLI needed).
+	// in-memory dotgit filesystem (no git CLI needed).
 	// go-git's PlainClone with a file:// URL still shells out to git,
 	// so we init + manually set up the repo instead.
 	repo, err := ggit.PlainInit(workDir, false)

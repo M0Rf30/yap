@@ -211,8 +211,7 @@ func (m *Pkg) writeChangelogIfPresent() error {
 
 	changelogPath := filepath.Join(m.PKGBUILD.PackageDir, ".CHANGELOG")
 
-	// #nosec G306 -- .CHANGELOG matches Pacman world-readable convention
-	return os.WriteFile(filepath.Clean(changelogPath), changelogData, 0o644)
+	return os.WriteFile(filepath.Clean(changelogPath), changelogData, 0o644) //nolint:gosec
 }
 
 func renderMtree(entries []*files.Entry) (string, error) {

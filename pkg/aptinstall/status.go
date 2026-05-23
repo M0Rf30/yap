@@ -1,8 +1,8 @@
 package aptinstall
 
 import (
-		"context"
-"fmt"
+	"context"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -103,7 +103,7 @@ func flushDpkgStatusEntry(st *dpkgParseState, entries map[string]*dpkgStatusEntr
 func readDpkgStatus() (map[string]*dpkgStatusEntry, error) {
 	entries := make(map[string]*dpkgStatusEntry)
 
-	data, err := os.ReadFile(dpkgStatusPath) // #nosec G304 - constant path
+	data, err := os.ReadFile(dpkgStatusPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return entries, nil // File doesn't exist yet; that's OK.
@@ -117,9 +117,7 @@ func readDpkgStatus() (map[string]*dpkgStatusEntry, error) {
 		entry := &dpkgStatusEntry{fields: make(map[string]string)}
 
 		// Copy all fields from the stanza into the entry
-		for k, v := range stanzaMap {
-			entry.fields[k] = v
-		}
+		maps.Copy(entry.fields, stanzaMap)
 
 		// Add the entry to the map using the same logic as flushDpkgStatusEntry
 		if entry.fields["Package"] == "" {
@@ -157,8 +155,8 @@ func readDpkgStatus() (map[string]*dpkgStatusEntry, error) {
 func writeDpkgStatus(entries map[string]*dpkgStatusEntry) error {
 	tmpPath := dpkgStatusPath + ".dpkg-tmp"
 
-	f, err := os.OpenFile(tmpPath, // #nosec G304 - constant path
-		os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644) // #nosec G302
+	f, err := os.OpenFile(tmpPath,
+		os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "create temp status file").
 			WithOperation("writeDpkgStatus").WithContext("path", tmpPath)
@@ -325,14 +323,15 @@ func writeYapdb(
 ) error {
 	// Extract package metadata from control fields.
 	version := controlFields["Version"]
+
 	summary := controlFields["Summary"]
 	if summary == "" {
 		// Fallback to Description if Summary is not present.
 		desc := controlFields["Description"]
 		if desc != "" {
 			// Take only the first line (synopsis).
-			if idx := strings.Index(desc, "\n"); idx >= 0 {
-				summary = desc[:idx]
+			if before, _, ok := strings.Cut(desc, "\n"); ok {
+				summary = before
 			} else {
 				summary = desc
 			}
@@ -357,7 +356,7 @@ func writeYapdb(
 
 	// Add Provides as "provide" capabilities.
 	if provides := controlFields["Provides"]; provides != "" {
-		for _, prov := range strings.Split(provides, ",") {
+		for prov := range strings.SplitSeq(provides, ",") {
 			prov = strings.TrimSpace(prov)
 			if prov != "" {
 				caps = append(caps, yapdb.Capability{
@@ -380,16 +379,18 @@ func writeYapdb(
 
 	// Add Depends as "require" capabilities.
 	if depends := controlFields["Depends"]; depends != "" {
-		for _, dep := range strings.Split(depends, ",") {
+		for dep := range strings.SplitSeq(depends, ",") {
 			dep = strings.TrimSpace(dep)
 			if dep != "" {
 				// Parse "package (>= version)" format.
 				depName := dep
 				depVersion := ""
+
 				if idx := strings.IndexAny(dep, "(<>=!"); idx >= 0 {
 					depName = strings.TrimSpace(dep[:idx])
 					depVersion = strings.TrimSpace(dep[idx:])
 				}
+
 				caps = append(caps, yapdb.Capability{
 					Kind:    "require",
 					Name:    depName,
@@ -409,7 +410,7 @@ func writeYapdb(
 	}
 	defer func() { _ = db.Close() }()
 
-	pkg := yapdb.Package{
+	pkg := &yapdb.Package{
 		Name:        pkgName,
 		Epoch:       "",
 		Version:     version,
@@ -501,7 +502,7 @@ func ensureDpkgDirs() error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0o755); err != nil { // #nosec G301 - dpkg dirs need read+exec
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "mkdir").
 				WithOperation("ensureDpkgDirs").WithContext("path", dir)
 		}
@@ -570,7 +571,7 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 	// Write .list file (file paths).
 	listPath := filepath.Join(infoDir, baseName+".list")
 
-	f, err := os.Create(listPath) // #nosec G304 - constructed from trusted values
+	f, err := os.Create(listPath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "create .list file").
 			WithOperation("writeDpkgInfoFiles").WithContext("path", listPath)
@@ -592,7 +593,7 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 	if contents.Md5sums != "" {
 		md5Path := filepath.Join(infoDir, baseName+".md5sums")
 
-		if err := os.WriteFile(md5Path, []byte(contents.Md5sums), 0o644); err != nil { // #nosec G306
+		if err := os.WriteFile(md5Path, []byte(contents.Md5sums), 0o644); err != nil { //nolint:gosec
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "write .md5sums").
 				WithOperation("writeDpkgInfoFiles").WithContext("path", md5Path)
 		}
@@ -602,7 +603,7 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 	if contents.Conffiles != "" {
 		confPath := filepath.Join(infoDir, baseName+".conffiles")
 
-		if err := os.WriteFile(confPath, []byte(contents.Conffiles), 0o644); err != nil { // #nosec G306
+		if err := os.WriteFile(confPath, []byte(contents.Conffiles), 0o644); err != nil { //nolint:gosec
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "write .conffiles").
 				WithOperation("writeDpkgInfoFiles").WithContext("path", confPath)
 		}
@@ -612,7 +613,7 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 	for scriptName, scriptBody := range contents.Scriptlets {
 		scriptPath := filepath.Join(infoDir, baseName+"."+scriptName)
 
-		if err := os.WriteFile(scriptPath, []byte(scriptBody), 0o755); err != nil { // #nosec G306
+		if err := os.WriteFile(scriptPath, []byte(scriptBody), 0o755); err != nil { //nolint:gosec
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "write scriptlet file").
 				WithOperation("writeDpkgInfoFiles").WithContext("script", scriptName).WithContext("path", scriptPath)
 		}
@@ -622,7 +623,7 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 	if contents.Triggers != "" {
 		triggersPath := filepath.Join(infoDir, baseName+".triggers")
 
-		if err := os.WriteFile(triggersPath, []byte(contents.Triggers), 0o644); err != nil { // #nosec G306
+		if err := os.WriteFile(triggersPath, []byte(contents.Triggers), 0o644); err != nil { //nolint:gosec
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "write .triggers").
 				WithOperation("writeDpkgInfoFiles").WithContext("path", triggersPath)
 		}

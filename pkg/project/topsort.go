@@ -131,8 +131,8 @@ func (mpc *MultipleProject) topologicalSortRuntimeDeps(projectMap map[string]*Pr
 		// runtime-dependency cycles via errors.Is / errors.As.
 		if errors.Is(err, ErrCircularDependency) {
 			//nolint:err113 // sentinel error chain required for errors.Is matching
-			return nil, yerrors.Wrap(ErrCircularRuntimeDependency, yerrors.ErrTypeInternal, "circular runtime dependency detected").
-				WithOperation("topologicalSortRuntimeDeps")
+			return nil, yerrors.Wrap(ErrCircularRuntimeDependency, yerrors.ErrTypeInternal, "circular runtime dependency detected"). //nolint:lll
+																			WithOperation("topologicalSortRuntimeDeps")
 		}
 
 		return nil, err

@@ -225,7 +225,7 @@ func Exec(ctx context.Context, excludeStdout bool, dir, name string, args ...str
 func ExecWithContext(
 	ctx context.Context, excludeStdout bool, dir, name string, args ...string,
 ) error {
-	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 //nolint:gosec -- internal build system cmd
+	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // internal build system cmd
 
 	if !excludeStdout {
 		_, err := MultiPrinter.Start()
@@ -549,12 +549,12 @@ func interpretCmdError(ctx context.Context, stderr interface{ Write([]byte) (int
 
 				sig := int(status.Signal())
 
-				return interp.ExitStatus(uint8(128 + sig)) // #nosec G115 -- signal values are bounded 0-127
+				return interp.ExitStatus(uint8(128 + sig)) //nolint:gosec
 			}
 
 			exitCode := status.ExitStatus()
 
-			return interp.ExitStatus(uint8(exitCode)) // #nosec G115 -- exit codes are bounded 0-255
+			return interp.ExitStatus(uint8(exitCode)) //nolint:gosec
 		}
 
 		return interp.ExitStatus(1)
@@ -809,12 +809,11 @@ func ExecWithSudoContext(
 	if needsSudo {
 		// Prepend sudo to the command
 		sudoArgs := append([]string{name}, args...)
-		// #nosec G204 - command name is validated against allowlist
 		cmd = exec.CommandContext(ctx, "sudo", sudoArgs...)
 
 		logger.Debug(i18n.T("logger.shell.debug.exec_sudo"), "command", name, "args", args, "dir", dir)
 	} else {
-		cmd = exec.CommandContext(ctx, name, args...) // #nosec G204 //nolint:gosec -- internal build system cmd
+		cmd = exec.CommandContext(ctx, name, args...) //nolint:gosec // internal build system cmd
 		logger.Debug(i18n.T("logger.shell.debug.exec_sudo_cmd"),
 			"command", name, "args", args, "dir", dir)
 	}

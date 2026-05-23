@@ -7,13 +7,15 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"io"
+	"maps"
 	"os"
 	"strings"
 
-	"github.com/M0Rf30/yap/v2/pkg/deb822"
 	"github.com/klauspost/compress/zstd"
 	"github.com/m0rf30/ar"
 	"github.com/ulikunitz/xz"
+
+	"github.com/M0Rf30/yap/v2/pkg/deb822"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
@@ -37,7 +39,7 @@ type debContents struct {
 // parseDEB opens a .deb, extracts control.tar and data.tar, and returns metadata.
 // The data.tar is NOT extracted to /; only the file list is returned.
 func parseDEB(debPath string) (*debContents, error) {
-	file, err := os.Open(debPath) // #nosec G304 - debPath is from trusted apt index metadata
+	file, err := os.Open(debPath) //nolint:gosec
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "open DEB").
 			WithOperation("parseDEB").WithContext("path", debPath)
@@ -250,9 +252,8 @@ func parseControl(control string) map[string]string {
 
 	_ = deb822.Parse(strings.NewReader(control), func(stanzaMap deb822.Stanza) error {
 		// Copy all fields from the stanza into the result map
-		for k, v := range stanzaMap {
-			fields[k] = v
-		}
+		maps.Copy(fields, stanzaMap)
+
 		return nil
 	})
 

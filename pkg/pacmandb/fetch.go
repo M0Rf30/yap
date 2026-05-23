@@ -41,7 +41,7 @@ func downloadFile(ctx context.Context, url, dest string) error {
 	// Atomic write: write to tmp, then rename.
 	tmpDest := dest + ".tmp"
 
-	f, err := os.Create(tmpDest) // #nosec G304 — dest is constructed from trusted constants
+	f, err := os.Create(tmpDest) //nolint:gosec
 	if err != nil {
 		return err
 	}

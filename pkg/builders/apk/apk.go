@@ -4,7 +4,7 @@ package apk
 import (
 	"archive/tar"
 	"context"
-	"crypto/sha1" // #nosec G505 -- SHA1 required by APK format for checksum headers
+	"crypto/sha1" //nolint:gosec
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -48,7 +48,7 @@ func (a apkFile) Open() (io.ReadCloser, error) {
 		return io.NopCloser(strings.NewReader("")), nil
 	}
 
-	return os.Open(filepath.Clean(a.diskPath)) // #nosec G304 -- walker-provided path under sourceDir
+	return os.Open(filepath.Clean(a.diskPath))
 }
 
 // walkAPKFiles walks sourceDir and emits an apkFile for each entry with names
@@ -118,7 +118,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Apk {
 	}
 }
 
-// BuildPackage creates an APK package in pure Go without external dependencies.
+// BuildPackage creates an APK package without external dependencies.
 // The package is created as a gzip-compressed tar archive containing the package
 // files and metadata (.PKGINFO and optional .install script).
 // Returns the path to the created APK file.
@@ -221,8 +221,7 @@ func isControlFile(name string) bool {
 //
 //nolint:gocyclo,cyclop // APK format requires specific two-stream construction
 func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFile string) error {
-
-	// Step 1: Walk source directory once
+	// Walk source directory once
 	fileList, err := walkAPKFiles(sourceDir)
 	if err != nil {
 		return err
@@ -235,7 +234,7 @@ func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFil
 		}
 	}
 
-	// Step 2: Create data.tar.gz with only non-control files, streaming to temp file
+	// Create data.tar.gz with only non-control files, streaming to temp file
 	dataTempFile, err := os.CreateTemp("", "apk-data-*.tar.gz")
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
@@ -279,16 +278,16 @@ func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFil
 		return err
 	}
 
-	// Step 3: Compute datahash = SHA256(data.tar.gz)
+	// Compute datahash = SHA256(data.tar.gz)
 	dataHash := hex.EncodeToString(dataHasher.Sum(nil))
 	a.PKGBUILD.DataHash = dataHash
 
-	// Step 4: Regenerate .PKGINFO with datahash field
+	// Regenerate .PKGINFO with datahash field
 	if err := a.createPkgInfo(); err != nil {
 		return err
 	}
 
-	// Step 5: Reload file list to get updated .PKGINFO
+	// Reload file list to get updated .PKGINFO
 	fileList2, err := walkAPKFiles(sourceDir)
 	if err != nil {
 		return err
@@ -300,7 +299,7 @@ func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFil
 		}
 	}
 
-	// Step 6: Create control.tar.gz with control files only, streaming to temp file
+	// Create control.tar.gz with control files only, streaming to temp file
 	controlTempFile, err := os.CreateTemp("", "apk-control-*.tar.gz")
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
@@ -341,7 +340,7 @@ func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFil
 		return err
 	}
 
-	// Step 7: Write final APK = control.tar.gz + data.tar.gz
+	// Write final APK = control.tar.gz + data.tar.gz
 	cleanFilePath := filepath.Clean(outputFile)
 
 	out, err := os.Create(cleanFilePath)
@@ -435,8 +434,7 @@ func (a *Apk) writeFileWithChecksum(
 	// Data files (non-control) get SHA1 checksums
 	if !isControlFile(hdr.Name) && hdr.Typeflag == tar.TypeReg {
 		// Pass 1: compute SHA1 by streaming (no full buffer)
-		// #nosec G401 -- SHA1 required by APK format for checksum headers
-		hasher := sha1.New()
+		hasher := sha1.New() //nolint:gosec
 
 		f1, err := file.Open()
 		if err != nil {

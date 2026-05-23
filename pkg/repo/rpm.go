@@ -24,7 +24,7 @@ const (
 func setupRPM(r *Repo) error {
 	// /etc/yum.repos.d is a documented system directory and must remain
 	// traversable for unprivileged dnf/yum operations.
-	if err := os.MkdirAll(rpmRepoDir, 0o755); err != nil { // #nosec G301
+	if err := os.MkdirAll(rpmRepoDir, 0o755); err != nil {
 		return err
 	}
 
@@ -44,7 +44,7 @@ func setupRPM(r *Repo) error {
 		// package signatures against the gpgkey= path in the .repo file even
 		// when the key is not in the RPM DB. Log a warning on failure rather
 		// than aborting the build.
-		if err := exec.CommandContext(ctx, "rpm", "--import", gpgKey).Run(); err != nil { // #nosec G204
+		if err := exec.CommandContext(ctx, "rpm", "--import", gpgKey).Run(); err != nil {
 			logger.Warn("repo: rpm --import failed (non-fatal; dnf will still verify via gpgkey= in .repo)",
 				"repo", r.Name,
 				"key", gpgKey,
@@ -69,7 +69,7 @@ func setupRPM(r *Repo) error {
 	dst := filepath.Join(rpmRepoDir, "yap-"+r.Name+".repo")
 	// dnf reads /etc/yum.repos.d files as the unprivileged update process, so
 	// world-readable 0o644 is the documented mode.
-	if err := os.WriteFile(dst, []byte(b.String()), 0o644); err != nil { // #nosec G306
+	if err := os.WriteFile(dst, []byte(b.String()), 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			fmt.Sprintf("repo %q: write %s", r.Name, dst)).
 			WithOperation("setupRPM").

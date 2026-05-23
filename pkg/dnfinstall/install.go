@@ -15,9 +15,18 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/yapdb"
 )
 
+// formatRPM is the constant identifier for the RPM package format.
+const formatRPM = "rpm"
+
 // downloadAndInstall downloads all packages in the resolved closure and
 // installs them in dependency order.
-func downloadAndInstall(ctx context.Context, cache *dnfcache.Cache, resolved []*dnfcache.PackageInfo, rootDir string, opts Options) error {
+func downloadAndInstall(
+	ctx context.Context,
+	cache *dnfcache.Cache,
+	resolved []*dnfcache.PackageInfo,
+	rootDir string,
+	opts Options,
+) error {
 	// Create a temporary directory for downloaded RPMs.
 	tmpDir, err := os.MkdirTemp("", "dnfinstall-*")
 	if err != nil {
@@ -28,6 +37,7 @@ func downloadAndInstall(ctx context.Context, cache *dnfcache.Cache, resolved []*
 
 	// Download all packages.
 	rpmPaths := make(map[string]string) // package name -> local path
+
 	var mu sync.Mutex
 
 	for _, pkg := range resolved {
@@ -86,7 +96,6 @@ func downloadRPM(ctx context.Context, _ *dnfcache.Cache, pkg *dnfcache.PackageIn
 
 // installPackage extracts a single RPM file to rootDir.
 // Implements the full install sequence: verify → %pretrans → %pre → extract → %post → yapdb → rpmdb → %posttrans.
-// Phase 2-6 implementation.
 func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) (retErr error) {
 	// Acquire install lock to prevent concurrent modifications.
 	release, err := acquireLock(ctx, rootDir)
@@ -101,7 +110,7 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 		}
 	}()
 
-	// Phase 5: Verify GPG signature before proceeding.
+	// Verify GPG signature before proceeding.
 	if err := verifyRPMSignature(ctx, rpmPath, opts); err != nil {
 		return errors.Wrap(err, errors.ErrTypeValidation, "RPM signature verification failed").
 			WithOperation("installPackage").
@@ -109,7 +118,7 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 	}
 
 	// Open and parse the RPM once for all phases.
-	f, err := os.Open(rpmPath) // #nosec G304 — path is validated by caller
+	f, err := os.Open(rpmPath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open RPM file").
 			WithOperation("installPackage").
@@ -126,7 +135,7 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 
 	pkgName, _ := rpm.Header.GetString(rpmutils.NAME)
 
-	// Phase 4a: Run %pretrans scriptlet.
+	// Run %pretrans scriptlet.
 	// %pretrans is typically optional setup (filesystem layout, SELinux
 	// labels). Per the same lenient policy as %post/%posttrans, log and
 	// continue on failure so a quirky third-party package doesn't abort
@@ -136,14 +145,14 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 			"package", pkgName, "error", err.Error())
 	}
 
-	// Phase 4b: Run %pre scriptlet (before file extraction).
+	// Run %pre scriptlet (before file extraction).
 	if err := runScriptlet(ctx, scriptletPreIn, rpm, rootDir, opts); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "prein scriptlet failed").
 			WithOperation("installPackage").
 			WithContext("package", pkgName)
 	}
 
-	// Phase 2: Extract the RPM to rootDir.
+	// Extract the RPM to rootDir.
 	entry, err := extractRPMWithHeader(ctx, rpmPath, rootDir, rpm, opts)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "failed to extract RPM").
@@ -151,7 +160,7 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 			WithContext("path", rpmPath)
 	}
 
-	// Phase 4c: Run %post scriptlet (after file extraction).
+	// Run %post scriptlet (after file extraction).
 	// Per RPM convention, %post failures are non-fatal: log and continue.
 	if err := runScriptlet(ctx, scriptletPostIn, rpm, rootDir, opts); err != nil {
 		logger.Warn("postin scriptlet failed (continuing)",
@@ -160,21 +169,22 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 
 	logger.Info("installed RPM package", "path", filepath.Base(rpmPath), "files", len(entry.Files))
 
-	// Phase 6: Write YAP state database (mandatory).
+	// Write YAP state database (mandatory).
 	if err := writeYapdb(ctx, rpm, entry, rootDir); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "failed to write yapdb").
 			WithOperation("installPackage").
 			WithContext("package", pkgName)
 	}
 
-	// Phase 3: Optionally write system rpmdb (SQLite only; warn-and-continue on BDB).
+	// Optionally write system rpmdb (SQLite only; warn-and-continue on BDB).
 	if opts.WriteSystemRpmdb {
+		//nolint:staticcheck // SA4023: writeSystemRpmdb stub always returns a non-nil error today; kept for future wiring
 		if err := writeSystemRpmdb(ctx, rpm, entry, rootDir); err != nil {
 			logger.Warn("system rpmdb write skipped", "error", err.Error(), "package", pkgName)
 		}
 	}
 
-	// Phase 4d: Run %posttrans scriptlet (after everything).
+	// Run %posttrans scriptlet (after everything).
 	// Per RPM convention, %posttrans failures are non-fatal: log and continue.
 	if err := runScriptlet(ctx, scriptletPostTrans, rpm, rootDir, opts); err != nil {
 		logger.Warn("posttrans scriptlet failed (continuing)",
@@ -219,13 +229,13 @@ func writeYapdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir
 	}
 	defer func() { _ = db.Close() }()
 
-	pkg := yapdb.Package{
+	pkg := &yapdb.Package{
 		Name:        name,
 		Epoch:       epoch,
 		Version:     version,
 		Release:     release,
 		Arch:        arch,
-		Format:      "rpm",
+		Format:      formatRPM,
 		Summary:     summary,
 		InstallTime: time.Now(),
 		Files:       files,
@@ -243,8 +253,10 @@ func writeYapdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir
 
 // writeSystemRpmdb optionally writes to the system rpmdb.sqlite (SQLite only).
 // On BDB systems or if the file doesn't exist, returns an error that is logged as a warning.
-func writeSystemRpmdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir string) error {
-	rpmdbPath := filepath.Join(rootDir, "var/lib/rpm/rpmdb.sqlite")
+//
+//nolint:staticcheck // SA4023: stub always returns non-nil error today; kept for future wiring
+func writeSystemRpmdb(_ context.Context, _ *rpmutils.Rpm, _ *rpmEntry, rootDir string) error {
+	rpmdbPath := filepath.Join(rootDir, "var", "lib", "rpm", "rpmdb.sqlite")
 
 	// Check if the SQLite rpmdb exists.
 	if _, err := os.Stat(rpmdbPath); err != nil {
@@ -252,8 +264,8 @@ func writeSystemRpmdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, r
 			WithContext("path", rpmdbPath)
 	}
 
-	// TODO: Phase 3 — implement rpmdb.Writer integration
-	// For now, this is a placeholder. When rpmdb.Writer is ready, call:
+	// TODO: implement rpmdb.Writer integration
+	// When rpmdb.Writer is ready, call:
 	// writer, err := rpmdb.OpenWriter(ctx, rpmdbPath)
 	// if err != nil { return err }
 	// defer writer.Close()

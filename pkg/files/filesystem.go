@@ -171,7 +171,7 @@ func IsStaticLibrary(path string) bool {
 	}
 
 	// Check by archive magic number
-	file, err := os.Open(path) // #nosec G304 - path is validated by caller
+	file, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return false
 	}

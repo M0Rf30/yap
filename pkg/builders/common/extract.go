@@ -142,7 +142,7 @@ func isAPKControlEntry(name string) bool {
 // data payload was previously dropped silently. This is the APK analogue of
 // the RPM regression fixed by extractRPM.
 func extractAPK(packagePath, destDir string) error {
-	file, err := os.Open(packagePath) // #nosec G304 - packagePath is from trusted build artifacts
+	file, err := os.Open(packagePath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open APK package").
 			WithContext("path", packagePath).
@@ -253,7 +253,7 @@ func extractAPKMember(r io.Reader, destDir string, dirMap map[string]bool) error
 			fileDir := filepath.Dir(cleanPath)
 			if _, seen := dirMap[fileDir]; !seen {
 				dirMap[fileDir] = true
-				_ = os.MkdirAll(fileDir, 0o755) // #nosec G301 -- intermediate dirs need read+exec for installed binaries/libs
+				_ = os.MkdirAll(fileDir, 0o755)
 			}
 
 			if err := writeAPKRegularFile(cleanPath, hdr, tr); err != nil {
@@ -282,8 +282,7 @@ func apkTarMode(mode int64, fallback os.FileMode) os.FileMode {
 // writeAPKRegularFile creates a regular file at path with content streamed
 // from tr, honoring the tar header mode.
 func writeAPKRegularFile(path string, hdr *tar.Header, tr io.Reader) error {
-	// #nosec G304 -- path is constrained by archive.SafeJoin to stay inside destDir.
-	out, err := os.OpenFile(path,
+	out, err := os.OpenFile(path, //nolint:gosec
 		os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
 		apkTarMode(hdr.Mode, 0o644))
 	if err != nil {

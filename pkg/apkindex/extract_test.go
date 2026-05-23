@@ -1,4 +1,4 @@
-package apkindex
+package apkindex //nolint:testpackage
 
 import (
 	"archive/tar"
@@ -83,6 +83,7 @@ func TestSafeAPKPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			path, ok := ExportSafeAPKPath(tt.entryName)
 			assert.Equal(t, tt.wantOK, ok, "ok mismatch")
+
 			if tt.wantOK {
 				assert.Equal(t, tt.wantPath, path, "path mismatch")
 			}
@@ -243,18 +244,23 @@ func TestExtractAPKData(t *testing.T) {
 		// Verify we can read it back
 		gr, err := gzip.NewReader(bytes.NewReader(buf.Bytes()))
 		require.NoError(t, err)
-		defer gr.Close()
+
+		defer func() { _ = gr.Close() }()
 
 		tr := tar.NewReader(gr)
 		count := 0
+
 		for {
 			hdr, err := tr.Next()
 			if err != nil {
 				break
 			}
+
 			count++
+
 			assert.Contains(t, files, hdr.Name)
 		}
+
 		assert.Equal(t, len(files), count)
 	})
 
@@ -276,7 +282,8 @@ func TestExtractAPKData(t *testing.T) {
 
 		gr, err := gzip.NewReader(bytes.NewReader(buf.Bytes()))
 		require.NoError(t, err)
-		defer gr.Close()
+
+		defer func() { _ = gr.Close() }()
 
 		tr := tar.NewReader(gr)
 		_, err = tr.Next()
@@ -294,6 +301,7 @@ func TestLargeFileHandling(t *testing.T) {
 		tw := tar.NewWriter(buf)
 
 		size := 1024 * 1024 // 1MB
+
 		content := make([]byte, size)
 		for i := range content {
 			content[i] = byte(i % 256)

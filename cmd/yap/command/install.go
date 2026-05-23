@@ -95,7 +95,7 @@ func detectPackageType(filePath string) (string, error) {
 // installPackage installs the package using the appropriate package manager
 // with the same arguments used by yap's internal package managers.
 func installPackage(packageType, artifactPath string) error {
-	// RPM: use pure-Go dnfinstall
+	// RPM: use dnfinstall
 	if packageType == packageTypeRPM {
 		logger.Info(i18n.T("logger.installpackage.info.installing_package_1"),
 			"command", "dnfinstall",
@@ -124,8 +124,10 @@ func installPackage(packageType, artifactPath string) error {
 	}
 
 	// Other formats: use subprocess-based package managers
-	var cmd string
-	var args []string
+	var (
+		cmd  string
+		args []string
+	)
 
 	switch packageType {
 	case packageTypeDeb:

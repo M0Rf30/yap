@@ -31,7 +31,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
-	)
+)
 
 // Options controls Install's runtime behaviour.
 //
@@ -59,8 +59,7 @@ type Options struct {
 	WriteDpkgStatus  bool
 }
 
-// Install performs a full pure-Go apt-get install equivalent with default
-// options.
+// Install performs a full apt-get install equivalent with default options.
 //
 // Default policy: when running on a privileged host (uid 0 — the expected
 // case inside a yap build container) `AllowRootInstall` is implicitly
@@ -331,7 +330,7 @@ func installPackage(
 	}
 
 	// Update dpkg status (unpacked state).
-	if err := updateDpkgStatusForPackage(ctx, pkgName, arch, contents.Control, "install ok unpacked", rootDir, opts, contents.Files); err != nil {
+	if err := updateDpkgStatusForPackage(ctx, pkgName, arch, contents.Control, "install ok unpacked", rootDir, opts, contents.Files); err != nil { //nolint:lll
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "update dpkg status (unpacked)").
 			WithContext("package", pkgName).
 			WithOperation("installPackage")
@@ -360,7 +359,7 @@ func installPackage(
 		finalState = "install ok unpacked"
 	}
 
-	if err := updateDpkgStatusForPackage(ctx, pkgName, arch, contents.Control, finalState, rootDir, opts, contents.Files); err != nil {
+	if err := updateDpkgStatusForPackage(ctx, pkgName, arch, contents.Control, finalState, rootDir, opts, contents.Files); err != nil { //nolint:lll
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "update dpkg status (final)").
 			WithContext("package", pkgName).
 			WithOperation("installPackage")
@@ -433,7 +432,7 @@ func RefreshLDCache() {
 	}
 
 	// nolint:noctx // ldconfig is a system utility, not a network call
-	cmd := exec.Command(bin) // #nosec G204 - LookPath returns absolute path
+	cmd := exec.Command(bin)
 
 	if err := cmd.Run(); err != nil {
 		logger.Warn("ldconfig failed", "error", err)

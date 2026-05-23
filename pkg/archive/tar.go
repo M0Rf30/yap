@@ -78,7 +78,7 @@ func detectKind(f *os.File, name string) (archiveKind, io.Reader, error) {
 	n, err := io.ReadFull(f, header)
 	// io.ReadFull returns io.ErrUnexpectedEOF for short reads (file smaller
 	// than sniffSize) and io.EOF for empty files. Both are acceptable here —
-	// we'll classify whatever bytes we did read.
+	// classify whatever bytes were read.
 	//
 	//nolint:errorlint // direct sentinel comparison is the documented pattern for io.ReadFull
 	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
@@ -346,7 +346,7 @@ func buildTarHeader(path, nameInArchive string, info fs.FileInfo) (*tar.Header, 
 
 // copyRegularFile streams the contents of path into tw, using a buffered copy.
 func copyRegularFile(path string, tw io.Writer) error {
-	f, err := os.Open(filepath.Clean(path)) // #nosec G304 -- path is walked from a caller-supplied build directory
+	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return err
 	}
@@ -617,195 +617,45 @@ func ensureParent(path string, dirMap map[string]bool) {
 	parent := filepath.Dir(path)
 	if _, seen := dirMap[parent]; !seen {
 		dirMap[parent] = true
-		_ = os.MkdirAll(parent, 0o755) // #nosec G301 -- intermediate dirs need read+exec
+		_ = os.MkdirAll(parent, 0o755)
 	}
 }
 
-// writeTarFile creates path with the mode from hdr and streams the entry body
-// from tr.
-func writeTarFile(path string, hdr *tar.Header, tr io.Reader) error {
-	// Skip rewriting identical files to support resumed extractions.
-	if existing, err := os.Stat(path); err == nil && existing.Size() == hdr.Size {
-		logger.Debug(i18n.T("logger.archive.debug.skip_exists"), "path", path)
-
-		return nil
+// extractFromReaderAt resets f and dispatches to an iterator built from a
+// ReaderAt-style archive (zip, 7z). The shared shape is hoisted here so each
+// concrete extractor reduces to a single buildIter call.
+func extractFromReaderAt(
+	ctx context.Context, f *os.File, destination string, patterns []string,
+	buildIter func(io.ReaderAt, int64) (entryIterator, error),
+) error {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
 	}
 
-	// #nosec G304,G703 -- path is constrained by safeJoin to stay inside destination
-	out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, hdr.FileInfo().Mode().Perm())
+	info, err := f.Stat()
 	if err != nil {
 		return err
 	}
 
-	defer func() {
-		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_new_1"),
-				"path", path, "error", closeErr)
-		}
-	}()
+	it, err := buildIter(f, info.Size())
+	if err != nil {
+		return err
+	}
 
-	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
-	_, err = io.CopyBuffer(out, tr, copyBuf) //nolint:gosec // size bounded by tar header
-	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
-
-	return err
+	return extractWithIterator(ctx, it, destination, patterns)
 }
 
 // extractZipIterator handles .zip / .jar inputs using the iterator interface.
 func extractZipIterator(ctx context.Context, f *os.File, destination string, patterns []string) error {
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-
-	zr, err := zip.NewReader(f, info.Size())
-	if err != nil {
-		return err
-	}
-
-	it := newZipIterator(zr)
-	return extractWithIterator(ctx, it, destination, patterns)
-}
-
-// extractZip handles .zip / .jar inputs. The zip reader needs random access,
-// so we use *os.File directly (the read offset is reset before use).
-//
-//nolint:gocyclo,cyclop // dir + file + symlink dispatch is inherently branchy
-func extractZip(ctx context.Context, f *os.File, destination string, patterns []string) error {
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-
-	zr, err := zip.NewReader(f, info.Size())
-	if err != nil {
-		return err
-	}
-
-	dirMap := make(map[string]bool)
-
-	for _, zf := range zr.File {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		if !matchesAny(patterns, zf.Name) {
-			continue
-		}
-
-		cleanPath, err := safeJoin(destination, zf.Name)
-		if err != nil {
-			logger.Warn(i18n.T("logger.archive.warn.path_traversal_rejected"),
-				"entry", zf.Name, "destination", destination)
-
-			return err
-		}
-
-		mode := zf.Mode()
-
-		switch {
-		case mode.IsDir():
-			dirMap[cleanPath] = true
-			if err := os.MkdirAll(cleanPath, 0o755); err != nil { // #nosec G301
-				return err
+	return extractFromReaderAt(ctx, f, destination, patterns,
+		func(r io.ReaderAt, size int64) (entryIterator, error) {
+			zr, err := zip.NewReader(r, size)
+			if err != nil {
+				return nil, err
 			}
 
-		case mode&os.ModeSymlink != 0:
-			if err := writeZipSymlink(zf, cleanPath, dirMap); err != nil {
-				return err
-			}
-
-		default:
-			ensureParent(cleanPath, dirMap)
-
-			if err := writeZipFile(zf, cleanPath); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// writeSymlinkFromOpener resolves a symlink target by reading the entry body
-// produced by openFn and creates the symlink at cleanPath after validating
-// the target. Used by both the zip and 7z extractors, which share this exact
-// shape (a file-like entry whose Open() yields the link target as the body).
-func writeSymlinkFromOpener(
-	entryName, cleanPath string,
-	openFn func() (io.ReadCloser, error),
-	dirMap map[string]bool,
-) error {
-	rc, err := openFn()
-	if err != nil {
-		return err
-	}
-
-	target, err := io.ReadAll(rc)
-	_ = rc.Close()
-
-	if err != nil {
-		return err
-	}
-
-	if err := safeSymlinkTarget(entryName, string(target)); err != nil {
-		logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
-			"entry", entryName, "target", string(target))
-
-		return err
-	}
-
-	ensureParent(cleanPath, dirMap)
-	_ = os.Remove(cleanPath)
-
-	return os.Symlink(string(target), cleanPath)
-}
-
-// writeZipSymlink resolves the symlink target stored in the zip entry body
-// and creates the symlink, applying the standard target validation.
-func writeZipSymlink(zf *zip.File, cleanPath string, dirMap map[string]bool) error {
-	return writeSymlinkFromOpener(zf.Name, cleanPath, zf.Open, dirMap)
-}
-
-// writeZipFile streams a single regular-file zip entry to disk.
-func writeZipFile(zf *zip.File, cleanPath string) error {
-	rc, err := zf.Open()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		_ = rc.Close()
-	}()
-
-	// #nosec G304,G703 -- cleanPath is constrained by safeJoin
-	out, err := os.OpenFile(cleanPath,
-		os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
-		zf.Mode().Perm())
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_new_1"),
-				"path", cleanPath, "error", closeErr)
-		}
-	}()
-
-	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
-	_, err = io.CopyBuffer(out, rc, copyBuf) // #nosec G110 -- size bounded by zip header
-	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
-
-	return err
+			return newZipIterator(zr), nil
+		})
 }
 
 // ---------------------------------------------------------------------------
@@ -814,126 +664,15 @@ func writeZipFile(zf *zip.File, cleanPath string) error {
 
 // extract7zIterator reads .7z archives using the iterator interface.
 func extract7zIterator(ctx context.Context, f *os.File, destination string, patterns []string) error {
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-
-	zr, err := sevenzip.NewReader(f, info.Size())
-	if err != nil {
-		return err
-	}
-
-	it := newSevenZipIterator(zr)
-	return extractWithIterator(ctx, it, destination, patterns)
-}
-
-// extract7z reads .7z archives. sevenzip requires random access (io.ReaderAt
-// + size), so we operate on the underlying *os.File rather than the sniffed
-// MultiReader. The file offset is reset before use.
-//
-//nolint:gocyclo,cyclop // dir + file + symlink dispatch is inherently branchy
-func extract7z(ctx context.Context, f *os.File, destination string, patterns []string) error {
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-
-	zr, err := sevenzip.NewReader(f, info.Size())
-	if err != nil {
-		return err
-	}
-
-	dirMap := make(map[string]bool)
-
-	for _, sf := range zr.File {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		if !matchesAny(patterns, sf.Name) {
-			continue
-		}
-
-		cleanPath, err := safeJoin(destination, sf.Name)
-		if err != nil {
-			logger.Warn(i18n.T("logger.archive.warn.path_traversal_rejected"),
-				"entry", sf.Name, "destination", destination)
-
-			return err
-		}
-
-		mode := sf.FileInfo().Mode()
-
-		switch {
-		case mode.IsDir():
-			dirMap[cleanPath] = true
-			if err := os.MkdirAll(cleanPath, 0o755); err != nil { // #nosec G301
-				return err
+	return extractFromReaderAt(ctx, f, destination, patterns,
+		func(r io.ReaderAt, size int64) (entryIterator, error) {
+			zr, err := sevenzip.NewReader(r, size)
+			if err != nil {
+				return nil, err
 			}
 
-		case mode&os.ModeSymlink != 0:
-			if err := write7zSymlink(sf, cleanPath, dirMap); err != nil {
-				return err
-			}
-
-		default:
-			ensureParent(cleanPath, dirMap)
-
-			if err := write7zFile(sf, cleanPath); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// write7zSymlink reads the symlink target from the 7z entry body and creates
-// the symlink, applying the standard target validation.
-func write7zSymlink(sf *sevenzip.File, cleanPath string, dirMap map[string]bool) error {
-	return writeSymlinkFromOpener(sf.Name, cleanPath, sf.Open, dirMap)
-}
-
-// write7zFile streams a single regular-file 7z entry to disk.
-func write7zFile(sf *sevenzip.File, cleanPath string) error {
-	rc, err := sf.Open()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		_ = rc.Close()
-	}()
-
-	// #nosec G304,G703 -- cleanPath is constrained by safeJoin
-	out, err := os.OpenFile(cleanPath,
-		os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
-		sf.FileInfo().Mode().Perm())
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_new_1"),
-				"path", cleanPath, "error", closeErr)
-		}
-	}()
-
-	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
-	_, err = io.CopyBuffer(out, rc, copyBuf) // #nosec G110 -- size bounded by 7z header
-	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
-
-	return err
+			return newSevenZipIterator(zr), nil
+		})
 }
 
 // ---------------------------------------------------------------------------
@@ -948,114 +687,6 @@ func extractRarIterator(ctx context.Context, reader io.Reader, destination strin
 	}
 
 	it := newRarIterator(rr)
+
 	return extractWithIterator(ctx, it, destination, patterns)
-}
-
-// extractRar reads .rar archives. rardecode operates on an io.Reader so the
-// sniffed MultiReader is fine.
-//
-//nolint:gocyclo,cyclop // dir + file + symlink dispatch is inherently branchy
-func extractRar(ctx context.Context, reader io.Reader, destination string, patterns []string) error {
-	rr, err := rardecode.NewReader(reader)
-	if err != nil {
-		return err
-	}
-
-	dirMap := make(map[string]bool)
-
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		hdr, err := rr.Next()
-		if err == io.EOF { //nolint:errorlint // io.EOF is the documented sentinel
-			return nil
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if !matchesAny(patterns, hdr.Name) {
-			continue
-		}
-
-		cleanPath, err := safeJoin(destination, hdr.Name)
-		if err != nil {
-			logger.Warn(i18n.T("logger.archive.warn.path_traversal_rejected"),
-				"entry", hdr.Name, "destination", destination)
-
-			return err
-		}
-
-		mode := hdr.Mode()
-
-		switch {
-		case hdr.IsDir:
-			dirMap[cleanPath] = true
-			if err := os.MkdirAll(cleanPath, 0o755); err != nil { // #nosec G301
-				return err
-			}
-
-		case mode&os.ModeSymlink != 0:
-			if err := writeRarSymlink(rr, hdr, cleanPath, dirMap); err != nil {
-				return err
-			}
-
-		default:
-			ensureParent(cleanPath, dirMap)
-
-			if err := writeRarFile(rr, hdr, cleanPath); err != nil {
-				return err
-			}
-		}
-	}
-}
-
-// writeRarSymlink reads the symlink target from the rar entry body and creates
-// the symlink, applying the standard target validation.
-func writeRarSymlink(
-	rr *rardecode.Reader, hdr *rardecode.FileHeader, cleanPath string, dirMap map[string]bool,
-) error {
-	target, err := io.ReadAll(rr)
-	if err != nil {
-		return err
-	}
-
-	if err := safeSymlinkTarget(hdr.Name, string(target)); err != nil {
-		logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"),
-			"entry", hdr.Name, "target", string(target))
-
-		return err
-	}
-
-	ensureParent(cleanPath, dirMap)
-	_ = os.Remove(cleanPath)
-
-	return os.Symlink(string(target), cleanPath)
-}
-
-// writeRarFile streams a single regular-file rar entry to disk.
-func writeRarFile(rr *rardecode.Reader, hdr *rardecode.FileHeader, cleanPath string) error {
-	// #nosec G304,G703 -- cleanPath is constrained by safeJoin
-	out, err := os.OpenFile(cleanPath,
-		os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
-		hdr.Mode().Perm())
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_new_1"),
-				"path", cleanPath, "error", closeErr)
-		}
-	}()
-
-	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
-	_, err = io.CopyBuffer(out, rr, copyBuf) // #nosec G110 -- size bounded by rar header
-	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
-
-	return err
 }

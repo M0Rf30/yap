@@ -67,7 +67,7 @@ var (
 
 // Load returns the process-global Cache, loading it from disk on the first
 // call. Subsequent calls return the cached result immediately.
-// The cache is always non-nil; on non-RPM hosts it is simply empty.
+// The cache is always non-nil; on non-RPM hosts it is empty.
 func Load() *Cache {
 	if c := globalCache.Load(); c != nil {
 		return c

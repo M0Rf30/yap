@@ -38,7 +38,7 @@ func parseConfigWithIncludes(
 
 	seenIncludes[path] = true
 
-	data, err := os.ReadFile(path) // #nosec G304,G703
+	data, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func handleConfigKeyValue(cfg *Config, curRepo *Repo, key, val string, seenInclu
 }
 
 func parseMirrorlist(path string) ([]string, error) {
-	data, err := os.ReadFile(path) // #nosec G304,G703
+	data, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}

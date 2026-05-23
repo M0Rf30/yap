@@ -17,7 +17,7 @@ YAP builds native packages for multiple GNU/Linux distributions from a single PK
 - **PKGBUILD-based**: familiar Arch Linux syntax extended with distribution and architecture overrides
 - **Cross-compilation**: build for a different architecture than your host
 - **Dependency-aware builds**: sequential by default; opt-in parallel topo-sort via `--parallel`
-- **Package signing**: APK RSA + DEB/RPM/Pacman GPG, pure-Go (no `gpg` binary required)
+- **Package signing**: APK RSA + DEB/RPM/Pacman GPG (no `gpg` binary required)
 - **SBOM generation**: CycloneDX 1.5 and SPDX 2.3 sidecars
 - **Per-format compression**: `zstd`/`gzip`/`xz` for DEB and RPM
 - **Changelog support**: `changelog` PKGBUILD field renders to native format per distro
@@ -344,7 +344,7 @@ yap completion powershell > yap.ps1
 | RPM | OpenPGP | `<package>.rpm.asc` + optional in-RPM via rpmpack |
 | Pacman | OpenPGP | `<package>.pkg.tar.zst.sig` (binary detached) |
 
-Pure-Go via `github.com/ProtonMail/go-crypto/openpgp` — no `gpg` binary required.
+Signing uses `github.com/ProtonMail/go-crypto/openpgp` — no `gpg` binary required.
 
 ### Key resolution (highest to lowest)
 

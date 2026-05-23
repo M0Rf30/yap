@@ -18,7 +18,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
-// createTestDEB creates a minimal but valid DEB package in pure Go.
+// createTestDEB creates a minimal but valid DEB package.
 // A DEB is an AR archive with three members:
 //
 //	debian-binary   — "2.0\n"

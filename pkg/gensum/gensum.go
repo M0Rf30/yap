@@ -102,7 +102,7 @@ var hashValueRe = regexp.MustCompile(`(['"])([0-9a-fA-F]{32,128}|SKIP)(['"])`)
 func UpdateChecksums(pkgbuildDir string) error {
 	pkgbuildPath := filepath.Join(pkgbuildDir, "PKGBUILD")
 
-	raw, err := os.ReadFile(filepath.Clean(pkgbuildPath)) // #nosec G304
+	raw, err := os.ReadFile(filepath.Clean(pkgbuildPath))
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to read PKGBUILD").
 			WithOperation("UpdateChecksums")
@@ -167,7 +167,7 @@ func UpdateChecksums(pkgbuildDir string) error {
 		return nil
 	}
 
-	if err := os.WriteFile(pkgbuildPath, []byte(result), 0o644); err != nil { // #nosec G306 G703
+	if err := os.WriteFile(pkgbuildPath, []byte(result), 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write PKGBUILD").
 			WithOperation("UpdateChecksums")
 	}
@@ -338,7 +338,7 @@ func downloadAndHash(rawURI, uri, tmpDir, pkgbuildDir string) (string, error) {
 
 // hashFile computes the SHA-256 digest of the file at path.
 func hashFile(path string) (string, error) {
-	f, err := os.Open(filepath.Clean(path)) // #nosec G304
+	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open file for hashing").
 			WithOperation("hashFile").

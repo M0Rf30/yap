@@ -8,11 +8,21 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // registers sqlite driver with database/sql
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	db "github.com/M0Rf30/yap/v2/pkg/yapdb/db"
 )
+
+// defaultDBPath is the canonical absolute location of the YAP state database.
+const defaultDBPath = "/var/lib/yap/installed.db"
+
+// dbRelPath is the relative path under <rootDir> for non-root installs.
+const dbRelPath = "var/lib/yap/installed.db"
+
+// ErrNotFound is returned by lookup methods when the requested record does
+// not exist in the database.
+var ErrNotFound = stderrors.New("yapdb: package not found")
 
 // DB wraps the sqlc-generated queries and provides a high-level API
 // for managing the YAP installed package registry.
@@ -106,10 +116,10 @@ func Open(ctx context.Context, path string) (*DB, error) {
 // Otherwise uses <rootDir>/var/lib/yap/installed.db.
 func DefaultPath(rootDir string) string {
 	if rootDir == "" || rootDir == "/" {
-		return "/var/lib/yap/installed.db"
+		return defaultDBPath
 	}
 
-	return filepath.Join(rootDir, "var/lib/yap/installed.db")
+	return filepath.Join(rootDir, dbRelPath)
 }
 
 // initSchema initializes the database schema if it doesn't exist.
@@ -185,7 +195,7 @@ INSERT INTO meta (key, value) VALUES ('schema_version', '1');
 // Insert adds or replaces an installed package record.
 // If a package with the same name+arch already exists, it is replaced atomically
 // (old files and caps are deleted via CASCADE).
-func (d *DB) Insert(ctx context.Context, p Package) error {
+func (d *DB) Insert(ctx context.Context, p *Package) error {
 	tx, err := d.sqlDB.BeginTx(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to begin transaction").
@@ -309,9 +319,9 @@ func (d *DB) ProvidersOf(ctx context.Context, capName string) ([]string, error) 
 			WithContext("capability", capName)
 	}
 
-	var providers []string
-	for _, row := range rows {
-		providers = append(providers, row.Name)
+	providers := make([]string, 0, len(rows))
+	for i := range rows {
+		providers = append(providers, rows[i].Name)
 	}
 
 	return providers, nil
@@ -325,8 +335,9 @@ func (d *DB) List(ctx context.Context) ([]Package, error) {
 			WithOperation("List")
 	}
 
-	var packages []Package
-	for _, row := range rows {
+	packages := make([]Package, 0, len(rows))
+	for i := range rows {
+		row := &rows[i]
 		packages = append(packages, Package{
 			Name:        row.Name,
 			Epoch:       row.Epoch,
@@ -342,14 +353,15 @@ func (d *DB) List(ctx context.Context) ([]Package, error) {
 	return packages, nil
 }
 
-// LookupByName returns the package record with files and caps, or nil if not installed.
+// LookupByName returns the package record with files and caps.
+// Returns (nil, ErrNotFound) if no package matches name+arch.
 func (d *DB) LookupByName(ctx context.Context, name, arch string) (*Package, error) {
 	row, err := d.queries.LookupPackageByNameArch(ctx, db.LookupPackageByNameArchParams{
 		Name: name,
 		Arch: arch,
 	})
 	if stderrors.Is(err, sql.ErrNoRows) {
-		return nil, nil
+		return nil, ErrNotFound
 	}
 
 	if err != nil {
@@ -380,7 +392,7 @@ func (d *DB) LookupByName(ctx context.Context, name, arch string) (*Package, err
 	for _, f := range fileRows {
 		pkg.Files = append(pkg.Files, File{
 			Path:       f.Path,
-			Mode:       os.FileMode(f.Mode),
+			Mode:       os.FileMode(f.Mode), //nolint:gosec
 			IsDir:      f.IsDir != 0,
 			IsSymlink:  f.IsSymlink != 0,
 			LinkTarget: f.LinkTarget,

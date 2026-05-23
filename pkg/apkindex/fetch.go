@@ -4,7 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
-	"crypto/sha1" // #nosec G505 -- SHA1 required by APK format
+	"crypto/sha1" //nolint:gosec
 	"fmt"
 	"io"
 	"os"
@@ -108,7 +108,7 @@ func Update(ctx context.Context) (*Index, error) {
 
 // sha1Hex returns the hex-encoded SHA1 hash of a string.
 func sha1Hex(s string) string {
-	h := sha1.Sum([]byte(s)) // #nosec G401 -- SHA1 required by APK format
+	h := sha1.Sum([]byte(s)) //nolint:gosec
 	return fmt.Sprintf("%x", h)
 }
 
@@ -128,7 +128,7 @@ func downloadFile(ctx context.Context, url, destPath string, maxBytes int64) err
 // loadIndexTarball opens an APKINDEX.tar.gz, finds the APKINDEX entry,
 // and feeds it to idx.ParseIndex.
 func loadIndexTarball(idx *Index, path, repoBaseURL string) error {
-	f, err := os.Open(path) // #nosec G304 -- cache path
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return apperrors.Wrap(err, apperrors.ErrTypeFileSystem, "open tarball").
 			WithOperation("loadIndexTarball").

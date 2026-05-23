@@ -34,8 +34,10 @@ type installedFile struct {
 }
 
 // extractRPM opens an .rpm at path and extracts its CPIO payload to rootDir.
+//
+//nolint:unparam // opts kept for API symmetry with extractRPMWithHeader; current callers pass Options{}
 func extractRPM(ctx context.Context, path, rootDir string, opts Options) (*rpmEntry, error) {
-	f, err := os.Open(path) // #nosec G304 — path validated by caller
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open RPM file").
 			WithOperation("extractRPM").
@@ -63,6 +65,8 @@ const (
 
 // extractRPMWithHeader extracts an already-parsed RPM to rootDir using
 // rpmutils' own PayloadReader, which handles cpio framing internally.
+//
+//nolint:gocyclo,cyclop,nestif // RPM CPIO extraction has many distinct branches by entry type
 func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmutils.Rpm, _ Options) (*rpmEntry, error) {
 	if rootDir != "/" {
 		if _, err := os.Stat(rootDir); err != nil {
@@ -111,12 +115,11 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 			continue
 		}
 
-		mode := uint32(fi.Mode()) // #nosec G115
+		mode := uint32(fi.Mode()) //nolint:gosec
 		fileType := mode & rpmTypeMask
 		perm := os.FileMode(mode & 0o7777)
 
-		// #nosec G115 — RPM device/inode constrained by file format
-		inodeKey := (uint64(uint32(fi.Device())) << 32) | uint64(uint32(fi.Inode()))
+		inodeKey := (uint64(uint32(fi.Device())) << 32) | uint64(uint32(fi.Inode())) //nolint:gosec
 
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 			return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create parent directories").
@@ -203,7 +206,7 @@ func writeRegularFile(pr rpmutils.PayloadReader, targetPath string, perm os.File
 
 	tmpPath := targetPath + ".rpm-new"
 
-	f, err := os.Create(tmpPath) // #nosec G304 — derived from safeRPMPath
+	f, err := os.Create(tmpPath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary file").
 			WithOperation("extractCPIOEntry").

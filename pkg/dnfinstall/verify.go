@@ -24,7 +24,7 @@ var ErrUnsignedRPM = errors.New("dnfinstall: RPM has no signature")
 // ErrUnknownSigner is returned when a signature is present but was made by
 // a key not in the trust anchor. This is distinct from a cryptographically
 // invalid signature and is treated the same as ErrNoTrustAnchor for the
-// AllowUnverifiedRPMs opt-in: the RPM simply hasn't been trusted yet.
+// AllowUnverifiedRPMs opt-in: the RPM hasn't been trusted yet.
 var ErrUnknownSigner = errors.New("dnfinstall: signature made by unknown entity")
 
 // ErrInvalidSignature is returned when a signature is present and
@@ -42,6 +42,8 @@ var ErrNoTrustAnchor = errors.New("dnfinstall: no usable trust anchor for RPM ve
 // invalid sig) return nil with a warning logged.
 // If opts.KeyringPath is set, loads keys from that path (file OR directory).
 // Otherwise loads from /etc/pki/rpm-gpg/.
+//
+//nolint:gocyclo,cyclop // signature verification has many distinct error paths
 func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 	// Check context cancellation.
 	if err := ctx.Err(); err != nil {
@@ -62,8 +64,10 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 		if opts.AllowUnverifiedRPMs {
 			logger.Warn("RPM keyring not found, skipping verification",
 				"path", path, "keyring", trustPath)
+
 			return nil
 		}
+
 		return ErrNoTrustAnchor
 	}
 
@@ -73,8 +77,10 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 		if opts.AllowUnverifiedRPMs {
 			logger.Warn("failed to load RPM keyring, skipping verification",
 				"path", path, "keyring", trustPath, "error", err)
+
 			return nil
 		}
+
 		return err
 	}
 
@@ -82,13 +88,15 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 		if opts.AllowUnverifiedRPMs {
 			logger.Warn("no keys in RPM keyring, skipping verification",
 				"path", path, "keyring", trustPath)
+
 			return nil
 		}
+
 		return ErrNoTrustAnchor
 	}
 
 	// Open RPM file.
-	f, err := os.Open(path) // #nosec G304 — path is validated by caller
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return yaperrors.Wrap(err, yaperrors.ErrTypeFileSystem, "failed to open RPM file").
 			WithOperation("verifyRPMSignature").
@@ -106,6 +114,7 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 		if opts.AllowUnverifiedRPMs {
 			logger.Warn("RPM signature verification failed, skipping",
 				"path", path, "error", verifyErr)
+
 			return nil
 		}
 
@@ -115,11 +124,12 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 	}
 
 	// Verify that we got a signature.
-	if sigs == nil || len(sigs) == 0 {
+	if len(sigs) == 0 {
 		if opts.AllowUnverifiedRPMs {
 			logger.Warn("RPM is unsigned, skipping verification", "path", path)
 			return nil
 		}
+
 		return yaperrors.Wrap(ErrUnsignedRPM, yaperrors.ErrTypeValidation, "RPM is unsigned").
 			WithOperation("verifyRPMSignature").
 			WithContext("path", path)
@@ -127,6 +137,7 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 
 	// Log successful verification with signer info if available.
 	signerInfo := ""
+
 	if len(sigs) > 0 && sigs[0] != nil {
 		if sigs[0].PrimaryName != "" {
 			signerInfo = fmt.Sprintf(" by %s", sigs[0].PrimaryName)
@@ -134,6 +145,7 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 			signerInfo = fmt.Sprintf(" by %X", sigs[0].KeyId)
 		}
 	}
+
 	logger.Debug("RPM signature verified"+signerInfo, "path", filepath.Base(path))
 
 	return nil
@@ -199,6 +211,7 @@ func loadRPMKeyringDir(dir string) (openpgp.EntityList, error) {
 			// for the default trust dir.
 			logger.Debug("skipped unreadable keyring file",
 				"path", filepath.Join(dir, name), "error", err)
+
 			continue
 		}
 
@@ -211,9 +224,8 @@ func loadRPMKeyringDir(dir string) (openpgp.EntityList, error) {
 // loadRPMKeyringFile reads a single keyring, auto-detecting binary vs
 // ASCII-armored format. Tries armored first, falls back to binary.
 func loadRPMKeyringFile(path string) (openpgp.EntityList, error) {
-	// #nosec G304 — path comes from /etc/pki/rpm-gpg/ or opts.KeyringPath;
 	// trust boundary is at the Options struct.
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}

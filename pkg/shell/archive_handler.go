@@ -2,13 +2,13 @@
 package shell
 
 // archiveExecHandler intercepts archive-extraction commands inside build
-// scripts and replaces them with pure-Go implementations from pkg/archive
+// scripts and replaces them with in-process implementations from pkg/archive
 // and pkg/builders/common (stdlib archive/tar + archive/zip + compress/bzip2 +
 // klauspost/compress + ulikunitz/xz + bodgit/sevenzip + nwaples/rardecode).
 // This eliminates the need for the corresponding system binaries in build
 // containers.
 //
-// All handled formats are pure-Go (no binary needed):
+// All handled formats are dispatched in-process (no binary needed):
 //   - unzip       → stdlib archive/zip
 //   - jar         → stdlib archive/zip (JARs are zips)
 //   - gunzip/gzip → stdlib compress/gzip
@@ -61,7 +61,7 @@ const (
 )
 
 // archiveExecHandler returns an interp.ExecHandlerFunc that intercepts
-// archive-extraction commands and handles them with pure-Go code.
+// archive-extraction commands and handles them in-process.
 func archiveExecHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 	return func(ctx context.Context, args []string) error {
 		if len(args) == 0 {
@@ -193,7 +193,7 @@ func handleGunzip(ctx context.Context, args []string) error {
 		inputPath = filepath.Join(hc.Dir, inputPath)
 	}
 
-	f, err := os.Open(filepath.Clean(inputPath)) // #nosec G304 -- user-supplied build script path
+	f, err := os.Open(filepath.Clean(inputPath))
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "gunzip: open input").
 			WithOperation("handleGunzip")
@@ -211,8 +211,8 @@ func handleGunzip(ctx context.Context, args []string) error {
 
 	if toStdout {
 		logger.Info("archive handler: gunzip → stdout", "input", inputPath)
-		// #nosec G110 -- decompression of user-supplied build sources
-		_, err = io.Copy(hc.Stdout, gr)
+
+		_, err = io.Copy(hc.Stdout, gr) //nolint:gosec
 
 		return err
 	}
@@ -225,7 +225,7 @@ func handleGunzip(ctx context.Context, args []string) error {
 
 	logger.Info("archive handler: gunzip in-place", "input", inputPath, "output", outPath)
 
-	outFile, err := os.Create(filepath.Clean(outPath)) // #nosec G304
+	outFile, err := os.Create(filepath.Clean(outPath))
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "gunzip: create output").
 			WithOperation("handleGunzip")
@@ -233,7 +233,7 @@ func handleGunzip(ctx context.Context, args []string) error {
 
 	defer func() { _ = outFile.Close() }()
 
-	if _, err = io.Copy(outFile, gr); err != nil { // #nosec G110 -- decompression of build sources
+	if _, err = io.Copy(outFile, gr); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeBuild, "gunzip: decompress").
 			WithOperation("handleGunzip")
 	}
@@ -473,7 +473,7 @@ func handleRpm2Cpio(ctx context.Context, args []string) error {
 
 	logger.Info("archive handler: rpm2cpio", "archive", archivePath)
 
-	f, err := os.Open(filepath.Clean(archivePath)) // #nosec G304 -- user-supplied build script path
+	f, err := os.Open(filepath.Clean(archivePath))
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "rpm2cpio: open").
 			WithOperation("handleRpm2Cpio")

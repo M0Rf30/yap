@@ -353,7 +353,7 @@ func filterInstalledAPK(packages []string) []string {
 // apkInstalledSet parses the APK installed database and returns a set of
 // installed package names. Returns nil on read error.
 func apkInstalledSet(path string) map[string]bool {
-	f, err := os.Open(path) // #nosec G304 — constant path
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return nil
 	}
@@ -515,7 +515,7 @@ func (pkgBuild *PKGBUILD) GetDepends(
 		missingPackages = resolveVirtualPackages(missingPackages)
 	}
 
-	// Pure-Go installers — no subprocess fallback. If installation fails,
+	// In-process installers — no subprocess fallback. If installation fails,
 	// return an error so the user fixes their PKGBUILD or repos rather than
 	// silently falling back to a different code path.
 	switch packageManager {

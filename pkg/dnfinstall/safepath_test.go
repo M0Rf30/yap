@@ -1,4 +1,4 @@
-package dnfinstall
+package dnfinstall //nolint:testpackage
 
 import (
 	"testing"
@@ -140,10 +140,10 @@ func TestSafeRPMSymlinkTarget(t *testing.T) {
 	rootDir := "/tmp/fakeroot"
 
 	tests := []struct {
-		name      string
-		linkPath  string
-		target    string
-		wantErr   bool
+		name       string
+		linkPath   string
+		target     string
+		wantErr    bool
 		wantErrSub string
 	}{
 		{
@@ -198,10 +198,10 @@ func TestSafeRPMSymlinkTargetWithRootSlash(t *testing.T) {
 	rootDir := "/"
 
 	tests := []struct {
-		name      string
-		linkPath  string
-		target    string
-		wantErr   bool
+		name     string
+		linkPath string
+		target   string
+		wantErr  bool
 	}{
 		{
 			name:     "absolute target allowed",
@@ -222,7 +222,7 @@ func TestSafeRPMSymlinkTargetWithRootSlash(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:    "relative target resolves within root",
+			name:     "relative target resolves within root",
 			linkPath: "/bin/sh",
 			target:   "../../../../../../etc/passwd",
 			wantErr:  false, // resolves to /etc/passwd which is under /
