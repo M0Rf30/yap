@@ -29,26 +29,6 @@ const DefaultTimeout = 10 * time.Minute
 // ErrTooLarge is returned when a response body exceeds the configured cap.
 var ErrTooLarge = errors.New("httpclient: response body exceeds size cap")
 
-// HTTPStatusError is returned by CheckStatus when the response is not 2xx.
-// Callers can use errors.As to extract the status code without parsing the
-// Error() string.
-type HTTPStatusError struct {
-	Code int
-	URL  string
-}
-
-// Error returns the error message for HTTPStatusError.
-func (e *HTTPStatusError) Error() string {
-	return fmt.Sprintf("httpclient: HTTP %d for %s", e.Code, e.URL)
-}
-
-// IsClientError reports whether the status is in the 4xx range. Useful for
-// classifying transient repo failures (auth, rate-limit, not-found) as
-// non-fatal vs systemic failures (network, 5xx, disk full).
-func (e *HTTPStatusError) IsClientError() bool {
-	return e.Code >= 400 && e.Code < 500
-}
-
 var sharedClient = &http.Client{
 	Timeout: DefaultTimeout,
 	// Redirects: stdlib default (10) is fine.
@@ -80,7 +60,7 @@ func LimitedBodyN(resp *http.Response, maxBytes int64) io.Reader {
 // The caller still owns resp.Body.Close().
 func CheckStatus(resp *http.Response, fetchURL string) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &HTTPStatusError{Code: resp.StatusCode, URL: fetchURL}
+		return fmt.Errorf("httpclient: HTTP %d for %s", resp.StatusCode, fetchURL)
 	}
 
 	return nil

@@ -261,11 +261,7 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 // libavcodec.so has DT_NEEDED entries for libvpx.so / libx264.so which
 // come from sibling packages (carbonio-libvpx, carbonio-x264) the
 // PKGBUILD did not declare.
-func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
-	ctx context.Context,
-	deps []string,
-	targetArch string,
-) error {
+func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch string) error {
 	if bb.Format != constants.FormatDEB {
 		// Non-DEB formats: fall back to normal install (no cross-arch conflict).
 		// RPM/APK/Pacman don't have a multiarch install story like dpkg, so we
@@ -278,7 +274,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 
 		installArgs := constants.GetInstallArgs(bb.Format)
 
-		return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, deps)
+		return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, deps)
 	}
 
 	// Use the extract-safe partitioning: since we download+extract (not dpkg -i),
@@ -396,12 +392,7 @@ func countDirect(resolved []*aptcache.PackageInfo, seedSet map[string]bool) int 
 // arch-specific (target-arch) packages are installed — this satisfies
 // transitive dependencies that arch-specific packages may have on arch-all
 // packages (e.g. carbonio-openldap:arm64 → carbonio-core which is arch:all).
-func (bb *BaseBuilder) installCrossDeps(
-	ctx context.Context,
-	makeDepends,
-	installArgs []string,
-	targetArch string,
-) error {
+func (bb *BaseBuilder) installCrossDeps(makeDepends, installArgs []string, targetArch string) error {
 	archSpecific, archAll := partitionArchAllDeps(makeDepends)
 	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
 
@@ -416,12 +407,12 @@ func (bb *BaseBuilder) installCrossDeps(
 	// Install arch-all (host) packages first so they are available to
 	// satisfy transitive dependencies of the target-arch packages.
 	if len(archAll) > 0 {
-		if err := bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, archAll); err != nil {
+		if err := bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, archAll); err != nil {
 			return err
 		}
 	}
 
-	return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, qualified)
+	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, qualified)
 }
 
 // ensureCrossArchRepo registers the foreign architecture (dpkg

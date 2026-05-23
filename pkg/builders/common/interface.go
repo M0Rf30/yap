@@ -342,12 +342,11 @@ func getUpdateCommand(format string) string {
 // Prepare installs build dependencies using the appropriate package manager.
 // This consolidates duplicated Prepare methods across all builders.
 func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
-	ctx := context.Background()
 	installArgs := constants.GetInstallArgs(bb.Format)
 
 	// Non-cross-compile path: install makedepends directly.
 	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
-		return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, makeDepends)
+		return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, makeDepends)
 	}
 
 	logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
@@ -376,10 +375,10 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 	// used directly (the cross-compiler is pointed at them via PKG_CONFIG_PATH
 	// and CROSS_COMPILE set in SetupCrossCompilationEnvironment).
 	if bb.Format == constants.FormatDEB {
-		return bb.installCrossDeps(ctx, makeDepends, installArgs, targetArch)
+		return bb.installCrossDeps(makeDepends, installArgs, targetArch)
 	}
 
-	return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, makeDepends)
+	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, makeDepends)
 }
 
 // PrepareEnvironment sets up the build environment with necessary tools.
@@ -416,7 +415,6 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 		}
 	}
 
-	ctx := context.Background()
 	installArgs := constants.GetInstallArgs(bb.Format)
 	pm := getPackageManager(bb.Format)
 
@@ -429,7 +427,7 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 	// and only pacman/zypper still hit the subprocess. Mirrors what
 	// pkg/builders/common cross-deps does and avoids the prepare-time
 	// "unauthenticated packages" failure on apt-get with --repo flags.
-	if err := bb.PKGBUILD.GetDepends(ctx, pm, installArgs, deps); err != nil {
+	if err := bb.PKGBUILD.GetDepends(pm, installArgs, deps); err != nil {
 		return err
 	}
 
@@ -474,14 +472,12 @@ func (bb *BaseBuilder) refreshCcacheSymlinks() {
 // /var/lib/apt/lists/. Without it, apt silently skips those repos and
 // aptcache.Reload() cannot see their packages for arch classification.
 func (bb *BaseBuilder) Update() error {
-	ctx := context.Background()
-
 	cmd := getUpdateCommand(bb.Format)
 	if bb.Format == constants.FormatDEB {
-		return bb.PKGBUILD.GetUpdates(ctx, getPackageManager(bb.Format), cmd, "--allow-insecure-repositories")
+		return bb.PKGBUILD.GetUpdates(getPackageManager(bb.Format), cmd, "--allow-insecure-repositories")
 	}
 
-	return bb.PKGBUILD.GetUpdates(ctx, getPackageManager(bb.Format), cmd)
+	return bb.PKGBUILD.GetUpdates(getPackageManager(bb.Format), cmd)
 }
 
 // SetupCcache checks if ccache is available and configures the build environment to use it.

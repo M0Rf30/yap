@@ -1,7 +1,6 @@
 package pkgbuild
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -643,19 +642,19 @@ func TestPKGBUILD_GetDepends(t *testing.T) {
 	pb := &PKGBUILD{}
 
 	// Test with empty makeDepends slice - should not error
-	err := pb.GetDepends(context.Background(), "pacman", []string{}, []string{})
+	err := pb.GetDepends("pacman", []string{}, []string{})
 	if err != nil {
 		t.Errorf("GetDepends with empty makeDepends should not return error, got: %v", err)
 	}
 
 	// Test with invalid command - should return error
-	err = pb.GetDepends(context.Background(), "nonexistent-command-12345", []string{}, []string{"make"})
+	err = pb.GetDepends("nonexistent-command-12345", []string{}, []string{"make"})
 	if err == nil {
 		t.Error("GetDepends with invalid command should return error")
 	}
 
 	// Test with echo command - should return security error
-	err = pb.GetDepends(context.Background(), "echo", []string{"arg1"}, []string{"make", "gcc"})
+	err = pb.GetDepends("echo", []string{"arg1"}, []string{"make", "gcc"})
 	if err == nil {
 		t.Error("GetDepends with non-allowed command should return security error")
 	}
@@ -665,19 +664,19 @@ func TestPKGBUILD_GetUpdates(t *testing.T) {
 	pb := &PKGBUILD{}
 
 	// Test with non-allowed command (echo) - should return security error
-	err := pb.GetUpdates(context.Background(), "echo", "update")
+	err := pb.GetUpdates("echo", "update")
 	if err == nil {
 		t.Error("GetUpdates with non-allowed command should return security error")
 	}
 
 	// Test with no arguments - should still return security error for echo
-	err = pb.GetUpdates(context.Background(), "echo")
+	err = pb.GetUpdates("echo")
 	if err == nil {
 		t.Error("GetUpdates with non-allowed command should return security error")
 	}
 
 	// Test with invalid command - should return error
-	err = pb.GetUpdates(context.Background(), "nonexistent-command-12345")
+	err = pb.GetUpdates("nonexistent-command-12345")
 	if err == nil {
 		t.Error("GetUpdates with invalid command should return error")
 	}
