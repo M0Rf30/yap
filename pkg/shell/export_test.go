@@ -9,3 +9,17 @@ func ParseGunzipArgsForTesting(args []string) (inputPath string, toStdout, keepO
 func ParseJarArgsForTesting(args []string, defaultDir string) (archivePath, destDir string) {
 	return parseJarArgs(args, defaultDir)
 }
+
+// ExtractErrorLinesForTesting exposes extractErrorLines for unit tests.
+func ExtractErrorLinesForTesting(raw, fallback string) string {
+	return extractErrorLines(raw, fallback)
+}
+
+// NormalizeScriptContentForTesting exposes normalizeScriptContent for unit tests.
+func NormalizeScriptContentForTesting(script string) string {
+	return normalizeScriptContent(script)
+}
+
+// LogScriptResultForTesting exposes logScriptResult for unit tests.
+// Re-exported as a package-level function so tests in the same package can call it.
+var LogScriptResultForTesting = logScriptResult

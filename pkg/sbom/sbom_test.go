@@ -77,3 +77,34 @@ func TestGenerateEmptyFormats(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, generatedFiles)
 }
+
+func TestGenerateUnknownFormat(t *testing.T) {
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName: "testpkg",
+		PkgVer:  "1.0.0",
+	}
+
+	opts := sbom.Options{
+		Formats: []sbom.Format{"unknown"},
+	}
+
+	generatedFiles, err := sbom.Generate(pkg, "/tmp/artifact", opts)
+	require.NoError(t, err)
+	assert.Empty(t, generatedFiles)
+}
+
+func TestGenerateWriteError(t *testing.T) {
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName: "testpkg",
+		PkgVer:  "1.0.0",
+	}
+
+	// Use a path inside a non-existent directory so os.WriteFile fails.
+	opts := sbom.Options{
+		Formats: []sbom.Format{sbom.FormatCycloneDX, sbom.FormatSPDX},
+	}
+
+	generatedFiles, err := sbom.Generate(pkg, "/nonexistent/dir/artifact", opts)
+	require.NoError(t, err)
+	assert.Empty(t, generatedFiles)
+}

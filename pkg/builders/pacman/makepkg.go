@@ -86,6 +86,8 @@ func (m *Pkg) PrepareFakeroot(artifactsPath string, targetArch string) error {
 		return err
 	}
 
+	m.SetupCrossStripEnv(targetArch)
+
 	if err := m.ApplyOptions(); err != nil {
 		return err
 	}

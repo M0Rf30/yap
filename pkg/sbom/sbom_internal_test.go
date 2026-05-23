@@ -151,3 +151,96 @@ func TestGenerateSPDX(t *testing.T) {
 	assert.Equal(t, "MIT", mainPkg.LicenseConcluded)
 	assert.Equal(t, "MIT", mainPkg.LicenseDeclared)
 }
+
+func TestGetDownloadLocation(t *testing.T) {
+	t.Run("has SourceURI", func(t *testing.T) {
+		pkg := &pkgbuild.PKGBUILD{
+			SourceURI: []string{"https://example.com/pkg-1.0.tar.gz"},
+			URL:       "https://example.com",
+		}
+		assert.Equal(t, "https://example.com/pkg-1.0.tar.gz", getDownloadLocation(pkg))
+	})
+
+	t.Run("no SourceURI but has URL", func(t *testing.T) {
+		pkg := &pkgbuild.PKGBUILD{
+			URL: "https://example.com",
+		}
+		assert.Equal(t, "https://example.com", getDownloadLocation(pkg))
+	})
+
+	t.Run("neither SourceURI nor URL", func(t *testing.T) {
+		pkg := &pkgbuild.PKGBUILD{}
+		assert.Equal(t, "NOASSERTION", getDownloadLocation(pkg))
+	})
+}
+
+func TestGenerateCycloneDXEmptyDepName(t *testing.T) {
+	// A dep string like ">=1.0" has no name before the operator — should be skipped.
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName:     "testpkg",
+		PkgVer:      "1.0.0",
+		Depends:     []string{">=1.0"},
+		MakeDepends: []string{">=2.0"},
+	}
+
+	bom := generateCycloneDX(pkg)
+	require.NotNil(t, bom)
+
+	// No components should have been added for the empty-name deps.
+	assert.Empty(t, bom.Components)
+	// The dependency entry exists (pkg.Depends is non-empty) but has no resolved dep names.
+	if len(bom.Dependencies) > 0 {
+		assert.Empty(t, bom.Dependencies[0].Depends)
+	}
+}
+
+func TestGenerateSPDXNoLicense(t *testing.T) {
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName: "testpkg",
+		PkgVer:  "1.0.0",
+		License: []string{}, // empty — should produce NOASSERTION
+	}
+
+	doc := generateSPDX(pkg)
+	require.NotNil(t, doc)
+	require.NotEmpty(t, doc.Packages)
+
+	mainPkg := doc.Packages[0]
+	assert.Equal(t, "NOASSERTION", mainPkg.LicenseConcluded)
+	assert.Equal(t, "NOASSERTION", mainPkg.LicenseDeclared)
+}
+
+func TestGenerateSPDXMakeDepsDeduplicated(t *testing.T) {
+	// "gcc" appears in both Depends and MakeDepends — should only be added once.
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName:     "testpkg",
+		PkgVer:      "1.0.0",
+		Depends:     []string{"gcc"},
+		MakeDepends: []string{"gcc", "cmake"},
+	}
+
+	doc := generateSPDX(pkg)
+	require.NotNil(t, doc)
+
+	// Count packages named "gcc".
+	gccCount := 0
+
+	for _, p := range doc.Packages {
+		if p.Name == "gcc" {
+			gccCount++
+		}
+	}
+
+	assert.Equal(t, 1, gccCount, "gcc should appear exactly once even though it is in both Depends and MakeDepends")
+
+	// cmake should still be present.
+	cmakeFound := false
+
+	for _, p := range doc.Packages {
+		if p.Name == "cmake" {
+			cmakeFound = true
+		}
+	}
+
+	assert.True(t, cmakeFound)
+}

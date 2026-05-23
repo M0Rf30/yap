@@ -25,3 +25,8 @@ func (r *Runtime) Pull(distro string) error {
 func (r *Runtime) Run(distro, workDir string, args []string) error {
 	return RunInRootless(distro, workDir, args)
 }
+
+// RunShell executes a shell command string inside the distro rootfs.
+func (r *Runtime) RunShell(distro, workDir, shellCmd string) error {
+	return RunInRootless(distro, workDir, []string{"/bin/sh", "-c", shellCmd})
+}

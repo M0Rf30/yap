@@ -107,13 +107,14 @@ var buildCmd = &cobra.Command{
 				distroTag = distro + "-" + release
 			}
 
-			// Pass sub-command + distro + workspace path.
-			// The container ENTRYPOINT is "yap", so we pass args only.
-			// YAP_IN_CONTAINER=1 (injected by the runtime) prevents re-dispatch.
-			// -s skips apt-get update (already done by prepare).
-			// -d skips makedep installation (handled by prepare).
-			subArgs := []string{buildCommand, distroTag, "/workspace", "-s", "-d"}
-			if RunCommandInContainer(distroTag, fullJSONPath, subArgs) {
+			// Run prepare+build in a single container invocation so makedeps
+			// installed by prepare are available to build. Skip prepare only
+			// when the user explicitly requested -s (skip-sync) or -d (no-makedeps),
+			// which implies they have already prepared the environment.
+			skipPrepare := buildOpts.SkipSyncDeps || buildOpts.NoMakeDeps
+			buildArgs := []string{buildCommand, distroTag, "/workspace"}
+
+			if RunPipelineInContainer(distroTag, fullJSONPath, buildArgs, skipPrepare) {
 				return nil
 			}
 		}

@@ -87,3 +87,32 @@ func TestGraphCommandFlags(t *testing.T) {
 		assert.False(t, showExternal)
 	})
 }
+
+func TestInitializeGraphDescriptions(t *testing.T) {
+	InitializeGraphDescriptions()
+	assert.NotEmpty(t, graphCmd.Short, "graphCmd.Short should be non-empty after InitializeGraphDescriptions")
+}
+
+func TestRunGraphCommandInvalidPath(t *testing.T) {
+	// Reset flags
+	graphOutput = ""
+	graphFormat = "svg"
+	graphTheme = "gradient"
+	showExternal = false
+
+	err := runGraphCommand(graphCmd, []string{"/nonexistent/path/that/does/not/exist/xyz123"})
+	assert.Error(t, err, "runGraphCommand should return error for invalid project path")
+}
+
+func TestRunGraphCommandNoYapJSON(t *testing.T) {
+	// Reset flags
+	graphOutput = ""
+	graphFormat = "svg"
+	graphTheme = "gradient"
+	showExternal = false
+
+	// Create a temp dir with no yap.json
+	tmpDir := t.TempDir()
+	err := runGraphCommand(graphCmd, []string{tmpDir})
+	assert.Error(t, err, "runGraphCommand should return error when no yap.json present")
+}

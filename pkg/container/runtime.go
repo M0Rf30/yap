@@ -27,7 +27,13 @@ type Runtime interface {
 
 	// Run executes the given command inside the distro container, mounting
 	// workDir as /workspace inside the container.
+	// args are passed directly to the container ENTRYPOINT.
 	Run(distro, workDir string, args []string) error
+
+	// RunShell executes a shell command string inside the distro container,
+	// overriding the ENTRYPOINT with /bin/sh -c. Use this to chain multiple
+	// yap sub-commands in a single container invocation.
+	RunShell(distro, workDir, shellCmd string) error
 
 	// Type returns the runtime identifier.
 	Type() RuntimeType

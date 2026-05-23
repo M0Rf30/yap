@@ -51,7 +51,13 @@ type OSRelease struct {
 // VERSION_CODENAME field so that callers can resolve distro-codename-specific
 // PKGBUILD directives such as depends__ubuntu_jammy.
 func ParseOSRelease() (OSRelease, error) {
-	file, err := os.Open("/etc/os-release")
+	return parseOSReleaseFile("/etc/os-release")
+}
+
+// parseOSReleaseFile reads and parses the os-release file at the given path.
+// Extracted from ParseOSRelease to allow testing with arbitrary files.
+func parseOSReleaseFile(path string) (OSRelease, error) {
+	file, err := os.Open(path) // #nosec G304 -- path is either /etc/os-release or a test temp file
 	if err != nil {
 		return OSRelease{}, errors.Wrap(err, errors.ErrTypeFileSystem,
 			i18n.T("errors.platform.open_os_release_failed")).
