@@ -10,6 +10,8 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
+const languageFlag = "--language"
+
 var (
 	verbose  bool
 	noColor  bool
@@ -45,7 +47,7 @@ func ParseLanguageFlag() {
 		var lang string
 
 		switch {
-		case arg == "-l" || arg == "--language":
+		case arg == "-l" || arg == languageFlag:
 			if i+1 < len(args) {
 				lang = args[i+1]
 			}

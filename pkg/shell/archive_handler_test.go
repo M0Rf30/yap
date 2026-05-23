@@ -250,3 +250,304 @@ func TestArchiveHandler_Rpm2Cpio(t *testing.T) {
 	// The actual rpm2cpio handler is tested via integration with archive.ExtractRPM
 	t.Skip("rpm2cpio test requires complex RPM creation; covered by archive.ExtractRPM tests")
 }
+
+// TestParseGunzipArgs tests the parseGunzipArgs function with various argument combinations.
+func TestParseGunzipArgs(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantPath   string
+		wantStdout bool
+		wantKeep   bool
+	}{
+		{
+			name:       "simple file",
+			args:       []string{"gunzip", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: false,
+			wantKeep:   false,
+		},
+		{
+			name:       "stdout flag -c",
+			args:       []string{"gunzip", "-c", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: true,
+			wantKeep:   false,
+		},
+		{
+			name:       "stdout flag --stdout",
+			args:       []string{"gunzip", "--stdout", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: true,
+			wantKeep:   false,
+		},
+		{
+			name:       "stdout flag --to-stdout",
+			args:       []string{"gunzip", "--to-stdout", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: true,
+			wantKeep:   false,
+		},
+		{
+			name:       "keep flag -k",
+			args:       []string{"gunzip", "-k", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: false,
+			wantKeep:   true,
+		},
+		{
+			name:       "keep flag --keep",
+			args:       []string{"gunzip", "--keep", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: false,
+			wantKeep:   true,
+		},
+		{
+			name:       "decompress flag -d",
+			args:       []string{"gunzip", "-d", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: false,
+			wantKeep:   false,
+		},
+		{
+			name:       "decompress flag --decompress",
+			args:       []string{"gunzip", "--decompress", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: false,
+			wantKeep:   false,
+		},
+		{
+			name:       "combined flags -dc",
+			args:       []string{"gunzip", "-dc", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: true,
+			wantKeep:   false,
+		},
+		{
+			name:       "combined flags -ck",
+			args:       []string{"gunzip", "-ck", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: true,
+			wantKeep:   true,
+		},
+		{
+			name:       "combined flags -dck",
+			args:       []string{"gunzip", "-dck", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: true,
+			wantKeep:   true,
+		},
+		{
+			name:       "no file specified",
+			args:       []string{"gunzip"},
+			wantPath:   "",
+			wantStdout: false,
+			wantKeep:   false,
+		},
+		{
+			name:       "gzip command",
+			args:       []string{"gzip", "-c", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: true,
+			wantKeep:   false,
+		},
+		{
+			name:       "multiple files (first is used)",
+			args:       []string{"gunzip", "file1.gz", "file2.gz"},
+			wantPath:   "file1.gz",
+			wantStdout: false,
+			wantKeep:   false,
+		},
+		{
+			name:       "flags before file",
+			args:       []string{"gunzip", "-c", "-k", "file.gz"},
+			wantPath:   "file.gz",
+			wantStdout: true,
+			wantKeep:   true,
+		},
+		{
+			name:       "flags after file",
+			args:       []string{"gunzip", "file.gz", "-c"},
+			wantPath:   "file.gz",
+			wantStdout: true,
+			wantKeep:   false,
+		},
+		{
+			name:       "absolute path",
+			args:       []string{"gunzip", "/tmp/file.gz"},
+			wantPath:   "/tmp/file.gz",
+			wantStdout: false,
+			wantKeep:   false,
+		},
+		{
+			name:       "relative path with subdirs",
+			args:       []string{"gunzip", "subdir/file.gz"},
+			wantPath:   "subdir/file.gz",
+			wantStdout: false,
+			wantKeep:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path, stdout, keep := ParseGunzipArgsForTesting(tt.args)
+			if path != tt.wantPath {
+				t.Errorf("inputPath: got %q, want %q", path, tt.wantPath)
+			}
+
+			if stdout != tt.wantStdout {
+				t.Errorf("toStdout: got %v, want %v", stdout, tt.wantStdout)
+			}
+
+			if keep != tt.wantKeep {
+				t.Errorf("keepOrig: got %v, want %v", keep, tt.wantKeep)
+			}
+		})
+	}
+}
+
+// TestParseJarArgs tests the parseJarArgs function with various argument combinations.
+func TestParseJarArgs(t *testing.T) {
+	const defaultDir = "/default/dir"
+
+	tests := []struct {
+		name        string
+		args        []string
+		defaultDir  string
+		wantArchive string
+		wantDestDir string
+	}{
+		{
+			name:        "simple xf",
+			args:        []string{"jar", "xf", "archive.jar"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "with dash prefix -xf",
+			args:        []string{"jar", "-xf", "archive.jar"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "with -C destination",
+			args:        []string{"jar", "xf", "archive.jar", "-C", "/dest"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: "/dest",
+		},
+		{
+			name:        "with --file= long option",
+			args:        []string{"jar", "x", "--file=archive.jar"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "no archive (missing f flag)",
+			args:        []string{"jar", "x"},
+			defaultDir:  defaultDir,
+			wantArchive: "",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "f flag but no file argument",
+			args:        []string{"jar", "xf"},
+			defaultDir:  defaultDir,
+			wantArchive: "",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "with file filters",
+			args:        []string{"jar", "xf", "archive.jar", "META-INF/*", "com/example/*"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "absolute archive path",
+			args:        []string{"jar", "xf", "/tmp/archive.jar"},
+			defaultDir:  defaultDir,
+			wantArchive: "/tmp/archive.jar",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "relative archive path",
+			args:        []string{"jar", "xf", "subdir/archive.jar"},
+			defaultDir:  defaultDir,
+			wantArchive: "subdir/archive.jar",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "combined flags xf",
+			args:        []string{"jar", "xf", "archive.jar"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "-C with relative path",
+			args:        []string{"jar", "xf", "archive.jar", "-C", "relative/dest"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: "relative/dest",
+		},
+		{
+			name:        "multiple -C (last wins)",
+			args:        []string{"jar", "xf", "archive.jar", "-C", "/first", "-C", "/second"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: "/second",
+		},
+		{
+			name:        "--file= with -C",
+			args:        []string{"jar", "x", "--file=archive.jar", "-C", "/dest"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: "/dest",
+		},
+		{
+			name:        "empty archive name",
+			args:        []string{"jar", "xf", ""},
+			defaultDir:  defaultDir,
+			wantArchive: "",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "extract mode without f flag",
+			args:        []string{"jar", "x", "archive.jar"},
+			defaultDir:  defaultDir,
+			wantArchive: "",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "long option --extract (skipped, needs xf after)",
+			args:        []string{"jar", "--extract", "xf", "archive.jar"},
+			defaultDir:  defaultDir,
+			wantArchive: "",
+			wantDestDir: defaultDir,
+		},
+		{
+			name:        "flags and positional mixed",
+			args:        []string{"jar", "-xf", "archive.jar", "-C", "/dest", "file1", "file2"},
+			defaultDir:  defaultDir,
+			wantArchive: "archive.jar",
+			wantDestDir: "/dest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			archive, destDir := ParseJarArgsForTesting(tt.args, tt.defaultDir)
+			if archive != tt.wantArchive {
+				t.Errorf("archivePath: got %q, want %q", archive, tt.wantArchive)
+			}
+
+			if destDir != tt.wantDestDir {
+				t.Errorf("destDir: got %q, want %q", destDir, tt.wantDestDir)
+			}
+		})
+	}
+}

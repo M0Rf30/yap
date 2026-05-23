@@ -119,6 +119,7 @@ func TestPKGBUILD_ComputeArchitecture(t *testing.T) {
 
 	// Test "any" architecture
 	pb.Arch = []string{"any"}
+
 	err := pb.ComputeArchitecture()
 	if err != nil {
 		t.Errorf("ComputeArchitecture returned error: %v", err)
@@ -130,6 +131,7 @@ func TestPKGBUILD_ComputeArchitecture(t *testing.T) {
 
 	// Test with x86_64 (assuming this is the current architecture)
 	pb.Arch = []string{"x86_64", "amd64"}
+
 	err = pb.ComputeArchitecture()
 	if err != nil {
 		t.Errorf("ComputeArchitecture returned error: %v", err)

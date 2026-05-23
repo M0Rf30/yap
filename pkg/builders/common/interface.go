@@ -484,23 +484,6 @@ func (bb *BaseBuilder) Update() error {
 	return bb.PKGBUILD.GetUpdates(ctx, getPackageManager(bb.Format), cmd)
 }
 
-// SetupCcache checks if ccache is available and configures the build environment to use it.
-// This function sets up environment variables to enable ccache for faster compilation.
-// It uses a mutex to serialize access to os.Setenv to prevent race conditions in parallel builds.
-//
-// Idempotent: returns immediately if YAP_CCACHE_SETUP is already set. The
-// ccache configuration is process-global (os.Setenv), so re-running it for
-// every package in a yap.json iteration only produces redundant log lines
-// and pointless envMutex contention.
-//
-// Note: SetupCcache and SetupCrossCompilationEnvironment write to the same
-// CC/CXX variables. When both are needed for a build, the call site invokes
-// SetupCcache first, then SetupCrossCompilationEnvironment, which overwrites
-// CC/CXX with the cross-compiler and relies on CCACHE_PREFIX to wrap it.
-// The memoization here is per-process, so a yap.json batch that mixes
-// cross- and non-cross-arch builds will not re-run ccache setup between
-// them — that pattern was already racy with the process-global os.Setenv
-// approach and is tracked separately.
 // BuildCcacheEnvSlice returns ccache environment variables as a "KEY=VALUE" slice
 // for safe concurrent use. Unlike SetupCcache, it does NOT mutate the process
 // environment (no os.Setenv calls). Returns nil if ccache is not available.
@@ -529,6 +512,24 @@ func (bb *BaseBuilder) BuildCcacheEnvSlice() []string {
 	}
 }
 
+// SetupCcache configures the build environment to use ccache if available.
+// It checks if ccache is available and sets up environment variables to enable
+// ccache for faster compilation. Uses a mutex to serialize access to os.Setenv
+// to prevent race conditions in parallel builds.
+//
+// Idempotent: returns immediately if YAP_CCACHE_SETUP is already set. The
+// ccache configuration is process-global (os.Setenv), so re-running it for
+// every package in a yap.json iteration only produces redundant log lines
+// and pointless envMutex contention.
+//
+// Note: SetupCcache and SetupCrossCompilationEnvironment write to the same
+// CC/CXX variables. When both are needed for a build, the call site invokes
+// SetupCcache first, then SetupCrossCompilationEnvironment, which overwrites
+// CC/CXX with the cross-compiler and relies on CCACHE_PREFIX to wrap it.
+// The memoization here is per-process, so a yap.json batch that mixes
+// cross- and non-cross-arch builds will not re-run ccache setup between
+// them — that pattern was already racy with the process-global os.Setenv
+// approach and is tracked separately.
 func (bb *BaseBuilder) SetupCcache() error {
 	// Already configured for this process — skip.
 	if os.Getenv("YAP_CCACHE_SETUP") == "1" {

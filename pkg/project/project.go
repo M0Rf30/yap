@@ -342,8 +342,6 @@ func (mpc *MultipleProject) installRuntimeDeps(ctx context.Context, runtimeDepen
 	return extractor.DownloadAndExtractCrossDeps(ctx, runtimeDepends, mpc.Opts.TargetArch)
 }
 
-
-
 // MultiProject is a function that performs multiple project operations.
 //
 // It takes in the following parameters:
@@ -396,6 +394,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	mpc.runtimeDepends = mpc.getRuntimeDeps()
 
 	ctx := context.Background()
+
 	err = mpc.syncDependencies(ctx, mpc.makeDepends, mpc.runtimeDepends)
 	if err != nil {
 		return err
@@ -405,12 +404,6 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	// This prevents data races in createPackage when called from parallel workers
 	return mpc.resolveOutputPath()
 }
-
-
-
-
-
-
 
 // doInstallOrExtract performs the actual package extraction.
 // All packers implement InstallOrExtractor and always extract to sysroot.
@@ -445,12 +438,6 @@ func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, work
 
 	return nil
 }
-
-
-
-
-
-
 
 // createPackage creates packages for the MultipleProject.
 //
@@ -575,8 +562,6 @@ func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
 	return nil
 }
 
-
-
 // installPackage installs a single package or extracts it for cross-compilation.
 func (mpc *MultipleProject) installPackage(proj *Project) error {
 	pkgName := proj.Builder.PKGBUILD.PkgName
@@ -666,12 +651,6 @@ func (mpc *MultipleProject) getRuntimeDeps() []string {
 	return result
 }
 
-
-
-
-
-
-
 // cleanZapArtifacts removes build artifacts for a project when Zap is enabled
 func (mpc *MultipleProject) cleanZapArtifacts(proj *Project) error {
 	// For single projects, StartDir is the actual project directory containing
@@ -728,7 +707,3 @@ func (mpc *MultipleProject) removeBuildArtifacts(dir string) error {
 
 	return nil
 }
-
-
-
-

@@ -12,13 +12,13 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
+	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/repo"
-	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // readProject reads the project file at the specified path
