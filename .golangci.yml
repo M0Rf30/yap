@@ -86,7 +86,7 @@ linters:
 
     forbidigo:
       forbid:
-        - p: ^fmt\.Errorf\(
+        - pattern: ^fmt\.Errorf$
           msg: "use pkg/errors.Wrap / errors.New per AGENTS.md instead of fmt.Errorf"
 
     lll:

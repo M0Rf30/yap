@@ -58,9 +58,16 @@ type Options struct {
 // Callers needing explicit control (sandboxed RootDir, suppressed ldconfig,
 // etc.) should call InstallWithOptions directly.
 func Install(ctx context.Context, names []string) error {
+	privileged := platform.IsPrivilegedHost()
 	return InstallWithOptions(ctx, names, Options{
 		RunLDConfig:      true,
-		AllowRootInstall: platform.IsPrivilegedHost(),
+		AllowRootInstall: privileged,
+		// Inside a yap build container repo metadata trust is established at
+		// fetch time (Release/repomd verified). Package-level GPG keyrings
+		// for third-party repos (EPEL, RPM Fusion, modules) are frequently
+		// missing in minimal Rocky/Alma/RHEL images and would block legitimate
+		// builds. Privileged-host = trusted-CI context → allow.
+		AllowUnverifiedRPMs: privileged,
 	})
 }
 

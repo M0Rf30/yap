@@ -172,18 +172,32 @@ func TestDownloadAndInstallContextCancellation(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestDownloadRPMNotImplemented tests downloadRPM returns not implemented error.
-func TestDownloadRPMNotImplemented(t *testing.T) {
+// TestDownloadRPMNilPackage tests downloadRPM rejects a nil package.
+func TestDownloadRPMNilPackage(t *testing.T) {
 	ctx := context.Background()
-	pkg := &dnfcache.PackageInfo{Name: "test-pkg"}
+	tmpDir := t.TempDir()
+
+	path, err := downloadRPM(ctx, nil, nil, tmpDir)
+
+	assert.Error(t, err)
+	assert.Empty(t, path)
+	assert.Contains(t, err.Error(), "nil package")
+}
+
+// TestDownloadRPMInvalidURL tests downloadRPM surfaces network errors from dnfcache.
+func TestDownloadRPMInvalidURL(t *testing.T) {
+	ctx := context.Background()
+	pkg := &dnfcache.PackageInfo{
+		Name:         "test-pkg",
+		BaseURL:      "http://127.0.0.1:1/",
+		LocationHref: "test-pkg.rpm",
+	}
 	tmpDir := t.TempDir()
 
 	path, err := downloadRPM(ctx, nil, pkg, tmpDir)
 
-	// Should return not implemented error.
 	assert.Error(t, err)
 	assert.Empty(t, path)
-	assert.Contains(t, err.Error(), "not implemented")
 }
 
 // TestDownloadRPMContextCancellation tests downloadRPM with a cancelled context.
