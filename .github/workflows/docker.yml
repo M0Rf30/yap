@@ -23,17 +23,19 @@ env:
   GO_VERSION: "1.26.1"
 
 jobs:
-  # Generate matrix for all OS builds
+  # Generate matrix for base OS builds
   matrix-prep:
     name: 📋 Prepare Build Matrix
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      matrix-g: ${{ steps.set-matrix.outputs.matrix-g }}
     steps:
       - name: 📋 Set matrix
         id: set-matrix
         run: |
-          echo 'matrix=["alpine","rocky-8","rocky-9","rocky-10","ubuntu-jammy","ubuntu-noble", "ubuntu-resolute"]' >> "$GITHUB_OUTPUT"
+          echo 'matrix=["alpine","arch","rocky-8","rocky-9","rocky-10","ubuntu-jammy","ubuntu-noble","ubuntu-resolute"]' >> "$GITHUB_OUTPUT"
+          echo 'matrix-g=["alpine-g","arch-g","rocky-8-g","rocky-9-g","rocky-10-g","ubuntu-jammy-g","ubuntu-noble-g","ubuntu-resolute-g"]' >> "$GITHUB_OUTPUT"
 
   # Build each OS image
   docker-build:
@@ -135,3 +137,102 @@ jobs:
             VERSION=${{ github.ref_name }}
             BUILD_TIME=${{ github.run_id }}
             COMMIT=${{ github.sha }}
+
+  # Build prepared (-g) images after base images are pushed
+  docker-build-g:
+    name: 🐳 ${{ matrix.os }}
+    needs: [matrix-prep, docker-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Only run on push (not PRs) since base images must be available in registry
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(needs.matrix-prep.outputs.matrix-g) }}
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
+          config: .hadolint.yml
+          output-file: hadolint-${{ matrix.os }}.sarif
+          format: sarif
+
+      - name: 📋 Upload Hadolint results
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: hadolint-${{ matrix.os }}.sarif
+          wait-for-processing: true
+          category: hadolint-${{ matrix.os }}
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: 🔐 Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔐 Log in to Docker Hub
+        continue-on-error: true
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 📋 Prepare image list
+        id: images
+        run: |
+          IMAGES="${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.os }}"
+          if [ -n "${{ secrets.DOCKER_USERNAME }}" ]; then
+            IMAGES="$IMAGES
+          ${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}"
+          fi
+          echo "list<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$IMAGES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: 📋 Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.images.outputs.list }}
+          labels: |
+            maintainer=M0Rf30
+            org.opencontainers.image.authors=M0Rf30
+            org.opencontainers.image.title=yap-${{ matrix.os }}
+            org.opencontainers.image.description=YAP - Yet Another Packager for ${{ matrix.os }} with Go toolchain
+            org.opencontainers.image.vendor=M0Rf30
+          tags: |
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: 🔨 Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: build/deploy/${{ matrix.os }}/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            REGISTRY=${{ env.REGISTRY }}/${{ github.repository_owner }}/yap
+            BASE_TAG=${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+            VERSION=${{ github.ref_name }}
