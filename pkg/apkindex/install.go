@@ -96,10 +96,13 @@ func (idx *Index) InstallPackagesWithOptions(
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	for _, p := range toInstall {
-		if _, err := idx.DownloadPackage(ctx, tmpDir, p.Name); err != nil {
-			return fmt.Errorf("apkindex: download %s: %w", p.Name, err)
-		}
+	pkgNames := make([]string, len(toInstall))
+	for i, p := range toInstall {
+		pkgNames[i] = p.Name
+	}
+
+	if _, downloadErr := idx.DownloadPackages(ctx, tmpDir, pkgNames); downloadErr != nil {
+		return downloadErr
 	}
 
 	// 4. Extract each .apk to / and register in installed DB.
@@ -327,23 +330,45 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 		// Regular file. Cap per-file size at 2 GiB.
 		const maxFileSize = 2 << 30
 
-		f, err := os.Create(targetPath) // #nosec G304 — targetPath is constrained by safeAPKPath
+		// Write to a sibling temp file then atomically rename over the
+		// target. This avoids ETXTBSY ("text file busy") when overwriting
+		// a binary that is currently being executed — the kernel allows
+		// unlinking a running binary but rejects truncate/write on it.
+		// Busybox-style images symlink many tools to /bin/busybox, and
+		// /bin/tar (the very tool we shell out to during the install
+		// pipeline elsewhere) is one of them, so this matters in practice.
+		tmpPath := targetPath + ".apk-new"
+
+		f, err := os.Create(tmpPath) // #nosec G304 — derived from safeAPKPath
 		if err != nil {
 			return fmt.Errorf("create file: %w", err)
 		}
 
 		if _, err := io.Copy(f, io.LimitReader(tr, maxFileSize)); err != nil {
 			_ = f.Close()
+			_ = os.Remove(tmpPath)
+
 			return fmt.Errorf("copy file: %w", err)
 		}
 
 		if err := f.Close(); err != nil {
+			_ = os.Remove(tmpPath)
+
 			return fmt.Errorf("close file: %w", err)
 		}
 
-		// Preserve permissions.
-		if err := os.Chmod(targetPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
+		// Preserve permissions before the rename so the file is in its
+		// final state when it becomes visible at targetPath.
+		if err := os.Chmod(tmpPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
+			_ = os.Remove(tmpPath)
+
 			return fmt.Errorf("chmod: %w", err)
+		}
+
+		if err := os.Rename(tmpPath, targetPath); err != nil {
+			_ = os.Remove(tmpPath)
+
+			return fmt.Errorf("rename file: %w", err)
 		}
 
 	case tar.TypeDir:

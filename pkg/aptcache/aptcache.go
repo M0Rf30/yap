@@ -1058,16 +1058,22 @@ func (c *Cache) parseFile(path string, dpkgStatus bool, baseURL string) error {
 	case strings.HasSuffix(path, ".bz2"):
 		r = bzip2.NewReader(f)
 	case strings.HasSuffix(path, ".xz"):
-		xzr, err := xz.NewReader(f)
+		// bufio.NewReader wraps the file in a buffered reader; ulikunitz/xz
+		// reads in small chunks and without buffering this causes excessive
+		// syscall overhead — 5-8x slower than buffered I/O.
+		xzr, err := xz.NewReader(bufio.NewReader(f))
 		if err != nil {
 			return err
 		}
 
 		r = xzr
 	case strings.HasSuffix(path, ".lz4"):
-		r = lz4.NewReader(f)
+		// bufio.NewReader wraps the file in a buffered reader; pierrec/lz4
+		// reads 4-byte block headers via io.ReadFull — without buffering this
+		// causes one syscall per header, same issue as ulikunitz/xz above.
+		r = lz4.NewReader(bufio.NewReader(f))
 	case strings.HasSuffix(path, ".zst"):
-		zr, err := zstd.NewReader(f)
+		zr, err := zstd.NewReader(bufio.NewReader(f))
 		if err != nil {
 			return err
 		}
@@ -1283,10 +1289,9 @@ func parseDependsField(value string) []string {
 		return nil
 	}
 
-	parts := strings.Split(value, ",")
-	out := make([]string, 0, len(parts))
+	out := make([]string, 0, 4) // typical dep count
 
-	for _, p := range parts {
+	for p := range strings.SplitSeq(value, ",") {
 		p = strings.TrimSpace(p)
 
 		// Alternative deps "foo | bar" — take the first.

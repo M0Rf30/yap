@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
 
+	apperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -256,7 +256,7 @@ func fetchAllRepos(ctx context.Context) error {
 			// existing on-disk cache for that repo is still usable. Only
 			// propagate errors that indicate a systemic problem (network
 			// failure, disk full, etc.).
-			if firstErr == nil && !isHTTPClientError(res.err) {
+			if firstErr == nil && !isNonFatalRepoError(res.err) {
 				firstErr = res.err
 			}
 		}
@@ -273,14 +273,18 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 	if baseURL == "" && repo.MirrorList != "" {
 		resolved, err := resolveMirrorList(ctx, expandRepoVars(repo.MirrorList))
 		if err != nil {
-			return fmt.Errorf("dnfcache: resolve mirrorlist for %s: %w", repo.ID, err)
+			return apperrors.Wrap(err, apperrors.ErrTypeNetwork, "resolve mirrorlist").
+				WithOperation("fetchRepo").
+				WithContext("repo_id", repo.ID)
 		}
 
 		baseURL = resolved
 	}
 
 	if baseURL == "" {
-		return fmt.Errorf("dnfcache: no baseurl or mirrorlist for repo %s", repo.ID)
+		return apperrors.New(apperrors.ErrTypeConfiguration, "no baseurl or mirrorlist for repo").
+			WithOperation("fetchRepo").
+			WithContext("repo_id", repo.ID)
 	}
 
 	baseURL = strings.TrimSuffix(baseURL, "/")
@@ -288,12 +292,16 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 
 	repomdData, err := fetchBytes(ctx, repomdURL)
 	if err != nil {
-		return fmt.Errorf("fetch repomd.xml for %s: %w", repo.ID, err)
+		return apperrors.Wrap(err, apperrors.ErrTypeNetwork, "fetch repomd.xml").
+			WithOperation("fetchRepo").
+			WithContext("repo_id", repo.ID)
 	}
 
 	var rmd repoMD
 	if err := xml.Unmarshal(repomdData, &rmd); err != nil {
-		return fmt.Errorf("parse repomd.xml for %s: %w", repo.ID, err)
+		return apperrors.Wrap(err, apperrors.ErrTypeParser, "parse repomd.xml").
+			WithOperation("fetchRepo").
+			WithContext("repo_id", repo.ID)
 	}
 
 	// Find the primary data entry.
@@ -311,7 +319,9 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 	}
 
 	if primaryHref == "" {
-		return fmt.Errorf("dnfcache: no primary data in repomd.xml for %s", repo.ID)
+		return apperrors.New(apperrors.ErrTypeParser, "no primary data in repomd.xml").
+			WithOperation("fetchRepo").
+			WithContext("repo_id", repo.ID)
 	}
 
 	primaryURL := baseURL + "/" + strings.TrimPrefix(primaryHref, "/")
@@ -332,7 +342,9 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 	destFile := filepath.Join(repoCache, filepath.Base(primaryHref))
 
 	if err := downloadVerified(ctx, primaryURL, destFile, primarySHA256); err != nil {
-		return fmt.Errorf("download primary.xml for %s: %w", repo.ID, err)
+		return apperrors.Wrap(err, apperrors.ErrTypeNetwork, "download primary.xml").
+			WithOperation("fetchRepo").
+			WithContext("repo_id", repo.ID)
 	}
 
 	if fi, statErr := os.Stat(destFile); statErr == nil {
@@ -374,7 +386,9 @@ func resolveMirrorList(ctx context.Context, mirrorListURL string) (string, error
 
 	// Metalink XML response.
 	if strings.HasPrefix(body, "<") || strings.Contains(body[:min(len(body), 100)], "<?xml") {
-		return parseMedalinkURL(body, mirrorListURL)
+		u, err := parseMedalinkURL(body, mirrorListURL)
+
+		return normalizeURL(u), err
 	}
 
 	// Plain mirrorlist: first non-comment, non-empty line.
@@ -384,10 +398,12 @@ func resolveMirrorList(ctx context.Context, mirrorListURL string) (string, error
 			continue
 		}
 
-		return line, nil
+		return normalizeURL(line), nil
 	}
 
-	return "", fmt.Errorf("dnfcache: no usable mirror in mirrorlist %s", mirrorListURL)
+	return "", apperrors.New(apperrors.ErrTypeNetwork, "no usable mirror in mirrorlist").
+		WithOperation("resolveMirrorList").
+		WithContext("url", mirrorListURL)
 }
 
 // retryMajorVersion retries a mirrorlist fetch replacing "X.Y" releasever
@@ -447,47 +463,26 @@ func parseMedalinkURL(body, sourceURL string) (string, error) {
 		return u + "/", nil
 	}
 
-	return "", fmt.Errorf("dnfcache: no usable mirror in metalink %s", sourceURL)
+	return "", apperrors.New(apperrors.ErrTypeNetwork, "no usable mirror in metalink").
+		WithOperation("parseMedalinkURL").
+		WithContext("url", sourceURL)
 }
 
-// isHTTPClientError returns true when err is an HTTP 4xx response from
-// httpclient.CheckStatus. These are non-fatal for repo refresh: the existing
-// on-disk cache remains usable (auth-gated or temporarily unavailable repos).
-func isHTTPClientError(err error) bool {
-	if err == nil {
+// isNonFatalRepoError reports whether the error is an HTTP 4xx response,
+// which is non-fatal for repo refresh: the existing on-disk cache stays
+// usable (auth-gated, rate-limited, or temporarily unavailable repos).
+func isNonFatalRepoError(err error) bool {
+	var he *httpclient.HTTPStatusError
+	if !errors.As(err, &he) {
 		return false
 	}
 
-	msg := err.Error()
-
-	for _, code := range []string{"HTTP 400 ", "HTTP 401 ", "HTTP 403 ", "HTTP 404 ", "HTTP 410 ", "HTTP 451 "} {
-		if strings.Contains(msg, code) {
-			return true
-		}
-	}
-
-	return false
+	return he.IsClientError()
 }
 
 // fetchBytes fetches a URL and returns its body as bytes.
 func fetchBytes(ctx context.Context, url string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpclient.Client().Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	if err := httpclient.CheckStatus(resp, url); err != nil {
-		return nil, err
-	}
-
-	return io.ReadAll(io.LimitReader(resp.Body, 64<<20)) // 64 MiB cap
+	return httpclient.FetchBytes(ctx, url, 64<<20) // 64 MiB cap
 }
 
 // downloadVerified downloads url to destFile, verifying SHA256 if provided.
@@ -509,46 +504,37 @@ func downloadVerified(ctx context.Context, url, destFile, expectedSHA256 string)
 	if err != nil {
 		return err
 	}
-
 	defer func() { _ = resp.Body.Close() }()
 
 	if err := httpclient.CheckStatus(resp, url); err != nil {
 		return err
 	}
 
-	tmp := destFile + ".tmp"
-
-	f, err := os.Create(tmp) // #nosec G304
-	if err != nil {
-		return err
-	}
-
 	h := sha256.New()
-	w := io.MultiWriter(f, h)
 
-	if _, err := io.Copy(w, io.LimitReader(resp.Body, 512<<20)); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
+	if err := httpclient.AtomicWrite(destFile, func(w io.Writer) error {
+		mw := io.MultiWriter(w, h)
+		_, err := io.Copy(mw, io.LimitReader(resp.Body, 512<<20))
 
 		return err
-	}
-
-	if err := f.Close(); err != nil {
-		_ = os.Remove(tmp)
-
+	}); err != nil {
 		return err
 	}
 
 	if expectedSHA256 != "" {
 		got := hex.EncodeToString(h.Sum(nil))
 		if got != expectedSHA256 {
-			_ = os.Remove(tmp)
+			_ = os.Remove(destFile)
 
-			return fmt.Errorf("dnfcache: SHA256 mismatch for %s: got %s, want %s", url, got, expectedSHA256)
+			return apperrors.New(apperrors.ErrTypePackaging, "SHA256 mismatch").
+				WithOperation("downloadVerified").
+				WithContext("url", url).
+				WithContext("got", got).
+				WithContext("want", expectedSHA256)
 		}
 	}
 
-	return os.Rename(tmp, destFile)
+	return nil
 }
 
 // fileMatchesSHA256 returns true if path exists and its SHA256 matches expected.
@@ -736,7 +722,10 @@ func (c *Cache) parsePrimaryFile(path, baseURL string) error {
 		r = gz
 
 	case strings.HasSuffix(path, ".xz"):
-		xzr, err := xz.NewReader(f)
+		// bufio.NewReader wraps the file in a buffered reader; ulikunitz/xz
+		// reads in small chunks and without buffering this causes excessive
+		// syscall overhead — 5-8x slower than buffered I/O.
+		xzr, err := xz.NewReader(bufio.NewReader(f))
 		if err != nil {
 			return err
 		}
@@ -744,7 +733,7 @@ func (c *Cache) parsePrimaryFile(path, baseURL string) error {
 		r = xzr
 
 	case strings.HasSuffix(path, ".zst"):
-		zr, err := zstd.NewReader(f)
+		zr, err := zstd.NewReader(bufio.NewReader(f))
 		if err != nil {
 			return err
 		}
