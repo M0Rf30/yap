@@ -1,0 +1,474 @@
+package apkindex
+
+import (
+	"archive/tar"
+	"bufio"
+	"compress/gzip"
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/M0Rf30/yap/v2/pkg/logger"
+)
+
+const apkInstalledDB = "/lib/apk/db/installed"
+
+// InstallOptions controls the safety / trust knobs for InstallPackages.
+//
+// AllowUnverifiedPackages: APK packages and APKINDEX tarballs ship with RSA
+// signatures. Verification of those signatures is not yet wired into this
+// package. Callers that accept this gap (e.g. inside a trusted CI container
+// fetching over HTTPS from official mirrors) must set this flag explicitly.
+type InstallOptions struct {
+	AllowUnverifiedPackages bool
+}
+
+// InstallPackages downloads each requested package + transitive deps, extracts each
+// to /, and updates /lib/apk/db/installed. Replaces "apk add".
+//
+// Equivalent to InstallPackagesWithOptions with the zero options (strict).
+func (idx *Index) InstallPackages(ctx context.Context, names []string) error {
+	return idx.InstallPackagesWithOptions(ctx, names, InstallOptions{})
+}
+
+// InstallPackagesWithOptions is the explicit-options variant of InstallPackages.
+// Scriptlets are not currently executed; they are logged as warnings.
+func (idx *Index) InstallPackagesWithOptions(
+	ctx context.Context, names []string, opts InstallOptions,
+) error {
+	if !opts.AllowUnverifiedPackages {
+		return fmt.Errorf(
+			"apkindex: APK signature verification is not yet implemented; " +
+				"set InstallOptions.AllowUnverifiedPackages to acknowledge")
+	}
+
+	logger.Warn("installing APK packages without signature verification " +
+		"(set InstallOptions.AllowUnverifiedPackages=false to refuse)")
+
+	// 1. Resolve transitive deps.
+	resolved, err := idx.ResolveDeps(names)
+	if err != nil {
+		return fmt.Errorf("apkindex: resolve deps: %w", err)
+	}
+
+	if len(resolved) == 0 {
+		return nil
+	}
+
+	// 2. Filter out already-installed packages.
+	installed := readInstalledDB()
+
+	var toInstall []*Package
+
+	for _, p := range resolved {
+		if !installed[p.Name] {
+			toInstall = append(toInstall, p)
+		}
+	}
+
+	if len(toInstall) == 0 {
+		return nil
+	}
+
+	logger.Info("installing APK packages",
+		"count", len(toInstall), "resolved", len(resolved))
+
+	// 3. Download all .apk files to a temp dir.
+	tmpDir, err := os.MkdirTemp("", "yap-apk-*")
+	if err != nil {
+		return fmt.Errorf("apkindex: mktemp: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	for _, p := range toInstall {
+		if _, err := idx.DownloadPackage(ctx, tmpDir, p.Name); err != nil {
+			return fmt.Errorf("apkindex: download %s: %w", p.Name, err)
+		}
+	}
+
+	// 4. Extract each .apk to / and register in installed DB.
+	for _, p := range toInstall {
+		apkPath := filepath.Join(tmpDir, p.Name+"-"+p.Version+".apk")
+
+		if err := extractAndRegister(apkPath, p); err != nil {
+			return fmt.Errorf("apkindex: install %s: %w", p.Name, err)
+		}
+
+		logger.Debug("installed", "package", p.Name, "version", p.Version)
+	}
+
+	return nil
+}
+
+// readInstalledDB parses /lib/apk/db/installed and returns a set of
+// installed package names. Returns empty map on read error.
+func readInstalledDB() map[string]bool {
+	f, err := os.Open(apkInstalledDB) // #nosec G304 -- constant path
+	if err != nil {
+		return make(map[string]bool)
+	}
+	defer func() { _ = f.Close() }()
+
+	installed := make(map[string]bool)
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+
+	var currentPkg string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if line == "" {
+			// End of stanza — commit the package name.
+			if currentPkg != "" {
+				installed[currentPkg] = true
+				currentPkg = ""
+			}
+
+			continue
+		}
+
+		// APK installed DB uses single-char field tags: "P:<pkgname>"
+		if pkg, ok := strings.CutPrefix(line, "P:"); ok {
+			currentPkg = pkg
+		}
+	}
+
+	// Flush last stanza (file may not end with blank line).
+	if currentPkg != "" {
+		installed[currentPkg] = true
+	}
+
+	return installed
+}
+
+// extractAndRegister extracts a .apk file to / and registers it in the installed database.
+// Orchestrates extraction of control and data streams, then registers the package.
+func extractAndRegister(apkPath string, pkg *Package) error {
+	// Open the .apk file (2-stream concatenated gzip: control + data).
+	f, err := os.Open(apkPath) // #nosec G304 -- temp dir path
+	if err != nil {
+		return fmt.Errorf("open apk: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	// Extract control stream to get .PKGINFO. The .apk format is a
+	// concatenation of two (or three, with signature) gzip streams; the
+	// stdlib gzip.Reader stops at the first stream's end, so a second
+	// gzip.NewReader call on the same file picks up the next stream from
+	// where the first one left off. Intentional — don't "clean up" by
+	// reusing the reader.
+	pkgInfo, err := extractAPKControl(f)
+	if err != nil {
+		return err
+	}
+
+	// Extract data stream to filesystem.
+	if err := extractAPKData(f); err != nil {
+		return err
+	}
+
+	// Register in /lib/apk/db/installed.
+	if err := registerInstalled(pkg, pkgInfo); err != nil {
+		return fmt.Errorf("register installed: %w", err)
+	}
+
+	return nil
+}
+
+// extractAPKControl reads the control.tar.gz stream from an APK file and returns the .PKGINFO content.
+func extractAPKControl(f *os.File) (string, error) {
+	gz1, err := gzip.NewReader(f)
+	if err != nil {
+		return "", fmt.Errorf("gzip reader 1: %w", err)
+	}
+	defer func() { _ = gz1.Close() }()
+
+	// One gzip member per .apk control stream — don't auto-advance into
+	// the data stream.
+	gz1.Multistream(false)
+
+	tr1 := tar.NewReader(gz1)
+
+	// Scan control stream to find .PKGINFO (for installed DB).
+	for {
+		hdr, err := tr1.Next()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return "", fmt.Errorf("tar read control: %w", err)
+		}
+
+		if hdr.Name == ".PKGINFO" {
+			data, err := io.ReadAll(io.LimitReader(tr1, 1<<20)) // 1 MiB cap on .PKGINFO
+			if err != nil {
+				return "", fmt.Errorf("read pkginfo: %w", err)
+			}
+
+			// Drain remainder of the control gzip member, capped so a
+			// malicious / oversize control tail can't OOM the build.
+			// Real control streams are tiny (KB); 16 MiB is generous.
+			_, _ = io.Copy(io.Discard, io.LimitReader(gz1, 16<<20))
+
+			return string(data), nil
+		}
+	}
+
+	return "", nil
+}
+
+// extractAPKData reads the data.tar.gz stream from an APK file and extracts files to the filesystem.
+func extractAPKData(f *os.File) error {
+	gz2, err := gzip.NewReader(f)
+	if err != nil {
+		return fmt.Errorf("gzip reader 2: %w", err)
+	}
+	defer func() { _ = gz2.Close() }()
+
+	tr2 := tar.NewReader(gz2)
+
+	for {
+		hdr, err := tr2.Next()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return fmt.Errorf("tar read data: %w", err)
+		}
+
+		if err := extractAPKEntry(tr2, hdr); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// safeAPKPath joins "/" with a sanitised tar-entry name, rejecting
+// traversal attempts (".." or absolute paths). The legacy `cleanName`
+// + `filepath.Join("/", …)` pattern is correct only because `cleanName`
+// has already been verified to not start with "..".
+func safeAPKPath(entryName string) (string, bool) {
+	cleanName := filepath.Clean(entryName)
+	if cleanName == "." || cleanName == "/" {
+		return "", false
+	}
+
+	if strings.HasPrefix(cleanName, "..") || filepath.IsAbs(cleanName) {
+		return "", false
+	}
+
+	// nolint:gocritic // We *do* want / as the join base — APK is system-wide.
+	return filepath.Join("/", cleanName), true
+}
+
+// safeAPKSymlinkTarget rejects symlink targets that would escape the
+// filesystem root via "..". Absolute targets are permitted because APK
+// packages commonly ship absolute symlinks (/usr/bin/foo → /usr/bin/bar).
+func safeAPKSymlinkTarget(linkPath, target string) error {
+	if filepath.IsAbs(target) {
+		return nil
+	}
+
+	resolved := filepath.Clean(filepath.Join(filepath.Dir(linkPath), target))
+	if strings.HasPrefix(resolved, "..") {
+		return fmt.Errorf("symlink %q -> %q escapes root", linkPath, target)
+	}
+
+	return nil
+}
+
+// extractAPKEntry extracts a single tar entry to the filesystem.
+// Handles regular files, directories, and symlinks with proper sanitization.
+func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
+	targetPath, ok := safeAPKPath(hdr.Name)
+	if !ok {
+		logger.Warn("skipping unsafe path in APK archive", "path", hdr.Name)
+
+		return nil
+	}
+
+	// Create parent directories.
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+
+	switch hdr.Typeflag {
+	case tar.TypeReg:
+		// Regular file. Cap per-file size at 2 GiB.
+		const maxFileSize = 2 << 30
+
+		f, err := os.Create(targetPath) // #nosec G304 — targetPath is constrained by safeAPKPath
+		if err != nil {
+			return fmt.Errorf("create file: %w", err)
+		}
+
+		if _, err := io.Copy(f, io.LimitReader(tr, maxFileSize)); err != nil {
+			_ = f.Close()
+			return fmt.Errorf("copy file: %w", err)
+		}
+
+		if err := f.Close(); err != nil {
+			return fmt.Errorf("close file: %w", err)
+		}
+
+		// Preserve permissions.
+		if err := os.Chmod(targetPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
+			return fmt.Errorf("chmod: %w", err)
+		}
+
+	case tar.TypeDir:
+		// Directory.
+		if err := os.MkdirAll(targetPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
+			return fmt.Errorf("mkdir: %w", err)
+		}
+
+	case tar.TypeSymlink:
+		if err := safeAPKSymlinkTarget(targetPath, hdr.Linkname); err != nil {
+			logger.Warn("skipping unsafe APK symlink",
+				"path", hdr.Name, "target", hdr.Linkname, "error", err)
+
+			return nil
+		}
+
+		if err := os.Symlink(hdr.Linkname, targetPath); err != nil {
+			// Ignore if already exists.
+			if !os.IsExist(err) {
+				return fmt.Errorf("symlink: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// registerInstalled writes a package stanza into /lib/apk/db/installed.
+// On reinstall/upgrade the existing stanza for the same package name is
+// replaced rather than appended (which would leak duplicate entries).
+func registerInstalled(pkg *Package, pkgInfo string) error {
+	if err := os.MkdirAll(filepath.Dir(apkInstalledDB), 0o755); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+
+	// Read existing DB → stanza map keyed by package name.
+	existing := readInstalledStanzas()
+
+	// Build the new stanza.
+	var stanza string
+
+	if pkgInfo != "" {
+		stanza = pkgInfo
+	} else {
+		stanza = fmt.Sprintf("P:%s\nV:%s\nA:%s\nI:%d\n",
+			pkg.Name, pkg.Version, pkg.Arch, pkg.InstSize)
+	}
+
+	existing[pkg.Name] = strings.TrimRight(stanza, "\n") + "\n"
+
+	return writeInstalledStanzas(existing)
+}
+
+// readInstalledStanzas parses /lib/apk/db/installed into a map of
+// package-name → raw stanza text (newline-terminated, no trailing blank).
+func readInstalledStanzas() map[string]string {
+	f, err := os.Open(apkInstalledDB) // #nosec G304 -- constant path
+	if err != nil {
+		return make(map[string]string)
+	}
+	defer func() { _ = f.Close() }()
+
+	stanzas := make(map[string]string)
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+
+	var (
+		current strings.Builder
+		name    string
+	)
+
+	flush := func() {
+		if name != "" && current.Len() > 0 {
+			stanzas[name] = strings.TrimRight(current.String(), "\n") + "\n"
+		}
+
+		current.Reset()
+
+		name = ""
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			flush()
+			continue
+		}
+
+		if pkg, ok := strings.CutPrefix(line, "P:"); ok {
+			name = pkg
+		}
+
+		current.WriteString(line)
+		current.WriteString("\n")
+	}
+
+	flush()
+
+	return stanzas
+}
+
+// writeInstalledStanzas writes the stanza map to /lib/apk/db/installed
+// atomically. Stanzas are written in sorted name order so the output is
+// reproducible.
+func writeInstalledStanzas(stanzas map[string]string) error {
+	tmpPath := apkInstalledDB + ".tmp"
+
+	// nolint:gosec // G304: constant path
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+
+	names := make([]string, 0, len(stanzas))
+	for k := range stanzas {
+		names = append(names, k)
+	}
+
+	sort.Strings(names)
+
+	for _, n := range names {
+		if _, err := f.WriteString(stanzas[n] + "\n"); err != nil {
+			_ = f.Close()
+			_ = os.Remove(tmpPath)
+
+			return fmt.Errorf("write stanza: %w", err)
+		}
+	}
+
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmpPath)
+
+		return fmt.Errorf("sync db: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+
+		return fmt.Errorf("close db: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, apkInstalledDB); err != nil {
+		_ = os.Remove(tmpPath)
+
+		return fmt.Errorf("rename db: %w", err)
+	}
+
+	return nil
+}

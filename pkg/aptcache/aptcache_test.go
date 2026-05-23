@@ -278,3 +278,134 @@ func TestNoTrailingNewline(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "amd64", info.Architecture)
 }
+
+// TestParseDependsField tests the parseDependsField function with various inputs.
+func TestParseDependsField(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "empty",
+			input:    "",
+			expected: nil,
+		},
+		{
+			name:     "single package",
+			input:    "gcc",
+			expected: []string{"gcc"},
+		},
+		{
+			name:     "multiple packages",
+			input:    "gcc, make, git",
+			expected: []string{"gcc", "make", "git"},
+		},
+		{
+			name:     "with version constraint",
+			input:    "libssl-dev (>= 1.1.0)",
+			expected: []string{"libssl-dev"},
+		},
+		{
+			name:     "with alternative",
+			input:    "gcc | clang",
+			expected: []string{"gcc"},
+		},
+		{
+			name:     "with arch qualifier",
+			input:    "libssl-dev:amd64",
+			expected: []string{"libssl-dev"},
+		},
+		{
+			name:     "complex: version + arch",
+			input:    "libssl-dev:amd64 (>= 1.1.0)",
+			expected: []string{"libssl-dev"},
+		},
+		{
+			name:     "multiple with mixed constraints",
+			input:    "gcc (>= 10), make, libssl-dev:amd64 (>= 1.1.0) | openssl-dev",
+			expected: []string{"gcc", "make", "libssl-dev"},
+		},
+		{
+			name:     "whitespace handling",
+			input:    "  gcc  ,  make  ,  git  ",
+			expected: []string{"gcc", "make", "git"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := aptcache.ParseDependsFieldForTesting(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestResolveDeps tests transitive dependency resolution.
+func TestResolveDeps(t *testing.T) {
+	// Create a synthetic cache with a dependency chain: C -> B -> A
+	stanza := `Package: a
+Architecture: amd64
+Version: 1.0
+Depends: 
+
+Package: b
+Architecture: amd64
+Version: 1.0
+Depends: a
+
+Package: c
+Architecture: amd64
+Version: 1.0
+Depends: b
+
+Package: d
+Architecture: amd64
+Version: 1.0
+Status: install ok installed
+Depends: a
+
+`
+
+	c := aptcache.NewCacheForTesting()
+	err := c.ParseDeb822ForTesting(strings.NewReader(stanza), true)
+	require.NoError(t, err)
+
+	// Resolve starting from c: should get [a, b, c] in dependency order
+	pkgs, unres, err := c.ResolveDepsForTesting([]string{"c"})
+	require.NoError(t, err)
+	require.Empty(t, unres)
+	require.Len(t, pkgs, 3)
+
+	// Verify order: dependencies before dependents
+	assert.Equal(t, "a", pkgs[0].Name)
+	assert.Equal(t, "b", pkgs[1].Name)
+	assert.Equal(t, "c", pkgs[2].Name)
+
+	// Resolve starting from d: should get [a] only (d is already installed)
+	pkgs, unres, err = c.ResolveDepsForTesting([]string{"d"})
+	require.NoError(t, err)
+	require.Empty(t, unres)
+	require.Len(t, pkgs, 1)
+	assert.Equal(t, "a", pkgs[0].Name)
+}
+
+// TestResolveDepsUnresolved tests handling of unresolvable packages.
+func TestResolveDepsUnresolved(t *testing.T) {
+	stanza := `Package: a
+Architecture: amd64
+Version: 1.0
+Depends: 
+
+`
+
+	c := aptcache.NewCacheForTesting()
+	err := c.ParseDeb822ForTesting(strings.NewReader(stanza), false)
+	require.NoError(t, err)
+
+	// Try to resolve a package that doesn't exist
+	pkgs, unres, err := c.ResolveDepsForTesting([]string{"nonexistent"})
+	require.NoError(t, err)
+	require.Empty(t, pkgs)
+	require.Equal(t, []string{"nonexistent"}, unres)
+}

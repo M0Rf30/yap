@@ -66,6 +66,14 @@ type BuildOptions struct {
 	DebugDir                string
 	SBOMFormat              string
 	ExtraRepos              []string
+	// AllowUnverifiedRepos bypasses the OpenPGP signature check on apt
+	// `Release` / `InRelease` files. Required when the source declares no
+	// `Signed-By` directive and no usable key exists in the default trust
+	// paths (`/etc/apt/trusted.gpg.d`, `/usr/share/keyrings`,
+	// `/etc/apt/keyrings`, `/etc/apt/trusted.gpg`). A signature that
+	// exists and fails to verify is *always* fatal, regardless of this
+	// flag — a forged signature is strictly worse than no signature.
+	AllowUnverifiedRepos bool
 }
 
 // extractPackageName extracts the package name from a dependency string,
