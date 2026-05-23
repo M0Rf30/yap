@@ -11,8 +11,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/m0rf30/ar"
 	"github.com/klauspost/compress/zstd"
+	"github.com/m0rf30/ar"
 	"github.com/ulikunitz/xz"
 )
 
