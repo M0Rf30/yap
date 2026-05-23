@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/blakesmith/ar"
+	"github.com/m0rf30/ar"
 	rpmutils "github.com/sassoftware/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
@@ -44,7 +44,7 @@ func (bb *BaseBuilder) ExtractToRoot(packagePath string) error {
 	switch bb.Format {
 	case constants.FormatDEB:
 		// DEB packages need special handling to extract data.tar from AR archive
-		extractErr = extractDEB(packagePath, "/")
+		extractErr = ExtractDEB(packagePath, "/")
 	case constants.FormatRPM:
 		// RPM format: header + cpio payload — the generic archive identifier
 		// does not recognize RPM, so we must decode the payload ourselves.
@@ -114,10 +114,10 @@ func cleanupMetadataFiles(format string) {
 	}
 }
 
-// extractDEB extracts a Debian package (.deb) to the destination directory.
+// ExtractDEB extracts a Debian package (.deb) to the destination directory.
 // DEB format: AR archive containing control.tar.gz and data.tar.{gz,xz,zst}
 // We need to extract data.tar from the AR archive and then extract its contents.
-func extractDEB(packagePath, destDir string) error {
+func ExtractDEB(packagePath, destDir string) error {
 	file, err := os.Open(packagePath) // #nosec G304 - packagePath is from trusted build artifacts
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open DEB package").
@@ -129,7 +129,11 @@ func extractDEB(packagePath, destDir string) error {
 		_ = file.Close()
 	}()
 
-	arReader := ar.NewReader(file)
+	arReader, err := ar.NewReader(file)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypePackaging, "failed to parse AR archive").
+			WithOperation("extractDEB")
+	}
 
 	// Iterate through AR archive members to find data.tar
 	var dataTarPath string

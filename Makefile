@@ -30,7 +30,7 @@ DOCKER_BUILD_FLAGS = --progress=plain --no-cache
 # Available distributions (dynamically retrieved from build/deploy folder)
 DISTROS = $(shell find build/deploy -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
-.PHONY: all build clean test test-coverage bench deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats
+.PHONY: all build clean test test-coverage bench deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats rpmdb-gen
 
 # Default target
 all: clean deps fmt lint lint-md test doc build
@@ -226,7 +226,22 @@ i18n-tool:
 	@echo "Building i18n management tool..."
 	@mkdir -p $(BUILD_DIR)
 	@$(GOBUILD) -o $(BUILD_DIR)/i18n-tool ./cmd/i18n-tool
-	@echo "i18n management tool built: $(BUILD_DIR)/i18n-tool"# Build the i18n management tool
+	@echo "i18n management tool built: $(BUILD_DIR)/i18n-tool"
+
+# Regenerate the rpmdb sqlc bindings. Requires sqlc to be installed:
+#   go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+rpmdb-gen:
+	@echo "Regenerating rpmdb sqlc bindings..."
+	@if command -v sqlc > /dev/null; then \
+		sqlc generate; \
+		echo "rpmdb bindings regenerated"; \
+	elif command -v ~/go/bin/sqlc > /dev/null; then \
+		~/go/bin/sqlc generate; \
+		echo "rpmdb bindings regenerated"; \
+	else \
+		echo "sqlc not found. Install with: go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest"; \
+		exit 1; \
+	fi
 
 # Help
 help:
@@ -256,4 +271,5 @@ help:
 	@echo "  i18n-tool        - Build the i18n management tool"
 	@echo "  i18n-check       - Check integrity of localization files"
 	@echo "  i18n-stats       - Show localization statistics"
+	@echo "  rpmdb-gen        - Regenerate rpmdb sqlc bindings"
 	@echo "  help             - Show this help"

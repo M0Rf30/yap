@@ -39,12 +39,16 @@ func setupRPM(r *Repo) error {
 		ctx, cancel := context.WithTimeout(context.Background(), rpmImportTimeout)
 		defer cancel()
 
-		if err := exec.CommandContext(ctx, "rpm", "--import", gpgKey).Run(); err != nil {
-			return errors.Wrap(err, errors.ErrTypeBuild,
-				fmt.Sprintf("repo %q: rpm --import %s", r.Name, gpgKey)).
-				WithOperation("setupRPM").
-				WithContext("repo", r.Name).
-				WithContext("key", gpgKey)
+		// rpm --import registers the key in the RPM database so that rpm -V
+		// (file verification) works. It is best-effort: dnf/yum still verify
+		// package signatures against the gpgkey= path in the .repo file even
+		// when the key is not in the RPM DB. Log a warning on failure rather
+		// than aborting the build.
+		if err := exec.CommandContext(ctx, "rpm", "--import", gpgKey).Run(); err != nil { // #nosec G204
+			logger.Warn("repo: rpm --import failed (non-fatal; dnf will still verify via gpgkey= in .repo)",
+				"repo", r.Name,
+				"key", gpgKey,
+				"error", err)
 		}
 	}
 

@@ -100,6 +100,17 @@ func ParseOSRelease() (OSRelease, error) {
 	return osRelease, nil
 }
 
+// IsPrivilegedHost reports whether the current process is running as
+// uid 0 (root). The pure-Go installers in pkg/aptinstall and pkg/apkindex
+// use this as the heuristic for "we're inside a yap build container and
+// it's safe to write to /, /var/lib/dpkg, /lib/apk/db, etc.".
+//
+// Non-root callers (developer workstations) hit the strict path and must
+// either set RootDir / AllowRootInstall explicitly or run as root.
+func IsPrivilegedHost() bool {
+	return os.Geteuid() == 0
+}
+
 // GetArchitecture returns the system architecture mapped to package manager conventions.
 func GetArchitecture() string {
 	architectureMap := map[string]string{

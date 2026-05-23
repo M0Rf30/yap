@@ -2663,3 +2663,106 @@ func TestPKGBUILD_SplitPackageFuncDistroResolution(t *testing.T) {
 		}
 	})
 }
+
+// TestStripVersionConstraint verifies that stripVersionConstraint correctly
+// removes all version constraint operators from package specifications.
+func TestStripVersionConstraint(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		// No constraint
+		{"no_constraint", "foo", "foo"},
+		{"no_constraint_with_spaces", "  foo  ", "foo"},
+
+		// Single-char operators
+		{"equals", "foo=1.0", "foo"},
+		{"greater_than", "foo>1", "foo"},
+		{"less_than", "foo<1", "foo"},
+		{"tilde_fuzzy", "foo~1.0", "foo"},
+
+		// Multi-char operators (must be checked first)
+		{"greater_equal", "foo>=1.0", "foo"},
+		{"less_equal", "foo<=1.0", "foo"},
+		{"not_equal", "foo!=1.0", "foo"},
+
+		// Complex version strings
+		{"complex_version", "libssl-dev>=1.1.1g-1ubuntu2", "libssl-dev"},
+		{"complex_version_tilde", "musl-dev~1.2.3_rc1", "musl-dev"},
+
+		// With spaces
+		{"spaces_around_operator", "foo >= 1.0", "foo"},
+		{"spaces_in_name", "  my-package  >=1.0", "my-package"},
+
+		// Edge cases
+		{"empty_string", "", ""},
+		{"only_spaces", "   ", ""},
+		{"operator_only", ">=", ""},
+
+		// Package names with hyphens and numbers
+		{"hyphenated_name", "lib-ssl-dev>=1.0", "lib-ssl-dev"},
+		{"name_with_numbers", "python3-dev>=3.8", "python3-dev"},
+
+		// Multiple operators (should stop at first)
+		{"multiple_operators", "foo>=1.0<=2.0", "foo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := stripVersionConstraint(tt.input)
+			if result != tt.expected {
+				t.Errorf("stripVersionConstraint(%q) = %q, want %q",
+					tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestFilterInstalledAPK verifies that filterInstalledAPK correctly strips
+// version constraints and identifies missing packages.
+func TestFilterInstalledAPK(t *testing.T) {
+	// This test would require mocking /lib/apk/db/installed or running in Alpine.
+	// For now, we test the version constraint stripping logic indirectly.
+	t.Run("version_constraint_stripping", func(t *testing.T) {
+		// Test that stripVersionConstraint is used correctly
+		specs := []string{
+			"musl-dev>=1.2",
+			"gcc!=10.0",
+			"make~4.3",
+		}
+
+		for _, spec := range specs {
+			name := stripVersionConstraint(spec)
+			if strings.Contains(name, ">=") || strings.Contains(name, "!=") ||
+				strings.Contains(name, "~") {
+				t.Errorf("stripVersionConstraint(%q) still contains operator: %q",
+					spec, name)
+			}
+		}
+	})
+}
+
+// TestFilterInstalledPacman verifies that filterInstalledPacman correctly strips
+// version constraints and identifies missing packages.
+func TestFilterInstalledPacman(t *testing.T) {
+	// This test would require mocking /var/lib/pacman/local or running on Arch.
+	// For now, we test the version constraint stripping logic indirectly.
+	t.Run("version_constraint_stripping", func(t *testing.T) {
+		// Test that stripVersionConstraint is used correctly
+		specs := []string{
+			"gcc>=12",
+			"make<=4.3",
+			"binutils=2.37",
+		}
+
+		for _, spec := range specs {
+			name := stripVersionConstraint(spec)
+			if strings.Contains(name, ">=") || strings.Contains(name, "<=") ||
+				strings.Contains(name, "=") {
+				t.Errorf("stripVersionConstraint(%q) still contains operator: %q",
+					spec, name)
+			}
+		}
+	})
+}

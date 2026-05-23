@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/M0Rf30/rpmpack"
-	"github.com/blakesmith/ar"
+	"github.com/m0rf30/ar"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -146,8 +146,8 @@ func TestExtractToRoot(t *testing.T) {
 	}
 
 	// For this test, we'll extract to the test root directory
-	// by modifying the test to use extractDEB directly
-	err := extractDEB(debPath, testRootDir)
+	// by modifying the test to use ExtractDEB directly
+	err := ExtractDEB(debPath, testRootDir)
 	if err != nil {
 		t.Fatalf("extractDEB failed: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestExtractDEB_MissingDataTar(t *testing.T) {
 
 	destDir := filepath.Join(tmpDir, "dest")
 
-	err := extractDEB(invalidDEB, destDir)
+	err := ExtractDEB(invalidDEB, destDir)
 	if err == nil {
 		t.Error("Expected error for invalid DEB, got nil")
 	}

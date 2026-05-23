@@ -1,0 +1,16 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    queries: "pkg/rpmdb/queries.sql"
+    schema: "pkg/rpmdb/schema.sql"
+    gen:
+      go:
+        package: "rpmdbgen"
+        out: "pkg/rpmdb/db"
+        sql_package: "database/sql"
+        emit_json_tags: false
+        emit_prepared_queries: false
+        emit_interface: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        emit_pointers_for_null_types: false
