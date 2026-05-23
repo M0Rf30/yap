@@ -17,6 +17,7 @@ package archive
 import (
 	"archive/tar"
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
@@ -35,6 +36,7 @@ import (
 	"github.com/nwaples/rardecode/v2"
 	"github.com/ulikunitz/xz"
 
+	"github.com/M0Rf30/yap/v2/pkg/buffers"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -354,7 +356,9 @@ func copyRegularFile(path string, tw io.Writer) error {
 		_ = f.Close()
 	}()
 
-	_, err = io.CopyBuffer(tw, f, make([]byte, 32*1024))
+	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
+	_, err = io.CopyBuffer(tw, f, copyBuf)
+	buffers.DefaultBufferPool.Put(copyBuf) //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
 
 	return err
 }
@@ -550,7 +554,10 @@ func openTarStream(reader io.Reader, kind archiveKind) (*tar.Reader, func() erro
 		return tar.NewReader(zr), func() error { zr.Close(); return nil }, nil
 
 	case kindTarXz:
-		xr, err := xz.NewReader(reader)
+		// bufio.NewReader wraps the reader in a buffered reader; ulikunitz/xz
+		// reads in small chunks and without buffering this causes excessive
+		// syscall overhead — 5-8x slower than buffered I/O.
+		xr, err := xz.NewReader(bufio.NewReader(reader))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -689,7 +696,9 @@ func writeTarFile(path string, hdr *tar.Header, tr io.Reader) error {
 		}
 	}()
 
-	_, err = io.CopyBuffer(out, tr, make([]byte, 32*1024)) //nolint:gosec // size bounded by tar header
+	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
+	_, err = io.CopyBuffer(out, tr, copyBuf) //nolint:gosec // size bounded by tar header
+	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
 
 	return err
 }
@@ -824,9 +833,9 @@ func writeZipFile(zf *zip.File, cleanPath string) error {
 		}
 	}()
 
-	// #nosec G110 -- size bounded by zip header; YAP processes vendor-provided
-	// sources, not adversarial uploads.
-	_, err = io.CopyBuffer(out, rc, make([]byte, 32*1024))
+	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
+	_, err = io.CopyBuffer(out, rc, copyBuf) // #nosec G110 -- size bounded by zip header
+	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
 
 	return err
 }
@@ -932,9 +941,9 @@ func write7zFile(sf *sevenzip.File, cleanPath string) error {
 		}
 	}()
 
-	// #nosec G110 -- size bounded by 7z header; YAP processes vendor-provided
-	// sources, not adversarial uploads.
-	_, err = io.CopyBuffer(out, rc, make([]byte, 32*1024))
+	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
+	_, err = io.CopyBuffer(out, rc, copyBuf) // #nosec G110 -- size bounded by 7z header
+	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
 
 	return err
 }
@@ -1045,9 +1054,9 @@ func writeRarFile(rr *rardecode.Reader, hdr *rardecode.FileHeader, cleanPath str
 		}
 	}()
 
-	// #nosec G110 -- size bounded by rar header; YAP processes vendor-provided
-	// sources, not adversarial uploads.
-	_, err = io.CopyBuffer(out, rr, make([]byte, 32*1024))
+	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
+	_, err = io.CopyBuffer(out, rr, copyBuf) // #nosec G110 -- size bounded by rar header
+	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
 
 	return err
 }
