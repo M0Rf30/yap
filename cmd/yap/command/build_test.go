@@ -1,9 +1,15 @@
 package command
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/project"
+	"github.com/M0Rf30/yap/v2/pkg/signing"
 )
 
 func TestLogStructuredError(t *testing.T) {
@@ -110,4 +116,91 @@ func TestValidateCompression(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResolveSigning_NilSigningConfig(t *testing.T) {
+	// Save and restore global state
+	origSignKey := signKey
+	origSignPassphrase := signPassphrase
+	origSignKeyName := signKeyName
+
+	defer func() {
+		signKey = origSignKey
+		signPassphrase = origSignPassphrase
+		signKeyName = origSignKeyName
+	}()
+
+	signKey = ""
+	signPassphrase = ""
+	signKeyName = ""
+
+	mpc := &project.MultipleProject{
+		Signing: nil,
+	}
+
+	cfg, err := resolveSigning(mpc)
+	assert.NoError(t, err)
+	assert.NotNil(t, cfg)
+	// With no key, signing should be disabled and key/pass empty
+	assert.Empty(t, cfg.KeyPath)
+	assert.Empty(t, cfg.Passphrase)
+}
+
+func TestResolveSigning_WithSigningConfig(t *testing.T) {
+	// Save and restore global state
+	origSignKey := signKey
+	origSignPassphrase := signPassphrase
+	origSignKeyName := signKeyName
+
+	defer func() {
+		signKey = origSignKey
+		signPassphrase = origSignPassphrase
+		signKeyName = origSignKeyName
+	}()
+
+	// Use CLI flags to override
+	signKey = ""
+	signPassphrase = ""
+	signKeyName = "mykey"
+
+	// Create a temp key file so ResolveGeneric doesn't fail on missing file
+	tmpDir := t.TempDir()
+
+	keyFile := filepath.Join(tmpDir, "test.gpg")
+	if err := os.WriteFile(keyFile, []byte("fake-key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	mpc := &project.MultipleProject{
+		Signing: &signing.Config{
+			KeyPath:    keyFile,
+			Passphrase: "secret",
+			KeyName:    "original-key-name",
+		},
+	}
+
+	cfg, err := resolveSigning(mpc)
+	assert.NoError(t, err)
+	assert.NotNil(t, cfg)
+	assert.Equal(t, keyFile, cfg.KeyPath)
+	// CLI signKeyName overrides project config
+	assert.Equal(t, "mykey", cfg.KeyName)
+}
+
+func TestLogStructuredError_WithPackageContext(t *testing.T) {
+	// logStructuredError calls logger.Fatal which calls os.Exit — we can only
+	// verify it doesn't panic before the fatal call by checking the function
+	// compiles and the error struct is valid.
+	err := yapErrors.New(yapErrors.ErrTypeBuild, "build failed").
+		WithContext("package", "mypkg").
+		WithContext("version", "1.0.0").
+		WithContext("release", "1").
+		WithContext("stage", "compile")
+
+	// We can't call logStructuredError directly (it calls Fatal/os.Exit).
+	// Verify the error context is accessible as expected by the function.
+	assert.Equal(t, "mypkg", err.Context["package"])
+	assert.Equal(t, "1.0.0", err.Context["version"])
+	assert.Equal(t, "1", err.Context["release"])
+	assert.Equal(t, "compile", err.Context["stage"])
 }

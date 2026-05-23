@@ -154,6 +154,32 @@ func Reload() *Cache {
 	return fresh
 }
 
+// NewEmptyCache creates an empty Cache suitable for injection in tests.
+// Use StoreGlobal to make it the active singleton returned by Load.
+func NewEmptyCache() *Cache {
+	return &Cache{
+		entries:   make(map[string]*PackageInfo),
+		providers: make(map[string][]string),
+	}
+}
+
+// AddEntry inserts or replaces a PackageInfo entry in the cache.
+// Intended for test setup; not safe for concurrent use during population.
+func (c *Cache) AddEntry(info PackageInfo) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	cp := info
+	c.entries[info.Name] = &cp
+}
+
+// StoreGlobal replaces the process-global cache returned by Load.
+// Intended for cross-package test injection; call with a cache built via
+// NewEmptyCache + AddEntry before the code under test calls Load.
+func StoreGlobal(c *Cache) {
+	globalCache.Store(c)
+}
+
 // Lookup returns the PackageInfo for the named package and whether it was found.
 // The name must be the bare package name without version constraints or arch qualifiers.
 func (c *Cache) Lookup(name string) (PackageInfo, bool) {

@@ -611,6 +611,46 @@ func (bb *BaseBuilder) PrepareScriptletWithHelpers(body string) string {
 	return preamble + body
 }
 
+// SetupCrossStripEnv sets STRIP and OBJCOPY in the process environment so that
+// the Go-side strip/objcopy pass (options.Apply → binary.StripFile) uses the
+// cross-compilation binutils rather than the host tools.
+//
+// This must be called before ApplyOptions() whenever a cross-compilation target
+// is active. It is a no-op when targetArch is empty or equals the build arch.
+func (bb *BaseBuilder) SetupCrossStripEnv(targetArch string) {
+	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
+		return
+	}
+
+	toolchain, err := bb.resolveToolchainPackages(targetArch)
+	if err != nil {
+		logger.Warn("cross-strip env: failed to resolve toolchain, strip will use native tools",
+			"target_arch", targetArch, "error", err)
+
+		return
+	}
+
+	prefix := toolchain.binutilsPrefix()
+	if prefix == "" {
+		return
+	}
+
+	envMutex.Lock()
+	defer envMutex.Unlock()
+
+	if err := os.Setenv("STRIP", prefix+"-strip"); err != nil {
+		logger.Warn("cross-strip env: failed to set STRIP", "error", err)
+	}
+
+	if err := os.Setenv("OBJCOPY", prefix+"-objcopy"); err != nil {
+		logger.Warn("cross-strip env: failed to set OBJCOPY", "error", err)
+	}
+
+	logger.Debug("cross-strip env configured",
+		"STRIP", prefix+"-strip",
+		"OBJCOPY", prefix+"-objcopy")
+}
+
 // ApplyOptions runs the PKGBUILD option handlers (strip, docs, libtool, etc.)
 // against the package directory. This consolidates the duplicated options.Apply
 // call across DEB, RPM, and Pacman builders.

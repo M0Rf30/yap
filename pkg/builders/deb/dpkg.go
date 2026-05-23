@@ -107,6 +107,7 @@ func (d *Package) PrepareFakeroot(_ string, targetArch string) error {
 	d.getRelease()
 	d.LogCrossCompilation(targetArch)
 	d.SetTargetArchitecture(targetArch)
+	d.SetupCrossStripEnv(targetArch)
 
 	err := os.RemoveAll(d.debDir)
 	if err != nil {

@@ -23,9 +23,15 @@ func LoadRepos() ([]Repo, error) {
 		return nil, err
 	}
 
+	return parseReposContent(string(data)), nil
+}
+
+// parseReposContent parses the text content of an /etc/apk/repositories file
+// and returns the list of repositories. Exported for testing via export_test.go.
+func parseReposContent(data string) []Repo {
 	var repos []Repo
 
-	for _, line := range strings.SplitAfter(string(data), "\n") {
+	for _, line := range strings.SplitAfter(data, "\n") {
 		line = strings.TrimSpace(line)
 
 		// Skip empty lines and comments.
@@ -53,7 +59,7 @@ func LoadRepos() ([]Repo, error) {
 		}
 	}
 
-	return repos, nil
+	return repos
 }
 
 // DetectArch returns the APK architecture for this host.

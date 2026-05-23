@@ -21,6 +21,24 @@ func (r *cliRuntime) Pull(distro string) error {
 		r.bin, "pull", constants.DockerOrg+distro)
 }
 
+// RunShell implements Runtime by overriding the ENTRYPOINT with /bin/sh -c
+// and executing shellCmd. Use this to chain multiple yap commands in one
+// container invocation, e.g. "yap prepare ubuntu-jammy && yap build ...".
+func (r *cliRuntime) RunShell(distro, workDir, shellCmd string) error {
+	runArgs := []string{
+		"run", "--rm",
+		"--entrypoint", "/bin/sh",
+		"-e", "YAP_IN_CONTAINER=1",
+		"-v", workDir + ":/workspace:z",
+		"-w", "/workspace",
+		"--user", "root",
+		constants.DockerOrg + distro,
+		"-c", shellCmd,
+	}
+
+	return shell.Exec(context.Background(), false, "", r.bin, runArgs...)
+}
+
 // Run implements Runtime by running the container with the workspace mounted.
 // The workspace directory is bind-mounted to /workspace inside the container.
 // YAP_IN_CONTAINER=1 is injected so the inner yap process knows it is already

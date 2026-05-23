@@ -3,6 +3,7 @@ package command
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/container"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -61,4 +62,91 @@ func RunCommandInContainer(distro, workDir string, subArgs []string) bool {
 	}
 
 	return true
+}
+
+// RunPipelineInContainer runs prepare then build in a single container
+// invocation using a shell chain. This ensures makedeps installed by prepare
+// are available to build without requiring a persistent container.
+//
+//   - distro: distribution tag, e.g. "ubuntu-noble"
+//   - workDir: host directory to mount as /workspace
+//   - buildArgs: arguments for the inner yap build command (distroTag + path)
+//   - skipPrepare: if true, skip the prepare step (user passed -s or -d)
+//
+// Returns true if dispatched, false if caller should proceed natively.
+func RunPipelineInContainer(distro, workDir string, buildArgs []string, skipPrepare bool) bool {
+	if IsInsideContainer() {
+		return false
+	}
+
+	abs, err := filepath.Abs(workDir)
+	if err == nil {
+		workDir = abs
+	}
+
+	rt, err := container.Detect(ContainerRuntimeOverride())
+	if err != nil {
+		logger.Error("failed to detect container runtime", "error", err)
+
+		return false
+	}
+
+	logger.Info("dispatching pipeline to container",
+		"runtime", string(rt.Type()),
+		"distro", distro,
+		"workdir", workDir,
+		"skip_prepare", skipPrepare)
+
+	// Build the shell command: optionally chain prepare before build.
+	// Both commands run inside the same container so makedeps installed
+	// by prepare are available to build.
+	buildCmd := "yap " + shellJoinArgs(buildArgs)
+
+	var shellCmd string
+	if skipPrepare {
+		shellCmd = buildCmd
+	} else {
+		shellCmd = "yap prepare " + distro + " && " + buildCmd
+	}
+
+	if err := rt.RunShell(distro, workDir, shellCmd); err != nil {
+		logger.Error("container pipeline failed", "error", err)
+		os.Exit(1)
+	}
+
+	return true
+}
+
+// shellJoinArgs joins args into a shell-safe string.
+func shellJoinArgs(args []string) string {
+	var b strings.Builder
+
+	for i, a := range args {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+
+		b.WriteString(shellQuoteArg(a))
+	}
+
+	return b.String()
+}
+
+// shellQuoteArg wraps a single argument in single quotes.
+func shellQuoteArg(s string) string {
+	var b strings.Builder
+
+	b.WriteByte('\'')
+
+	for _, c := range s {
+		if c == '\'' {
+			b.WriteString("'\\''")
+		} else {
+			b.WriteRune(c)
+		}
+	}
+
+	b.WriteByte('\'')
+
+	return b.String()
 }

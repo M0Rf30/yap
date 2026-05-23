@@ -171,29 +171,41 @@ func strip(path string, args ...string) error {
 	// Use cross-compilation strip if STRIP environment variable is set.
 	// This allows stripping binaries compiled for foreign architectures.
 	stripCmd := os.Getenv("STRIP")
-	if stripCmd == "" {
-		stripCmd = "strip"
-	} else if _, err := exec.LookPath(stripCmd); err != nil {
-		// Cross-strip not installed. Two cases:
-		//   (a) The binary is host-arch (pre-built package that doesn't actually
-		//       need a cross toolchain): native strip works correctly.
-		//   (b) The binary is foreign-arch (real cross-compile output): native
-		//       strip cannot parse it and will hard-fail. Skip with a warning
-		//       rather than break the build — strip is an optional optimization,
-		//       not a correctness requirement.
+
+	switch {
+	case stripCmd == "":
+		// No cross-strip configured. Check whether the binary is foreign-arch
+		// before invoking the native strip — native strip cannot parse ELF
+		// binaries built for a different architecture and will hard-fail.
+		// Strip is an optional optimization, not a correctness requirement,
+		// so we skip with a warning rather than break the build.
 		if isForeignArchELF(path) {
 			logger.Warn(
-				"cross-strip not found and binary is foreign-arch; skipping strip",
-				"cross_strip", stripCmd,
+				"skipping strip: binary is foreign-arch and no cross-strip configured",
 				"binary", path)
 
 			return nil
 		}
 
-		logger.Warn("cross-strip not found in PATH, falling back to native strip",
-			"cross_strip", stripCmd)
-
 		stripCmd = "strip"
+
+	case stripCmd != "":
+		if _, err := exec.LookPath(stripCmd); err != nil {
+			// Cross-strip configured but not installed. Same two cases as above.
+			if isForeignArchELF(path) {
+				logger.Warn(
+					"cross-strip not found and binary is foreign-arch; skipping strip",
+					"cross_strip", stripCmd,
+					"binary", path)
+
+				return nil
+			}
+
+			logger.Warn("cross-strip not found in PATH, falling back to native strip",
+				"cross_strip", stripCmd)
+
+			stripCmd = "strip"
+		}
 	}
 
 	args = append(args, path)

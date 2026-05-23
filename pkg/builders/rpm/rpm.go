@@ -146,6 +146,7 @@ func (r *RPM) PrepareFakeroot(_ string, targetArch string) error {
 	r.getRelease()
 	r.LogCrossCompilation(targetArch)
 	r.SetTargetArchitecture(targetArch)
+	r.SetupCrossStripEnv(targetArch)
 
 	return r.ApplyOptions()
 }
