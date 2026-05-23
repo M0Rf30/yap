@@ -45,19 +45,19 @@ func TestIsPerlModule(t *testing.T) {
 // ─── partitionArchAllDeps ────────────────────────────────────────────────────
 
 // makeArchAllPkg returns a PackageInfo with Architecture: all.
-func makeArchAllPkg(name string) aptcache.PackageInfo {
+func makeArchAllPkg(name string) aptcache.PackageInfo { //nolint:unparam // test helper; name varies by call site
 	return aptcache.PackageInfo{Name: name, Architecture: "all"}
 }
 
 // makeArchSpecificPkg returns a PackageInfo with Architecture: amd64 and
 // Multi-Arch: same (typical dev library — must be qualified per arch).
-func makeArchSpecificPkg(name string) aptcache.PackageInfo {
+func makeArchSpecificPkg(name string) aptcache.PackageInfo { //nolint:unparam // test helper; name varies by call site
 	return aptcache.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "same"}
 }
 
 // makeMultiArchForeignPkg returns a PackageInfo with Multi-Arch: foreign
 // (host tool — must NOT be qualified with target arch).
-func makeMultiArchForeignPkg(name string) aptcache.PackageInfo {
+func makeMultiArchForeignPkg(name string) aptcache.PackageInfo { //nolint:unparam // test helper; name varies by call site
 	return aptcache.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "foreign"}
 }
 
@@ -579,7 +579,7 @@ func TestValidateTargetArch_ErrorMessageContainsKnownArches(t *testing.T) {
 
 // containsStr is a simple substring helper to avoid importing strings in test.
 func containsStr(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(s) > 0 && stringContains(s, sub))
+	return len(s) >= len(sub) && (s == sub || s != "" && stringContains(s, sub))
 }
 
 func stringContains(s, sub string) bool {

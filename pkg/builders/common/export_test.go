@@ -21,8 +21,8 @@ var CountDirect = countDirect
 // and partitionArchAllDepsForExtract see it during tests.
 func MakeTestCache(entries []aptcache.PackageInfo) {
 	c := aptcache.NewEmptyCache()
-	for _, e := range entries {
-		c.AddEntry(e)
+	for i := range entries {
+		c.AddEntry(&entries[i])
 	}
 
 	aptcache.StoreGlobal(c)

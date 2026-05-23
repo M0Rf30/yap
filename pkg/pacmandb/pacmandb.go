@@ -8,12 +8,12 @@ package pacmandb
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -95,7 +95,9 @@ func syncRepo(ctx context.Context, repo Repo, arch string) error {
 		return nil
 	}
 
-	return fmt.Errorf("all mirrors failed for repo %q", repo.Name)
+	return errors.New(errors.ErrTypeNetwork, "all mirrors failed for repository").
+		WithOperation("syncRepo").
+		WithContext("repo", repo.Name)
 }
 
 func substituteVars(server, repo, arch string) string {

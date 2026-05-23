@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 
+	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -120,7 +120,9 @@ func verifyInReleaseOrFallback(
 	// match. Treat this the same as "no trust anchor" — bypassable via opt-in.
 	if errors.Is(err, ErrUnknownSigner) {
 		if !allowUnverified {
-			return nil, fmt.Errorf("aptrepo: %s: %w", baseURL, err)
+			return nil, yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "InRelease signature verification failed").
+				WithOperation("verifyInReleaseOrFallback").
+				WithContext("url", baseURL)
 		}
 
 		logger.Warn("skipping InRelease signature check (unknown signer, opt-in)",
@@ -131,12 +133,16 @@ func verifyInReleaseOrFallback(
 
 	// A bad signature (corrupted data, wrong key material) is *never* tolerated.
 	if !errors.Is(err, ErrUnsigned) {
-		return nil, fmt.Errorf("aptrepo: %s: %w", baseURL, err)
+		return nil, yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "InRelease signature verification failed").
+			WithOperation("verifyInReleaseOrFallback").
+			WithContext("url", baseURL)
 	}
 
 	// File is not signed at all → defer to the opt-in.
 	if !allowUnverified {
-		return nil, fmt.Errorf("aptrepo: %s: %w", baseURL, ErrUnsigned)
+		return nil, yaperrors.New(yaperrors.ErrTypeValidation, "InRelease is not signed").
+			WithOperation("verifyInReleaseOrFallback").
+			WithContext("url", baseURL)
 	}
 
 	logger.Warn("accepting unsigned InRelease (opt-in)", "url", baseURL)
@@ -158,8 +164,9 @@ func verifyDetachedOrFallback(
 	// "deb http://… ./" one-liners ship this way historically.
 	if sigErr != nil {
 		if !allowUnverified {
-			return nil, fmt.Errorf("aptrepo: %s: Release.gpg not available: %w (%w)",
-				baseURL, sigErr, ErrUnsigned)
+			return nil, yaperrors.Wrap(sigErr, yaperrors.ErrTypeNetwork, "Release.gpg not available").
+				WithOperation("verifyDetachedOrFallback").
+				WithContext("url", baseURL)
 		}
 
 		logger.Warn("accepting unsigned Release (opt-in)",
@@ -190,7 +197,9 @@ func verifyDetachedOrFallback(
 	// Unknown signer: bypassable via opt-in (same policy as InRelease).
 	if errors.Is(err, ErrUnknownSigner) {
 		if !allowUnverified {
-			return nil, fmt.Errorf("aptrepo: %s: %w", baseURL, err)
+			return nil, yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "Release.gpg signature verification failed").
+				WithOperation("verifyDetachedOrFallback").
+				WithContext("url", baseURL)
 		}
 
 		logger.Warn("skipping Release.gpg signature check (unknown signer, opt-in)",
@@ -199,7 +208,9 @@ func verifyDetachedOrFallback(
 		return body, nil
 	}
 
-	return nil, fmt.Errorf("aptrepo: %s: %w", baseURL, err)
+	return nil, yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "Release.gpg signature verification failed").
+		WithOperation("verifyDetachedOrFallback").
+		WithContext("url", baseURL)
 }
 
 // parseReleaseBody parses the (already-verified, signature-stripped)

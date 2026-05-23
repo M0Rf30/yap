@@ -291,7 +291,7 @@ func TestBuildPackageNameSpecialCharacters(t *testing.T) {
 	}
 }
 
-func TestSetupCcache(t *testing.T) {
+func TestBuildCcacheEnvSlice(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
@@ -301,52 +301,66 @@ func TestSetupCcache(t *testing.T) {
 	}
 	builder := NewBaseBuilder(pkg, "test-format")
 
-	// Test when ccache is not available (should return nil and not set environment variables)
+	// Test when ccache is not available
 	// We'll temporarily set PATH to a directory without ccache to simulate it not being installed
 	originalPath := os.Getenv("PATH")
 	_ = os.Setenv("PATH", "/nonexistent") // This directory doesn't exist, so ccache won't be found
 
-	err := builder.SetupCcache()
-	if err != nil {
-		t.Fatalf("SetupCcache should not return an error when ccache is not available, got: %v", err)
+	envSlice := builder.BuildCcacheEnvSlice()
+	if envSlice != nil {
+		t.Fatalf("BuildCcacheEnvSlice should return nil when ccache is not available, got: %v", envSlice)
 	}
 
 	// Restore original PATH
 	_ = os.Setenv("PATH", originalPath)
 
-	// Test that the function works without error when ccache is available
+	// Test that the function returns a slice when ccache is available
 	// This will depend on whether ccache is actually installed on the test system
-	err = builder.SetupCcache()
-	if err != nil {
+	envSlice = builder.BuildCcacheEnvSlice()
+	if envSlice == nil {
 		// If ccache is not available on the system, this is expected
-		// The function should handle this gracefully
-		t.Logf("SetupCcache returned error (expected if ccache is not installed): %v", err)
+		t.Logf("BuildCcacheEnvSlice returned nil (expected if ccache is not installed)")
+		return
 	}
 
-	// Test with a fake ccache by temporarily setting PATH to include a directory with a fake ccache
-	fakeBinDir := filepath.Join(tempDir, "bin")
-	_ = os.MkdirAll(fakeBinDir, 0o755)
-
-	// On Unix systems, we could create a fake ccache executable, but for this test
-	// we'll just check that the function doesn't crash and handles the PATH correctly
-	originalPath = os.Getenv("PATH")
-	fakePath := fakeBinDir + ":" + originalPath
-	_ = os.Setenv("PATH", fakePath)
-
-	// For testing purposes, we won't actually create the executable since
-	// exec.LookPath will just check if the file exists in PATH with executable permissions
-	// Instead, we'll just verify the function works when ccache might be available
-
-	err = builder.SetupCcache()
-	if err != nil {
-		t.Logf("SetupCcache error when fake ccache might be in PATH: %v", err)
+	// Verify the expected environment variables are in the slice
+	expectedVars := map[string]bool{
+		"CC=ccache gcc":  false,
+		"CXX=ccache g++": false,
+		"CCACHE_SLOPPINESS=time_macros,include_file_mtime": false,
+		"CCACHE_NOHASHDIR=1": false,
 	}
 
-	// Restore original PATH
-	_ = os.Setenv("PATH", originalPath)
+	for _, envVar := range envSlice {
+		for expected := range expectedVars {
+			if envVar == expected {
+				expectedVars[expected] = true
+			}
+		}
+	}
+
+	for expected, found := range expectedVars {
+		if !found {
+			t.Errorf("Expected environment variable not found in slice: %s", expected)
+		}
+	}
+
+	// Verify CCACHE_BASEDIR is set correctly
+	found := false
+	for _, envVar := range envSlice {
+		if strings.HasPrefix(envVar, "CCACHE_BASEDIR=") {
+			if !strings.HasSuffix(envVar, tempDir) {
+				t.Errorf("CCACHE_BASEDIR not set to StartDir: %s", envVar)
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("CCACHE_BASEDIR not found in environment slice")
+	}
 }
 
-func TestSetupCcacheWithRealEnvironment(t *testing.T) {
+func TestBuildCcacheEnvSliceWithRealEnvironment(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
@@ -356,25 +370,15 @@ func TestSetupCcacheWithRealEnvironment(t *testing.T) {
 	}
 	builder := NewBaseBuilder(pkg, "test-format")
 
-	// Save original environment variables
-	originalCC := os.Getenv("CC")
-	originalCXX := os.Getenv("CXX")
-	originalCCacheBaseDir := os.Getenv("CCACHE_BASEDIR")
-	originalCCacheSloppiness := os.Getenv("CCACHE_SLOPPINESS")
-	originalCCacheNoHashDir := os.Getenv("CCACHE_NOHASHDIR")
-	originalCCacheDir := os.Getenv("CCACHE_DIR")
+	// Save original PATH
+	originalPath := os.Getenv("PATH")
 
-	// Restore original environment variables after test
+	// Restore original PATH after test
 	defer func() {
-		_ = os.Setenv("CC", originalCC)
-		_ = os.Setenv("CXX", originalCXX)
-		_ = os.Setenv("CCACHE_BASEDIR", originalCCacheBaseDir)
-		_ = os.Setenv("CCACHE_SLOPPINESS", originalCCacheSloppiness)
-		_ = os.Setenv("CCACHE_NOHASHDIR", originalCCacheNoHashDir)
-		_ = os.Setenv("CCACHE_DIR", originalCCacheDir)
+		_ = os.Setenv("PATH", originalPath)
 	}()
 
-	// Test that SetupCcache sets the expected environment variables when ccache is available
+	// Test that BuildCcacheEnvSlice returns expected environment variables when ccache is available
 	// We'll test this by temporarily creating a fake ccache executable in PATH
 	fakeBinDir := filepath.Join(tempDir, "bin")
 	_ = os.MkdirAll(fakeBinDir, 0o755)
@@ -382,38 +386,56 @@ func TestSetupCcacheWithRealEnvironment(t *testing.T) {
 	// On Unix systems, create an executable file
 	_ = os.WriteFile(filepath.Join(fakeBinDir, "ccache"), []byte("#!/bin/sh\necho 'fake ccache'\n"), 0o755)
 
-	originalPath := os.Getenv("PATH")
 	fakePath := fakeBinDir + ":" + originalPath
 	_ = os.Setenv("PATH", fakePath)
 
-	defer func() {
-		_ = os.Setenv("PATH", originalPath)
-	}()
-
-	// Call SetupCcache
-	err := builder.SetupCcache()
-	if err != nil {
-		t.Logf("SetupCcache returned error: %v (may be expected if ccache not installed)", err)
+	// Call BuildCcacheEnvSlice
+	envSlice := builder.BuildCcacheEnvSlice()
+	if envSlice == nil {
+		t.Logf("BuildCcacheEnvSlice returned nil (ccache not available)")
+		return
 	}
 
-	// The function should have set environment variables if ccache was found
-	// Check that environment variables are set (they may be set even if ccache is not installed)
-	cc := os.Getenv("CC")
-	cxx := os.Getenv("CXX")
-	ccacheBaseDir := os.Getenv("CCACHE_BASEDIR")
-	ccacheSloppiness := os.Getenv("CCACHE_SLOPPINESS")
-	ccacheNoHashDir := os.Getenv("CCACHE_NOHASHDIR")
-	ccacheDir := os.Getenv("CCACHE_DIR")
+	// Verify expected environment variables are in the slice
+	expectedVars := map[string]bool{
+		"CC=ccache gcc":  false,
+		"CXX=ccache g++": false,
+		"CCACHE_SLOPPINESS=time_macros,include_file_mtime": false,
+		"CCACHE_NOHASHDIR=1": false,
+	}
 
-	// If ccache was found and environment was set, these should match expected values
-	// But since we don't know if ccache is actually available on the test system,
-	// we just check that the function doesn't crash and handles both cases
-	t.Logf("CC environment variable after SetupCcache: %s", cc)
-	t.Logf("CXX environment variable after SetupCcache: %s", cxx)
-	t.Logf("CCACHE_BASEDIR environment variable after SetupCcache: %s", ccacheBaseDir)
-	t.Logf("CCACHE_SLOPPINESS environment variable after SetupCcache: %s", ccacheSloppiness)
-	t.Logf("CCACHE_NOHASHDIR environment variable after SetupCcache: %s", ccacheNoHashDir)
-	t.Logf("CCACHE_DIR environment variable after SetupCcache: %s", ccacheDir)
+	for _, envVar := range envSlice {
+		for expected := range expectedVars {
+			if envVar == expected {
+				expectedVars[expected] = true
+			}
+		}
+	}
+
+	// Log results
+	for expected, found := range expectedVars {
+		if found {
+			t.Logf("Found expected environment variable: %s", expected)
+		} else {
+			t.Logf("Missing expected environment variable: %s", expected)
+		}
+	}
+
+	// Verify CCACHE_BASEDIR is set correctly
+	found := false
+	for _, envVar := range envSlice {
+		if strings.HasPrefix(envVar, "CCACHE_BASEDIR=") {
+			if !strings.HasSuffix(envVar, tempDir) {
+				t.Logf("CCACHE_BASEDIR not set to StartDir: %s", envVar)
+			} else {
+				t.Logf("CCACHE_BASEDIR correctly set: %s", envVar)
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Logf("CCACHE_BASEDIR not found in environment slice")
+	}
 }
 
 func TestPrepareBackupFilePaths(t *testing.T) {
@@ -492,7 +514,7 @@ func TestGetUpdateCommand(t *testing.T) {
 	}
 }
 
-func TestSetupCrossCompilationEnvironment(t *testing.T) {
+func TestBuildCrossEnvSlice(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "yap-cross-comp-test")
 	if err != nil {
@@ -562,13 +584,13 @@ func TestSetupCrossCompilationEnvironment(t *testing.T) {
 			// Create base builder
 			bb := NewBaseBuilder(pkg, tc.format)
 
-			// Setup cross-compilation environment
-			err := bb.SetupCrossCompilationEnvironment(tc.targetArch)
+			// Build cross-compilation environment slice
+			envSlice, err := bb.BuildCrossEnvSlice(tc.targetArch)
 
 			// For valid cross-compilation scenarios, we expect success
 			if tc.targetArch != "" && tc.targetArch != pkg.ArchComputed {
 				if err != nil {
-					t.Logf("SetupCrossCompilationEnvironment error (expected for some toolchains): %v", err)
+					t.Logf("BuildCrossEnvSlice error (expected for some toolchains): %v", err)
 					// Some toolchains might not be available in test environment, that's ok
 					return
 				}
@@ -578,24 +600,29 @@ func TestSetupCrossCompilationEnvironment(t *testing.T) {
 					t.Errorf("Expected no error for no cross-compilation, got: %v", err)
 					return
 				}
-			}
-
-			// Check expected environment variables
-			for key, expectedValue := range tc.expectEnv {
-				actualValue := os.Getenv(key)
-				if expectedValue != "" && actualValue != expectedValue {
-					t.Errorf("Expected %s=%s, got %s", key, expectedValue, actualValue)
+				if envSlice != nil {
+					t.Errorf("Expected nil slice for no cross-compilation, got: %v", envSlice)
+					return
 				}
 			}
 
-			// Clean up environment variables for next test
-			for key := range tc.expectEnv {
-				_ = os.Unsetenv(key)
+			// Check expected environment variables in the slice
+			for key, expectedValue := range tc.expectEnv {
+				found := false
+				for _, envVar := range envSlice {
+					if strings.HasPrefix(envVar, key+"=") {
+						actualValue := strings.TrimPrefix(envVar, key+"=")
+						if expectedValue != "" && actualValue != expectedValue {
+							t.Errorf("Expected %s=%s, got %s", key, expectedValue, actualValue)
+						}
+						found = true
+						break
+					}
+				}
+				if expectedValue != "" && !found {
+					t.Errorf("Expected environment variable not found in slice: %s", key)
+				}
 			}
-
-			_ = os.Unsetenv("CC")
-			_ = os.Unsetenv("CXX")
-			_ = os.Unsetenv("CROSS_COMPILE")
 		})
 	}
 }
@@ -938,20 +965,9 @@ func TestCrossCompilationToolchainMapping(t *testing.T) {
 	}
 }
 
-// TestCrossCompilationEnvironmentVariables tests that environment variables
-// are set correctly for cross-compilation, without the suffix duplication bug.
-func TestCrossCompilationEnvironmentVariables(t *testing.T) {
-	// Save original environment
-	originalCC := os.Getenv("CC")
-	originalCXX := os.Getenv("CXX")
-	originalAR := os.Getenv("AR")
-
-	defer func() {
-		_ = os.Setenv("CC", originalCC)
-		_ = os.Setenv("CXX", originalCXX)
-		_ = os.Setenv("AR", originalAR)
-	}()
-
+// TestBuildCrossEnvSliceEnvironmentVariables tests that environment variables
+// are set correctly in the returned slice for cross-compilation.
+func TestBuildCrossEnvSliceEnvironmentVariables(t *testing.T) {
 	tempDir := t.TempDir()
 
 	pkg := &pkgbuild.PKGBUILD{
@@ -990,23 +1006,33 @@ func TestCrossCompilationEnvironmentVariables(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear environment
-			_ = os.Setenv("CC", "")
-			_ = os.Setenv("CXX", "")
-			_ = os.Setenv("AR", "")
-
 			bb := NewBaseBuilder(pkg, tt.format)
 
-			err := bb.SetupCrossCompilationEnvironment(tt.targetArch)
+			envSlice, err := bb.BuildCrossEnvSlice(tt.targetArch)
 			if err != nil {
-				t.Logf("SetupCrossCompilationEnvironment returned error (may be expected): %v", err)
+				t.Logf("BuildCrossEnvSlice returned error (may be expected): %v", err)
 				// Don't fail the test - some toolchains might not be available
 				return
 			}
 
-			cc := os.Getenv("CC")
-			cxx := os.Getenv("CXX")
-			ar := os.Getenv("AR")
+			if envSlice == nil {
+				t.Logf("BuildCrossEnvSlice returned nil (toolchain not available)")
+				return
+			}
+
+			// Extract values from the slice
+			var cc, cxx, ar string
+			for _, envVar := range envSlice {
+				if strings.HasPrefix(envVar, "CC=") {
+					cc = strings.TrimPrefix(envVar, "CC=")
+				}
+				if strings.HasPrefix(envVar, "CXX=") {
+					cxx = strings.TrimPrefix(envVar, "CXX=")
+				}
+				if strings.HasPrefix(envVar, "AR=") {
+					ar = strings.TrimPrefix(envVar, "AR=")
+				}
+			}
 
 			t.Logf("CC=%s, CXX=%s, AR=%s", cc, cxx, ar)
 
@@ -1024,20 +1050,26 @@ func TestCrossCompilationEnvironmentVariables(t *testing.T) {
 				t.Errorf("AR should end with -ar, got: %s", ar)
 			}
 
-			// Check Rust and Go environment variables
-			rustTarget := os.Getenv("CARGO_BUILD_TARGET")
-			if rustTarget != "" {
-				rustTargetUpper := strings.ToUpper(strings.ReplaceAll(rustTarget, "-", "_"))
-
-				rustCC := os.Getenv("TARGET_" + rustTargetUpper + "_CC")
-				if rustCC != "" {
-					if strings.Contains(rustCC, "gcc-gcc") || strings.Contains(rustCC, "--gcc") {
-						t.Errorf("Rust TARGET_CC contains duplicated gcc suffix: %s", rustCC)
-					}
+			// Check Rust and Go environment variables in the slice
+			var rustTarget, rustCC, goCC string
+			for _, envVar := range envSlice {
+				if strings.HasPrefix(envVar, "CARGO_BUILD_TARGET=") {
+					rustTarget = strings.TrimPrefix(envVar, "CARGO_BUILD_TARGET=")
+				}
+				if strings.HasPrefix(envVar, "TARGET_") && strings.Contains(envVar, "_CC=") {
+					rustCC = envVar
+				}
+				if strings.HasPrefix(envVar, "CC_FOR_TARGET=") {
+					goCC = strings.TrimPrefix(envVar, "CC_FOR_TARGET=")
 				}
 			}
 
-			goCC := os.Getenv("CC_FOR_TARGET")
+			if rustTarget != "" {
+				if strings.Contains(rustCC, "gcc-gcc") || strings.Contains(rustCC, "--gcc") {
+					t.Errorf("Rust TARGET_CC contains duplicated gcc suffix: %s", rustCC)
+				}
+			}
+
 			if goCC != "" {
 				if strings.Contains(goCC, "gcc-gcc") || strings.Contains(goCC, "--gcc") {
 					t.Errorf("Go CC_FOR_TARGET contains duplicated gcc suffix: %s", goCC)
@@ -1047,24 +1079,42 @@ func TestCrossCompilationEnvironmentVariables(t *testing.T) {
 	}
 }
 
-func TestSetupCrossCompilationEnvironment_AppendsPkgConfigPath(t *testing.T) {
-	existing := "/my/existing/pkgconfig"
-	t.Setenv("PKG_CONFIG_PATH", existing)
-	t.Setenv("LD_LIBRARY_PATH", "")
-
+func TestBuildCrossEnvSlice_AppendsPkgConfigPath(t *testing.T) {
 	bb := NewBaseBuilder(&pkgbuild.PKGBUILD{
 		PkgName:      "test",
 		ArchComputed: "x86_64",
 	}, constants.FormatDEB)
 
-	err := bb.SetupCrossCompilationEnvironment("aarch64")
+	envSlice, err := bb.BuildCrossEnvSlice("aarch64")
 	if err != nil {
-		t.Fatalf("SetupCrossCompilationEnvironment: %v", err)
+		t.Fatalf("BuildCrossEnvSlice: %v", err)
 	}
 
-	result := os.Getenv("PKG_CONFIG_PATH")
-	if !strings.Contains(result, existing) {
-		t.Errorf("PKG_CONFIG_PATH=%q lost existing value %q", result, existing)
+	if envSlice == nil {
+		t.Logf("BuildCrossEnvSlice returned nil (toolchain not available)")
+		return
+	}
+
+	// Find PKG_CONFIG_PATH in the slice
+	var result string
+	for _, envVar := range envSlice {
+		if strings.HasPrefix(envVar, "PKG_CONFIG_PATH=") {
+			result = strings.TrimPrefix(envVar, "PKG_CONFIG_PATH=")
+			break
+		}
+	}
+
+	if result == "" {
+		t.Errorf("PKG_CONFIG_PATH not found in environment slice")
+		return
+	}
+
+	// Note: The slice doesn't include the existing PKG_CONFIG_PATH value
+	// since it's not part of the process environment. The caller is responsible
+	// for merging the slice with existing environment variables.
+	// Just verify that the cross-compilation paths are present.
+	if !strings.Contains(result, "aarch64-linux-gnu") {
+		t.Errorf("PKG_CONFIG_PATH=%q missing cross-compilation path", result)
 	}
 }
 

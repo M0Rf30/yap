@@ -181,14 +181,19 @@ func refreshCrossAptIndexes() error {
 	return nil
 }
 
+const (
+	ubuntuPortsURI = "http://ports.ubuntu.com/ubuntu-ports/"
+	debianPortsURI = "http://deb.debian.org/debian-ports/"
+)
+
 // portsURIFor returns the per-distro ports archive URI used for non-primary
 // architectures, or "" when the distro is not supported.
 func portsURIFor(distro string) string {
 	switch distro {
 	case constants.DistroUbuntu:
-		return "http://ports.ubuntu.com/ubuntu-ports/"
+		return ubuntuPortsURI
 	case constants.DistroDebian:
-		return "http://deb.debian.org/debian-ports/"
+		return debianPortsURI
 	}
 
 	return ""

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/dnfinstall"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -38,33 +40,14 @@ const (
 	distroUbuntu = "ubuntu"
 )
 
-// envMutex serializes access to os.Setenv calls in SetupCcache and
-// SetupCrossCompilationEnvironment to prevent race conditions in parallel builds.
-// When multiple packages targeting different architectures are built concurrently,
-// they would otherwise stomp on each other's environment variables.
+// envMutex serializes access to os.Setenv calls in SetupCrossStripEnv to prevent
+// race conditions in parallel builds. When multiple packages targeting different
+// architectures are built concurrently, they would otherwise stomp on each other's
+// environment variables.
 var envMutex sync.Mutex
 
 // depVersionRegex matches version operators in dependency strings like "gcc<=11.0".
 var depVersionRegex = regexp.MustCompile(`(<=|>=|=|>|<)`)
-
-// Builder defines the common interface that all package builders must implement.
-// This unifies the behavior across different package formats (APK, DEB, RPM, Pacman).
-type Builder interface {
-	// BuildPackage creates the package file at the specified artifacts path
-	BuildPackage(artifactsPath string, targetArch string) (string, error)
-
-	// PrepareFakeroot sets up the package metadata and prepares the build environment
-	PrepareFakeroot(artifactsPath string, targetArch string) error
-
-	// Prepare installs build dependencies and prepares the build environment
-	Prepare(makeDepends []string, targetArch string) error
-
-	// PrepareEnvironment sets up the build environment with necessary tools
-	PrepareEnvironment(golang bool, targetArch string) error
-
-	// Update updates the package manager's package database
-	Update() error
-}
 
 // BaseBuilder provides common functionality that can be embedded in concrete builders.
 type BaseBuilder struct {
@@ -341,12 +324,15 @@ func getUpdateCommand(format string) string {
 
 // Prepare installs build dependencies using the appropriate package manager.
 // This consolidates duplicated Prepare methods across all builders.
-func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
-	ctx := context.Background()
-	installArgs := constants.GetInstallArgs(bb.Format)
-
+func (bb *BaseBuilder) Prepare(ctx context.Context, makeDepends []string, targetArch string) error {
 	// Non-cross-compile path: install makedepends directly.
 	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
+		// RPM: use pure-Go dnfinstall
+		if bb.Format == constants.FormatRPM {
+			return bb.installRPMDeps(ctx, makeDepends)
+		}
+
+		installArgs := constants.GetInstallArgs(bb.Format)
 		return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, makeDepends)
 	}
 
@@ -376,9 +362,15 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 	// used directly (the cross-compiler is pointed at them via PKG_CONFIG_PATH
 	// and CROSS_COMPILE set in SetupCrossCompilationEnvironment).
 	if bb.Format == constants.FormatDEB {
-		return bb.installCrossDeps(ctx, makeDepends, installArgs, targetArch)
+		return bb.installCrossDeps(ctx, makeDepends, constants.GetInstallArgs(bb.Format), targetArch)
 	}
 
+	// RPM: use pure-Go dnfinstall
+	if bb.Format == constants.FormatRPM {
+		return bb.installRPMDeps(ctx, makeDepends)
+	}
+
+	installArgs := constants.GetInstallArgs(bb.Format)
 	return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, makeDepends)
 }
 
@@ -388,7 +380,7 @@ func (bb *BaseBuilder) Prepare(makeDepends []string, targetArch string) error {
 // "yap prepare" whose job is to *install* the cross-compiler — the toolchain
 // cannot be present before it is installed.  Validation runs later during the
 // build stage (builder.processFunction → SetupCrossCompilationEnvironment).
-func (bb *BaseBuilder) PrepareEnvironment(golang bool, targetArch string) error {
+func (bb *BaseBuilder) PrepareEnvironment(ctx context.Context, golang bool, targetArch string) error {
 	return bb.prepareEnvironmentWithValidation(golang, targetArch, true)
 }
 
@@ -473,15 +465,33 @@ func (bb *BaseBuilder) refreshCcacheSymlinks() {
 // Packages index files for unsigned extra repos (e.g. --repo flags) to
 // /var/lib/apt/lists/. Without it, apt silently skips those repos and
 // aptcache.Reload() cannot see their packages for arch classification.
-func (bb *BaseBuilder) Update() error {
-	ctx := context.Background()
-
+func (bb *BaseBuilder) Update(ctx context.Context) error {
 	cmd := getUpdateCommand(bb.Format)
 	if bb.Format == constants.FormatDEB {
 		return bb.PKGBUILD.GetUpdates(ctx, getPackageManager(bb.Format), cmd, "--allow-insecure-repositories")
 	}
 
 	return bb.PKGBUILD.GetUpdates(ctx, getPackageManager(bb.Format), cmd)
+}
+
+// installRPMDeps installs RPM dependencies using the pure-Go dnfinstall package.
+// This is called by Prepare and cross-compilation paths when the format is RPM.
+func (bb *BaseBuilder) installRPMDeps(ctx context.Context, deps []string) error {
+	if len(deps) == 0 {
+		return nil
+	}
+
+	logger.Info("installing RPM dependencies via pure-Go dnfinstall",
+		"packages", len(deps),
+		"packages_list", strings.Join(deps, ", "))
+
+	if err := dnfinstall.Install(ctx, deps); err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to install RPM dependencies").
+			WithOperation("installRPMDeps").
+			WithContext("packages", strings.Join(deps, ", "))
+	}
+
+	return nil
 }
 
 // BuildCcacheEnvSlice returns ccache environment variables as a "KEY=VALUE" slice
@@ -510,94 +520,6 @@ func (bb *BaseBuilder) BuildCcacheEnvSlice() []string {
 		// $HOME/.cache/ccache. Persistent caches (e.g. Kubernetes volumes) mounted
 		// at that path are then shared across builds within the same user account.
 	}
-}
-
-// SetupCcache configures the build environment to use ccache if available.
-// It checks if ccache is available and sets up environment variables to enable
-// ccache for faster compilation. Uses a mutex to serialize access to os.Setenv
-// to prevent race conditions in parallel builds.
-//
-// Idempotent: returns immediately if YAP_CCACHE_SETUP is already set. The
-// ccache configuration is process-global (os.Setenv), so re-running it for
-// every package in a yap.json iteration only produces redundant log lines
-// and pointless envMutex contention.
-//
-// Note: SetupCcache and SetupCrossCompilationEnvironment write to the same
-// CC/CXX variables. When both are needed for a build, the call site invokes
-// SetupCcache first, then SetupCrossCompilationEnvironment, which overwrites
-// CC/CXX with the cross-compiler and relies on CCACHE_PREFIX to wrap it.
-// The memoization here is per-process, so a yap.json batch that mixes
-// cross- and non-cross-arch builds will not re-run ccache setup between
-// them — that pattern was already racy with the process-global os.Setenv
-// approach and is tracked separately.
-func (bb *BaseBuilder) SetupCcache() error {
-	// Already configured for this process — skip.
-	if os.Getenv("YAP_CCACHE_SETUP") == "1" {
-		logger.Debug("ccache already configured; skipping",
-			"package", bb.PKGBUILD.PkgName)
-
-		return nil
-	}
-
-	// Check if ccache is available in the system using Go's exec.LookPath
-	_, err := exec.LookPath("ccache")
-	ccacheAvailable := err == nil // ccache is available if command is found in PATH
-
-	if !ccacheAvailable {
-		// ccache not found, log and continue without ccache.
-		// Mark "setup attempted" so subsequent packages don't repeat the lookup.
-		if err := setenv("YAP_CCACHE_SETUP", "1"); err != nil {
-			return err
-		}
-
-		logger.Info(i18n.T("logger.setupccache.info.ccache_not_found_skipping_1"),
-			"package", bb.PKGBUILD.PkgName)
-
-		return nil
-	}
-
-	// Serialize access to os.Setenv to prevent race conditions in parallel builds
-	envMutex.Lock()
-	defer envMutex.Unlock()
-
-	// Set up ccache environment variables. CC/CXX are wrapped only when the
-	// build is not cross-compiling — for cross builds SetupCrossCompilationEnvironment
-	// runs after this function and substitutes the bare cross-compiler, relying
-	// on the /usr/lib/ccache (or /usr/lib64/ccache) symlinks to invoke ccache.
-	if err := setenv("CC", "ccache gcc"); err != nil {
-		return err
-	}
-
-	if err := setenv("CXX", "ccache g++"); err != nil {
-		return err
-	}
-
-	if err := setenv("CCACHE_BASEDIR", bb.PKGBUILD.StartDir); err != nil {
-		return err
-	}
-
-	if err := setenv("CCACHE_SLOPPINESS", "time_macros,include_file_mtime"); err != nil {
-		return err
-	}
-
-	if err := setenv("CCACHE_NOHASHDIR", "1"); err != nil {
-		return err
-	}
-
-	// CCACHE_DIR is intentionally left unset so ccache resolves to its default
-	// $HOME/.cache/ccache. Persistent caches (e.g. Kubernetes volumes) mounted
-	// at that path are then shared across builds within the same user account.
-
-	// Mark setup so subsequent packages in the same process skip the full
-	// re-configuration. See the function-level comment for rationale.
-	if err := setenv("YAP_CCACHE_SETUP", "1"); err != nil {
-		return err
-	}
-
-	logger.Info(i18n.T("logger.setupccache.info.ccache_enabled_for_build_1"),
-		"package", bb.PKGBUILD.PkgName)
-
-	return nil
 }
 
 // PrepareScriptletWithHelpers prepends the PKGBUILD helper function preamble to a scriptlet body.

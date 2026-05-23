@@ -4,9 +4,45 @@
 
 package rpmdbgen
 
+type Basename struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+type Conflictname struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+type Dirname struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+type Filedigest struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+type Installtid struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
 type Name struct {
 	Name string
 	Hnum int64
+}
+
+type Obsoletename struct {
+	Key  string
+	Hnum int64
+	Idx  int64
 }
 
 type Package struct {
@@ -15,6 +51,30 @@ type Package struct {
 }
 
 type Providename struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+type Requirename struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+type Sha1header struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+type Sigmd5 struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+type Triggername struct {
 	Key  string
 	Hnum int64
 	Idx  int64

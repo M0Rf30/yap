@@ -5,13 +5,13 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -41,9 +41,10 @@ func (idx *Index) InstallPackagesWithOptions(
 	ctx context.Context, names []string, opts InstallOptions,
 ) error {
 	if !opts.AllowUnverifiedPackages {
-		return fmt.Errorf(
-			"apkindex: APK signature verification is not yet implemented; " +
-				"set InstallOptions.AllowUnverifiedPackages to acknowledge")
+		return errors.New(errors.ErrTypeValidation,
+			"APK signature verification is not yet implemented; "+
+				"set InstallOptions.AllowUnverifiedPackages to acknowledge").
+			WithOperation("InstallPackagesWithOptions")
 	}
 
 	logger.Warn("installing APK packages without signature verification " +
@@ -52,7 +53,8 @@ func (idx *Index) InstallPackagesWithOptions(
 	// 1. Resolve transitive deps.
 	resolved, err := idx.ResolveDeps(names)
 	if err != nil {
-		return fmt.Errorf("apkindex: resolve deps: %w", err)
+		return errors.Wrap(err, errors.ErrTypeInternal, "failed to resolve dependencies").
+			WithOperation("InstallPackagesWithOptions")
 	}
 
 	if len(resolved) == 0 {
@@ -92,7 +94,8 @@ func (idx *Index) InstallPackagesWithOptions(
 	// 3. Download all .apk files to a temp dir.
 	tmpDir, err := os.MkdirTemp("", "yap-apk-*")
 	if err != nil {
-		return fmt.Errorf("apkindex: mktemp: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary directory").
+			WithOperation("InstallPackagesWithOptions")
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
@@ -110,7 +113,9 @@ func (idx *Index) InstallPackagesWithOptions(
 		apkPath := filepath.Join(tmpDir, p.Name+"-"+p.Version+".apk")
 
 		if err := extractAndRegister(apkPath, p); err != nil {
-			return fmt.Errorf("apkindex: install %s: %w", p.Name, err)
+			return errors.Wrap(err, errors.ErrTypePackaging, "failed to install package").
+				WithOperation("InstallPackagesWithOptions").
+				WithContext("package", p.Name)
 		}
 
 		logger.Debug("installed", "package", p.Name, "version", p.Version)
@@ -167,7 +172,9 @@ func extractAndRegister(apkPath string, pkg *Package) error {
 	// Open the .apk file (2-or-3-stream concatenated gzip: [signature] + control + data).
 	f, err := os.Open(apkPath) // #nosec G304 -- temp dir path
 	if err != nil {
-		return fmt.Errorf("open apk: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open APK file").
+			WithOperation("extractAndRegister").
+			WithContext("path", apkPath)
 	}
 	defer func() { _ = f.Close() }()
 
@@ -196,7 +203,9 @@ func extractAndRegister(apkPath string, pkg *Package) error {
 
 	// Register in /lib/apk/db/installed.
 	if err := registerInstalled(pkg, pkgInfo); err != nil {
-		return fmt.Errorf("register installed: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to register installed package").
+			WithOperation("extractAndRegister").
+			WithContext("package", pkg.Name)
 	}
 
 	return nil
@@ -209,7 +218,8 @@ func extractAndRegister(apkPath string, pkg *Package) error {
 func tryReadPkgInfoFromNextStream(br *bufio.Reader) (string, error) {
 	gz, err := gzip.NewReader(br)
 	if err != nil {
-		return "", fmt.Errorf("gzip reader: %w", err)
+		return "", errors.Wrap(err, errors.ErrTypeParser, "failed to create gzip reader").
+			WithOperation("tryReadPkgInfoFromNextStream")
 	}
 	defer func() { _ = gz.Close() }()
 
@@ -227,13 +237,15 @@ func tryReadPkgInfoFromNextStream(br *bufio.Reader) (string, error) {
 		}
 
 		if err != nil {
-			return "", fmt.Errorf("tar read: %w", err)
+			return "", errors.Wrap(err, errors.ErrTypeParser, "failed to read tar entry").
+				WithOperation("tryReadPkgInfoFromNextStream")
 		}
 
 		if hdr.Name == ".PKGINFO" {
 			data, err := io.ReadAll(io.LimitReader(tr, 1<<20)) // 1 MiB cap
 			if err != nil {
-				return "", fmt.Errorf("read pkginfo: %w", err)
+				return "", errors.Wrap(err, errors.ErrTypeParser, "failed to read .PKGINFO file").
+					WithOperation("tryReadPkgInfoFromNextStream")
 			}
 
 			pkgInfo = string(data)
@@ -252,7 +264,8 @@ func tryReadPkgInfoFromNextStream(br *bufio.Reader) (string, error) {
 func extractAPKData(r io.Reader) error {
 	gz2, err := gzip.NewReader(r)
 	if err != nil {
-		return fmt.Errorf("gzip reader 2: %w", err)
+		return errors.Wrap(err, errors.ErrTypeParser, "failed to create gzip reader for data stream").
+			WithOperation("extractAPKData")
 	}
 	defer func() { _ = gz2.Close() }()
 
@@ -265,7 +278,8 @@ func extractAPKData(r io.Reader) error {
 		}
 
 		if err != nil {
-			return fmt.Errorf("tar read data: %w", err)
+			return errors.Wrap(err, errors.ErrTypeParser, "failed to read tar entry from data stream").
+				WithOperation("extractAPKData")
 		}
 
 		if err := extractAPKEntry(tr2, hdr); err != nil {
@@ -304,7 +318,10 @@ func safeAPKSymlinkTarget(linkPath, target string) error {
 
 	resolved := filepath.Clean(filepath.Join(filepath.Dir(linkPath), target))
 	if strings.HasPrefix(resolved, "..") {
-		return fmt.Errorf("symlink %q -> %q escapes root", linkPath, target)
+		return errors.New(errors.ErrTypeValidation, "symlink target escapes root").
+			WithOperation("safeAPKSymlinkTarget").
+			WithContext("link_path", linkPath).
+			WithContext("target", target)
 	}
 
 	return nil
@@ -322,7 +339,9 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 
 	// Create parent directories.
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create parent directories").
+			WithOperation("extractAPKEntry").
+			WithContext("path", targetPath)
 	}
 
 	switch hdr.Typeflag {
@@ -341,20 +360,26 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 
 		f, err := os.Create(tmpPath) // #nosec G304 — derived from safeAPKPath
 		if err != nil {
-			return fmt.Errorf("create file: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary file").
+				WithOperation("extractAPKEntry").
+				WithContext("path", tmpPath)
 		}
 
 		if _, err := io.Copy(f, io.LimitReader(tr, maxFileSize)); err != nil {
 			_ = f.Close()
 			_ = os.Remove(tmpPath)
 
-			return fmt.Errorf("copy file: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to copy file contents").
+				WithOperation("extractAPKEntry").
+				WithContext("path", tmpPath)
 		}
 
 		if err := f.Close(); err != nil {
 			_ = os.Remove(tmpPath)
 
-			return fmt.Errorf("close file: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to close file").
+				WithOperation("extractAPKEntry").
+				WithContext("path", tmpPath)
 		}
 
 		// Preserve permissions before the rename so the file is in its
@@ -362,19 +387,26 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 		if err := os.Chmod(tmpPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
 			_ = os.Remove(tmpPath)
 
-			return fmt.Errorf("chmod: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set file permissions").
+				WithOperation("extractAPKEntry").
+				WithContext("path", tmpPath)
 		}
 
 		if err := os.Rename(tmpPath, targetPath); err != nil {
 			_ = os.Remove(tmpPath)
 
-			return fmt.Errorf("rename file: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to rename file").
+				WithOperation("extractAPKEntry").
+				WithContext("from", tmpPath).
+				WithContext("to", targetPath)
 		}
 
 	case tar.TypeDir:
 		// Directory.
 		if err := os.MkdirAll(targetPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
-			return fmt.Errorf("mkdir: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create directory").
+				WithOperation("extractAPKEntry").
+				WithContext("path", targetPath)
 		}
 
 	case tar.TypeSymlink:
@@ -388,7 +420,10 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 		if err := os.Symlink(hdr.Linkname, targetPath); err != nil {
 			// Ignore if already exists.
 			if !os.IsExist(err) {
-				return fmt.Errorf("symlink: %w", err)
+				return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create symlink").
+					WithOperation("extractAPKEntry").
+					WithContext("path", targetPath).
+					WithContext("target", hdr.Linkname)
 			}
 		}
 	}
@@ -401,7 +436,9 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 // replaced rather than appended (which would leak duplicate entries).
 func registerInstalled(pkg *Package, pkgInfo string) error {
 	if err := os.MkdirAll(filepath.Dir(apkInstalledDB), 0o755); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create database directory").
+			WithOperation("registerInstalled").
+			WithContext("path", filepath.Dir(apkInstalledDB))
 	}
 
 	// Read existing DB → stanza map keyed by package name.
@@ -413,8 +450,19 @@ func registerInstalled(pkg *Package, pkgInfo string) error {
 	if pkgInfo != "" {
 		stanza = pkgInfo
 	} else {
-		stanza = fmt.Sprintf("P:%s\nV:%s\nA:%s\nI:%d\n",
-			pkg.Name, pkg.Version, pkg.Arch, pkg.InstSize)
+		// Build stanza manually without fmt.Sprintf
+		var sb strings.Builder
+		sb.WriteString("P:")
+		sb.WriteString(pkg.Name)
+		sb.WriteString("\nV:")
+		sb.WriteString(pkg.Version)
+		sb.WriteString("\nA:")
+		sb.WriteString(pkg.Arch)
+		sb.WriteString("\nI:")
+		// Convert int64 to string
+		sb.WriteString(string(rune(pkg.InstSize)))
+		sb.WriteString("\n")
+		stanza = sb.String()
 	}
 
 	existing[pkg.Name] = strings.TrimRight(stanza, "\n") + "\n"
@@ -479,7 +527,9 @@ func writeInstalledStanzas(stanzas map[string]string) error {
 	// nolint:gosec // G304: constant path
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
-		return fmt.Errorf("open db: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open database file").
+			WithOperation("writeInstalledStanzas").
+			WithContext("path", tmpPath)
 	}
 
 	names := make([]string, 0, len(stanzas))
@@ -494,7 +544,9 @@ func writeInstalledStanzas(stanzas map[string]string) error {
 			_ = f.Close()
 			_ = os.Remove(tmpPath)
 
-			return fmt.Errorf("write stanza: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write stanza to database").
+				WithOperation("writeInstalledStanzas").
+				WithContext("package", n)
 		}
 	}
 
@@ -502,19 +554,26 @@ func writeInstalledStanzas(stanzas map[string]string) error {
 		_ = f.Close()
 		_ = os.Remove(tmpPath)
 
-		return fmt.Errorf("sync db: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to sync database file").
+			WithOperation("writeInstalledStanzas").
+			WithContext("path", tmpPath)
 	}
 
 	if err := f.Close(); err != nil {
 		_ = os.Remove(tmpPath)
 
-		return fmt.Errorf("close db: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to close database file").
+			WithOperation("writeInstalledStanzas").
+			WithContext("path", tmpPath)
 	}
 
 	if err := os.Rename(tmpPath, apkInstalledDB); err != nil {
 		_ = os.Remove(tmpPath)
 
-		return fmt.Errorf("rename db: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to rename database file").
+			WithOperation("writeInstalledStanzas").
+			WithContext("from", tmpPath).
+			WithContext("to", apkInstalledDB)
 	}
 
 	return nil

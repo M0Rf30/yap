@@ -7,7 +7,8 @@ toolchain go1.26.1
 require (
 	github.com/M0Rf30/rpmpack v0.0.0-20260516153039-ce80a51ac79c
 	github.com/ProtonMail/go-crypto v1.4.1
-	github.com/bodgit/sevenzip v1.6.2
+	github.com/bodgit/sevenzip v1.6.3
+	github.com/cavaliergopher/cpio v1.0.1
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.7.0
 	github.com/go-git/go-git/v5 v5.19.1
@@ -41,13 +42,12 @@ require (
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
-	github.com/cavaliergopher/cpio v1.0.1 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
-	github.com/containernetworking/plugins v1.9.0 // indirect
+	github.com/containernetworking/plugins v1.9.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/docker/cli v29.4.3+incompatible // indirect
-	github.com/docker/docker-credential-helpers v0.9.3 // indirect
+	github.com/docker/cli v29.5.2+incompatible // indirect
+	github.com/docker/docker-credential-helpers v0.9.7 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
@@ -55,7 +55,7 @@ require (
 	github.com/go-git/go-billy/v5 v5.9.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/gofrs/flock v0.12.1 // indirect
+	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
@@ -65,7 +65,7 @@ require (
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -78,12 +78,13 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/skeema/knownhosts v1.3.2 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
+	github.com/stangelandcl/ppmd v0.1.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	go4.org v0.0.0-20260112195520-a5071408f32f // indirect
-	golang.org/x/crypto v0.51.0 // indirect
-	golang.org/x/net v0.54.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	modernc.org/libc v1.72.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

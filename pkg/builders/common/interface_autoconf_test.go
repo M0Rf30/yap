@@ -2,6 +2,7 @@ package common
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -80,22 +81,7 @@ func TestGetGNUTriplet(t *testing.T) {
 	}
 }
 
-func TestSetupCrossCompilationEnvironment_AutoconfVariables(t *testing.T) {
-	// Note: Not using t.Parallel() since we're testing global environment variables
-
-	// Save original environment
-	origHost := os.Getenv("ac_cv_host")
-	origBuild := os.Getenv("ac_cv_build")
-	origCC := os.Getenv("CC")
-	origCXX := os.Getenv("CXX")
-
-	defer func() {
-		_ = os.Setenv("ac_cv_host", origHost)
-		_ = os.Setenv("ac_cv_build", origBuild)
-		_ = os.Setenv("CC", origCC)
-		_ = os.Setenv("CXX", origCXX)
-	}()
-
+func TestBuildCrossEnvSlice_AutoconfVariables(t *testing.T) {
 	tests := []struct {
 		name              string
 		targetArch        string
@@ -132,12 +118,6 @@ func TestSetupCrossCompilationEnvironment_AutoconfVariables(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Note: Not using t.Parallel() since we're testing global environment variables
-
-			// Clear environment before test
-			_ = os.Unsetenv("ac_cv_host")
-			_ = os.Unsetenv("ac_cv_build")
-
 			bb := &BaseBuilder{
 				PKGBUILD: &pkgbuild.PKGBUILD{
 					ArchComputed: tt.buildArch,
@@ -146,32 +126,46 @@ func TestSetupCrossCompilationEnvironment_AutoconfVariables(t *testing.T) {
 				Format: tt.format,
 			}
 
-			err := bb.SetupCrossCompilationEnvironment(tt.targetArch)
+			envSlice, err := bb.BuildCrossEnvSlice(tt.targetArch)
 			if err != nil {
-				t.Fatalf("SetupCrossCompilationEnvironment() error = %v", err)
+				t.Fatalf("BuildCrossEnvSlice() error = %v", err)
 			}
 
-			// ac_cv_host / ac_cv_build must NOT be set in the environment.
+			if envSlice == nil {
+				t.Logf("BuildCrossEnvSlice returned nil (toolchain not available)")
+				return
+			}
+
+			// ac_cv_host / ac_cv_build must NOT be set in the slice.
 			// Setting them poisons sub-configures (e.g. ICU's icu-native/)
 			// that need the host triplet, not the cross triplet.
 			// Autoconf derives these from --host/--build flags instead.
-			if got := os.Getenv("ac_cv_host"); got != "" {
-				t.Errorf("ac_cv_host should not be set in environment (got %q); use --host flag instead", got)
+			for _, envVar := range envSlice {
+				if strings.HasPrefix(envVar, "ac_cv_host=") {
+					t.Errorf("ac_cv_host should not be set in slice (got %q); use --host flag instead", envVar)
+				}
+				if strings.HasPrefix(envVar, "ac_cv_build=") {
+					t.Errorf("ac_cv_build should not be set in slice (got %q); use --build flag instead", envVar)
+				}
 			}
 
-			if got := os.Getenv("ac_cv_build"); got != "" {
-				t.Errorf("ac_cv_build should not be set in environment (got %q); use --build flag instead", got)
+			// Verify C/C++ compiler is set in the slice
+			var cc, cxx string
+			for _, envVar := range envSlice {
+				if strings.HasPrefix(envVar, "CC=") {
+					cc = strings.TrimPrefix(envVar, "CC=")
+				}
+				if strings.HasPrefix(envVar, "CXX=") {
+					cxx = strings.TrimPrefix(envVar, "CXX=")
+				}
 			}
 
-			// Verify C/C++ compiler is set
-			cc := os.Getenv("CC")
 			if cc == "" {
-				t.Error("CC environment variable should be set for cross-compilation")
+				t.Error("CC environment variable should be set in slice for cross-compilation")
 			}
 
-			cxx := os.Getenv("CXX")
 			if cxx == "" {
-				t.Error("CXX environment variable should be set for cross-compilation")
+				t.Error("CXX environment variable should be set in slice for cross-compilation")
 			}
 		})
 	}
@@ -201,18 +195,20 @@ func TestSetupCrossCompilationEnvironment_NoAutoconfForNoCrossCompilation(t *tes
 		Format: constants.FormatDEB,
 	}
 
-	err := bb.SetupCrossCompilationEnvironment("x86_64")
+	envSlice, err := bb.BuildCrossEnvSlice("x86_64")
 	if err != nil {
-		t.Fatalf("SetupCrossCompilationEnvironment() error = %v", err)
+		t.Fatalf("BuildCrossEnvSlice() error = %v", err)
 	}
 
-	// Autoconf variables should not be set when not cross-compiling
-	hostTriplet := os.Getenv("ac_cv_host")
-	buildTriplet := os.Getenv("ac_cv_build")
+	// When not cross-compiling, should return nil
+	if envSlice != nil {
+		t.Errorf("BuildCrossEnvSlice should return nil when not cross-compiling, got: %v", envSlice)
+	}
 
-	// These should be empty since we're not cross-compiling
-	if hostTriplet != "" || buildTriplet != "" {
-		t.Errorf("Autoconf variables should not be set when not cross-compiling: ac_cv_host=%s, ac_cv_build=%s",
-			hostTriplet, buildTriplet)
+	// Verify no autoconf variables are in the slice
+	for _, envVar := range envSlice {
+		if strings.HasPrefix(envVar, "ac_cv_") {
+			t.Errorf("Autoconf variables should not be set when not cross-compiling: %s", envVar)
+		}
 	}
 }

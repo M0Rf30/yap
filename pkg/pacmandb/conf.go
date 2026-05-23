@@ -1,9 +1,10 @@
 package pacmandb
 
 import (
-	"fmt"
 	"os"
 	"strings"
+
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // Config represents the parsed pacman.conf configuration.
@@ -30,7 +31,9 @@ func parseConfigWithIncludes(
 	seenIncludes map[string]bool,
 ) (*Config, error) {
 	if seenIncludes[path] {
-		return nil, fmt.Errorf("pacmandb: circular Include %q", path)
+		return nil, errors.New(errors.ErrTypeConfiguration, "circular Include directive detected").
+			WithOperation("parseConfigWithIncludes").
+			WithContext("path", path)
 	}
 
 	seenIncludes[path] = true

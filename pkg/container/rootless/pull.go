@@ -154,7 +154,8 @@ func extractTar(r io.Reader, destDir string) error {
 		}
 
 		if err != nil {
-			return fmt.Errorf("reading tar: %w", err)
+			return errors.Wrap(err, errors.ErrTypeParser, "failed to read tar entry").
+				WithOperation("extractTarStream")
 		}
 
 		// Skip overlay whiteout files.
@@ -195,18 +196,24 @@ func extractTarEntry(tr *tar.Reader, hdr *tar.Header, target, destDir string) er
 
 func extractRegularFile(tr *tar.Reader, hdr *tar.Header, target string) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return fmt.Errorf("mkdir parent %s: %w", target, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create parent directory").
+			WithOperation("extractRegularFile").
+			WithContext("path", target)
 	}
 
 	f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode)) //nolint:gosec
 	if err != nil {
-		return fmt.Errorf("create %s: %w", target, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create file").
+			WithOperation("extractRegularFile").
+			WithContext("path", target)
 	}
 
 	if _, err := io.Copy(f, tr); err != nil { //nolint:gosec
 		_ = f.Close()
 
-		return fmt.Errorf("write %s: %w", target, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write file").
+			WithOperation("extractRegularFile").
+			WithContext("path", target)
 	}
 
 	return f.Close()
@@ -214,7 +221,9 @@ func extractRegularFile(tr *tar.Reader, hdr *tar.Header, target string) error {
 
 func extractSymlink(hdr *tar.Header, target string) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return fmt.Errorf("mkdir parent %s: %w", target, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create parent directory").
+			WithOperation("extractSymlink").
+			WithContext("path", target)
 	}
 
 	_ = os.Remove(target)
@@ -226,7 +235,9 @@ func extractHardLink(hdr *tar.Header, target, destDir string) error {
 	linkTarget := filepath.Join(destDir, filepath.Clean("/"+hdr.Linkname)) //nolint:gosec
 
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return fmt.Errorf("mkdir parent %s: %w", target, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create parent directory").
+			WithOperation("extractHardLink").
+			WithContext("path", target)
 	}
 
 	_ = os.Remove(target)

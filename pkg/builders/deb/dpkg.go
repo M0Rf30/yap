@@ -51,7 +51,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string) *Package {
 // It takes artifactsPath to specify where to store the package.
 // The method calls dpkgDeb to create the package and removes the
 // package directory, returning the path to the created DEB file and an error if any step fails.
-func (d *Package) BuildPackage(artifactsPath string, targetArch string) (string, error) {
+func (d *Package) BuildPackage(ctx context.Context, artifactsPath string, targetArch string) (string, error) {
 	debTemp, err := os.MkdirTemp(d.PKGBUILD.SourceDir, "tmp")
 	if err != nil {
 		return "", err
@@ -69,7 +69,7 @@ func (d *Package) BuildPackage(artifactsPath string, targetArch string) (string,
 	dataArchive := filepath.Join(debTemp, dataFilename)
 
 	// Create control archive
-	err = archive.CreateTarCompressed(context.Background(), d.debDir, controlArchive,
+	err = archive.CreateTarCompressed(ctx, d.debDir, controlArchive,
 		d.compression, true)
 	if err != nil {
 		return "", err
@@ -81,7 +81,7 @@ func (d *Package) BuildPackage(artifactsPath string, targetArch string) (string,
 	}
 
 	// Create data archive
-	err = archive.CreateTarCompressed(context.Background(), d.PKGBUILD.PackageDir,
+	err = archive.CreateTarCompressed(ctx, d.PKGBUILD.PackageDir,
 		dataArchive, d.compression, true)
 	if err != nil {
 		return "", err
@@ -103,7 +103,7 @@ func (d *Package) BuildPackage(artifactsPath string, targetArch string) (string,
 // PrepareFakeroot sets up the environment for building a Debian package in a fakeroot context.
 // It retrieves architecture and release information, cleans up the debDir, creates necessary
 // resources, and strips binaries. The method returns an error if any step fails.
-func (d *Package) PrepareFakeroot(_ string, targetArch string) error {
+func (d *Package) PrepareFakeroot(ctx context.Context, _ string, targetArch string) error {
 	d.getRelease()
 	d.LogCrossCompilation(targetArch)
 	d.SetTargetArchitecture(targetArch)

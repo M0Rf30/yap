@@ -2,7 +2,6 @@ package aptinstall
 
 import (
 	"archive/tar"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/m0rf30/ar"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -19,14 +19,16 @@ import (
 func extractDataTar(debPath, destDir string, conffiles []string) error {
 	file, err := os.Open(debPath) // #nosec G304 - debPath is from trusted apt index metadata
 	if err != nil {
-		return fmt.Errorf("open DEB: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "open DEB").
+			WithOperation("extractDataTar").WithContext("path", debPath)
 	}
 
 	defer func() { _ = file.Close() }()
 
 	arReader, err := ar.NewReader(file)
 	if err != nil {
-		return fmt.Errorf("parse AR archive: %w", err)
+		return errors.Wrap(err, errors.ErrTypeParser, "parse AR archive").
+			WithOperation("extractDataTar").WithContext("path", debPath)
 	}
 
 	var dataTarPath string
@@ -38,14 +40,16 @@ func extractDataTar(debPath, destDir string, conffiles []string) error {
 				break
 			}
 
-			return fmt.Errorf("read AR header: %w", err)
+			return errors.Wrap(err, errors.ErrTypeParser, "read AR header").
+				WithOperation("extractDataTar")
 		}
 
 		if strings.HasPrefix(header.Name, "data.tar") {
 			// Create a temporary file for data.tar.
 			tmpFile, err := os.CreateTemp("", "data.tar.*")
 			if err != nil {
-				return fmt.Errorf("create temp file: %w", err)
+				return errors.Wrap(err, errors.ErrTypeFileSystem, "create temp file").
+					WithOperation("extractDataTar")
 			}
 
 			dataTarPath = tmpFile.Name()
@@ -55,13 +59,15 @@ func extractDataTar(debPath, destDir string, conffiles []string) error {
 				_ = tmpFile.Close()
 				_ = os.Remove(dataTarPath) // #nosec G703
 
-				return fmt.Errorf("write temp file: %w", err)
+				return errors.Wrap(err, errors.ErrTypeFileSystem, "write temp file").
+					WithOperation("extractDataTar")
 			}
 
 			if err := tmpFile.Close(); err != nil {
 				_ = os.Remove(dataTarPath) // #nosec G703
 
-				return fmt.Errorf("close temp file: %w", err)
+				return errors.Wrap(err, errors.ErrTypeFileSystem, "close temp file").
+					WithOperation("extractDataTar")
 			}
 
 			break
@@ -69,7 +75,8 @@ func extractDataTar(debPath, destDir string, conffiles []string) error {
 	}
 
 	if dataTarPath == "" {
-		return fmt.Errorf("data.tar not found in DEB")
+		return errors.New(errors.ErrTypeParser, "data.tar not found in DEB").
+			WithOperation("extractDataTar").WithContext("path", debPath)
 	}
 
 	defer func() {
@@ -97,11 +104,13 @@ func safeJoin(destDir, entry string) (string, error) {
 
 	rel, err := filepath.Rel(filepath.Clean(destDir), cleaned)
 	if err != nil {
-		return "", fmt.Errorf("path traversal: %q outside %q: %w", entry, destDir, err)
+		return "", errors.Wrap(err, errors.ErrTypeValidation, "path traversal").
+			WithOperation("safeJoin").WithContext("entry", entry).WithContext("destDir", destDir)
 	}
 
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("path traversal: %q escapes %q", entry, destDir)
+		return "", errors.New(errors.ErrTypeValidation, "path traversal: entry escapes destDir").
+			WithOperation("safeJoin").WithContext("entry", entry).WithContext("destDir", destDir)
 	}
 
 	return cleaned, nil
@@ -125,12 +134,14 @@ func safeSymlinkTarget(destDir, linkPath, target string) error {
 
 	rel, err := filepath.Rel(filepath.Clean(destDir), resolved)
 	if err != nil {
-		return fmt.Errorf("symlink target traversal: %q -> %q: %w", linkPath, target, err)
+		return errors.Wrap(err, errors.ErrTypeValidation, "symlink target traversal").
+			WithOperation("safeSymlinkTarget").WithContext("link", linkPath).WithContext("target", target)
 	}
 
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return fmt.Errorf("symlink target traversal: %q -> %q escapes %q",
-			linkPath, target, destDir)
+		return errors.New(errors.ErrTypeValidation, "symlink target traversal: escapes destDir").
+			WithOperation("safeSymlinkTarget").WithContext("link", linkPath).
+			WithContext("target", target).WithContext("destDir", destDir)
 	}
 
 	return nil
@@ -161,14 +172,16 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 	// Open and decompress the data.tar.
 	file, err := os.Open(dataTarPath) // #nosec G304 - dataTarPath is from os.CreateTemp
 	if err != nil {
-		return fmt.Errorf("open data.tar: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "open data.tar").
+			WithOperation("extractDataTarWithConffiles").WithContext("path", dataTarPath)
 	}
 
 	defer func() { _ = file.Close() }()
 
 	decompressed, err := decompressStream(file, dataTarPath)
 	if err != nil {
-		return fmt.Errorf("decompress data.tar: %w", err)
+		return errors.Wrap(err, errors.ErrTypeParser, "decompress data.tar").
+			WithOperation("extractDataTarWithConffiles")
 	}
 
 	defer func() { _ = decompressed.Close() }()
@@ -183,7 +196,8 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 				break
 			}
 
-			return fmt.Errorf("read tar entry: %w", err)
+			return errors.Wrap(err, errors.ErrTypeParser, "read tar entry").
+				WithOperation("extractDataTarWithConffiles")
 		}
 
 		// Strip leading "./" from tar entry names.
@@ -234,7 +248,8 @@ func extractTarDir(hdr *tar.Header, fullPath string, dirMap map[string]bool) err
 
 	// nolint:gosec // G301: mode is from tar header, constrained by safeJoin
 	if err := os.MkdirAll(fullPath, os.FileMode(hdr.Mode)); err != nil {
-		return fmt.Errorf("mkdir %s: %w", fullPath, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "mkdir").
+			WithOperation("extractTarDir").WithContext("path", fullPath)
 	}
 
 	return nil
@@ -261,7 +276,8 @@ func extractTarSymlink(hdr *tar.Header, destDir, fullPath string, dirMap map[str
 	}
 
 	if err := os.Symlink(hdr.Linkname, fullPath); err != nil {
-		return fmt.Errorf("symlink %s: %w", fullPath, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "symlink").
+			WithOperation("extractTarSymlink").WithContext("path", fullPath)
 	}
 
 	return nil
@@ -299,7 +315,8 @@ func extractTarFile(
 	// nolint:gosec // G304: fullPath is constrained by safeJoin; G306: mode is from tar header
 	f, err := os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode))
 	if err != nil {
-		return fmt.Errorf("create %s: %w", fullPath, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "create file").
+			WithOperation("extractTarFile").WithContext("path", fullPath)
 	}
 
 	// Limit file size to prevent decompression bombs (2GB max per file).
@@ -308,11 +325,13 @@ func extractTarFile(
 	if _, err := io.Copy(f, io.LimitReader(tr, maxFileSize)); err != nil {
 		_ = f.Close()
 
-		return fmt.Errorf("write %s: %w", fullPath, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "write file").
+			WithOperation("extractTarFile").WithContext("path", fullPath)
 	}
 
 	if err := f.Close(); err != nil {
-		return fmt.Errorf("close %s: %w", fullPath, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "close file").
+			WithOperation("extractTarFile").WithContext("path", fullPath)
 	}
 
 	return nil

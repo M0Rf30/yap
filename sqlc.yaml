@@ -14,3 +14,17 @@ sql:
         emit_exact_table_names: false
         emit_empty_slices: true
         emit_pointers_for_null_types: false
+  - engine: "sqlite"
+    queries: "pkg/yapdb/queries.sql"
+    schema: "pkg/yapdb/schema.sql"
+    gen:
+      go:
+        package: "yapdbgen"
+        out: "pkg/yapdb/db"
+        sql_package: "database/sql"
+        emit_json_tags: false
+        emit_prepared_queries: false
+        emit_interface: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        emit_pointers_for_null_types: false

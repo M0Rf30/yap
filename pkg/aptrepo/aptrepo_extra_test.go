@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/stretchr/testify/assert"
@@ -254,7 +255,12 @@ func TestVerifyInReleaseOrFallback_UnsignedAllowUnverified(t *testing.T) {
 	)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "example.com")
+	// URL is stored in context, not in the error message
+	var yapErr *yaperrors.YapError
+	assert.ErrorAs(t, err, &yapErr, "error should be a YapError")
+	if yapErr != nil {
+		assert.Equal(t, "https://example.com/ubuntu/", yapErr.Context["url"])
+	}
 }
 
 // TestVerifyInReleaseOrFallback_UnsignedStrictMode confirms that a plain
@@ -272,7 +278,12 @@ func TestVerifyInReleaseOrFallback_UnsignedStrictMode(t *testing.T) {
 	)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "example.com")
+	// URL is stored in context, not in the error message
+	var yapErr *yaperrors.YapError
+	assert.ErrorAs(t, err, &yapErr, "error should be a YapError")
+	if yapErr != nil {
+		assert.Equal(t, "https://example.com/ubuntu/", yapErr.Context["url"])
+	}
 }
 
 // TestVerifyInReleaseOrFallback_UnknownSignerAllowUnverified confirms that a
@@ -377,7 +388,12 @@ func TestVerifyDetachedOrFallback_SigErrStrictMode(t *testing.T) {
 	)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "example.com")
+	// URL is stored in context, not in the error message
+	var yapErr *yaperrors.YapError
+	assert.ErrorAs(t, err, &yapErr, "error should be a YapError")
+	if yapErr != nil {
+		assert.Equal(t, "https://example.com/ubuntu/", yapErr.Context["url"])
+	}
 }
 
 // TestVerifyDetachedOrFallback_EmptyKeyringAllowUnverified confirms that

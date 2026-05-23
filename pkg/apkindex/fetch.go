@@ -213,8 +213,9 @@ func (idx *Index) DownloadPackages(ctx context.Context, destDir string, names []
 
 	for resp := range respCh {
 		if err := resp.Err(); err != nil && firstErr == nil {
-			firstErr = fmt.Errorf("apkindex: download %q: %w",
-				filepath.Base(resp.Filename), err)
+			firstErr = apperrors.Wrap(err, apperrors.ErrTypeNetwork, "failed to download package").
+				WithOperation("DownloadPackages").
+				WithContext("filename", filepath.Base(resp.Filename))
 		}
 	}
 

@@ -334,25 +334,11 @@ func TestPKGBUILD_processOptions(t *testing.T) {
 func TestPKGBUILD_mapVariables(t *testing.T) {
 	pb := &PKGBUILD{}
 
-	// Store original environment
-	originalPkgname := os.Getenv("pkgname")
-	originalEpoch := os.Getenv("epoch")
-
-	defer func() {
-		// Restore original environment
-		_ = os.Setenv("pkgname", originalPkgname)
-		_ = os.Setenv("epoch", originalEpoch)
-	}()
-
 	// Test mapping pkgname
 	pb.mapVariables("pkgname", "test-package")
 
 	if pb.PkgName != "test-package" {
 		t.Errorf("Expected PkgName 'test-package', got '%s'", pb.PkgName)
-	}
-
-	if os.Getenv("pkgname") != "test-package" {
-		t.Error("pkgname environment variable not set correctly")
 	}
 
 	// Test mapping epoch
@@ -373,6 +359,13 @@ func TestPKGBUILD_mapVariables(t *testing.T) {
 
 	if pb.PkgDesc != "Test description" {
 		t.Errorf("Expected PkgDesc 'Test description', got '%s'", pb.PkgDesc)
+	}
+
+	// Test custom variables are stored
+	pb.mapVariables("_custom_var", "custom_value")
+
+	if pb.CustomVariables == nil || pb.CustomVariables["_custom_var"] != "custom_value" {
+		t.Error("Custom variable not stored correctly")
 	}
 }
 
@@ -949,19 +942,12 @@ func TestPKGBUILD_mapFunctions_EdgeCases(t *testing.T) {
 func TestPKGBUILD_mapVariables_EdgeCases(t *testing.T) {
 	pb := &PKGBUILD{}
 
-	// Store original environment
-	originalPkgrel := os.Getenv("pkgrel")
-	originalPkgdesc := os.Getenv("pkgdesc")
-
-	defer func() {
-		// Restore original environment
-		_ = os.Setenv("pkgrel", originalPkgrel)
-		_ = os.Setenv("pkgdesc", originalPkgdesc)
-	}()
-
-	// Test unknown variable
+	// Test unknown variable (should be stored as custom variable)
 	pb.mapVariables("unknown_var", "value")
-	// Should not panic, just ignore unknown variables
+
+	if pb.CustomVariables == nil || pb.CustomVariables["unknown_var"] != "value" {
+		t.Error("Unknown variable not stored as custom variable")
+	}
 
 	// Test all variable mappings
 	pb.mapVariables("pkgrel", "2")

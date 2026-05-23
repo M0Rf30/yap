@@ -3,12 +3,12 @@ package aptinstall // nolint:revive // package comment is in aptinstall.go
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -100,7 +100,8 @@ func runScriptlet(
 	// Sanity: the file must exist or /bin/sh will fail with a confusing
 	// error message.
 	if _, err := os.Stat(scriptPath); err != nil {
-		return fmt.Errorf("scriptlet %s not on disk: %w", scriptName, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "scriptlet not on disk").
+			WithOperation("runScriptlet").WithContext("scriptlet", scriptName).WithContext("path", scriptPath)
 	}
 
 	logger.Debug("running maintainer scriptlet",
@@ -142,7 +143,8 @@ func runScriptlet(
 	}
 
 	if err != nil {
-		return fmt.Errorf("%s: %w", scriptName, err)
+		return errors.Wrap(err, errors.ErrTypeBuild, "scriptlet execution failed").
+			WithOperation("runScriptlet").WithContext("scriptlet", scriptName).WithContext("package", pkgName)
 	}
 
 	return nil

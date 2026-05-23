@@ -37,6 +37,8 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
 	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
+
+	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // defaultAptKeyringPaths is the set of files/directories apt itself trusts
@@ -82,7 +84,8 @@ type verifyResult struct {
 func verifyInRelease(data []byte, keyring openpgp.EntityList) (verifyResult, error) {
 	block, _ := clearsign.Decode(data)
 	if block == nil {
-		return verifyResult{}, fmt.Errorf("aptrepo: not a clear-signed message")
+		return verifyResult{}, yaperrors.New(yaperrors.ErrTypeParser, "not a clear-signed message").
+			WithOperation("verifyInRelease")
 	}
 
 	if block.ArmoredSignature == nil {
@@ -135,7 +138,7 @@ func loadKeyringForSource(signedBy string) (openpgp.EntityList, error) {
 
 	info, err := os.Stat(signedBy)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %q: %w", ErrNoTrustAnchor, signedBy, err)
+		return nil, ErrNoTrustAnchor
 	}
 
 	if info.IsDir() {
@@ -144,11 +147,11 @@ func loadKeyringForSource(signedBy string) (openpgp.EntityList, error) {
 
 	keys, err := loadKeyringFile(signedBy)
 	if err != nil {
-		return nil, fmt.Errorf("aptrepo: load keyring %q: %w", signedBy, err)
+		return nil, ErrNoTrustAnchor
 	}
 
 	if len(keys) == 0 {
-		return nil, fmt.Errorf("%w: %q is empty", ErrNoTrustAnchor, signedBy)
+		return nil, ErrNoTrustAnchor
 	}
 
 	return keys, nil
@@ -189,9 +192,7 @@ func loadDefaultAptKeyring() (openpgp.EntityList, error) {
 	}
 
 	if len(combined) == 0 {
-		return nil, fmt.Errorf(
-			"%w: no keys in default apt trust paths %v",
-			ErrNoTrustAnchor, defaultAptKeyringPaths)
+		return nil, ErrNoTrustAnchor
 	}
 
 	return combined, nil
@@ -276,20 +277,26 @@ func signerName(e *openpgp.Entity) string {
 func wrapPGPError(err error) error {
 	switch {
 	case errors.Is(err, pgperrors.ErrUnknownIssuer):
-		return fmt.Errorf("%w: %w", ErrUnknownSigner, err)
+		// Return the sentinel error directly to preserve identity for errors.Is checks
+		return ErrUnknownSigner
 	case errors.Is(err, pgperrors.ErrSignatureExpired):
-		return fmt.Errorf("aptrepo: signature expired: %w", err)
+		return yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "signature expired").
+			WithOperation("wrapPGPError")
 	case errors.Is(err, pgperrors.ErrKeyExpired):
-		return fmt.Errorf("aptrepo: signing key expired: %w", err)
+		return yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "signing key expired").
+			WithOperation("wrapPGPError")
 	case errors.Is(err, pgperrors.ErrKeyRevoked):
-		return fmt.Errorf("aptrepo: signing key revoked: %w", err)
+		return yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "signing key revoked").
+			WithOperation("wrapPGPError")
 	}
 
 	// Type-assert SignatureError (string type) for "actual bad signature".
 	var sigErr pgperrors.SignatureError
 	if errors.As(err, &sigErr) {
-		return fmt.Errorf("aptrepo: invalid signature: %w", err)
+		return yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "invalid signature").
+			WithOperation("wrapPGPError")
 	}
 
-	return fmt.Errorf("aptrepo: verification failed: %w", err)
+	return yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "verification failed").
+		WithOperation("wrapPGPError")
 }

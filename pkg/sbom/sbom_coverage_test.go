@@ -1,4 +1,4 @@
-package sbom
+package sbom //nolint:testpackage // white-box tests require access to unexported functions
 
 // sbom_coverage_test.go — internal white-box tests targeting uncovered branches
 // in sbom.go (Generate function).

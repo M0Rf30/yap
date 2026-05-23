@@ -27,20 +27,20 @@ type Packer interface {
 	// BuildPackage starts the package building process and writes the final artifact
 	// to the specified output path. It returns the path to the built artifact and an error
 	// if any issues occur during the build.
-	BuildPackage(output string, targetArch string) (string, error)
+	BuildPackage(ctx context.Context, output string, targetArch string) (string, error)
 	// Prepare appends the dependencies required to build all the projects. It
 	// returns any error if encountered.
-	Prepare(depends []string, targetArch string) error
+	Prepare(ctx context.Context, depends []string, targetArch string) error
 	// PrepareEnvironment reads a flag to install golang tools on request, on the
 	// build machine. It returns any error if encountered.
-	PrepareEnvironment(flag bool, targetArch string) error
+	PrepareEnvironment(ctx context.Context, flag bool, targetArch string) error
 	// PrepareFakeroot sets up the environment for building the final artifact in a fakeroot context.
 	// It takes an output path where the artifact will be written and returns an error if any issues
 	// occur.
-	PrepareFakeroot(output string, targetArch string) error
+	PrepareFakeroot(ctx context.Context, output string, targetArch string) error
 	// Update performs a package manager update operation. It returns any error if
 	// encountered.
-	Update() error
+	Update(ctx context.Context) error
 }
 
 // CrossDepsExtractor is implemented by builders that support downloading and

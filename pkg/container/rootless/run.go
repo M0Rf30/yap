@@ -89,7 +89,8 @@ func runExec() error {
 	argsRaw := os.Getenv(envChildArgs)
 
 	if rootfs == "" {
-		return fmt.Errorf("missing %s env", envChildRootfs)
+		return errors.New(errors.ErrTypeConfiguration, "missing rootfs environment variable").
+			WithOperation("runExec")
 	}
 
 	var args []string
@@ -142,7 +143,9 @@ func RunInRootless(distro, workDir string, args []string) error {
 		envChildArgs:    joinNUL(args),
 	} {
 		if err := os.Setenv(k, v); err != nil {
-			return fmt.Errorf("setenv %s: %w", k, err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set environment variable").
+				WithOperation("RunInRootless").
+				WithContext("key", k)
 		}
 	}
 
@@ -183,16 +186,19 @@ func execInRootfs(rootfs, workDir string, args []string) error {
 		wsTarget := filepath.Join(rootfs, "workspace")
 
 		if err := bindMount(workDir, wsTarget); err != nil {
-			return fmt.Errorf("bind mount workspace: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to bind mount workspace").
+				WithOperation("execInRootfs")
 		}
 	}
 
 	if err := pivotOrChroot(rootfs); err != nil {
-		return fmt.Errorf("pivot/chroot: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to pivot root or chroot").
+			WithOperation("execInRootfs")
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("no command specified")
+		return errors.New(errors.ErrTypeConfiguration, "no command specified").
+			WithOperation("execInRootfs")
 	}
 
 	bin, err := exec.LookPath(args[0])
@@ -209,7 +215,8 @@ func pivotOrChroot(newRoot string) error {
 	putOld := filepath.Join(newRoot, ".put_old")
 
 	if err := os.MkdirAll(putOld, 0o700); err != nil { //nolint:gosec // path from rootfsPath, not user input
-		return fmt.Errorf("mkdir put_old: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create put_old directory").
+			WithOperation("pivotOrChroot")
 	}
 
 	if err := syscall.PivotRoot(newRoot, putOld); err == nil {
@@ -224,7 +231,9 @@ func pivotOrChroot(newRoot string) error {
 
 	// Fallback: plain chroot.
 	if err := syscall.Chroot(newRoot); err != nil {
-		return fmt.Errorf("chroot %s: %w", newRoot, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to chroot").
+			WithOperation("pivotOrChroot").
+			WithContext("path", newRoot)
 	}
 
 	return os.Chdir("/")
@@ -233,7 +242,9 @@ func pivotOrChroot(newRoot string) error {
 // bindMount bind-mounts src to dest.
 func bindMount(src, dest string) error {
 	if err := os.MkdirAll(dest, 0o755); err != nil { //nolint:gosec // path from rootfsPath, not user input
-		return fmt.Errorf("mkdir %s: %w", dest, err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create mount destination directory").
+			WithOperation("bindMount").
+			WithContext("path", dest)
 	}
 
 	return syscall.Mount(src, dest, "", syscall.MS_BIND|syscall.MS_REC, "")

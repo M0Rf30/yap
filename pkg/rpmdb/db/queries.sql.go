@@ -13,11 +13,228 @@ const countByName = `-- name: CountByName :one
 SELECT COUNT(*) FROM Name WHERE name = ?
 `
 
+// Read queries
 func (q *Queries) CountByName(ctx context.Context, name string) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countByName, name)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const countPackages = `-- name: CountPackages :one
+SELECT COUNT(*) FROM Packages
+`
+
+func (q *Queries) CountPackages(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPackages)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getMaxHnum = `-- name: GetMaxHnum :one
+SELECT COALESCE(MAX(hnum), 0) FROM Packages
+`
+
+func (q *Queries) GetMaxHnum(ctx context.Context) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getMaxHnum)
+	var coalesce interface{}
+	err := row.Scan(&coalesce)
+	return coalesce, err
+}
+
+const insertBasenames = `-- name: InsertBasenames :exec
+INSERT INTO Basenames (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertBasenamesParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertBasenames(ctx context.Context, arg InsertBasenamesParams) error {
+	_, err := q.db.ExecContext(ctx, insertBasenames, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertConflictname = `-- name: InsertConflictname :exec
+INSERT INTO Conflictname (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertConflictnameParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertConflictname(ctx context.Context, arg InsertConflictnameParams) error {
+	_, err := q.db.ExecContext(ctx, insertConflictname, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertDirnames = `-- name: InsertDirnames :exec
+INSERT INTO Dirnames (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertDirnamesParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertDirnames(ctx context.Context, arg InsertDirnamesParams) error {
+	_, err := q.db.ExecContext(ctx, insertDirnames, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertFiledigests = `-- name: InsertFiledigests :exec
+INSERT INTO Filedigests (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertFiledigestsParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertFiledigests(ctx context.Context, arg InsertFiledigestsParams) error {
+	_, err := q.db.ExecContext(ctx, insertFiledigests, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertInstalltid = `-- name: InsertInstalltid :exec
+INSERT INTO Installtid (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertInstalltidParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertInstalltid(ctx context.Context, arg InsertInstalltidParams) error {
+	_, err := q.db.ExecContext(ctx, insertInstalltid, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertName = `-- name: InsertName :exec
+INSERT INTO Name (name, hnum) VALUES (?, ?)
+`
+
+type InsertNameParams struct {
+	Name string
+	Hnum int64
+}
+
+func (q *Queries) InsertName(ctx context.Context, arg InsertNameParams) error {
+	_, err := q.db.ExecContext(ctx, insertName, arg.Name, arg.Hnum)
+	return err
+}
+
+const insertObsoletename = `-- name: InsertObsoletename :exec
+INSERT INTO Obsoletename (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertObsoletenameParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertObsoletename(ctx context.Context, arg InsertObsoletenameParams) error {
+	_, err := q.db.ExecContext(ctx, insertObsoletename, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertPackage = `-- name: InsertPackage :exec
+INSERT INTO Packages (hnum, blob) VALUES (?, ?)
+`
+
+type InsertPackageParams struct {
+	Hnum int64
+	Blob []byte
+}
+
+// Write queries
+func (q *Queries) InsertPackage(ctx context.Context, arg InsertPackageParams) error {
+	_, err := q.db.ExecContext(ctx, insertPackage, arg.Hnum, arg.Blob)
+	return err
+}
+
+const insertProvidename = `-- name: InsertProvidename :exec
+INSERT INTO Providename (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertProvidenameParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertProvidename(ctx context.Context, arg InsertProvidenameParams) error {
+	_, err := q.db.ExecContext(ctx, insertProvidename, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertRequirename = `-- name: InsertRequirename :exec
+INSERT INTO Requirename (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertRequirenameParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertRequirename(ctx context.Context, arg InsertRequirenameParams) error {
+	_, err := q.db.ExecContext(ctx, insertRequirename, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertSha1header = `-- name: InsertSha1header :exec
+INSERT INTO Sha1header (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertSha1headerParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertSha1header(ctx context.Context, arg InsertSha1headerParams) error {
+	_, err := q.db.ExecContext(ctx, insertSha1header, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertSigmd5 = `-- name: InsertSigmd5 :exec
+INSERT INTO Sigmd5 (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertSigmd5Params struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertSigmd5(ctx context.Context, arg InsertSigmd5Params) error {
+	_, err := q.db.ExecContext(ctx, insertSigmd5, arg.Key, arg.Hnum, arg.Idx)
+	return err
+}
+
+const insertTriggername = `-- name: InsertTriggername :exec
+INSERT INTO Triggername (key, hnum, idx) VALUES (?, ?, ?)
+`
+
+type InsertTriggernameParams struct {
+	Key  string
+	Hnum int64
+	Idx  int64
+}
+
+func (q *Queries) InsertTriggername(ctx context.Context, arg InsertTriggernameParams) error {
+	_, err := q.db.ExecContext(ctx, insertTriggername, arg.Key, arg.Hnum, arg.Idx)
+	return err
 }
 
 const listInstalledNames = `-- name: ListInstalledNames :many

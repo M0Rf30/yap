@@ -1,14 +1,19 @@
 package aptinstall
 
 import (
-	"bufio"
-	"fmt"
+		"context"
+"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
+	"time"
+
+	"github.com/M0Rf30/yap/v2/pkg/deb822"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/yapdb"
 )
 
 const (
@@ -104,22 +109,35 @@ func readDpkgStatus() (map[string]*dpkgStatusEntry, error) {
 			return entries, nil // File doesn't exist yet; that's OK.
 		}
 
-		return nil, fmt.Errorf("read dpkg status: %w", err)
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "read dpkg status").
+			WithOperation("readDpkgStatus").WithContext("path", dpkgStatusPath)
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(string(data)))
-	// Allow long Description fields.
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	if err := deb822.Parse(strings.NewReader(string(data)), func(stanzaMap deb822.Stanza) error {
+		entry := &dpkgStatusEntry{fields: make(map[string]string)}
 
-	st := dpkgParseState{}
+		// Copy all fields from the stanza into the entry
+		for k, v := range stanzaMap {
+			entry.fields[k] = v
+		}
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		handleDpkgStatusLine(line, &st, entries)
+		// Add the entry to the map using the same logic as flushDpkgStatusEntry
+		if entry.fields["Package"] == "" {
+			return nil
+		}
+
+		key := entry.fields["Package"]
+		if arch, ok := entry.fields["Architecture"]; ok && arch != "" {
+			key = key + ":" + arch
+		}
+
+		entries[key] = entry
+
+		return nil
+	}); err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeParser, "parse dpkg status").
+			WithOperation("readDpkgStatus").WithContext("path", dpkgStatusPath)
 	}
-
-	// Flush last entry.
-	flushDpkgStatusEntry(&st, entries)
 
 	return entries, nil
 }
@@ -142,7 +160,8 @@ func writeDpkgStatus(entries map[string]*dpkgStatusEntry) error {
 	f, err := os.OpenFile(tmpPath, // #nosec G304 - constant path
 		os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644) // #nosec G302
 	if err != nil {
-		return fmt.Errorf("create temp status file: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "create temp status file").
+			WithOperation("writeDpkgStatus").WithContext("path", tmpPath)
 	}
 
 	if err := writeAllStatusEntries(f, entries); err != nil {
@@ -156,13 +175,15 @@ func writeDpkgStatus(entries map[string]*dpkgStatusEntry) error {
 		_ = f.Close()
 		_ = os.Remove(tmpPath)
 
-		return fmt.Errorf("sync status file: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "sync status file").
+			WithOperation("writeDpkgStatus")
 	}
 
 	if err := f.Close(); err != nil {
 		_ = os.Remove(tmpPath)
 
-		return fmt.Errorf("close status file: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "close status file").
+			WithOperation("writeDpkgStatus")
 	}
 
 	// Atomic clobber. On POSIX, rename(2) replaces the destination
@@ -170,7 +191,8 @@ func writeDpkgStatus(entries map[string]*dpkgStatusEntry) error {
 	if err := os.Rename(tmpPath, dpkgStatusPath); err != nil {
 		_ = os.Remove(tmpPath)
 
-		return fmt.Errorf("rename status file: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "rename status file").
+			WithOperation("writeDpkgStatus")
 	}
 
 	return nil
@@ -293,9 +315,133 @@ func writeDeb822Field(f *os.File, field, value string) error {
 	return nil
 }
 
-// updateDpkgStatusForPackage updates or inserts a package entry in /var/lib/dpkg/status.
+// writeYapdb writes the installed package metadata to the YAP state database.
+func writeYapdb(
+	ctx context.Context,
+	pkgName, arch string,
+	controlFields map[string]string,
+	rootDir string,
+	files []string,
+) error {
+	// Extract package metadata from control fields.
+	version := controlFields["Version"]
+	summary := controlFields["Summary"]
+	if summary == "" {
+		// Fallback to Description if Summary is not present.
+		desc := controlFields["Description"]
+		if desc != "" {
+			// Take only the first line (synopsis).
+			if idx := strings.Index(desc, "\n"); idx >= 0 {
+				summary = desc[:idx]
+			} else {
+				summary = desc
+			}
+		}
+	}
+
+	// Convert files to yapdb.File.
+	var yapdbFiles []yapdb.File
+	for _, filePath := range files {
+		yapdbFiles = append(yapdbFiles, yapdb.File{
+			Path:       filePath,
+			Mode:       0o644, // Default mode; we don't track actual modes from .deb
+			IsDir:      false,
+			IsSymlink:  false,
+			LinkTarget: "",
+			SHA256:     "", // We don't track SHA256 from .deb
+		})
+	}
+
+	// Extract capabilities from Provides and Depends fields.
+	var caps []yapdb.Capability
+
+	// Add Provides as "provide" capabilities.
+	if provides := controlFields["Provides"]; provides != "" {
+		for _, prov := range strings.Split(provides, ",") {
+			prov = strings.TrimSpace(prov)
+			if prov != "" {
+				caps = append(caps, yapdb.Capability{
+					Kind:    "provide",
+					Name:    prov,
+					Flags:   0,
+					Version: version,
+				})
+			}
+		}
+	}
+
+	// Add package name as a provide capability.
+	caps = append(caps, yapdb.Capability{
+		Kind:    "provide",
+		Name:    pkgName,
+		Flags:   0,
+		Version: version,
+	})
+
+	// Add Depends as "require" capabilities.
+	if depends := controlFields["Depends"]; depends != "" {
+		for _, dep := range strings.Split(depends, ",") {
+			dep = strings.TrimSpace(dep)
+			if dep != "" {
+				// Parse "package (>= version)" format.
+				depName := dep
+				depVersion := ""
+				if idx := strings.IndexAny(dep, "(<>=!"); idx >= 0 {
+					depName = strings.TrimSpace(dep[:idx])
+					depVersion = strings.TrimSpace(dep[idx:])
+				}
+				caps = append(caps, yapdb.Capability{
+					Kind:    "require",
+					Name:    depName,
+					Flags:   0,
+					Version: depVersion,
+				})
+			}
+		}
+	}
+
+	// Open yapdb and insert the package record.
+	db, err := yapdb.Open(ctx, yapdb.DefaultPath(rootDir))
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open yapdb").
+			WithOperation("writeYapdb").
+			WithContext("package", pkgName)
+	}
+	defer func() { _ = db.Close() }()
+
+	pkg := yapdb.Package{
+		Name:        pkgName,
+		Epoch:       "",
+		Version:     version,
+		Release:     "",
+		Arch:        arch,
+		Format:      "deb",
+		Summary:     summary,
+		InstallTime: time.Now(),
+		Files:       yapdbFiles,
+		Caps:        caps,
+	}
+
+	if err := db.Insert(ctx, pkg); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to insert package into yapdb").
+			WithOperation("writeYapdb").
+			WithContext("package", pkgName)
+	}
+
+	return nil
+}
+
+// updateDpkgStatusForPackage updates or inserts a package entry in /var/lib/dpkg/status
+// and optionally writes to yapdb.
 // Callers wrap this in WithDpkgLock for transaction-wide consistency.
-func updateDpkgStatusForPackage(pkgName, arch, control string, status string) error {
+func updateDpkgStatusForPackage(
+	ctx context.Context,
+	pkgName, arch, control string,
+	status string,
+	rootDir string,
+	opts Options,
+	files []string,
+) error {
 	entries, err := readDpkgStatus()
 	if err != nil {
 		return err
@@ -329,7 +475,21 @@ func updateDpkgStatusForPackage(pkgName, arch, control string, status string) er
 	// Replace or insert.
 	entries[key] = entry
 
-	return writeDpkgStatus(entries)
+	// Write to yapdb (always, unless explicitly disabled).
+	if err := writeYapdb(ctx, pkgName, arch, controlFields, rootDir, files); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "write yapdb").
+			WithOperation("updateDpkgStatusForPackage").
+			WithContext("package", pkgName)
+	}
+
+	// Optionally write to dpkg status file.
+	if opts.WriteDpkgStatus {
+		if err := writeDpkgStatus(entries); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ensureDpkgDirs creates /var/lib/dpkg and /var/lib/dpkg/info if they don't exist.
@@ -342,7 +502,8 @@ func ensureDpkgDirs() error {
 
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0o755); err != nil { // #nosec G301 - dpkg dirs need read+exec
-			return fmt.Errorf("mkdir %s: %w", dir, err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "mkdir").
+				WithOperation("ensureDpkgDirs").WithContext("path", dir)
 		}
 	}
 
@@ -379,7 +540,8 @@ func acquireDpkgLock() (*dpkgLockFile, error) {
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
 		_ = f.Close()
 
-		return nil, fmt.Errorf("flock %s: %w", dpkgLockPath, err)
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "flock").
+			WithOperation("acquireDpkgLock").WithContext("path", dpkgLockPath)
 	}
 
 	return &dpkgLockFile{f: f}, nil
@@ -410,7 +572,8 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 
 	f, err := os.Create(listPath) // #nosec G304 - constructed from trusted values
 	if err != nil {
-		return fmt.Errorf("create .list file: %w", err)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "create .list file").
+			WithOperation("writeDpkgInfoFiles").WithContext("path", listPath)
 	}
 
 	for _, path := range contents.Files {
@@ -430,7 +593,8 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 		md5Path := filepath.Join(infoDir, baseName+".md5sums")
 
 		if err := os.WriteFile(md5Path, []byte(contents.Md5sums), 0o644); err != nil { // #nosec G306
-			return fmt.Errorf("write .md5sums: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "write .md5sums").
+				WithOperation("writeDpkgInfoFiles").WithContext("path", md5Path)
 		}
 	}
 
@@ -439,7 +603,8 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 		confPath := filepath.Join(infoDir, baseName+".conffiles")
 
 		if err := os.WriteFile(confPath, []byte(contents.Conffiles), 0o644); err != nil { // #nosec G306
-			return fmt.Errorf("write .conffiles: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "write .conffiles").
+				WithOperation("writeDpkgInfoFiles").WithContext("path", confPath)
 		}
 	}
 
@@ -448,7 +613,8 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 		scriptPath := filepath.Join(infoDir, baseName+"."+scriptName)
 
 		if err := os.WriteFile(scriptPath, []byte(scriptBody), 0o755); err != nil { // #nosec G306
-			return fmt.Errorf("write .%s: %w", scriptName, err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "write scriptlet file").
+				WithOperation("writeDpkgInfoFiles").WithContext("script", scriptName).WithContext("path", scriptPath)
 		}
 	}
 
@@ -457,7 +623,8 @@ func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
 		triggersPath := filepath.Join(infoDir, baseName+".triggers")
 
 		if err := os.WriteFile(triggersPath, []byte(contents.Triggers), 0o644); err != nil { // #nosec G306
-			return fmt.Errorf("write .triggers: %w", err)
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "write .triggers").
+				WithOperation("writeDpkgInfoFiles").WithContext("path", triggersPath)
 		}
 	}
 

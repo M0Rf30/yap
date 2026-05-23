@@ -2,11 +2,11 @@ package pacmandb
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 )
 
@@ -31,7 +31,11 @@ func downloadFile(ctx context.Context, url, dest string) error {
 	}
 
 	if resp.ContentLength > maxPacmanDBBytes {
-		return fmt.Errorf("pacmandb: %s body too large: %d bytes", url, resp.ContentLength)
+		return errors.New(errors.ErrTypeValidation, "response body too large").
+			WithOperation("downloadFile").
+			WithContext("url", url).
+			WithContext("size", resp.ContentLength).
+			WithContext("cap", maxPacmanDBBytes)
 	}
 
 	// Atomic write: write to tmp, then rename.
@@ -54,7 +58,11 @@ func downloadFile(ctx context.Context, url, dest string) error {
 		_ = f.Close()
 		_ = os.Remove(tmpDest)
 
-		return fmt.Errorf("pacmandb: %s exceeded %d-byte cap", url, maxPacmanDBBytes)
+		return errors.New(errors.ErrTypeValidation, "downloaded size exceeded cap").
+			WithOperation("downloadFile").
+			WithContext("url", url).
+			WithContext("size", written).
+			WithContext("cap", maxPacmanDBBytes)
 	}
 
 	if err := f.Close(); err != nil {

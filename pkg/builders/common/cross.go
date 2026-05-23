@@ -31,21 +31,6 @@ func aptCacheDownloadClosure(
 	return cache.DownloadClosure(ctx, dir, seeds)
 }
 
-// Note: fmt is still used for fmt.Sprintf in SetupCrossCompilationEnvironment
-
-// setenv wraps os.Setenv and returns a wrapped error if the operation fails.
-// This ensures environment variable setup failures are properly propagated
-// rather than silently ignored.
-func setenv(key, value string) error {
-	if err := os.Setenv(key, value); err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild, "failed to set environment variable").
-			WithOperation("setenv").
-			WithContext("key", key)
-	}
-
-	return nil
-}
-
 // crossCompileParams holds pre-computed cross-compilation parameters
 // shared between SetupCrossCompilationEnvironment and BuildCrossEnvSlice.
 type crossCompileParams struct {
@@ -429,6 +414,11 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 			"target_arch", targetArch,
 			"deps", len(deps))
 
+		// RPM: use pure-Go dnfinstall
+		if bb.Format == constants.FormatRPM {
+			return bb.installRPMDeps(ctx, deps)
+		}
+
 		installArgs := constants.GetInstallArgs(bb.Format)
 
 		return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, deps)
@@ -569,9 +559,21 @@ func (bb *BaseBuilder) installCrossDeps(
 	// Install arch-all (host) packages first so they are available to
 	// satisfy transitive dependencies of the target-arch packages.
 	if len(archAll) > 0 {
-		if err := bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, archAll); err != nil {
-			return err
+		// RPM: use pure-Go dnfinstall
+		if bb.Format == constants.FormatRPM {
+			if err := bb.installRPMDeps(ctx, archAll); err != nil {
+				return err
+			}
+		} else {
+			if err := bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, archAll); err != nil {
+				return err
+			}
 		}
+	}
+
+	// RPM: use pure-Go dnfinstall
+	if bb.Format == constants.FormatRPM {
+		return bb.installRPMDeps(ctx, qualified)
 	}
 
 	return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, qualified)
@@ -826,292 +828,6 @@ func (bb *BaseBuilder) BuildCrossEnvSlice(targetArch string) ([]string, error) {
 	return envSlice, nil
 }
 
-// SetupCrossCompilationEnvironment configures environment variables for cross-compilation.
-// This function sets up environment variables for C/C++, Rust, and Go cross-compilation.
-// It uses a mutex to serialize access to os.Setenv to prevent race conditions in parallel builds.
-//
-//nolint:gocyclo,cyclop,nestif // complexity inherent to cross-compilation env setup
-func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error {
-	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
-		// No cross-compilation needed
-		return nil
-	}
-
-	// Idempotency: the cross-compile env is process-global (os.Setenv) and
-	// changes only when the target architecture changes. Subsequent packages
-	// in the same yap.json that target the same arch don't need to re-run
-	// the setup. Skipping also avoids:
-	//   - log spam ("Rust/Go/autoconf cross-compilation configured" per pkg);
-	//   - PKG_CONFIG_PATH duplication (each call appends the existing value
-	//     back to the prepended toolchain paths, so paths multiply per pkg);
-	//   - unnecessary contention on envMutex during parallel builds.
-	if os.Getenv("YAP_CROSS_ENV_FOR") == targetArch {
-		logger.Debug("cross-compilation environment already configured; skipping",
-			"target_arch", targetArch)
-
-		return nil
-	}
-
-	logger.Info(i18n.T("logger.cross_compilation.setting_up_cross_compilation_environment"),
-		"target_arch", targetArch,
-		"build_arch", bb.PKGBUILD.ArchComputed)
-
-	// Resolve toolchain packages for the target architecture
-	toolchainPackages, err := bb.resolveToolchainPackages(targetArch)
-	if err != nil {
-		return err
-	}
-
-	// Compute cross-compilation parameters
-	params := bb.buildCrossParams(targetArch, &toolchainPackages)
-
-	// Serialize access to os.Setenv to prevent race conditions in parallel builds
-	envMutex.Lock()
-	defer envMutex.Unlock()
-
-	// For cross-compilation, set CC/CXX to the bare cross-compiler and use
-	// CCACHE_PREFIX so ccache wraps it transparently.  Setting CC="ccache
-	// aarch64-linux-gnu-gcc" breaks build systems (e.g. OpenSSL's Configure)
-	// that derive the cross-prefix by stripping a known suffix from CC.
-	if err := setenv("CC", params.gccExecutable); err != nil {
-		return err
-	}
-
-	if err := setenv("CXX", params.gppExecutable); err != nil {
-		return err
-	}
-
-	if params.ccacheAvailable {
-		// ccache wraps the cross-compiler transparently via the
-		// /usr/lib/ccache/<cross-compiler> symlinks that are ahead of the
-		// real compiler on PATH. No extra env var is needed.
-		logger.Info("ccache active for cross-compilation",
-			"cc", params.gccExecutable,
-			"via", "/usr/lib/ccache/"+params.gccExecutable)
-	}
-
-	if err := setenv("AR", params.binutilsPrefix+"-ar"); err != nil {
-		return err
-	}
-
-	if err := setenv("STRIP", params.binutilsPrefix+"-strip"); err != nil {
-		return err
-	}
-
-	if err := setenv("RANLIB", params.binutilsPrefix+"-ranlib"); err != nil {
-		return err
-	}
-
-	if err := setenv("OBJDUMP", params.binutilsPrefix+"-objdump"); err != nil {
-		return err
-	}
-
-	if err := setenv("OBJCOPY", params.binutilsPrefix+"-objcopy"); err != nil {
-		return err
-	}
-
-	if err := setenv("LD", params.binutilsPrefix+"-ld"); err != nil {
-		return err
-	}
-
-	if err := setenv("NM", params.binutilsPrefix+"-nm"); err != nil {
-		return err
-	}
-
-	// Generate a standard CMake cross-compilation toolchain file and point
-	// CMAKE_TOOLCHAIN_FILE at it. PKGBUILDs can override this by passing
-	// -DCMAKE_TOOLCHAIN_FILE=... explicitly to cmake, which takes precedence
-	// over the environment variable.
-	cmakeToolchain, cmakeErr := writeCMakeToolchainFile(
-		targetArch, params.gccExecutable, params.gppExecutable, params.ccPrefix)
-	if cmakeErr != nil {
-		logger.Warn("failed to write CMake toolchain file", "error", cmakeErr)
-	} else {
-		if err := setenv("CMAKE_TOOLCHAIN_FILE", cmakeToolchain); err != nil {
-			return err
-		}
-	}
-
-	// Set up Rust cross-compilation environment variables
-	if params.rustTarget != "" {
-		if err := setenv("CARGO_BUILD_TARGET", params.rustTarget); err != nil {
-			return err
-		}
-
-		if err := setenv("RUSTC_TARGET", params.rustTarget); err != nil {
-			return err
-		}
-
-		// Cargo's linker must be a C compiler (gcc), not the raw linker (ld).
-		// Using ld directly causes link failures because Cargo invokes the
-		// linker as a C compiler wrapper (passes -Wl,... flags etc.).
-		if err := setenv("CARGO_TARGET_"+params.rustTargetUpper+"_LINKER", params.gccExecutable); err != nil {
-			return err
-		}
-
-		// Rust build script CC/CXX: use bare cross-compiler; ccache wraps
-		// via /usr/lib/ccache/<cross-compiler> symlinks on PATH.
-		if err := setenv("TARGET_"+params.rustTargetUpper+"_CC", params.gccExecutable); err != nil {
-			return err
-		}
-
-		if err := setenv("TARGET_"+params.rustTargetUpper+"_CXX", params.gppExecutable); err != nil {
-			return err
-		}
-
-		// Prevent the host's -m64 (or other host-arch flags) from leaking
-		// into C code compiled by Rust's cc crate for the target. The cc
-		// crate reads CFLAGS_<TARGET> (underscores, upper-case) and uses it
-		// instead of deriving flags from the host CFLAGS.
-		if err := setenv("CFLAGS_"+params.rustTargetUpper, "-O2 -fPIC"); err != nil {
-			return err
-		}
-	}
-
-	// Set up Go cross-compilation environment variables
-	goOS := linuxOS // Default to Linux for cross-compilation
-	if params.goArch != "" {
-		if err := setenv("GOOS", goOS); err != nil {
-			return err
-		}
-
-		if err := setenv("GOARCH", params.goArch); err != nil {
-			return err
-		}
-
-		// CGO: bare cross-compiler; ccache wraps via CCACHE_PREFIX.
-		if err := setenv("CGO_ENABLED", "1"); err != nil {
-			return err
-		}
-
-		if err := setenv("CC_FOR_TARGET", params.gccExecutable); err != nil {
-			return err
-		}
-
-		if err := setenv("CXX_FOR_TARGET", params.gppExecutable); err != nil {
-			return err
-		}
-	}
-
-	// Autotools: CC_FOR_BUILD/CXX_FOR_BUILD must produce host-arch executables
-	// (build-time code generators, lex/yacc tools, etc.). Without these, autotools
-	// may inherit the cross-compiler and produce target-arch binaries that cannot
-	// run on the build host.
-	if err := setenv("CC_FOR_BUILD", "gcc"); err != nil {
-		return err
-	}
-
-	if err := setenv("CXX_FOR_BUILD", "g++"); err != nil {
-		return err
-	}
-
-	if err := setenv("CFLAGS_FOR_BUILD", ""); err != nil {
-		return err
-	}
-
-	if err := setenv("CXXFLAGS_FOR_BUILD", ""); err != nil {
-		return err
-	}
-
-	// Set common cross-compilation variables.
-	// CROSS_COMPILE is the canonical indicator (e.g. "aarch64-linux-gnu-").
-	// We intentionally do NOT set TARGET_ARCH/HOST_ARCH/BUILD_ARCH because
-	// GNU make's implicit LINK.c rule expands $(TARGET_ARCH) verbatim into
-	// compile commands, breaking any package that uses the default link rule.
-	if err := setenv("CROSS_COMPILE", params.ccPrefix+"-"); err != nil {
-		return err
-	}
-
-	// CROSS_COMPILE_HOST is CROSS_COMPILE without the trailing dash.
-	// Convenience for PKGBUILDs that need the bare triplet (e.g. aarch64-linux-gnu)
-	// without having to strip it via ${CROSS_COMPILE%-}.
-	if err := setenv("CROSS_COMPILE_HOST", params.ccPrefix); err != nil {
-		return err
-	}
-
-	// Configure pkg-config for cross-compilation: prepend toolchain paths to
-	// any existing PKG_CONFIG_PATH.
-	crossPkgConfigPaths := []string{
-		"/usr/lib/" + params.ccPrefix + "/pkgconfig",
-		"/usr/local/lib/" + params.ccPrefix + "/pkgconfig",
-	}
-
-	existingPkgConfig := os.Getenv("PKG_CONFIG_PATH")
-	if existingPkgConfig != "" {
-		crossPkgConfigPaths = append(crossPkgConfigPaths, existingPkgConfig)
-	}
-
-	if err := setenv("PKG_CONFIG_PATH", strings.Join(crossPkgConfigPaths, ":")); err != nil {
-		return err
-	}
-
-	if err := setenv("PKG_CONFIG_LIBDIR", "/usr/lib/"+params.ccPrefix+"/pkgconfig"); err != nil {
-		return err
-	}
-
-	// Set up autoconf cross-compilation configuration
-	if params.hostTriplet != "" && params.buildTriplet != "" {
-		// Do NOT set ac_cv_host / ac_cv_build as environment variables.
-		// Autoconf derives them from --host / --build flags passed to configure.
-		// Setting them in the environment poisons every sub-configure in the
-		// same process tree: packages like ICU run a native sub-build
-		// (icu-native/) that needs ac_cv_host=x86_64-linux-gnu, but would
-		// inherit aarch64-linux-gnu from the environment and fail.
-
-		// Pre-populate autoconf type-size cache variables. When cross-compiling,
-		// configure cannot execute test binaries to probe sizes; without these
-		// cached values it either fails or silently produces wrong results.
-		if sizeVars, ok := autoconfSizeVars[targetArch]; ok {
-			for k, v := range sizeVars {
-				if err := setenv(k, v); err != nil {
-					return err
-				}
-			}
-		}
-
-		// Set the wrapper in the environment (will be available to the build script)
-		if err := setenv("YAP_CONFIGURE_WRAPPER", params.configureWrapper); err != nil {
-			return err
-		}
-	}
-
-	// Mutex will be released by defer statement above
-
-	if params.rustTarget != "" {
-		logger.Info(i18n.T("logger.cross_compilation.rust_cross_compilation_configured"),
-			"rust_target", params.rustTarget,
-			"target_arch", targetArch)
-	}
-
-	if params.goArch != "" {
-		logger.Info(i18n.T("logger.cross_compilation.go_cross_compilation_configured"),
-			"goos", goOS,
-			"goarch", params.goArch,
-			"target_arch", targetArch)
-	}
-
-	if params.hostTriplet != "" && params.buildTriplet != "" {
-		logger.Info(i18n.T("logger.cross_compilation.autoconf_cross_compilation_configured"),
-			"host_triplet", params.hostTriplet,
-			"build_triplet", params.buildTriplet)
-	}
-
-	logger.Info(i18n.T("logger.cross_compilation.cross_compilation_environment_configured"),
-		"target_arch", targetArch,
-		"cc", os.Getenv("CC"),
-		"cxx", os.Getenv("CXX"))
-
-	// Mark setup so subsequent packages targeting the same arch skip the
-	// full re-configuration. Cleared implicitly by yap exiting; if a future
-	// caller needs to force re-setup (e.g. arch change mid-run), they should
-	// os.Unsetenv("YAP_CROSS_ENV_FOR") first.
-	if err := setenv("YAP_CROSS_ENV_FOR", targetArch); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // archTargets holds the Rust target triple, Go GOARCH value, and GNU
 // system triplet for a single YAP architecture. Grouping them in a single
 // table eliminates the "added Rust support but forgot Go/GNU" failure mode
@@ -1309,7 +1025,9 @@ func ValidateTargetArch(arch string) error {
 
 	sort.Strings(known)
 
-	return fmt.Errorf("unsupported target architecture %q — known: %s", arch, strings.Join(known, ", "))
+	knownStr := strings.Join(known, ", ")
+	return errors.New(errors.ErrTypeValidation, fmt.Sprintf("unsupported target architecture %q — known: %s", arch, knownStr)).
+		WithOperation("ValidateTargetArch")
 }
 
 // writeCMakeToolchainFile writes a standard CMake cross-compilation toolchain
@@ -1359,7 +1077,8 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 `, targetArch, targetArch, gccExecutable, gppExecutable, sysroot, multarchLib)
 
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return "", fmt.Errorf("writing CMake toolchain file: %w", err)
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "writing CMake toolchain file").
+			WithOperation("writeCMakeToolchainFile")
 	}
 
 	return path, nil

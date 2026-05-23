@@ -17,14 +17,14 @@ func NewCacheForTesting() *Cache {
 
 // ParseDeb822ForTesting exposes parseDeb822 for unit tests.
 func (c *Cache) ParseDeb822ForTesting(r io.Reader, dpkgStatus bool) error {
-	return c.parseDeb822(r, dpkgStatus, "")
+	return c.parseDeb822(r, "test", dpkgStatus, "")
 }
 
 // ParseDeb822WithBaseURLForTesting exposes parseDeb822 with an explicit
 // baseURL so closure / download integration tests can wire packages up to
 // an httptest server.
 func (c *Cache) ParseDeb822WithBaseURLForTesting(r io.Reader, dpkgStatus bool, baseURL string) error {
-	return c.parseDeb822(r, dpkgStatus, baseURL)
+	return c.parseDeb822(r, "test", dpkgStatus, baseURL)
 }
 
 // ParseLegacySourcesListForRepoTesting exposes parseLegacySourcesListForRepo for unit tests.
@@ -40,11 +40,6 @@ func ParseDeb822SourcesListForRepoTesting(content string) []SourceEntry {
 // ParseDependsFieldForTesting exposes parseDependsField for unit tests.
 func ParseDependsFieldForTesting(value string) []string {
 	return parseDependsField(value)
-}
-
-// ResolveDepsForTesting exposes ResolveDeps for unit tests.
-func (c *Cache) ResolveDepsForTesting(seeds []string) ([]*PackageInfo, []string, error) {
-	return c.ResolveDeps(seeds)
 }
 
 // LoadAptListsForTesting exposes loadAptLists so benchmarks can measure

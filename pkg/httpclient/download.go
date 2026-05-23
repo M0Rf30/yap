@@ -2,10 +2,11 @@ package httpclient
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // FetchBytes downloads url and returns the body, capped at maxBytes.
@@ -36,7 +37,10 @@ func FetchBytes(ctx context.Context, url string, maxBytes int64) ([]byte, error)
 	}
 
 	if int64(len(data)) > maxBytes {
-		return nil, fmt.Errorf("%w: url=%s cap=%d", ErrTooLarge, url, maxBytes)
+		return nil, errors.Wrap(ErrTooLarge, errors.ErrTypeValidation, "response body exceeds size cap").
+			WithOperation("FetchBytes").
+			WithContext("url", url).
+			WithContext("cap", maxBytes)
 	}
 
 	return data, nil
@@ -67,8 +71,11 @@ func FetchToFile(ctx context.Context, url, destPath string, maxBytes int64) erro
 
 	// Cheap preflight: reject if Content-Length already exceeds cap.
 	if resp.ContentLength > 0 && resp.ContentLength > maxBytes {
-		return fmt.Errorf("%w: url=%s content-length=%d cap=%d",
-			ErrTooLarge, url, resp.ContentLength, maxBytes)
+		return errors.Wrap(ErrTooLarge, errors.ErrTypeValidation, "response body exceeds size cap").
+			WithOperation("FetchToFile").
+			WithContext("url", url).
+			WithContext("content-length", resp.ContentLength).
+			WithContext("cap", maxBytes)
 	}
 
 	return AtomicWrite(destPath, func(w io.Writer) error {
@@ -78,7 +85,10 @@ func FetchToFile(ctx context.Context, url, destPath string, maxBytes int64) erro
 		}
 
 		if written > maxBytes {
-			return fmt.Errorf("%w: url=%s cap=%d", ErrTooLarge, url, maxBytes)
+			return errors.Wrap(ErrTooLarge, errors.ErrTypeValidation, "response body exceeds size cap").
+				WithOperation("FetchToFile").
+				WithContext("url", url).
+				WithContext("cap", maxBytes)
 		}
 
 		return nil
