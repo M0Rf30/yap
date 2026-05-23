@@ -84,7 +84,7 @@ func GenerateSVGGraph(graphData *graph.Data, outputPath string, showExternal boo
 // GeneratePNGGraph generates a PNG graph by first creating SVG and providing
 // conversion instructions.
 func GeneratePNGGraph(graphData *graph.Data, outputPath string, showExternal bool) error {
-	// For PNG generation, we'll first create an SVG and then inform the user
+	// For PNG generation, create an SVG and inform the user
 	// about conversion options since Go doesn't have built-in SVG->PNG conversion
 	svgPath := strings.TrimSuffix(outputPath, ".png") + ".svg"
 

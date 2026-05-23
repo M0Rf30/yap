@@ -58,7 +58,6 @@ func Purge(packageDir string) error {
 			if matched {
 				logger.Debug("purging file", "path", path)
 
-				// #nosec G122 -- path from WalkDir within trusted packageDir
 				//nolint:gosec
 				if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
 					return removeErr
@@ -75,7 +74,7 @@ func Purge(packageDir string) error {
 
 			for _, target := range purgeTargets {
 				if strings.HasSuffix(rel, target) {
-					_ = os.Remove(path) // #nosec G122 -- trusted packageDir
+					_ = os.Remove(path) //nolint:gosec
 
 					break
 				}

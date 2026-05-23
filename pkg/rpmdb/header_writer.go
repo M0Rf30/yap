@@ -20,6 +20,8 @@ type headerEntry struct {
 //
 // This is a partial serializer — it handles the tags required for rpm -q,
 // rpm -qf, and rpm -e to work. Full byte-identity round-trip is not a goal.
+//
+//nolint:gocyclo,cyclop // header serialization dispatch is inherently large
 func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	entries := make(map[int]headerEntry)
 	blobs := new(bytes.Buffer)
@@ -29,17 +31,21 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 		if value == "" {
 			return nil
 		}
-		offset := int32(blobs.Len())
+
+		offset := int32(blobs.Len()) //nolint:gosec
+
 		data := append([]byte(value), 0) // null-terminated
 		if _, err := blobs.Write(data); err != nil {
 			return err
 		}
+
 		entries[tag] = headerEntry{
-			tag:      int32(tag),
+			tag:      int32(tag), //nolint:gosec
 			dataType: int32(rpmutils.RPM_STRING_TYPE),
 			offset:   offset,
 			count:    1,
 		}
+
 		return nil
 	}
 
@@ -48,23 +54,28 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 		if len(values) == 0 {
 			return nil
 		}
-		offset := int32(blobs.Len())
+
+		offset := int32(blobs.Len()) //nolint:gosec
+
 		for _, v := range values {
 			data := append([]byte(v), 0)
 			if _, err := blobs.Write(data); err != nil {
 				return err
 			}
 		}
+
 		entries[tag] = headerEntry{
-			tag:      int32(tag),
+			tag:      int32(tag), //nolint:gosec
 			dataType: int32(rpmutils.RPM_STRING_ARRAY_TYPE),
 			offset:   offset,
-			count:    int32(len(values)),
+			count:    int32(len(values)), //nolint:gosec
 		}
+
 		return nil
 	}
 
 	// Helper to write an int32 array tag
+	//nolint:dupl // closure parameterized by element type (int32 vs int64)
 	writeInt32Array := func(tag int, values []int32) error {
 		if len(values) == 0 {
 			return nil
@@ -75,22 +86,26 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 				return err
 			}
 		}
-		offset := int32(blobs.Len())
+
+		offset := int32(blobs.Len()) //nolint:gosec
 		for _, v := range values {
 			if err := binary.Write(blobs, binary.BigEndian, v); err != nil {
 				return err
 			}
 		}
+
 		entries[tag] = headerEntry{
-			tag:      int32(tag),
+			tag:      int32(tag), //nolint:gosec
 			dataType: int32(rpmutils.RPM_INT32_TYPE),
 			offset:   offset,
-			count:    int32(len(values)),
+			count:    int32(len(values)), //nolint:gosec
 		}
+
 		return nil
 	}
 
 	// Helper to write an int64 array tag
+	//nolint:dupl // closure parameterized by element type (int32 vs int64)
 	writeInt64Array := func(tag int, values []int64) error {
 		if len(values) == 0 {
 			return nil
@@ -101,22 +116,23 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 				return err
 			}
 		}
-		offset := int32(blobs.Len())
+
+		offset := int32(blobs.Len()) //nolint:gosec
 		for _, v := range values {
 			if err := binary.Write(blobs, binary.BigEndian, v); err != nil {
 				return err
 			}
 		}
+
 		entries[tag] = headerEntry{
-			tag:      int32(tag),
+			tag:      int32(tag), //nolint:gosec
 			dataType: int32(rpmutils.RPM_INT64_TYPE),
 			offset:   offset,
-			count:    int32(len(values)),
+			count:    int32(len(values)), //nolint:gosec
 		}
+
 		return nil
 	}
-
-
 
 	// Extract basic metadata
 	name, _ := rpm.Header.GetString(rpmutils.NAME)
@@ -137,39 +153,51 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	if err := writeString(rpmutils.NAME, name); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.VERSION, version); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.RELEASE, release); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.ARCH, arch); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.OS, os); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.SUMMARY, summary); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.DESCRIPTION, description); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.LICENSE, license); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.GROUP, group); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.URL, url); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.PACKAGER, packager); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.VENDOR, vendor); err != nil {
 		return nil, err
 	}
+
 	if err := writeString(rpmutils.BUILDHOST, buildhost); err != nil {
 		return nil, err
 	}
@@ -177,14 +205,16 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	// EPOCH (optional)
 	if rpm.Header.HasTag(rpmutils.EPOCH) {
 		epoch, _ := rpm.Header.GetInt(rpmutils.EPOCH)
-		if err := writeInt32Array(rpmutils.EPOCH, []int32{int32(epoch)}); err != nil {
+		if err := writeInt32Array(rpmutils.EPOCH, []int32{int32(epoch)}); err != nil { //nolint:gosec
 			return nil, err
 		}
 	}
 
 	// BUILDTIME
 	buildtime, _ := rpm.Header.GetInt(rpmutils.BUILDTIME)
-	if err := writeInt32Array(rpmutils.BUILDTIME, []int32{int32(buildtime)}); err != nil {
+
+	bt := int32(buildtime) //nolint:gosec
+	if err := writeInt32Array(rpmutils.BUILDTIME, []int32{bt}); err != nil {
 		return nil, err
 	}
 
@@ -203,11 +233,13 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	if err := writeStringArray(rpmutils.PROVIDENAME, provides); err != nil {
 		return nil, err
 	}
+
 	if len(provides) > 0 {
 		provideFlags, _ := rpm.Header.GetUint32s(rpmutils.PROVIDEFLAGS)
 		if err := writeInt32Array(rpmutils.PROVIDEFLAGS, toInt32Slice(provideFlags)); err != nil {
 			return nil, err
 		}
+
 		provideVersions, _ := rpm.Header.GetStrings(rpmutils.PROVIDEVERSION)
 		if err := writeStringArray(rpmutils.PROVIDEVERSION, provideVersions); err != nil {
 			return nil, err
@@ -219,11 +251,13 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	if err := writeStringArray(rpmutils.REQUIRENAME, requires); err != nil {
 		return nil, err
 	}
+
 	if len(requires) > 0 {
 		requireFlags, _ := rpm.Header.GetUint32s(rpmutils.REQUIREFLAGS)
 		if err := writeInt32Array(rpmutils.REQUIREFLAGS, toInt32Slice(requireFlags)); err != nil {
 			return nil, err
 		}
+
 		requireVersions, _ := rpm.Header.GetStrings(rpmutils.REQUIREVERSION)
 		if err := writeStringArray(rpmutils.REQUIREVERSION, requireVersions); err != nil {
 			return nil, err
@@ -235,11 +269,13 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	if err := writeStringArray(rpmutils.CONFLICTNAME, conflicts); err != nil {
 		return nil, err
 	}
+
 	if len(conflicts) > 0 {
 		conflictFlags, _ := rpm.Header.GetUint32s(rpmutils.CONFLICTFLAGS)
 		if err := writeInt32Array(rpmutils.CONFLICTFLAGS, toInt32Slice(conflictFlags)); err != nil {
 			return nil, err
 		}
+
 		conflictVersions, _ := rpm.Header.GetStrings(rpmutils.CONFLICTVERSION)
 		if err := writeStringArray(rpmutils.CONFLICTVERSION, conflictVersions); err != nil {
 			return nil, err
@@ -251,11 +287,13 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	if err := writeStringArray(rpmutils.OBSOLETENAME, obsoletes); err != nil {
 		return nil, err
 	}
+
 	if len(obsoletes) > 0 {
 		obsoleteFlags, _ := rpm.Header.GetUint32s(rpmutils.OBSOLETEFLAGS)
 		if err := writeInt32Array(rpmutils.OBSOLETEFLAGS, toInt32Slice(obsoleteFlags)); err != nil {
 			return nil, err
 		}
+
 		obsoleteVersions, _ := rpm.Header.GetStrings(rpmutils.OBSOLETEVERSION)
 		if err := writeStringArray(rpmutils.OBSOLETEVERSION, obsoleteVersions); err != nil {
 			return nil, err
@@ -263,7 +301,7 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	}
 
 	// FILE METADATA
-	if len(files) > 0 {
+	if len(files) > 0 { //nolint:nestif // file metadata block is sequential array population
 		basenames := make([]string, len(files))
 		dirnames := make([]string, 0)
 		dirindexes := make([]int32, len(files))
@@ -278,8 +316,11 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 
 		// Build directory list and indices
 		dirMap := make(map[string]int)
-		for _, f := range files {
+
+		for i := range files {
+			f := &files[i]
 			dir := dirFromPath(f.Path)
+
 			if _, ok := dirMap[dir]; !ok {
 				dirMap[dir] = len(dirnames)
 				dirnames = append(dirnames, dir)
@@ -287,49 +328,60 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 		}
 
 		// Populate file arrays
-		for i, f := range files {
+		for i := range files {
+			f := &files[i]
 			basenames[i] = basenameFromPath(f.Path)
-			dirindexes[i] = int32(dirMap[dirFromPath(f.Path)])
+			dirindexes[i] = int32(dirMap[dirFromPath(f.Path)]) //nolint:gosec
 			filesizes[i] = f.Size
-			filemodes[i] = int32(f.Mode)
+			filemodes[i] = int32(f.Mode) //nolint:gosec
 			filedigests[i] = f.SHA256
 			filelinktos[i] = f.LinkTarget
-			fileflags[i] = int32(f.Flags)
+			fileflags[i] = int32(f.Flags) //nolint:gosec
 			fileusers[i] = f.User
 			filegroups[i] = f.Group
-			filemtimes[i] = int32(f.MTime.Unix())
+			filemtimes[i] = int32(f.MTime.Unix()) //nolint:gosec
 		}
 
 		if err := writeStringArray(rpmutils.BASENAMES, basenames); err != nil {
 			return nil, err
 		}
+
 		if err := writeStringArray(rpmutils.DIRNAMES, dirnames); err != nil {
 			return nil, err
 		}
+
 		if err := writeInt32Array(rpmutils.DIRINDEXES, dirindexes); err != nil {
 			return nil, err
 		}
+
 		if err := writeInt64Array(rpmutils.FILESIZES, filesizes); err != nil {
 			return nil, err
 		}
+
 		if err := writeInt32Array(rpmutils.FILEMODES, filemodes); err != nil {
 			return nil, err
 		}
+
 		if err := writeStringArray(rpmutils.FILEDIGESTS, filedigests); err != nil {
 			return nil, err
 		}
+
 		if err := writeStringArray(rpmutils.FILELINKTOS, filelinktos); err != nil {
 			return nil, err
 		}
+
 		if err := writeInt32Array(rpmutils.FILEFLAGS, fileflags); err != nil {
 			return nil, err
 		}
+
 		if err := writeStringArray(rpmutils.FILEUSERNAME, fileusers); err != nil {
 			return nil, err
 		}
+
 		if err := writeStringArray(rpmutils.FILEGROUPNAME, filegroups); err != nil {
 			return nil, err
 		}
+
 		if err := writeInt32Array(rpmutils.FILEMTIMES, filemtimes); err != nil {
 			return nil, err
 		}
@@ -369,6 +421,7 @@ func serializeHeaderBlob(entries map[int]headerEntry, blobs *bytes.Buffer) ([]by
 
 	// Write header intro
 	result := new(bytes.Buffer)
+
 	intro := struct {
 		Magic    [8]byte
 		Reserved [4]byte
@@ -376,8 +429,8 @@ func serializeHeaderBlob(entries map[int]headerEntry, blobs *bytes.Buffer) ([]by
 		Size     uint32
 	}{
 		Magic:   [8]byte{0x8e, 0xad, 0xe8, 0x01, 0x00, 0x00, 0x00, 0x00},
-		Entries: uint32(len(tags)),
-		Size:    uint32(blobs.Len()),
+		Entries: uint32(len(tags)),   //nolint:gosec
+		Size:    uint32(blobs.Len()), //nolint:gosec
 	}
 	if err := binary.Write(result, binary.BigEndian, intro); err != nil {
 		return nil, err
@@ -403,8 +456,9 @@ func serializeHeaderBlob(entries map[int]headerEntry, blobs *bytes.Buffer) ([]by
 func toInt32Slice(u32s []uint32) []int32 {
 	result := make([]int32, len(u32s))
 	for i, v := range u32s {
-		result[i] = int32(v)
+		result[i] = int32(v) //nolint:gosec
 	}
+
 	return result
 }
 
@@ -415,9 +469,11 @@ func dirFromPath(path string) string {
 			if i == 0 {
 				return "/"
 			}
+
 			return path[:i+1]
 		}
 	}
+
 	return ""
 }
 
@@ -428,5 +484,6 @@ func basenameFromPath(path string) string {
 			return path[i+1:]
 		}
 	}
+
 	return path
 }

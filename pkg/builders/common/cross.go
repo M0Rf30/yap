@@ -414,7 +414,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 			"target_arch", targetArch,
 			"deps", len(deps))
 
-		// RPM: use pure-Go dnfinstall
+		// RPM: use dnfinstall
 		if bb.Format == constants.FormatRPM {
 			return bb.installRPMDeps(ctx, deps)
 		}
@@ -558,25 +558,30 @@ func (bb *BaseBuilder) installCrossDeps(
 
 	// Install arch-all (host) packages first so they are available to
 	// satisfy transitive dependencies of the target-arch packages.
-	if len(archAll) > 0 {
-		// RPM: use pure-Go dnfinstall
-		if bb.Format == constants.FormatRPM {
-			if err := bb.installRPMDeps(ctx, archAll); err != nil {
-				return err
-			}
-		} else {
-			if err := bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, archAll); err != nil {
-				return err
-			}
-		}
+	if err := bb.installArchAllDeps(ctx, archAll, installArgs); err != nil {
+		return err
 	}
 
-	// RPM: use pure-Go dnfinstall
+	// RPM: use dnfinstall
 	if bb.Format == constants.FormatRPM {
 		return bb.installRPMDeps(ctx, qualified)
 	}
 
 	return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, qualified)
+}
+
+// installArchAllDeps installs the host arch-all dependency subset
+// (extracted from installCrossDeps to lower its nesting complexity).
+func (bb *BaseBuilder) installArchAllDeps(ctx context.Context, archAll, installArgs []string) error {
+	if len(archAll) == 0 {
+		return nil
+	}
+
+	if bb.Format == constants.FormatRPM {
+		return bb.installRPMDeps(ctx, archAll)
+	}
+
+	return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, archAll)
 }
 
 // ensureCrossArchRepo registers the foreign architecture (dpkg
@@ -1026,8 +1031,9 @@ func ValidateTargetArch(arch string) error {
 	sort.Strings(known)
 
 	knownStr := strings.Join(known, ", ")
-	return errors.New(errors.ErrTypeValidation, fmt.Sprintf("unsupported target architecture %q — known: %s", arch, knownStr)).
-		WithOperation("ValidateTargetArch")
+
+	return errors.New(errors.ErrTypeValidation, fmt.Sprintf("unsupported target architecture %q — known: %s", arch, knownStr)). //nolint:lll
+																	WithOperation("ValidateTargetArch")
 }
 
 // writeCMakeToolchainFile writes a standard CMake cross-compilation toolchain

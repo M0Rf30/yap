@@ -14,30 +14,18 @@ import (
 	rpmutils "github.com/sassoftware/go-rpmutils"
 )
 
-// createTestRPM creates a minimal mock RPM for testing.
-// This is a simplified version; real tests would use actual RPM files.
-func createTestRPM(t *testing.T, name, version, release string) *rpmutils.Rpm {
-	t.Helper()
-
-	// Create a minimal RPM header by reading from a test fixture or
-	// constructing one programmatically. For now, we'll use a simple approach.
-	// In production, you'd use actual RPM files from test fixtures.
-
-	// This is a placeholder that would need actual RPM data.
-	// For the test suite, we'll focus on the database operations.
-	return nil
-}
-
 // TestOpenWriterFresh tests opening a fresh database.
 func TestOpenWriterFresh(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "rpmdb.sqlite")
 
 	ctx := context.Background()
+
 	w, err := OpenWriter(ctx, dbPath)
 	if err != nil {
 		t.Fatalf("OpenWriter failed: %v", err)
 	}
+
 	defer func() {
 		_ = w.Close()
 	}()
@@ -49,10 +37,12 @@ func TestOpenWriterFresh(t *testing.T) {
 
 	// Verify schema was initialized
 	var count int
+
 	err = w.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='table'").Scan(&count)
 	if err != nil {
 		t.Fatalf("failed to query tables: %v", err)
 	}
+
 	if count == 0 {
 		t.Fatal("no tables created")
 	}
@@ -70,6 +60,7 @@ func TestOpenWriterExisting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first OpenWriter failed: %v", err)
 	}
+
 	_ = w1.Close()
 
 	// Second open should succeed
@@ -83,10 +74,12 @@ func TestOpenWriterExisting(t *testing.T) {
 
 	// Verify tables still exist
 	var count int
+
 	err = w2.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='table'").Scan(&count)
 	if err != nil {
 		t.Fatalf("failed to query tables: %v", err)
 	}
+
 	if count == 0 {
 		t.Fatal("tables missing after reopen")
 	}
@@ -110,14 +103,17 @@ func TestOpenWriterPopulated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to insert package: %v", err)
 	}
+
 	_ = w1.Close()
 
 	// Try to open again; should fail with ErrPopulated
 	w2, err := OpenWriter(ctx, dbPath)
 	if w2 != nil {
 		_ = w2.Close()
+
 		t.Fatal("expected OpenWriter to fail on populated database")
 	}
+
 	if !errors.Is(err, ErrPopulated) {
 		t.Fatalf("expected ErrPopulated, got %v", err)
 	}
@@ -143,10 +139,12 @@ func TestInstallWithFiles(t *testing.T) {
 	dbPath := filepath.Join(dir, "rpmdb.sqlite")
 
 	ctx := context.Background()
+
 	w, err := OpenWriter(ctx, dbPath)
 	if err != nil {
 		t.Fatalf("OpenWriter failed: %v", err)
 	}
+
 	defer func() {
 		_ = w.Close()
 	}()
@@ -196,10 +194,12 @@ func TestInstallWithFiles(t *testing.T) {
 
 	// Verify basenames
 	var count int
+
 	err = w.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM Basenames").Scan(&count)
 	if err != nil {
 		t.Fatalf("failed to query basenames: %v", err)
 	}
+
 	if count != 3 {
 		t.Fatalf("expected 3 basenames, got %d", count)
 	}
@@ -209,6 +209,7 @@ func TestInstallWithFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to query dirnames: %v", err)
 	}
+
 	if count != 2 { // /usr/bin/ and /etc/
 		t.Fatalf("expected 2 dirnames, got %d", count)
 	}
@@ -220,16 +221,19 @@ func TestInstallMultiplePackages(t *testing.T) {
 	dbPath := filepath.Join(dir, "rpmdb.sqlite")
 
 	ctx := context.Background()
+
 	w, err := OpenWriter(ctx, dbPath)
 	if err != nil {
 		t.Fatalf("OpenWriter failed: %v", err)
 	}
+
 	defer func() {
 		_ = w.Close()
 	}()
 
 	// Install first package
 	rpm1 := createMockRPM(t, "pkg1", "1.0", "1")
+
 	err = w.Install(ctx, rpm1, []InstalledFile{
 		{
 			Path:  "/usr/bin/pkg1",
@@ -246,6 +250,7 @@ func TestInstallMultiplePackages(t *testing.T) {
 
 	// Install second package
 	rpm2 := createMockRPM(t, "pkg2", "2.0", "1")
+
 	err = w.Install(ctx, rpm2, []InstalledFile{
 		{
 			Path:  "/usr/bin/pkg2",
@@ -262,10 +267,12 @@ func TestInstallMultiplePackages(t *testing.T) {
 
 	// Verify both packages
 	var count int
+
 	err = w.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM Packages").Scan(&count)
 	if err != nil {
 		t.Fatalf("failed to query packages: %v", err)
 	}
+
 	if count != 2 {
 		t.Fatalf("expected 2 packages, got %d", count)
 	}
@@ -275,6 +282,7 @@ func TestInstallMultiplePackages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to query names: %v", err)
 	}
+
 	if count != 2 {
 		t.Fatalf("expected 2 names, got %d", count)
 	}
@@ -286,10 +294,12 @@ func TestInstallContextCancellation(t *testing.T) {
 	dbPath := filepath.Join(dir, "rpmdb.sqlite")
 
 	ctx := context.Background()
+
 	w, err := OpenWriter(ctx, dbPath)
 	if err != nil {
 		t.Fatalf("OpenWriter failed: %v", err)
 	}
+
 	defer func() {
 		_ = w.Close()
 	}()
@@ -358,6 +368,7 @@ func TestPathHelpers(t *testing.T) {
 		if dir != tt.wantDir {
 			t.Errorf("dirFromPath(%q) = %q, want %q", tt.path, dir, tt.wantDir)
 		}
+
 		if base != tt.wantBase {
 			t.Errorf("basenameFromPath(%q) = %q, want %q", tt.path, base, tt.wantBase)
 		}
@@ -366,7 +377,9 @@ func TestPathHelpers(t *testing.T) {
 
 // createMockRPM creates a mock RPM header for testing.
 // This is a simplified version that creates a minimal valid RPM structure.
-func createMockRPM(t *testing.T, name, version, release string) *rpmutils.Rpm {
+//
+//nolint:unparam // params kept for documentation / future expansion
+func createMockRPM(t *testing.T, _, _, release string) *rpmutils.Rpm {
 	t.Helper()
 
 	// For testing purposes, we create a minimal RPM structure.

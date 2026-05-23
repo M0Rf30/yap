@@ -19,7 +19,7 @@ import (
 // DEB format: AR archive containing control.tar.gz and data.tar.{gz,xz,zst}
 // We need to extract data.tar from the AR archive and then extract its contents.
 func ExtractDEB(packagePath, destDir string) error {
-	file, err := os.Open(packagePath) // #nosec G304 - packagePath is from trusted build artifacts
+	file, err := os.Open(packagePath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open DEB package").
 			WithContext("path", packagePath).
@@ -64,14 +64,14 @@ func ExtractDEB(packagePath, destDir string) error {
 			// Copy data.tar to temp file
 			if _, err := io.Copy(tmpFile, arReader); err != nil {
 				_ = tmpFile.Close()
-				_ = os.Remove(dataTarPath) // #nosec G703 -- path comes from os.CreateTemp, not user input //nolint:gosec
+				_ = os.Remove(dataTarPath) //nolint:gosec
 
 				return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write temp file").
 					WithOperation("ExtractDEB")
 			}
 
 			if err := tmpFile.Close(); err != nil {
-				_ = os.Remove(dataTarPath) // #nosec G703 -- path comes from os.CreateTemp, not user input //nolint:gosec
+				_ = os.Remove(dataTarPath) //nolint:gosec
 
 				return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to close temp file").
 					WithOperation("ExtractDEB")
@@ -117,7 +117,7 @@ const (
 // Streaming entries ourselves also lets us reuse SafeJoin for
 // traversal protection and skip risky entry types (char/block/FIFO).
 func ExtractRPM(packagePath, destDir string) error {
-	file, err := os.Open(packagePath) // #nosec G304,G703 -- packagePath is from trusted build artifacts
+	file, err := os.Open(packagePath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open RPM package").
 			WithContext("path", packagePath).
@@ -193,15 +193,13 @@ func extractRPMEntry(
 	}
 
 	mode := fi.Mode()
-	// #nosec G115 -- POSIX mode is a 32-bit field; masking with os.ModePerm
 	// (0o777) discards the type bits and any out-of-range data before use.
-	perm := os.FileMode(uint32(mode)) & os.ModePerm
+	perm := os.FileMode(uint32(mode)) & os.ModePerm //nolint:gosec
 
 	switch mode & rpmFileTypeMask {
 	case rpmFileTypeDir:
 		dirMap[target] = true
 
-		// #nosec G703 -- target is constrained by SafeJoin above.
 		return os.MkdirAll(target, perm|0o100) // ensure exec bit so we can descend
 
 	case rpmFileTypeLink:
@@ -215,12 +213,12 @@ func extractRPMEntry(
 		parent := filepath.Dir(target)
 		if _, seen := dirMap[parent]; !seen {
 			dirMap[parent] = true
-			_ = os.MkdirAll(parent, 0o755) // #nosec G301,G703 -- intermediate dirs need read+exec; path is SafeJoin-constrained
+			_ = os.MkdirAll(parent, 0o755)
 		}
 
-		_ = os.Remove(target) // #nosec G703 -- target is constrained by SafeJoin above.
+		_ = os.Remove(target)
 
-		return os.Symlink(fi.Linkname(), target) // #nosec G703 -- target is constrained by SafeJoin above.
+		return os.Symlink(fi.Linkname(), target)
 
 	case rpmFileTypeReg:
 		// Hardlinks: payload only ships content for the last entry of a link
@@ -233,7 +231,7 @@ func extractRPMEntry(
 		parent := filepath.Dir(target)
 		if _, seen := dirMap[parent]; !seen {
 			dirMap[parent] = true
-			_ = os.MkdirAll(parent, 0o755) // #nosec G301,G703 -- intermediate dirs need read+exec; path is SafeJoin-constrained
+			_ = os.MkdirAll(parent, 0o755)
 		}
 
 		return writeRPMRegularFile(pr, target, perm)
@@ -247,8 +245,7 @@ func extractRPMEntry(
 
 // writeRPMRegularFile streams the current payload entry's content to path.
 func writeRPMRegularFile(pr rpmutils.PayloadReader, path string, perm os.FileMode) error {
-	// #nosec G304,G703 -- path is constrained by SafeJoin to stay inside destDir.
-	out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "open file failed").
 			WithContext("path", path).

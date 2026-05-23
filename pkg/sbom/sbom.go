@@ -71,8 +71,7 @@ func Generate(pkg *pkgbuild.PKGBUILD, artifactPath string,
 		}
 
 		// Write to file
-		// #nosec G306 -- SBOM sidecars are intentionally world-readable
-		if err := os.WriteFile(sbomPath, jsonData, 0o644); err != nil {
+		if err := os.WriteFile(sbomPath, jsonData, 0o644); err != nil { //nolint:gosec
 			logger.Warn("Failed to write SBOM file",
 				"path", sbomPath,
 				"error", err)

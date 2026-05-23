@@ -92,8 +92,7 @@ func (s *GPGSigner) writeSignatureSidecar(
 	ext string,
 ) error {
 	sigPath := artifactPath + ext
-	// #nosec G306 -- signature files are intentionally world-readable
-	if err := os.WriteFile(sigPath, signatureBuf.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(sigPath, signatureBuf.Bytes(), 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			"failed to write signature file").
 			WithOperation("writeSignatureSidecar").
@@ -115,7 +114,7 @@ func (s *GPGSigner) Sign(ctx context.Context, artifactPath string) error {
 	}
 
 	// Read the artifact
-	artifactData, err := os.ReadFile(artifactPath) // #nosec G304 -- path is the build output we just produced
+	artifactData, err := os.ReadFile(artifactPath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			"failed to read artifact for signing").

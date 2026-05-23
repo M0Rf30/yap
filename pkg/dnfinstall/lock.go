@@ -14,7 +14,7 @@ import (
 // Polls every 500ms for up to 30s. Honors ctx cancellation.
 // Returns a release function that must be called to unlock and close the file.
 func acquireLock(ctx context.Context, rootDir string) (release func() error, err error) {
-	lockPath := filepath.Join(rootDir, "var/lib/yap/install.lock")
+	lockPath := filepath.Join(rootDir, "var", "lib", "yap", "install.lock")
 
 	// Ensure parent directory exists.
 	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
@@ -24,7 +24,7 @@ func acquireLock(ctx context.Context, rootDir string) (release func() error, err
 	}
 
 	// Open or create the lock file.
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open lock file").
 			WithOperation("acquireLock").
@@ -33,6 +33,7 @@ func acquireLock(ctx context.Context, rootDir string) (release func() error, err
 
 	// Poll for the lock with a 30-second timeout.
 	deadline := time.Now().Add(30 * time.Second)
+
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -50,6 +51,7 @@ func acquireLock(ctx context.Context, rootDir string) (release func() error, err
 		// Check if it's a "would block" error (lock held by another process).
 		if err != syscall.EWOULDBLOCK {
 			_ = f.Close()
+
 			return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "flock failed").
 				WithOperation("acquireLock").
 				WithContext("path", lockPath)
@@ -59,11 +61,13 @@ func acquireLock(ctx context.Context, rootDir string) (release func() error, err
 		select {
 		case <-ctx.Done():
 			_ = f.Close()
+
 			return nil, errors.Wrap(ctx.Err(), errors.ErrTypeFileSystem, "context cancelled while waiting for lock").
 				WithOperation("acquireLock")
 		case <-ticker.C:
 			if time.Now().After(deadline) {
 				_ = f.Close()
+
 				return nil, errors.New(errors.ErrTypeFileSystem, "lock acquisition timeout (30s)").
 					WithOperation("acquireLock").
 					WithContext("path", lockPath)

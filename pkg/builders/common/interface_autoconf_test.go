@@ -144,6 +144,7 @@ func TestBuildCrossEnvSlice_AutoconfVariables(t *testing.T) {
 				if strings.HasPrefix(envVar, "ac_cv_host=") {
 					t.Errorf("ac_cv_host should not be set in slice (got %q); use --host flag instead", envVar)
 				}
+
 				if strings.HasPrefix(envVar, "ac_cv_build=") {
 					t.Errorf("ac_cv_build should not be set in slice (got %q); use --build flag instead", envVar)
 				}
@@ -151,12 +152,14 @@ func TestBuildCrossEnvSlice_AutoconfVariables(t *testing.T) {
 
 			// Verify C/C++ compiler is set in the slice
 			var cc, cxx string
+
 			for _, envVar := range envSlice {
-				if strings.HasPrefix(envVar, "CC=") {
-					cc = strings.TrimPrefix(envVar, "CC=")
+				if after, ok := strings.CutPrefix(envVar, "CC="); ok {
+					cc = after
 				}
-				if strings.HasPrefix(envVar, "CXX=") {
-					cxx = strings.TrimPrefix(envVar, "CXX=")
+
+				if after, ok := strings.CutPrefix(envVar, "CXX="); ok {
+					cxx = after
 				}
 			}
 

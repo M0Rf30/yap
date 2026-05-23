@@ -1,4 +1,4 @@
-// Package yapdb provides a pure-Go state tracker for packages installed by YAP.
+// Package yapdb provides a state tracker for packages installed by YAP.
 //
 // It maintains a SQLite database of installed packages, their files, and
 // capabilities (provides, requires, conflicts, obsoletes). This allows YAP

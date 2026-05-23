@@ -43,7 +43,7 @@ func setupDeb(r *Repo) error {
 
 	// /etc/apt/sources.list.d is a documented Debian system directory and
 	// must remain traversable for unprivileged apt operations.
-	if err := os.MkdirAll(debSourcesDir, 0o755); err != nil { // #nosec G301
+	if err := os.MkdirAll(debSourcesDir, 0o755); err != nil {
 		return err
 	}
 
@@ -63,7 +63,7 @@ func setupDeb(r *Repo) error {
 	dst := filepath.Join(debSourcesDir, "yap-"+r.Name+".sources")
 	// apt must read this file as the unprivileged _apt user, so it has to be
 	// world-readable; gosec's stricter 0o600 default does not apply here.
-	if err := os.WriteFile(dst, []byte(b.String()), 0o644); err != nil { // #nosec G306
+	if err := os.WriteFile(dst, []byte(b.String()), 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			fmt.Sprintf("repo %q: write %s", r.Name, dst)).
 			WithOperation("setupDeb").

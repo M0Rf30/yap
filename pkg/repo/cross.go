@@ -149,7 +149,7 @@ func configureCrossArchAndSources(
 	return setupDeb(&r)
 }
 
-// refreshCrossAptIndexes refreshes the apt index via pure-Go aptrepo. There is
+// refreshCrossAptIndexes refreshes the apt index via aptrepo. There is
 // no subprocess fallback: a failure here means the cross-arch ports repo
 // could not be reached and later install steps would fail anyway.
 //
@@ -218,7 +218,7 @@ func archiveKeyringFor(distro string) string {
 // keyring without an extra KeyURL fetch.
 func writeCrossSource(r *Repo, targetDebArch, codename, distro, keyring string) error {
 	// /etc/apt/sources.list.d is a documented Debian system directory.
-	if err := os.MkdirAll(debSourcesDir, 0o755); err != nil { // #nosec G301
+	if err := os.MkdirAll(debSourcesDir, 0o755); err != nil {
 		return err
 	}
 
@@ -239,7 +239,7 @@ func writeCrossSource(r *Repo, targetDebArch, codename, distro, keyring string) 
 
 	dst := filepath.Join(debSourcesDir, "yap-"+r.Name+".sources")
 	// apt must read this file as the unprivileged _apt user.
-	if err := os.WriteFile(dst, []byte(body), 0o644); err != nil { // #nosec G306
+	if err := os.WriteFile(dst, []byte(body), 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			fmt.Sprintf("repo %q: write %s", r.Name, dst)).
 			WithOperation("writeCrossSource").
@@ -310,7 +310,7 @@ func restrictDeb822Sources(hostDebArch string) error {
 func patchDeb822File(path, hostDebArch string) error {
 	// path is constrained to /etc/apt/sources.list.d; the entry name is sourced
 	// from os.ReadDir and is not user-controlled at runtime.
-	data, err := os.ReadFile(path) // #nosec G304
+	data, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return err
 	}
@@ -327,7 +327,7 @@ func patchDeb822File(path, hostDebArch string) error {
 }
 
 func restrictLegacySourcesList(hostDebArch string) error {
-	data, err := os.ReadFile(debSourcesList) // #nosec G304
+	data, err := os.ReadFile(debSourcesList)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -347,7 +347,7 @@ func restrictLegacySourcesList(hostDebArch string) error {
 }
 
 // addDpkgArchitecture registers a foreign architecture with dpkg by appending
-// it to /var/lib/dpkg/arch. This is the pure-Go equivalent of
+// it to /var/lib/dpkg/arch. This is equivalent to
 // "dpkg --add-architecture <arch>": dpkg itself only reads and writes that
 // plain-text file (one arch per line). The function is idempotent — it is a
 // no-op when the arch is already listed.
@@ -355,7 +355,7 @@ func addDpkgArchitecture(arch string) error {
 	const dpkgArchFile = "/var/lib/dpkg/arch"
 
 	// Read existing content (file may not exist on minimal images).
-	data, err := os.ReadFile(dpkgArchFile) // #nosec G304
+	data, err := os.ReadFile(dpkgArchFile)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -377,12 +377,12 @@ func addDpkgArchitecture(arch string) error {
 
 	content += arch + "\n"
 
-	if err := os.MkdirAll(filepath.Dir(dpkgArchFile), 0o755); err != nil { // #nosec G301
+	if err := os.MkdirAll(filepath.Dir(dpkgArchFile), 0o755); err != nil {
 		return err
 	}
 
 	// /var/lib/dpkg/arch is a dpkg-internal file; 0o644 matches dpkg's own mode.
-	if err := os.WriteFile(dpkgArchFile, []byte(content), 0o644); err != nil { // #nosec G306,G703
+	if err := os.WriteFile(dpkgArchFile, []byte(content), 0o644); err != nil { //nolint:gosec
 		return err
 	}
 
@@ -397,7 +397,7 @@ func addDpkgArchitecture(arch string) error {
 func writeRoot(path string, data []byte) error {
 	// path is composed of package constants plus a sanitized repo name; the
 	// caller controls the value and apt requires world-readable mode.
-	if err := os.WriteFile(path, data, 0o644); err != nil { // #nosec G306,G703
+	if err := os.WriteFile(path, data, 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			fmt.Sprintf("repo: write %s", path)).
 			WithOperation("writeRoot").

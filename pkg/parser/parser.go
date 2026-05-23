@@ -132,6 +132,46 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 		varDecl   string
 	)
 
+	// localVars tracks PKGBUILD scalar variables as they are parsed so that
+	// later assignments (e.g. source=("git+${url}")) can expand them correctly.
+	localVars := make(map[string]string)
+
+	// expandFunc merges PKGBUILD-local variables with the process environment,
+	// giving PKGBUILD variables priority over environment variables.
+	expandFunc := func(name string) string {
+		if v, ok := localVars[name]; ok {
+			return v
+		}
+
+		return os.Getenv(name)
+	}
+
+	handleAssign := func(nodeType *syntax.Assign) error {
+		if nodeType.Array != nil {
+			// StringifyArray accumulates output across elements (shared builder),
+			// so only the last element contains the full expanded array.
+			// Use shell.Fields on the last element only to get all values.
+			lines := set.StringifyArray(nodeType)
+			arrayDecl = nil
+
+			if len(lines) > 0 {
+				arrayDecl, _ = shell.Fields(lines[len(lines)-1], expandFunc)
+			}
+
+			return pkgBuild.AddItem(nodeType.Name.Value, arrayDecl)
+		}
+
+		strVal, strErr := set.StringifyAssign(nodeType)
+		if strErr != nil {
+			return strErr
+		}
+
+		varDecl, _ = shell.Expand(strVal, expandFunc)
+		localVars[nodeType.Name.Value] = varDecl
+
+		return pkgBuild.AddItem(nodeType.Name.Value, varDecl)
+	}
+
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
 		// Do NOT recurse into function bodies — assignments inside functions are
 		// local and must not be treated as top-level PKGBUILD variables.
@@ -140,22 +180,7 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 		}
 
 		if nodeType, ok := node.(*syntax.Assign); ok {
-			if nodeType.Array != nil {
-				for _, line := range set.StringifyArray(nodeType) {
-					arrayDecl, _ = shell.Fields(line, os.Getenv)
-				}
-
-				err = pkgBuild.AddItem(nodeType.Name.Value, arrayDecl)
-			} else {
-				strVal, strErr := set.StringifyAssign(nodeType)
-				if strErr != nil {
-					err = strErr
-					return false
-				}
-
-				varDecl, _ = shell.Expand(strVal, os.Getenv)
-				err = pkgBuild.AddItem(nodeType.Name.Value, varDecl)
-			}
+			err = handleAssign(nodeType)
 		}
 
 		return true

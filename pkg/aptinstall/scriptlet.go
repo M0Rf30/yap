@@ -110,7 +110,7 @@ func runScriptlet(
 		"action", action)
 
 	cmdArgs := append([]string{scriptPath, action}, args...)
-	cmd := exec.CommandContext(ctx, "/bin/sh", cmdArgs...) // #nosec G204 -- scriptPath is /var/lib/dpkg/info/<pkg>.X
+	cmd := exec.CommandContext(ctx, "/bin/sh", cmdArgs...)
 
 	cmd.Env = append(filterScriptletEnv(),
 		"DEBIAN_FRONTEND=noninteractive",

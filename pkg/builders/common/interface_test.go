@@ -347,14 +347,17 @@ func TestBuildCcacheEnvSlice(t *testing.T) {
 
 	// Verify CCACHE_BASEDIR is set correctly
 	found := false
+
 	for _, envVar := range envSlice {
 		if strings.HasPrefix(envVar, "CCACHE_BASEDIR=") {
 			if !strings.HasSuffix(envVar, tempDir) {
 				t.Errorf("CCACHE_BASEDIR not set to StartDir: %s", envVar)
 			}
+
 			found = true
 		}
 	}
+
 	if !found {
 		t.Errorf("CCACHE_BASEDIR not found in environment slice")
 	}
@@ -423,6 +426,7 @@ func TestBuildCcacheEnvSliceWithRealEnvironment(t *testing.T) {
 
 	// Verify CCACHE_BASEDIR is set correctly
 	found := false
+
 	for _, envVar := range envSlice {
 		if strings.HasPrefix(envVar, "CCACHE_BASEDIR=") {
 			if !strings.HasSuffix(envVar, tempDir) {
@@ -430,9 +434,11 @@ func TestBuildCcacheEnvSliceWithRealEnvironment(t *testing.T) {
 			} else {
 				t.Logf("CCACHE_BASEDIR correctly set: %s", envVar)
 			}
+
 			found = true
 		}
 	}
+
 	if !found {
 		t.Logf("CCACHE_BASEDIR not found in environment slice")
 	}
@@ -600,6 +606,7 @@ func TestBuildCrossEnvSlice(t *testing.T) {
 					t.Errorf("Expected no error for no cross-compilation, got: %v", err)
 					return
 				}
+
 				if envSlice != nil {
 					t.Errorf("Expected nil slice for no cross-compilation, got: %v", envSlice)
 					return
@@ -609,16 +616,20 @@ func TestBuildCrossEnvSlice(t *testing.T) {
 			// Check expected environment variables in the slice
 			for key, expectedValue := range tc.expectEnv {
 				found := false
+
 				for _, envVar := range envSlice {
-					if strings.HasPrefix(envVar, key+"=") {
-						actualValue := strings.TrimPrefix(envVar, key+"=")
+					if after, ok := strings.CutPrefix(envVar, key+"="); ok {
+						actualValue := after
 						if expectedValue != "" && actualValue != expectedValue {
 							t.Errorf("Expected %s=%s, got %s", key, expectedValue, actualValue)
 						}
+
 						found = true
+
 						break
 					}
 				}
+
 				if expectedValue != "" && !found {
 					t.Errorf("Expected environment variable not found in slice: %s", key)
 				}
@@ -1022,15 +1033,18 @@ func TestBuildCrossEnvSliceEnvironmentVariables(t *testing.T) {
 
 			// Extract values from the slice
 			var cc, cxx, ar string
+
 			for _, envVar := range envSlice {
-				if strings.HasPrefix(envVar, "CC=") {
-					cc = strings.TrimPrefix(envVar, "CC=")
+				if after, ok := strings.CutPrefix(envVar, "CC="); ok {
+					cc = after
 				}
-				if strings.HasPrefix(envVar, "CXX=") {
-					cxx = strings.TrimPrefix(envVar, "CXX=")
+
+				if after, ok := strings.CutPrefix(envVar, "CXX="); ok {
+					cxx = after
 				}
-				if strings.HasPrefix(envVar, "AR=") {
-					ar = strings.TrimPrefix(envVar, "AR=")
+
+				if after, ok := strings.CutPrefix(envVar, "AR="); ok {
+					ar = after
 				}
 			}
 
@@ -1052,15 +1066,18 @@ func TestBuildCrossEnvSliceEnvironmentVariables(t *testing.T) {
 
 			// Check Rust and Go environment variables in the slice
 			var rustTarget, rustCC, goCC string
+
 			for _, envVar := range envSlice {
-				if strings.HasPrefix(envVar, "CARGO_BUILD_TARGET=") {
-					rustTarget = strings.TrimPrefix(envVar, "CARGO_BUILD_TARGET=")
+				if after, ok := strings.CutPrefix(envVar, "CARGO_BUILD_TARGET="); ok {
+					rustTarget = after
 				}
+
 				if strings.HasPrefix(envVar, "TARGET_") && strings.Contains(envVar, "_CC=") {
 					rustCC = envVar
 				}
-				if strings.HasPrefix(envVar, "CC_FOR_TARGET=") {
-					goCC = strings.TrimPrefix(envVar, "CC_FOR_TARGET=")
+
+				if after, ok := strings.CutPrefix(envVar, "CC_FOR_TARGET="); ok {
+					goCC = after
 				}
 			}
 
@@ -1097,9 +1114,10 @@ func TestBuildCrossEnvSlice_AppendsPkgConfigPath(t *testing.T) {
 
 	// Find PKG_CONFIG_PATH in the slice
 	var result string
+
 	for _, envVar := range envSlice {
-		if strings.HasPrefix(envVar, "PKG_CONFIG_PATH=") {
-			result = strings.TrimPrefix(envVar, "PKG_CONFIG_PATH=")
+		if after, ok := strings.CutPrefix(envVar, "PKG_CONFIG_PATH="); ok {
+			result = after
 			break
 		}
 	}

@@ -1,7 +1,7 @@
 // Package shell provides process execution and shell operations.
 package shell
 
-// fakeroot.go implements a pure-Go fakeroot mechanism using Linux user namespaces
+// fakeroot.go implements a fakeroot mechanism using Linux user namespaces
 // (CLONE_NEWUSER). When applied to an exec.Cmd, the subprocess sees itself as UID 0
 // (root) while the kernel maps that back to the real caller UID on the host.
 // This allows package() scripts to call `install -o root -g root` without actually

@@ -518,6 +518,8 @@
   translation: "Impossibile ottenere la toolchain per"
 - id: errors.cross_compilation.skip_validation_tip
   translation: "Per saltare la validazione della toolchain e tentare comunque la compilazione, usare: --skip-toolchain-validation"
+- id: errors.cross_compilation.target_architecture_format
+  translation: "Architettura target"
 
 # Messaggi logger - Build
 - id: logger.build.build_completed
@@ -552,6 +554,10 @@
   translation: "Saltato, il file esiste già"
 - id: logger.archive.warn.close_failed
   translation: "Chiusura dell'archivio fallita"
+- id: logger.archive.warn.path_traversal_rejected
+  translation: "Tentativo di path traversal rifiutato"
+- id: logger.archive.warn.symlink_rejected
+  translation: "Symlink rifiutato"
 
 # Messaggi logger - Build package
 - id: logger.buildpackage.warn.failed_to_remove_temporary_1
@@ -1022,3 +1028,7 @@
 # Logger messages - Package signing
 - id: logger.signing_artifact
   translation: "Firma artefatto del pacchetto"
+
+# Messaggi di test
+- id: test.message
+  translation: "Messaggio di test"

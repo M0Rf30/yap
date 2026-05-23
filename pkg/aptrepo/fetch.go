@@ -58,9 +58,9 @@ func fetchComponentIndex(ctx context.Context, src *aptcache.SourceEntry, comp, a
 
 		// Write to /var/lib/apt/lists/.
 		encoded := encodeListFilename(src.URL, src.Suite, relPath)
+
 		destPath := filepath.Join(aptListsDir, encoded)
-		// #nosec G306 — file permissions 0o644 are appropriate for apt list files
-		if err := os.WriteFile(destPath, data, 0o644); err != nil {
+		if err := os.WriteFile(destPath, data, 0o644); err != nil { //nolint:gosec
 			return err
 		}
 

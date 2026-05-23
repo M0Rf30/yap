@@ -11,11 +11,12 @@ import (
 	"strings"
 	"testing"
 
-	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 )
@@ -258,6 +259,7 @@ func TestVerifyInReleaseOrFallback_UnsignedAllowUnverified(t *testing.T) {
 	// URL is stored in context, not in the error message
 	var yapErr *yaperrors.YapError
 	assert.ErrorAs(t, err, &yapErr, "error should be a YapError")
+
 	if yapErr != nil {
 		assert.Equal(t, "https://example.com/ubuntu/", yapErr.Context["url"])
 	}
@@ -281,6 +283,7 @@ func TestVerifyInReleaseOrFallback_UnsignedStrictMode(t *testing.T) {
 	// URL is stored in context, not in the error message
 	var yapErr *yaperrors.YapError
 	assert.ErrorAs(t, err, &yapErr, "error should be a YapError")
+
 	if yapErr != nil {
 		assert.Equal(t, "https://example.com/ubuntu/", yapErr.Context["url"])
 	}
@@ -391,6 +394,7 @@ func TestVerifyDetachedOrFallback_SigErrStrictMode(t *testing.T) {
 	// URL is stored in context, not in the error message
 	var yapErr *yaperrors.YapError
 	assert.ErrorAs(t, err, &yapErr, "error should be a YapError")
+
 	if yapErr != nil {
 		assert.Equal(t, "https://example.com/ubuntu/", yapErr.Context["url"])
 	}

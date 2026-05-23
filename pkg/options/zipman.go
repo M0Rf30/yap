@@ -60,7 +60,7 @@ func ZipMan(packageDir string) error {
 func gzipFile(path string) error {
 	logger.Debug("compressing man page", "path", path)
 
-	in, err := os.Open(path) // #nosec G304 -- path from WalkDir within trusted packageDir
+	in, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func gzipFile(path string) error {
 
 	outPath := path + ".gz"
 
-	out, err := os.Create(outPath) // #nosec G304 -- derived from trusted WalkDir path
+	out, err := os.Create(outPath) //nolint:gosec
 	if err != nil {
 		return err
 	}

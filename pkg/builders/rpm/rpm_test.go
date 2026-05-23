@@ -1,9 +1,8 @@
 package rpm
 
-import "context"
-
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"

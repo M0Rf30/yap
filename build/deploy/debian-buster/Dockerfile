@@ -27,7 +27,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     -buildvcs=false \
     -ldflags "-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
     -o /usr/bin/yap \
-    cmd/yap/yap.go && \
+    ./cmd/yap && \
     upx --best --lzma /usr/bin/yap
 
 # Generate bash completion (do this in build stage where we can execute the binary)

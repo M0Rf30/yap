@@ -1,4 +1,4 @@
-package dnfinstall
+package dnfinstall //nolint:testpackage
 
 import (
 	"testing"
@@ -88,6 +88,7 @@ func TestExtractCapabilitiesProvides(t *testing.T) {
 
 	// Find provides.
 	var provides []string
+
 	for _, cap := range caps {
 		if cap.Kind == "provide" {
 			provides = append(provides, cap.Name)
@@ -113,6 +114,7 @@ func TestExtractCapabilitiesRequires(t *testing.T) {
 
 	// Find requires.
 	var requires []string
+
 	for _, cap := range caps {
 		if cap.Kind == "require" {
 			requires = append(requires, cap.Name)
@@ -137,6 +139,7 @@ func TestExtractCapabilitiesConflicts(t *testing.T) {
 
 	// Find conflicts.
 	var conflicts []string
+
 	for _, cap := range caps {
 		if cap.Kind == "conflict" {
 			conflicts = append(conflicts, cap.Name)
@@ -161,6 +164,7 @@ func TestExtractCapabilitiesObsoletes(t *testing.T) {
 
 	// Find obsoletes.
 	var obsoletes []string
+
 	for _, cap := range caps {
 		if cap.Kind == "obsolete" {
 			obsoletes = append(obsoletes, cap.Name)

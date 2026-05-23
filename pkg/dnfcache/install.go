@@ -146,7 +146,7 @@ func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string,
 		return "", err
 	}
 
-	f, err := os.Create(dest) // #nosec G304
+	f, err := os.Create(dest) //nolint:gosec
 	if err != nil {
 		return "", err
 	}
@@ -188,7 +188,7 @@ func rpmInstall(ctx context.Context, paths []string) error {
 
 	args := append([]string{"--install", "--nodeps"}, paths...)
 
-	cmd := exec.CommandContext(ctx, "rpm", args...) // #nosec G204
+	cmd := exec.CommandContext(ctx, "rpm", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

@@ -37,12 +37,15 @@ func readCapList(rpm *rpmutils.Rpm, kind string, nameTag, flagsTag, versionTag i
 
 	out := make([]yapdb.Capability, len(names))
 	for i := range names {
-		var fl int
-		var ver string
+		var (
+			fl  int
+			ver string
+		)
 
 		if i < len(flags) {
 			fl = int(flags[i])
 		}
+
 		if i < len(versions) {
 			ver = versions[i]
 		}

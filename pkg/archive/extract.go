@@ -21,7 +21,7 @@ func extractWithIterator(
 	destination string,
 	patterns []string,
 ) error {
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	dirMap := make(map[string]bool)
 
@@ -54,7 +54,7 @@ func extractWithIterator(
 		switch {
 		case entry.IsDir:
 			dirMap[cleanPath] = true
-			if err := os.MkdirAll(cleanPath, 0o755); err != nil { // #nosec G301
+			if err := os.MkdirAll(cleanPath, 0o755); err != nil {
 				return err
 			}
 
@@ -97,7 +97,7 @@ func extractWithIterator(
 			// Regular file
 			ensureParent(cleanPath, dirMap)
 
-			if err := writeFileFromEntry(cleanPath, entry); err != nil {
+			if err := writeFileFromEntry(cleanPath, &entry); err != nil {
 				return err
 			}
 		}
@@ -106,7 +106,7 @@ func extractWithIterator(
 
 // writeFileFromEntry creates path with the mode from entry and streams the entry body
 // from entry.Open().
-func writeFileFromEntry(path string, entry archiveEntry) error {
+func writeFileFromEntry(path string, entry *archiveEntry) error {
 	// Skip rewriting identical files to support resumed extractions.
 	if existing, err := os.Stat(path); err == nil && existing.Size() == entry.Size {
 		logger.Debug(i18n.T("logger.archive.debug.skip_exists"), "path", path)
@@ -114,8 +114,7 @@ func writeFileFromEntry(path string, entry archiveEntry) error {
 		return nil
 	}
 
-	// #nosec G304,G703 -- path is constrained by safeJoin to stay inside destination
-	out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, entry.Mode.Perm())
+	out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, entry.Mode.Perm()) //nolint:gosec
 	if err != nil {
 		return err
 	}

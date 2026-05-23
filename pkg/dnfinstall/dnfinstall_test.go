@@ -1,4 +1,4 @@
-package dnfinstall
+package dnfinstall //nolint:testpackage
 
 import (
 	"context"
@@ -13,10 +13,10 @@ import (
 // TestResolveRootDirLive tests resolveRootDir with "/" as the target.
 func TestResolveRootDirLive(t *testing.T) {
 	tests := []struct {
-		name              string
-		opts              Options
-		wantErr           bool
-		wantErrSubstring  string
+		name             string
+		opts             Options
+		wantErr          bool
+		wantErrSubstring string
 	}{
 		{
 			name: "root without AllowRootInstall rejected",
@@ -145,8 +145,7 @@ func TestInstallFileValidation(t *testing.T) {
 	err = InstallFile(ctx, rpmPath, opts)
 	require.Error(t, err)
 	// Should fail during signature verification or RPM parsing
-	// (signature verification happens first now in Phase 5)
-	assert.True(t, 
+	assert.True(t,
 		assert.Contains(t, err.Error(), "signature verification") ||
 			assert.Contains(t, err.Error(), "failed to parse RPM"),
 		"error should mention signature verification or RPM parsing")

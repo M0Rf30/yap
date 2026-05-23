@@ -4,8 +4,8 @@
 // supported formats (APK, DEB, RPM, Pacman). It defines the Signer interface,
 // signing configuration, and resolution logic for keys and passphrases.
 //
-// Phase 0 (this phase) provides infrastructure only. Actual signing
-// implementations are added in Phase 3 (APK RSA) and Phase 4 (DEB/RPM/Pacman GPG).
+// Signing implementations are provided for APK (RSA PKCS#1 v1.5 SHA1) and
+// DEB/RPM/Pacman (OpenPGP).
 package signing
 
 import (
@@ -82,10 +82,10 @@ func (c *Config) Clear() {
 //
 // The behavior depends on the format:
 //   - APK: rebuilds the package with a third concatenated gzip stream
-//     containing .SIGN.RSA.<keyname>.rsa.pub (Phase 3)
-//   - DEB: appends _gpgorigin to the ar archive (dpkg-sig style) (Phase 4)
-//   - RPM: writes signature into the RPM lead/header (delegated to rpmpack) (Phase 4)
-//   - Pacman: writes detached <artifactPath>.sig (Phase 4)
+//     containing .SIGN.RSA.<keyname>.rsa.pub
+//   - DEB: appends _gpgorigin to the ar archive (dpkg-sig style)
+//   - RPM: writes signature into the RPM lead/header (delegated to rpmpack)
+//   - Pacman: writes detached <artifactPath>.sig
 type Signer interface {
 	// Sign signs the artifact at artifactPath.
 	Sign(ctx context.Context, artifactPath string) error

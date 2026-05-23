@@ -60,9 +60,9 @@ test-coverage:
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
-# Run E2E test for pure-Go RPM install on Rocky Linux 8
+# Run E2E test for RPM install on Rocky Linux 8
 test-e2e-rpm:
-	@echo "Running pure-Go RPM install E2E test on rockylinux:8..."
+	@echo "Running RPM install E2E test on rockylinux:8..."
 	@CONTAINER_RUNTIME=$$(command -v docker || command -v podman); \
 	if [ -z "$$CONTAINER_RUNTIME" ]; then \
 		echo "Error: docker or podman not found"; \
@@ -104,7 +104,7 @@ lint:
 lint-md:
 	@echo "Linting markdown files..."
 	@if command -v markdownlint-cli2 > /dev/null; then \
-		markdownlint-cli2 --config .markdownlint.yml "**/*.md"; \
+		markdownlint-cli2 --config .markdownlint.yml "**/*.md" "!**/node_modules/**"; \
 	elif command -v markdownlint > /dev/null; then \
 		markdownlint --config .markdownlint.yml .; \
 	else \
@@ -266,7 +266,7 @@ help:
 	@echo "  clean            - Clean build artifacts"
 	@echo "  test             - Run tests"
 	@echo "  test-coverage    - Run tests with coverage report"
-	@echo "  test-e2e-rpm     - Run E2E test for pure-Go RPM install on Rocky 8"
+	@echo "  test-e2e-rpm     - Run E2E test for RPM install on Rocky 8"
 	@echo "  bench            - Run benchmarks"
 	@echo "  deps             - Download dependencies"
 	@echo "  fmt              - Format code"

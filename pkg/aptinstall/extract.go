@@ -17,7 +17,7 @@ import (
 // It handles conffile collisions: if a conffile already exists on disk, it is NOT
 // overwritten (dpkg behavior with DEBIAN_FRONTEND=noninteractive).
 func extractDataTar(debPath, destDir string, conffiles []string) error {
-	file, err := os.Open(debPath) // #nosec G304 - debPath is from trusted apt index metadata
+	file, err := os.Open(debPath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "open DEB").
 			WithOperation("extractDataTar").WithContext("path", debPath)
@@ -57,14 +57,14 @@ func extractDataTar(debPath, destDir string, conffiles []string) error {
 			// Copy data.tar to temp file.
 			if _, err := io.Copy(tmpFile, arReader); err != nil {
 				_ = tmpFile.Close()
-				_ = os.Remove(dataTarPath) // #nosec G703
+				_ = os.Remove(dataTarPath)
 
 				return errors.Wrap(err, errors.ErrTypeFileSystem, "write temp file").
 					WithOperation("extractDataTar")
 			}
 
 			if err := tmpFile.Close(); err != nil {
-				_ = os.Remove(dataTarPath) // #nosec G703
+				_ = os.Remove(dataTarPath)
 
 				return errors.Wrap(err, errors.ErrTypeFileSystem, "close temp file").
 					WithOperation("extractDataTar")
@@ -170,7 +170,7 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 	}
 
 	// Open and decompress the data.tar.
-	file, err := os.Open(dataTarPath) // #nosec G304 - dataTarPath is from os.CreateTemp
+	file, err := os.Open(dataTarPath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "open data.tar").
 			WithOperation("extractDataTarWithConffiles").WithContext("path", dataTarPath)
@@ -272,7 +272,7 @@ func extractTarSymlink(hdr *tar.Header, destDir, fullPath string, dirMap map[str
 	parentDir := filepath.Dir(fullPath)
 	if _, seen := dirMap[parentDir]; !seen {
 		dirMap[parentDir] = true
-		_ = os.MkdirAll(parentDir, 0o755) // #nosec G301
+		_ = os.MkdirAll(parentDir, 0o755)
 	}
 
 	if err := os.Symlink(hdr.Linkname, fullPath); err != nil {

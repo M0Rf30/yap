@@ -1,4 +1,4 @@
-package dnfinstall
+package dnfinstall //nolint:testpackage
 
 import (
 	"context"
@@ -63,7 +63,7 @@ func TestWriteSystemRpmdbExists(t *testing.T) {
 	rootDir := t.TempDir()
 
 	// Create the rpmdb directory structure.
-	rpmdbDir := filepath.Join(rootDir, "var/lib/rpm")
+	rpmdbDir := filepath.Join(rootDir, "var", "lib", "rpm")
 	err := os.MkdirAll(rpmdbDir, 0o755)
 	require.NoError(t, err)
 
@@ -78,7 +78,7 @@ func TestWriteSystemRpmdbExists(t *testing.T) {
 	// Call writeSystemRpmdb.
 	err = writeSystemRpmdb(ctx, rpm, entry, rootDir)
 
-	// Should return "not yet implemented" error (Phase 3 placeholder).
+	// Should return "not yet implemented" error.
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not yet implemented")
 }
@@ -210,7 +210,7 @@ func TestDownloadRPMContextCancellation(t *testing.T) {
 
 	path, err := downloadRPM(ctx, nil, pkg, tmpDir)
 
-	// Should return not implemented error (Phase 2 placeholder).
+	// Should return not implemented error.
 	assert.Error(t, err)
 	assert.Empty(t, path)
 }
@@ -230,6 +230,7 @@ func TestYapdbInsertWithCapabilities(t *testing.T) {
 	// Open yapdb.
 	db, err := yapdb.Open(ctx, dbPath)
 	require.NoError(t, err)
+
 	defer func() { _ = db.Close() }()
 
 	// Create a package with capabilities.
@@ -249,7 +250,7 @@ func TestYapdbInsertWithCapabilities(t *testing.T) {
 	}
 
 	// Insert the package.
-	err = db.Insert(ctx, pkg)
+	err = db.Insert(ctx, &pkg)
 	require.NoError(t, err)
 
 	// Lookup the package.
@@ -258,15 +259,16 @@ func TestYapdbInsertWithCapabilities(t *testing.T) {
 
 	// Verify capabilities were stored.
 	assert.Len(t, retrieved.Caps, 4)
-	
+
 	// Check that all capability kinds are present (order may vary).
 	kinds := make(map[string]bool)
 	names := make(map[string]bool)
+
 	for _, cap := range retrieved.Caps {
 		kinds[cap.Kind] = true
 		names[cap.Name] = true
 	}
-	
+
 	assert.True(t, kinds["provide"])
 	assert.True(t, kinds["require"])
 	assert.True(t, kinds["conflict"])
@@ -284,6 +286,7 @@ func TestYapdbInsertMultipleCapabilities(t *testing.T) {
 
 	db, err := yapdb.Open(ctx, dbPath)
 	require.NoError(t, err)
+
 	defer func() { _ = db.Close() }()
 
 	// Create a package with multiple provides.
@@ -301,7 +304,7 @@ func TestYapdbInsertMultipleCapabilities(t *testing.T) {
 		},
 	}
 
-	err = db.Insert(ctx, pkg)
+	err = db.Insert(ctx, &pkg)
 	require.NoError(t, err)
 
 	retrieved, err := db.LookupByName(ctx, "multi-pkg", "x86_64")
@@ -309,6 +312,7 @@ func TestYapdbInsertMultipleCapabilities(t *testing.T) {
 
 	// Verify all provides were stored.
 	assert.Len(t, retrieved.Caps, 3)
+
 	for i, cap := range retrieved.Caps {
 		assert.Equal(t, "provide", cap.Kind)
 		assert.Equal(t, "lib"+string(rune('1'+i)), cap.Name)
@@ -322,6 +326,7 @@ func TestYapdbProvidersOf(t *testing.T) {
 
 	db, err := yapdb.Open(ctx, dbPath)
 	require.NoError(t, err)
+
 	defer func() { _ = db.Close() }()
 
 	// Insert a package that provides "mylib".
@@ -337,7 +342,7 @@ func TestYapdbProvidersOf(t *testing.T) {
 		},
 	}
 
-	err = db.Insert(ctx, pkg)
+	err = db.Insert(ctx, &pkg)
 	require.NoError(t, err)
 
 	// Query for providers of "mylib".

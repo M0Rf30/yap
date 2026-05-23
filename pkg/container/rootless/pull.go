@@ -44,8 +44,8 @@ func rootfsPath(distro string) (string, error) {
 	return filepath.Join(home, ".local", "share", "yap", "rootfs", distro), nil
 }
 
-// PullImage pulls the YAP builder image for distro from the registry using
-// pure Go (no CLI required) and extracts it to a local rootfs directory.
+// PullImage pulls the YAP builder image for distro from the registry
+// (no CLI required) and extracts it to a local rootfs directory.
 func PullImage(distro string) error {
 	ref := constants.DockerOrg + distro
 	logger.Info("pulling image", "ref", ref)

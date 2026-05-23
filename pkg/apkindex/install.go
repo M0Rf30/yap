@@ -127,7 +127,7 @@ func (idx *Index) InstallPackagesWithOptions(
 // readInstalledDB parses /lib/apk/db/installed and returns a set of
 // installed package names. Returns empty map on read error.
 func readInstalledDB() map[string]bool {
-	f, err := os.Open(apkInstalledDB) // #nosec G304 -- constant path
+	f, err := os.Open(apkInstalledDB)
 	if err != nil {
 		return make(map[string]bool)
 	}
@@ -170,7 +170,7 @@ func readInstalledDB() map[string]bool {
 // Orchestrates extraction of control and data streams, then registers the package.
 func extractAndRegister(apkPath string, pkg *Package) error {
 	// Open the .apk file (2-or-3-stream concatenated gzip: [signature] + control + data).
-	f, err := os.Open(apkPath) // #nosec G304 -- temp dir path
+	f, err := os.Open(apkPath) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open APK file").
 			WithOperation("extractAndRegister").
@@ -358,7 +358,7 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 		// pipeline elsewhere) is one of them, so this matters in practice.
 		tmpPath := targetPath + ".apk-new"
 
-		f, err := os.Create(tmpPath) // #nosec G304 — derived from safeAPKPath
+		f, err := os.Create(tmpPath) //nolint:gosec
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary file").
 				WithOperation("extractAPKEntry").
@@ -384,7 +384,7 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 
 		// Preserve permissions before the rename so the file is in its
 		// final state when it becomes visible at targetPath.
-		if err := os.Chmod(tmpPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
+		if err := os.Chmod(tmpPath, os.FileMode(hdr.Mode)); err != nil { //nolint:gosec
 			_ = os.Remove(tmpPath)
 
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set file permissions").
@@ -403,7 +403,7 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 
 	case tar.TypeDir:
 		// Directory.
-		if err := os.MkdirAll(targetPath, os.FileMode(hdr.Mode)); err != nil { // #nosec G115 — hdr.Mode is from tar header
+		if err := os.MkdirAll(targetPath, os.FileMode(hdr.Mode)); err != nil { //nolint:gosec
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create directory").
 				WithOperation("extractAPKEntry").
 				WithContext("path", targetPath)
@@ -460,7 +460,7 @@ func registerInstalled(pkg *Package, pkgInfo string) error {
 		sb.WriteString(pkg.Arch)
 		sb.WriteString("\nI:")
 		// Convert int64 to string
-		sb.WriteString(string(rune(pkg.InstSize)))
+		sb.WriteString(string(rune(pkg.InstSize))) //nolint:gosec
 		sb.WriteString("\n")
 		stanza = sb.String()
 	}
@@ -473,7 +473,7 @@ func registerInstalled(pkg *Package, pkgInfo string) error {
 // readInstalledStanzas parses /lib/apk/db/installed into a map of
 // package-name → raw stanza text (newline-terminated, no trailing blank).
 func readInstalledStanzas() map[string]string {
-	f, err := os.Open(apkInstalledDB) // #nosec G304 -- constant path
+	f, err := os.Open(apkInstalledDB)
 	if err != nil {
 		return make(map[string]string)
 	}

@@ -62,7 +62,7 @@ var ErrNoTrustAnchor = errors.New("aptrepo: no usable trust anchor for source")
 // well-formed but was made by a key not in the trust anchor. This is
 // distinct from a *bad* signature (corrupted data / wrong key material)
 // and is treated the same as ErrNoTrustAnchor for the AllowUnverifiedRepos
-// opt-in: the repo simply hasn't been trusted yet.
+// opt-in: the repo hasn't been trusted yet.
 var ErrUnknownSigner = errors.New("aptrepo: signature made by unknown entity")
 
 // ErrUnsigned is returned when the fetched Release / InRelease file
@@ -126,7 +126,7 @@ func verifyDetachedRelease(body, signature []byte, keyring openpgp.EntityList) (
 // into an openpgp.EntityList suitable for verification.
 //
 // signedBy is the raw value from the deb822 / one-liner Signed-By field.
-// For now only filesystem paths are supported; inline armored key blocks
+// Filesystem paths are supported; inline armored key blocks
 // (a niche deb822 feature) are not. Empty / unset signedBy means "use the
 // default apt trust paths".
 func loadKeyringForSource(signedBy string) (openpgp.EntityList, error) {
@@ -234,9 +234,8 @@ func loadKeyringDir(dir string) (openpgp.EntityList, error) {
 // loadKeyringFile reads a single keyring, auto-detecting binary vs
 // ASCII-armored format.
 func loadKeyringFile(path string) (openpgp.EntityList, error) {
-	// #nosec G304 — path comes from sources.list or our hardcoded
 	// default-keyring list; trust boundary is at the sources.list parser.
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}

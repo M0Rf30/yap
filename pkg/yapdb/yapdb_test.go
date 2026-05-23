@@ -1,7 +1,8 @@
-package yapdb
+package yapdb //nolint:testpackage // tests access unexported db.path field
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -88,7 +89,7 @@ func TestInsertAndLookup(t *testing.T) {
 		},
 	}
 
-	if err := db.Insert(ctx, pkg); err != nil {
+	if err := db.Insert(ctx, &pkg); err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
 
@@ -97,6 +98,7 @@ func TestInsertAndLookup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LookupByName failed: %v", err)
 	}
+
 	if found == nil {
 		t.Fatal("expected package to be found")
 	}
@@ -104,12 +106,15 @@ func TestInsertAndLookup(t *testing.T) {
 	if found.Name != "test-pkg" {
 		t.Errorf("expected name test-pkg, got %s", found.Name)
 	}
+
 	if found.Version != "1.0.0" {
 		t.Errorf("expected version 1.0.0, got %s", found.Version)
 	}
+
 	if len(found.Files) != 2 {
 		t.Errorf("expected 2 files, got %d", len(found.Files))
 	}
+
 	if len(found.Caps) != 2 {
 		t.Errorf("expected 2 capabilities, got %d", len(found.Caps))
 	}
@@ -136,7 +141,7 @@ func TestInsertIdempotent(t *testing.T) {
 	}
 
 	// Insert first time.
-	if err := db.Insert(ctx, pkg); err != nil {
+	if err := db.Insert(ctx, &pkg); err != nil {
 		t.Fatalf("first Insert failed: %v", err)
 	}
 
@@ -147,7 +152,7 @@ func TestInsertIdempotent(t *testing.T) {
 		{Path: "/usr/lib/test.so", Mode: 0o755, SHA256: "def456"},
 	}
 
-	if err := db.Insert(ctx, pkg); err != nil {
+	if err := db.Insert(ctx, &pkg); err != nil {
 		t.Fatalf("second Insert failed: %v", err)
 	}
 
@@ -156,9 +161,11 @@ func TestInsertIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LookupByName failed: %v", err)
 	}
+
 	if found.Version != "2.0.0" {
 		t.Errorf("expected version 2.0.0, got %s", found.Version)
 	}
+
 	if len(found.Files) != 2 {
 		t.Errorf("expected 2 files after replace, got %d", len(found.Files))
 	}
@@ -179,7 +186,7 @@ func TestIsInstalled(t *testing.T) {
 		InstallTime: time.Now(),
 	}
 
-	if err := db.Insert(ctx, pkg); err != nil {
+	if err := db.Insert(ctx, &pkg); err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
 
@@ -187,6 +194,7 @@ func TestIsInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IsInstalled failed: %v", err)
 	}
+
 	if !installed {
 		t.Error("expected package to be installed")
 	}
@@ -195,6 +203,7 @@ func TestIsInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IsInstalled failed: %v", err)
 	}
+
 	if installed {
 		t.Error("expected nonexistent package to not be installed")
 	}
@@ -230,10 +239,11 @@ func TestProvidersOf(t *testing.T) {
 		},
 	}
 
-	if err := db.Insert(ctx, pkg1); err != nil {
+	if err := db.Insert(ctx, &pkg1); err != nil {
 		t.Fatalf("Insert pkg1 failed: %v", err)
 	}
-	if err := db.Insert(ctx, pkg2); err != nil {
+
+	if err := db.Insert(ctx, &pkg2); err != nil {
 		t.Fatalf("Insert pkg2 failed: %v", err)
 	}
 
@@ -251,6 +261,7 @@ func TestProvidersOf(t *testing.T) {
 	for _, p := range providers {
 		found[p] = true
 	}
+
 	if !found["pkg1"] || !found["pkg2"] {
 		t.Errorf("expected pkg1 and pkg2 in providers, got %v", providers)
 	}
@@ -280,10 +291,11 @@ func TestList(t *testing.T) {
 		InstallTime: time.Now(),
 	}
 
-	if err := db.Insert(ctx, pkg1); err != nil {
+	if err := db.Insert(ctx, &pkg1); err != nil {
 		t.Fatalf("Insert pkg1 failed: %v", err)
 	}
-	if err := db.Insert(ctx, pkg2); err != nil {
+
+	if err := db.Insert(ctx, &pkg2); err != nil {
 		t.Fatalf("Insert pkg2 failed: %v", err)
 	}
 
@@ -321,7 +333,7 @@ func TestRemove(t *testing.T) {
 		},
 	}
 
-	if err := db.Insert(ctx, pkg); err != nil {
+	if err := db.Insert(ctx, &pkg); err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
 
@@ -330,6 +342,7 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IsInstalled failed: %v", err)
 	}
+
 	if !installed {
 		t.Fatal("expected package to be installed")
 	}
@@ -344,15 +357,17 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IsInstalled failed: %v", err)
 	}
+
 	if installed {
 		t.Error("expected package to be removed")
 	}
 
 	// Verify files are cascaded.
 	found, err := db.LookupByName(ctx, "test-pkg", "x86_64")
-	if err != nil {
-		t.Fatalf("LookupByName failed: %v", err)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("LookupByName: expected ErrNotFound, got err=%v found=%v", err, found)
 	}
+
 	if found != nil {
 		t.Error("expected package to be nil after removal")
 	}
@@ -363,11 +378,12 @@ func TestConcurrentOpenClose(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test.db")
 
 	// Open and close multiple times.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		db, err := Open(context.Background(), dbPath)
 		if err != nil {
 			t.Fatalf("Open iteration %d failed: %v", i, err)
 		}
+
 		if err := db.Close(); err != nil {
 			t.Fatalf("Close iteration %d failed: %v", i, err)
 		}
@@ -381,9 +397,10 @@ func TestLookupNonexistent(t *testing.T) {
 	ctx := context.Background()
 
 	found, err := db.LookupByName(ctx, "nonexistent", "x86_64")
-	if err != nil {
-		t.Fatalf("LookupByName failed: %v", err)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("LookupByName: expected ErrNotFound, got err=%v found=%v", err, found)
 	}
+
 	if found != nil {
 		t.Error("expected nil for nonexistent package")
 	}
@@ -413,10 +430,11 @@ func TestMultipleArchitectures(t *testing.T) {
 		InstallTime: time.Now(),
 	}
 
-	if err := db.Insert(ctx, pkg1); err != nil {
+	if err := db.Insert(ctx, &pkg1); err != nil {
 		t.Fatalf("Insert pkg1 failed: %v", err)
 	}
-	if err := db.Insert(ctx, pkg2); err != nil {
+
+	if err := db.Insert(ctx, &pkg2); err != nil {
 		t.Fatalf("Insert pkg2 failed: %v", err)
 	}
 
@@ -425,6 +443,7 @@ func TestMultipleArchitectures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LookupByName x86_64 failed: %v", err)
 	}
+
 	if found1 == nil {
 		t.Fatal("expected x86_64 package to be found")
 	}
@@ -433,6 +452,7 @@ func TestMultipleArchitectures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LookupByName aarch64 failed: %v", err)
 	}
+
 	if found2 == nil {
 		t.Fatal("expected aarch64 package to be found")
 	}
@@ -443,9 +463,10 @@ func TestMultipleArchitectures(t *testing.T) {
 	}
 
 	found1, err = db.LookupByName(ctx, "test-pkg", "x86_64")
-	if err != nil {
-		t.Fatalf("LookupByName x86_64 after remove failed: %v", err)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("LookupByName x86_64 after remove: expected ErrNotFound, got err=%v", err)
 	}
+
 	if found1 != nil {
 		t.Error("expected x86_64 package to be removed")
 	}
@@ -454,6 +475,7 @@ func TestMultipleArchitectures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LookupByName aarch64 after remove failed: %v", err)
 	}
+
 	if found2 == nil {
 		t.Error("expected aarch64 package to still exist")
 	}
@@ -461,6 +483,8 @@ func TestMultipleArchitectures(t *testing.T) {
 
 // setupTestDB creates a temporary database for testing.
 func setupTestDB(t *testing.T) *DB {
+	t.Helper()
+
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 

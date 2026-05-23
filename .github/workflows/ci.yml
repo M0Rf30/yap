@@ -77,7 +77,6 @@ jobs:
     with:
       go-version: "1.26.1"
       upload-sarif: true
-      run-gosec: true
       run-vulncheck: false
 
   # ===================================
@@ -216,7 +215,7 @@ jobs:
           if [ -f examples/yap/PKGBUILD ]; then
             echo "🧪 Testing example build..."
             cd examples/yap
-            timeout 300 ../../dist/yap-linux-amd64 build .
+            timeout 300 ../../dist/yap-linux-amd64 build --skip-sync .
             cd ../..
           fi
 

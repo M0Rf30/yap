@@ -6,8 +6,8 @@ import (
 
 // NewSigner constructs the appropriate concrete Signer for the format.
 //
-// For FormatAPK, returns an RSASigner (Phase 3 — PKCS#1 v1.5 SHA1).
-// For FormatDEB, FormatRPM, FormatPacman, returns a GPGSigner (Phase 4 — OpenPGP).
+// For FormatAPK, returns an RSASigner (PKCS#1 v1.5 SHA1).
+// For FormatDEB, FormatRPM, FormatPacman, returns a GPGSigner (OpenPGP).
 //
 // If signing is disabled (cfg.Enabled == false), a NoopSigner is returned.
 func NewSigner(format Format, cfg Config) (Signer, error) {
@@ -24,12 +24,12 @@ func NewSigner(format Format, cfg Config) (Signer, error) {
 			WithContext("format", string(format))
 	}
 
-	// Phase 3: APK RSA signing (PKCS#1 v1.5 SHA1)
+	// APK RSA signing (PKCS#1 v1.5 SHA1)
 	if format == FormatAPK {
 		return NewRSASigner(cfg)
 	}
 
-	// Phase 4: DEB/RPM/Pacman GPG signing (OpenPGP)
+	// DEB/RPM/Pacman GPG signing (OpenPGP)
 	if format == FormatDEB || format == FormatRPM || format == FormatPacman {
 		return NewGPGSigner(cfg, format)
 	}

@@ -1,4 +1,4 @@
-package dnfinstall
+package dnfinstall //nolint:testpackage
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 // returns nil when AllowUnverifiedRPMs is true.
 func TestVerifyRPMSignatureUnsignedWithBypass(t *testing.T) {
 	tmpDir := t.TempDir()
+
 	keyringDir := filepath.Join(tmpDir, "keyring")
 	if err := os.Mkdir(keyringDir, 0o755); err != nil {
 		t.Fatalf("failed to create keyring dir: %v", err)
@@ -31,6 +32,7 @@ func TestVerifyRPMSignatureUnsignedWithBypass(t *testing.T) {
 	}
 
 	ctx := context.Background()
+
 	err := verifyRPMSignature(ctx, rpmPath, opts)
 	if err != nil {
 		t.Errorf("expected nil, got %v", err)
@@ -41,6 +43,7 @@ func TestVerifyRPMSignatureUnsignedWithBypass(t *testing.T) {
 // returns an error when AllowUnverifiedRPMs is false.
 func TestVerifyRPMSignatureUnsignedStrict(t *testing.T) {
 	tmpDir := t.TempDir()
+
 	keyringDir := filepath.Join(tmpDir, "keyring")
 	if err := os.Mkdir(keyringDir, 0o755); err != nil {
 		t.Fatalf("failed to create keyring dir: %v", err)
@@ -58,6 +61,7 @@ func TestVerifyRPMSignatureUnsignedStrict(t *testing.T) {
 	}
 
 	ctx := context.Background()
+
 	err := verifyRPMSignature(ctx, rpmPath, opts)
 	if err == nil {
 		t.Error("expected error, got nil")
@@ -68,6 +72,7 @@ func TestVerifyRPMSignatureUnsignedStrict(t *testing.T) {
 // returns nil when AllowUnverifiedRPMs is true.
 func TestVerifyRPMSignatureMissingKeyringWithBypass(t *testing.T) {
 	tmpDir := t.TempDir()
+
 	rpmPath := filepath.Join(tmpDir, "test.rpm")
 	if err := createMinimalRPM(rpmPath); err != nil {
 		t.Fatalf("failed to create test RPM: %v", err)
@@ -79,6 +84,7 @@ func TestVerifyRPMSignatureMissingKeyringWithBypass(t *testing.T) {
 	}
 
 	ctx := context.Background()
+
 	err := verifyRPMSignature(ctx, rpmPath, opts)
 	if err != nil {
 		t.Errorf("expected nil, got %v", err)
@@ -89,6 +95,7 @@ func TestVerifyRPMSignatureMissingKeyringWithBypass(t *testing.T) {
 // returns ErrNoTrustAnchor when AllowUnverifiedRPMs is false.
 func TestVerifyRPMSignatureMissingKeyringStrict(t *testing.T) {
 	tmpDir := t.TempDir()
+
 	rpmPath := filepath.Join(tmpDir, "test.rpm")
 	if err := createMinimalRPM(rpmPath); err != nil {
 		t.Fatalf("failed to create test RPM: %v", err)
@@ -100,6 +107,7 @@ func TestVerifyRPMSignatureMissingKeyringStrict(t *testing.T) {
 	}
 
 	ctx := context.Background()
+
 	err := verifyRPMSignature(ctx, rpmPath, opts)
 	if !errors.Is(err, ErrNoTrustAnchor) {
 		t.Errorf("expected ErrNoTrustAnchor, got %v", err)
@@ -112,10 +120,12 @@ func TestLoadRPMKeyringFile(t *testing.T) {
 
 	// Create a minimal test keyring (empty armored block).
 	keyPath := filepath.Join(tmpDir, "test.gpg")
+
 	f, err := os.Create(keyPath)
 	if err != nil {
 		t.Fatalf("failed to create keyring file: %v", err)
 	}
+
 	defer func() { _ = f.Close() }()
 
 	// Write an empty but valid ASCII-armored PGP block.
@@ -133,9 +143,8 @@ func TestLoadRPMKeyringFile(t *testing.T) {
 	// Load the keyring (will fail to parse, but that's OK for this test).
 	keys, err := loadRPMKeyringFile(keyPath)
 	// We expect an error because the data isn't a valid key, but the function should handle it.
-	if err == nil && len(keys) == 0 {
-		// This is expected - empty/invalid keyring
-	}
+	_ = err
+	_ = keys
 }
 
 // TestLoadRPMKeyringDir tests loading a directory of keyring files.
@@ -215,9 +224,8 @@ func TestLoadRPMKeyring(t *testing.T) {
 	ctx := context.Background()
 	keys, err := loadRPMKeyring(ctx, keyPath)
 	// Will fail to parse, but that's OK.
-	if err == nil && len(keys) == 0 {
-		// Expected - invalid key file
-	}
+	_ = err
+	_ = keys
 
 	// Test with a directory.
 	keys, err = loadRPMKeyring(ctx, tmpDir)
@@ -302,6 +310,7 @@ func TestSignerName(t *testing.T) {
 // TestVerifyRPMSignatureNonexistentFile tests that a nonexistent RPM file returns an error.
 func TestVerifyRPMSignatureNonexistentFile(t *testing.T) {
 	tmpDir := t.TempDir()
+
 	keyringDir := filepath.Join(tmpDir, "keyring")
 	if err := os.Mkdir(keyringDir, 0o755); err != nil {
 		t.Fatalf("failed to create keyring dir: %v", err)
@@ -313,6 +322,7 @@ func TestVerifyRPMSignatureNonexistentFile(t *testing.T) {
 	}
 
 	ctx := context.Background()
+
 	err := verifyRPMSignature(ctx, filepath.Join(tmpDir, "nonexistent.rpm"), opts)
 	if err == nil {
 		t.Error("expected error for nonexistent file, got nil")
@@ -421,12 +431,14 @@ func TestLoadRPMKeyringDirFiltering(t *testing.T) {
 // BenchmarkLoadRPMKeyringFile benchmarks keyring file loading.
 func BenchmarkLoadRPMKeyringFile(b *testing.B) {
 	tmpDir := b.TempDir()
+
 	keyPath := filepath.Join(tmpDir, "test.gpg")
 	if err := os.WriteFile(keyPath, []byte("invalid"), 0o644); err != nil {
 		b.Fatalf("failed to write key file: %v", err)
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, _ = loadRPMKeyringFile(keyPath)
 	}
@@ -437,7 +449,7 @@ func BenchmarkLoadRPMKeyringDir(b *testing.B) {
 	tmpDir := b.TempDir()
 
 	// Create some test files.
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		path := filepath.Join(tmpDir, "test"+string(rune(i))+".gpg")
 		if err := os.WriteFile(path, []byte("invalid"), 0o644); err != nil {
 			b.Fatalf("failed to write key file: %v", err)
@@ -445,6 +457,7 @@ func BenchmarkLoadRPMKeyringDir(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, _ = loadRPMKeyringDir(tmpDir)
 	}

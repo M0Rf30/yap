@@ -1,4 +1,4 @@
-package dnfinstall
+package dnfinstall //nolint:testpackage
 
 import (
 	"os"
@@ -12,30 +12,34 @@ import (
 // TestFilterScriptletEnv verifies that environment filtering works correctly.
 func TestFilterScriptletEnv(t *testing.T) {
 	// Set some test environment variables.
-	os.Setenv("TEST_ALLOWED", "yes")
-	os.Setenv("PATH", "/usr/bin")
-	os.Setenv("RANDOM_VAR", "should_be_filtered")
+	t.Setenv("TEST_ALLOWED", "yes")
+	t.Setenv("PATH", "/usr/bin")
+	t.Setenv("RANDOM_VAR", "should_be_filtered")
 
 	env := filterScriptletEnv()
 
 	// Check that PATH is present.
 	found := false
+
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "PATH=") {
 			found = true
 			break
 		}
 	}
+
 	assert.True(t, found, "PATH should be in filtered environment")
 
 	// Check that HOME is present.
 	found = false
+
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "HOME=") {
 			found = true
 			break
 		}
 	}
+
 	assert.True(t, found, "HOME should be in filtered environment")
 
 	// Check that random variables are filtered out.
@@ -107,13 +111,15 @@ func TestScriptletEnvAllowList(t *testing.T) {
 func TestFilterScriptletEnvMinimal(t *testing.T) {
 	// Clear environment to test minimal case.
 	oldEnv := os.Environ()
+
 	os.Clearenv()
 	defer func() {
 		os.Clearenv()
+
 		for _, kv := range oldEnv {
 			parts := strings.SplitN(kv, "=", 2)
 			if len(parts) == 2 {
-				os.Setenv(parts[0], parts[1])
+				_ = os.Setenv(parts[0], parts[1])
 			}
 		}
 	}()
@@ -122,23 +128,29 @@ func TestFilterScriptletEnvMinimal(t *testing.T) {
 
 	// Check that PATH is provided even if not in parent environment.
 	found := false
+
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "PATH=") {
 			found = true
+
 			assert.Contains(t, kv, "/usr/bin", "PATH should contain /usr/bin")
+
 			break
 		}
 	}
+
 	assert.True(t, found, "PATH should be provided")
 
 	// Check that HOME is provided.
 	found = false
+
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "HOME=") {
 			found = true
 			break
 		}
 	}
+
 	assert.True(t, found, "HOME should be provided")
 }
 
@@ -190,19 +202,23 @@ func TestHasEnvKeyEdgeCases(t *testing.T) {
 // TestFilterScriptletEnvPreservesValues verifies that filtering preserves variable values.
 func TestFilterScriptletEnvPreservesValues(t *testing.T) {
 	// Set a test variable that's in the allow list.
-	os.Setenv("LANG", "en_US.UTF-8")
+	t.Setenv("LANG", "en_US.UTF-8")
 
 	env := filterScriptletEnv()
 
 	// Find and verify the LANG variable.
 	found := false
+
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "LANG=") {
 			found = true
+
 			assert.Equal(t, "LANG=en_US.UTF-8", kv, "LANG value should be preserved")
+
 			break
 		}
 	}
+
 	assert.True(t, found, "LANG should be in filtered environment")
 }
 
@@ -218,7 +234,7 @@ func TestScriptletTagPairArgValue(t *testing.T) {
 // infrastructure is properly set up.
 func TestScriptletIntegration(t *testing.T) {
 	// Verify that all scriptlet kinds are properly configured.
-	for kind := scriptletKind(0); kind < 4; kind++ {
+	for kind := range scriptletKind(4) {
 		tags, ok := scriptletTags[kind]
 		require.True(t, ok, "scriptlet kind %d should be in scriptletTags", kind)
 		require.NotEmpty(t, tags.kindName, "scriptlet kind %d should have a name", kind)
@@ -232,11 +248,13 @@ func TestScriptletIntegration(t *testing.T) {
 
 	// Verify that PATH is always present.
 	pathFound := false
+
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "PATH=") {
 			pathFound = true
 			break
 		}
 	}
+
 	require.True(t, pathFound, "PATH should always be in filtered environment")
 }

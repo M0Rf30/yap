@@ -14,3 +14,4 @@ MD024: false  # no-duplicate-heading - Allow duplicate headings
 MD029: false  # ol-prefix - Allow flexible ordered list numbering  
 MD040: false  # fenced-code-language - Allow code blocks without language
 MD041: false  # first-line-heading - Don't require H1 as first line
+MD060: false  # table-column-style - Allow compact table separators

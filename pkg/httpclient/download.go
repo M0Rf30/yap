@@ -101,7 +101,7 @@ func FetchToFile(ctx context.Context, url, destPath string, maxBytes int64) erro
 func AtomicWrite(destPath string, fn func(io.Writer) error) error {
 	tmpPath := destPath + ".tmp"
 
-	f, err := os.Create(tmpPath) // #nosec G304 — destPath is caller-controlled
+	f, err := os.Create(tmpPath) //nolint:gosec
 	if err != nil {
 		return err
 	}

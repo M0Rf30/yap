@@ -17,15 +17,21 @@ type Stanza map[string]string
 // Parse calls fn for each stanza in r. Returning an error from fn aborts.
 // Empty lines separate stanzas. Lines starting with '#' are comments (skipped at top level only).
 // Continuation lines (start with space/tab) append to the previous field.
-// A line equal to " ." (space + dot) on a continuation = blank-line marker → translate to a literal blank line in the value.
+// A " ." (space + dot) continuation line is a blank-line marker; translate to
+// a literal blank line in the value.
+//
+//nolint:gocyclo,cyclop // deb822 stanza parser inherently branchy
 func Parse(r io.Reader, fn func(Stanza) error) error {
 	scanner := bufio.NewScanner(r)
 	// Some Packages files have very long Description lines.
 	scanner.Buffer(make([]byte, 256*1024), 256*1024)
 
 	stanza := make(Stanza)
-	var currentField string
-	var currentValue strings.Builder
+
+	var (
+		currentField string
+		currentValue strings.Builder
+	)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -47,6 +53,7 @@ func Parse(r io.Reader, fn func(Stanza) error) error {
 			// Reset for next stanza.
 			stanza = make(Stanza)
 			currentField = ""
+
 			currentValue.Reset()
 
 			continue
@@ -58,20 +65,8 @@ func Parse(r io.Reader, fn func(Stanza) error) error {
 		}
 
 		// Continuation line (starts with space or tab).
-		if len(line) > 0 && (line[0] == ' ' || line[0] == '\t') {
-			// Handle the special " ." blank-line marker.
-			if line == " ." {
-				currentValue.WriteString("\n")
-			} else {
-				// Strip the leading space/tab (the continuation marker).
-				currentValue.WriteString("\n")
-				if line[0] == ' ' {
-					currentValue.WriteString(strings.TrimPrefix(line, " "))
-				} else {
-					currentValue.WriteString(strings.TrimPrefix(line, "\t"))
-				}
-			}
-
+		if line != "" && (line[0] == ' ' || line[0] == '\t') {
+			appendContinuation(&currentValue, line)
 			continue
 		}
 
@@ -89,6 +84,7 @@ func Parse(r io.Reader, fn func(Stanza) error) error {
 
 		// Start the new field.
 		currentField = field
+
 		currentValue.Reset()
 		currentValue.WriteString(strings.TrimSpace(value))
 	}
@@ -110,4 +106,21 @@ func Parse(r io.Reader, fn func(Stanza) error) error {
 	}
 
 	return nil
+}
+
+// appendContinuation appends a deb822 continuation line to the in-flight value.
+// Handles the " ." blank-line marker and strips the leading space/tab marker.
+func appendContinuation(buf *strings.Builder, line string) {
+	if line == " ." {
+		buf.WriteString("\n")
+		return
+	}
+
+	buf.WriteString("\n")
+
+	if line[0] == ' ' {
+		buf.WriteString(strings.TrimPrefix(line, " "))
+	} else {
+		buf.WriteString(strings.TrimPrefix(line, "\t"))
+	}
 }

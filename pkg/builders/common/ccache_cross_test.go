@@ -74,10 +74,12 @@ func TestCrossCompilationWithCcache(t *testing.T) {
 			// Verify ccache is in the slice
 			ccFound := false
 			cxxFound := false
+
 			for _, envVar := range ccacheEnv {
 				if strings.HasPrefix(envVar, "CC=") && strings.Contains(envVar, "ccache") {
 					ccFound = true
 				}
+
 				if strings.HasPrefix(envVar, "CXX=") && strings.Contains(envVar, "ccache") {
 					cxxFound = true
 				}
@@ -107,19 +109,23 @@ func TestCrossCompilationWithCcache(t *testing.T) {
 			// Verify CC/CXX in cross-compilation slice are bare cross-compilers, not ccache-wrapped
 			ccCrossFound := false
 			cxxCrossFound := false
+
 			for _, envVar := range crossEnv {
 				if strings.HasPrefix(envVar, "CC=") {
 					if strings.Contains(envVar, "ccache") {
 						t.Errorf("CC in cross-compilation should not contain 'ccache' directly. Got: %s", envVar)
 					}
+
 					if strings.Contains(envVar, "gcc") {
 						ccCrossFound = true
 					}
 				}
+
 				if strings.HasPrefix(envVar, "CXX=") {
 					if strings.Contains(envVar, "ccache") {
 						t.Errorf("CXX in cross-compilation should not contain 'ccache' directly. Got: %s", envVar)
 					}
+
 					if strings.Contains(envVar, "g++") {
 						cxxCrossFound = true
 					}

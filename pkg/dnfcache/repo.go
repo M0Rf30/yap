@@ -54,7 +54,7 @@ func parseRepoFiles() []RepoEntry {
 
 		path := filepath.Join(yumRepoDir, e.Name())
 
-		data, err := os.ReadFile(path) // #nosec G304
+		data, err := os.ReadFile(path) //nolint:gosec
 		if err != nil {
 			continue
 		}
@@ -328,14 +328,14 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 
 	// Destination: /var/cache/dnf/<repoID>/repodata/<filename>
 	repoCache := filepath.Join(dnfCacheDir, repo.ID, "repodata")
-	if err := os.MkdirAll(repoCache, 0o755); err != nil { // #nosec G301
+	if err := os.MkdirAll(repoCache, 0o755); err != nil {
 		return err
 	}
 
 	// Persist the resolved baseURL so loadFromDisk can use it without
 	// re-fetching the mirrorlist.
 	baseurlFile := filepath.Join(dnfCacheDir, repo.ID, ".baseurl")
-	if err := os.WriteFile(baseurlFile, []byte(baseURL), 0o644); err != nil { // #nosec G306
+	if err := os.WriteFile(baseurlFile, []byte(baseURL), 0o644); err != nil { //nolint:gosec
 		return err
 	}
 
@@ -539,7 +539,7 @@ func downloadVerified(ctx context.Context, url, destFile, expectedSHA256 string)
 
 // fileMatchesSHA256 returns true if path exists and its SHA256 matches expected.
 func fileMatchesSHA256(path, expected string) (bool, error) {
-	f, err := os.Open(path) // #nosec G304
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return false, err
 	}
@@ -630,7 +630,7 @@ func collectPrimaryFiles() []primaryFileJob {
 		}
 
 		if baseURL == "" {
-			if b, err := os.ReadFile(filepath.Join(cacheDir, ".baseurl")); err == nil { // #nosec G304
+			if b, err := os.ReadFile(filepath.Join(cacheDir, ".baseurl")); err == nil { //nolint:gosec
 				baseURL = strings.TrimSpace(string(b))
 			}
 		}
@@ -701,7 +701,7 @@ func isPrimaryIndex(name string) bool {
 
 // parsePrimaryFile opens and parses a primary.xml file (possibly compressed).
 func (c *Cache) parsePrimaryFile(path, baseURL string) error {
-	f, err := os.Open(path) // #nosec G304
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return err
 	}

@@ -57,7 +57,7 @@ func ParseOSRelease() (OSRelease, error) {
 // parseOSReleaseFile reads and parses the os-release file at the given path.
 // Extracted from ParseOSRelease to allow testing with arbitrary files.
 func parseOSReleaseFile(path string) (OSRelease, error) {
-	file, err := os.Open(path) // #nosec G304 -- path is either /etc/os-release or a test temp file
+	file, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return OSRelease{}, errors.Wrap(err, errors.ErrTypeFileSystem,
 			i18n.T("errors.platform.open_os_release_failed")).
@@ -107,7 +107,7 @@ func parseOSReleaseFile(path string) (OSRelease, error) {
 }
 
 // IsPrivilegedHost reports whether the current process is running as
-// uid 0 (root). The pure-Go installers in pkg/aptinstall and pkg/apkindex
+// uid 0 (root). The installers in pkg/aptinstall and pkg/apkindex
 // use this as the heuristic for "we're inside a yap build container and
 // it's safe to write to /, /var/lib/dpkg, /lib/apk/db, etc.".
 //

@@ -64,7 +64,7 @@ func loadInstalledSetSubprocess(ctx context.Context) map[string]bool {
 		"-qa",
 		"--queryformat",
 		"%{NAME}\n",
-	).Output() // #nosec G204
+	).Output()
 	if err != nil {
 		return map[string]bool{}
 	}
@@ -122,7 +122,7 @@ func loadInstalledProvidesSubprocess(ctx context.Context) map[string]bool {
 		"-qa",
 		"--queryformat",
 		"[%{PROVIDENAME}\n]",
-	).Output() // #nosec G204
+	).Output()
 	if err != nil {
 		return map[string]bool{}
 	}
@@ -179,7 +179,7 @@ func expandDNFVars(rawURL string) string {
 	return dnfVarRe.ReplaceAllStringFunc(rawURL, func(m string) string {
 		varName := m[1:] // strip leading '$'
 
-		val, err := os.ReadFile("/etc/dnf/vars/" + varName) // #nosec G304
+		val, err := os.ReadFile("/etc/dnf/vars/" + varName) //nolint:gosec
 		if err != nil {
 			return m // leave unexpanded
 		}
@@ -219,7 +219,7 @@ func goArchToRPM() string {
 // readReleasever reads VERSION_ID from /etc/os-release.
 // Returns an empty string if the file cannot be read or the field is absent.
 func readReleasever() string {
-	data, err := os.ReadFile("/etc/os-release") // #nosec G304
+	data, err := os.ReadFile("/etc/os-release")
 	if err != nil {
 		return ""
 	}

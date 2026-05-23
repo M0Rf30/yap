@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "==> E2E: pure-Go RPM install on $(. /etc/os-release && echo "$PRETTY_NAME")"
+echo "==> E2E: RPM install on $(. /etc/os-release && echo "$PRETTY_NAME")"
 
 # 1. Fetch a small RPM via dnf download
 RPM_PATH="/tmp/yap-e2e-tree.rpm"

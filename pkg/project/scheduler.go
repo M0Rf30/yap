@@ -5,9 +5,10 @@ import (
 	"context"
 	"fmt"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"golang.org/x/sync/errgroup"
 )
 
 // buildProjectsParallel builds multiple projects in parallel for better performance.
@@ -20,8 +21,6 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 	g.SetLimit(maxWorkers)
 
 	for workerNum, proj := range projects {
-		proj := proj
-		workerNum := workerNum
 		g.Go(func() error {
 			pkgName := proj.Builder.PKGBUILD.PkgName
 			workerIDStr := fmt.Sprintf("worker-%d", workerNum)
@@ -39,18 +38,18 @@ func (mpc *MultipleProject) buildProjectsParallel(projects []*Project, maxWorker
 			default:
 			}
 
-			// Step 1: Build the package
+			// Build the package
 			if err := proj.Builder.Compile(gctx, mpc.Opts.NoBuild); err != nil {
 				return err
 			}
 
 			if !mpc.Opts.NoBuild {
-				// Step 2: Create the package file
+				// Create the package file
 				if err := mpc.createPackage(proj); err != nil {
 					return err
 				}
 
-				// Step 3: Install immediately (Arch Linux style) or extract for cross-compilation
+				// Install immediately (Arch Linux style) or extract for cross-compilation
 				if shouldInstall {
 					if err := mpc.installPackageForWorker(proj, pkgName, workerIDStr); err != nil {
 						return err
@@ -109,62 +108,6 @@ func (mpc *MultipleProject) buildProjectsSequential(ctx context.Context, project
 	}
 
 	return nil
-}
-
-// runWorker executes the build pipeline for a single project in a worker goroutine.
-// It handles compilation, package creation, and optional installation.
-// Returns early if context is cancelled or if ToPkgName is reached.
-func (mpc *MultipleProject) runWorker(ctx context.Context, cancel context.CancelFunc,
-	proj *Project, pkgName, workerIDStr string, shouldInstall bool, errorChan chan<- error) {
-	// Check if cancelled before starting work
-	select {
-	case <-ctx.Done():
-		return
-	default:
-	}
-
-	logger.Debug(i18n.T("logger.creating_package"),
-		"package", pkgName,
-		"version", proj.Builder.PKGBUILD.PkgVer,
-		"release", proj.Builder.PKGBUILD.PkgRel,
-		"worker_id", workerIDStr)
-
-	// Step 1: Build the package
-	err := proj.Builder.Compile(ctx, mpc.Opts.NoBuild)
-	if err != nil {
-		cancel()
-
-		errorChan <- err
-
-		return
-	}
-
-	if !mpc.Opts.NoBuild {
-		// Step 2: Create the package file
-		err := mpc.createPackage(proj)
-		if err != nil {
-			cancel()
-
-			errorChan <- err
-
-			return
-		}
-
-		// Step 3: Install immediately (Arch Linux style) or extract for cross-compilation
-		if shouldInstall {
-			if err := mpc.installPackageForWorker(proj, pkgName, workerIDStr); err != nil {
-				cancel()
-
-				errorChan <- err
-
-				return
-			}
-		}
-	}
-
-	if mpc.Opts.ToPkgName != "" && pkgName == mpc.Opts.ToPkgName {
-		return
-	}
 }
 
 // buildProjectsInOrder builds projects in dependency-aware batches with parallel processing
@@ -253,13 +196,13 @@ func (mpc *MultipleProject) buildBatchWithDependencyInstall(projects []*Project,
 		"regular_packages", len(regularPackages),
 		"batch_number", batchNumber)
 
-	// Phase 1: Build and install runtime dependencies first
+	// Build and install runtime dependencies first
 	// Install immediately after building to make them available for dependent packages
 	if err := mpc.buildRuntimeDependenciesInOrder(runtimeDeps, maxWorkers); err != nil {
 		return err
 	}
 
-	// Phase 2: Build and install regular packages
+	// Build and install regular packages
 	// Regular packages may depend on runtime deps from this batch
 	return mpc.buildAndInstallRegularPackages(regularPackages, maxWorkers)
 }
