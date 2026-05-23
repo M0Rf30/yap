@@ -190,21 +190,27 @@ func expandDNFVars(rawURL string) string {
 
 var dnfVarRe = regexp.MustCompile(`\$[A-Za-z_][A-Za-z0-9_]*`)
 
+const (
+	archX8664   = "x86_64"
+	archPPC64LE = "ppc64le"
+	archS390X   = "s390x"
+)
+
 // goArchToRPM maps GOARCH values to RPM $basearch strings.
 func goArchToRPM() string {
 	switch runtime.GOARCH {
 	case "amd64":
-		return "x86_64"
+		return archX8664
 	case "arm64":
 		return "aarch64"
 	case "386":
 		return "i686"
 	case "arm":
 		return "armhfp"
-	case "ppc64le":
-		return "ppc64le"
-	case "s390x":
-		return "s390x"
+	case "ppc64le": //nolint:goconst
+		return archPPC64LE
+	case "s390x": //nolint:goconst
+		return archS390X
 	default:
 		return runtime.GOARCH
 	}

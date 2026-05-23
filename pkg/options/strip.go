@@ -26,6 +26,7 @@ var (
 func SetDebugDir(dir string) {
 	debugDirMu.Lock()
 	defer debugDirMu.Unlock()
+
 	debugDir = dir
 }
 
@@ -87,7 +88,9 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	// Separate debug info before stripping, if a debug directory is configured.
 	// Read debugDir under lock to prevent races with SetDebugDir in parallel builds.
 	debugDirMu.RLock()
+
 	localDebugDir := debugDir
+
 	debugDirMu.RUnlock()
 
 	if localDebugDir != "" {

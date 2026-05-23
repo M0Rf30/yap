@@ -9,9 +9,9 @@ import (
 	"sort"
 	"sync"
 
+	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // buildProjectsParallel builds multiple projects in parallel for better performance.

@@ -8,12 +8,19 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
+const (
+	docDirUsrShareDoc      = "usr/share/doc"
+	docDirUsrShareGtkDoc   = "usr/share/gtk-doc"
+	docDirLocalShareDoc    = "usr/local/share/doc"
+	docDirLocalShareGtkDoc = "usr/local/share/gtk-doc"
+)
+
 // docDirs mirrors makepkg's DOC_DIRS: directories considered documentation.
 var docDirs = []string{
-	"usr/share/doc",
-	"usr/share/gtk-doc",
-	"usr/local/share/doc",
-	"usr/local/share/gtk-doc",
+	docDirUsrShareDoc,
+	docDirUsrShareGtkDoc,
+	docDirLocalShareDoc,
+	docDirLocalShareGtkDoc,
 }
 
 // RemoveDocs removes documentation directories from the package directory,

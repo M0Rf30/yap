@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/sbom"
 	"github.com/M0Rf30/yap/v2/pkg/signing"
-	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
 // signArtifact signs a built package artifact based on its file extension

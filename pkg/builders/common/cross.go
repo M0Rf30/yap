@@ -49,28 +49,28 @@ func setenv(key, value string) error {
 // crossCompileParams holds pre-computed cross-compilation parameters
 // shared between SetupCrossCompilationEnvironment and BuildCrossEnvSlice.
 type crossCompileParams struct {
-	gccExecutable      string
-	gppExecutable      string
-	binutilsPrefix     string
-	ccPrefix           string
-	rustTarget         string
-	rustTargetUpper    string
-	goArch             string
-	hostTriplet        string
-	buildTriplet       string
-	configureWrapper   string
-	ccacheAvailable    bool
+	gccExecutable    string
+	gppExecutable    string
+	binutilsPrefix   string
+	ccPrefix         string
+	rustTarget       string
+	rustTargetUpper  string
+	goArch           string
+	hostTriplet      string
+	buildTriplet     string
+	configureWrapper string
+	ccacheAvailable  bool
 }
 
 // extractCCPrefix extracts the cross-compiler prefix from a gcc executable name.
 // e.g. "aarch64-linux-gnu-gcc" -> "aarch64-linux-gnu"
 func extractCCPrefix(gccExecutable string) string {
-	if idx := strings.Index(gccExecutable, "-gcc"); idx != -1 {
-		return gccExecutable[:idx]
+	if before, _, ok := strings.Cut(gccExecutable, "-gcc"); ok {
+		return before
 	}
 
-	if idx := strings.Index(gccExecutable, "gcc"); idx != -1 {
-		return strings.TrimSuffix(gccExecutable[:idx], "-")
+	if before, _, ok := strings.Cut(gccExecutable, "gcc"); ok {
+		return strings.TrimSuffix(before, "-")
 	}
 
 	return ""
@@ -149,7 +149,7 @@ func (bb *BaseBuilder) formatToDistro() string {
 
 // buildCrossParams computes cross-compilation parameters from the toolchain packages.
 // This is shared between SetupCrossCompilationEnvironment and BuildCrossEnvSlice.
-func (bb *BaseBuilder) buildCrossParams(targetArch string, toolchainPackages CrossToolchain) crossCompileParams {
+func (bb *BaseBuilder) buildCrossParams(targetArch string, toolchainPackages *CrossToolchain) crossCompileParams {
 	_, ccacheErr := exec.LookPath("ccache")
 
 	gccExecutable := toolchainPackages.GetExecutableName(toolchainPackages.GCCPackage)
@@ -159,6 +159,7 @@ func (bb *BaseBuilder) buildCrossParams(targetArch string, toolchainPackages Cro
 	ccPrefix := extractCCPrefix(gccExecutable)
 
 	rustTarget := bb.getRustTargetArchitecture(targetArch)
+
 	rustTargetUpper := ""
 	if rustTarget != "" {
 		rustTargetUpper = strings.ToUpper(strings.ReplaceAll(rustTarget, "-", "_"))
@@ -672,6 +673,8 @@ func (bb *BaseBuilder) validateCrossToolchain(targetArch string) error {
 // "KEY=VALUE" slice for safe concurrent use. Unlike SetupCrossCompilationEnvironment,
 // it does NOT mutate the process environment (no os.Setenv calls).
 // Returns nil if no cross-compilation is needed (targetArch == "" or == build arch).
+//
+//nolint:gocyclo,cyclop // complexity inherent to cross-compilation env setup
 func (bb *BaseBuilder) BuildCrossEnvSlice(targetArch string) ([]string, error) {
 	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
 		// No cross-compilation needed
@@ -685,14 +688,16 @@ func (bb *BaseBuilder) BuildCrossEnvSlice(targetArch string) ([]string, error) {
 	}
 
 	// Compute cross-compilation parameters
-	params := bb.buildCrossParams(targetArch, toolchainPackages)
+	params := bb.buildCrossParams(targetArch, &toolchainPackages)
 
 	// Build environment slice without calling os.Setenv
 	var envSlice []string
 
 	// Add C/C++ cross-compilation environment variables
-	envSlice = append(envSlice, "CC="+params.gccExecutable)
-	envSlice = append(envSlice, "CXX="+params.gppExecutable)
+	envSlice = append(envSlice,
+		"CC="+params.gccExecutable,
+		"CXX="+params.gppExecutable,
+	)
 
 	if params.ccacheAvailable {
 		// ccache wraps the cross-compiler transparently via the
@@ -703,17 +708,21 @@ func (bb *BaseBuilder) BuildCrossEnvSlice(targetArch string) ([]string, error) {
 			"via", "/usr/lib/ccache/"+params.gccExecutable)
 	}
 
-	envSlice = append(envSlice, "AR="+params.binutilsPrefix+"-ar")
-	envSlice = append(envSlice, "STRIP="+params.binutilsPrefix+"-strip")
-	envSlice = append(envSlice, "RANLIB="+params.binutilsPrefix+"-ranlib")
-	envSlice = append(envSlice, "OBJDUMP="+params.binutilsPrefix+"-objdump")
-	envSlice = append(envSlice, "OBJCOPY="+params.binutilsPrefix+"-objcopy")
-	envSlice = append(envSlice, "LD="+params.binutilsPrefix+"-ld")
-	envSlice = append(envSlice, "NM="+params.binutilsPrefix+"-nm")
+	envSlice = append(envSlice,
+		"AR="+params.binutilsPrefix+"-ar",
+		"STRIP="+params.binutilsPrefix+"-strip",
+		"RANLIB="+params.binutilsPrefix+"-ranlib",
+		"OBJDUMP="+params.binutilsPrefix+"-objdump",
+		"OBJCOPY="+params.binutilsPrefix+"-objcopy",
+		"LD="+params.binutilsPrefix+"-ld",
+		"NM="+params.binutilsPrefix+"-nm",
+	)
 
 	// Generate a standard CMake cross-compilation toolchain file and point
 	// CMAKE_TOOLCHAIN_FILE at it.
-	if cmakeToolchain, err := writeCMakeToolchainFile(targetArch, params.gccExecutable, params.gppExecutable, params.ccPrefix); err != nil {
+	cmakeToolchain, err := writeCMakeToolchainFile(
+		targetArch, params.gccExecutable, params.gppExecutable, params.ccPrefix)
+	if err != nil {
 		logger.Warn("failed to write CMake toolchain file", "error", err)
 	} else {
 		envSlice = append(envSlice, "CMAKE_TOOLCHAIN_FILE="+cmakeToolchain)
@@ -721,43 +730,44 @@ func (bb *BaseBuilder) BuildCrossEnvSlice(targetArch string) ([]string, error) {
 
 	// Set up Rust cross-compilation environment variables
 	if params.rustTarget != "" {
-		envSlice = append(envSlice, "CARGO_BUILD_TARGET="+params.rustTarget)
-		envSlice = append(envSlice, "RUSTC_TARGET="+params.rustTarget)
-
-		// Cargo's linker must be a C compiler (gcc), not the raw linker (ld).
-		envSlice = append(envSlice, "CARGO_TARGET_"+params.rustTargetUpper+"_LINKER="+params.gccExecutable)
-
-		// Rust build script CC/CXX: use bare cross-compiler; ccache wraps
-		// via /usr/lib/ccache/<cross-compiler> symlinks on PATH.
-		envSlice = append(envSlice, "TARGET_"+params.rustTargetUpper+"_CC="+params.gccExecutable)
-		envSlice = append(envSlice, "TARGET_"+params.rustTargetUpper+"_CXX="+params.gppExecutable)
-
-		// Prevent the host's -m64 (or other host-arch flags) from leaking
-		// into C code compiled by Rust's cc crate for the target.
-		envSlice = append(envSlice, "CFLAGS_"+params.rustTargetUpper+"=-O2 -fPIC")
+		envSlice = append(envSlice,
+			"CARGO_BUILD_TARGET="+params.rustTarget,
+			"RUSTC_TARGET="+params.rustTarget,
+			// Cargo's linker must be a C compiler (gcc), not the raw linker (ld).
+			"CARGO_TARGET_"+params.rustTargetUpper+"_LINKER="+params.gccExecutable,
+			// Rust build script CC/CXX: use bare cross-compiler; ccache wraps
+			// via /usr/lib/ccache/<cross-compiler> symlinks on PATH.
+			"TARGET_"+params.rustTargetUpper+"_CC="+params.gccExecutable,
+			"TARGET_"+params.rustTargetUpper+"_CXX="+params.gppExecutable,
+			// Prevent the host's -m64 (or other host-arch flags) from leaking
+			// into C code compiled by Rust's cc crate for the target.
+			"CFLAGS_"+params.rustTargetUpper+"=-O2 -fPIC",
+		)
 	}
 
 	// Set up Go cross-compilation environment variables
 	goOS := linuxOS // Default to Linux for cross-compilation
 	if params.goArch != "" {
-		envSlice = append(envSlice, "GOOS="+goOS)
-		envSlice = append(envSlice, "GOARCH="+params.goArch)
-
-		// CGO: bare cross-compiler; ccache wraps via CCACHE_PREFIX.
-		envSlice = append(envSlice, "CGO_ENABLED=1")
-		envSlice = append(envSlice, "CC_FOR_TARGET="+params.gccExecutable)
-		envSlice = append(envSlice, "CXX_FOR_TARGET="+params.gppExecutable)
+		envSlice = append(envSlice,
+			"GOOS="+goOS,
+			"GOARCH="+params.goArch,
+			// CGO: bare cross-compiler; ccache wraps via CCACHE_PREFIX.
+			"CGO_ENABLED=1",
+			"CC_FOR_TARGET="+params.gccExecutable,
+			"CXX_FOR_TARGET="+params.gppExecutable,
+		)
 	}
 
 	// Autotools: CC_FOR_BUILD/CXX_FOR_BUILD must produce host-arch executables
-	envSlice = append(envSlice, "CC_FOR_BUILD=gcc")
-	envSlice = append(envSlice, "CXX_FOR_BUILD=g++")
-	envSlice = append(envSlice, "CFLAGS_FOR_BUILD=")
-	envSlice = append(envSlice, "CXXFLAGS_FOR_BUILD=")
-
 	// Set common cross-compilation variables.
-	envSlice = append(envSlice, "CROSS_COMPILE="+params.ccPrefix+"-")
-	envSlice = append(envSlice, "CROSS_COMPILE_HOST="+params.ccPrefix)
+	envSlice = append(envSlice,
+		"CC_FOR_BUILD=gcc",
+		"CXX_FOR_BUILD=g++",
+		"CFLAGS_FOR_BUILD=",
+		"CXXFLAGS_FOR_BUILD=",
+		"CROSS_COMPILE="+params.ccPrefix+"-",
+		"CROSS_COMPILE_HOST="+params.ccPrefix,
+	)
 
 	// Configure pkg-config for cross-compilation: prepend toolchain paths to
 	// any existing PKG_CONFIG_PATH.
@@ -771,8 +781,10 @@ func (bb *BaseBuilder) BuildCrossEnvSlice(targetArch string) ([]string, error) {
 		crossPkgConfigPaths = append(crossPkgConfigPaths, existingPkgConfig)
 	}
 
-	envSlice = append(envSlice, "PKG_CONFIG_PATH="+strings.Join(crossPkgConfigPaths, ":"))
-	envSlice = append(envSlice, "PKG_CONFIG_LIBDIR=/usr/lib/"+params.ccPrefix+"/pkgconfig")
+	envSlice = append(envSlice,
+		"PKG_CONFIG_PATH="+strings.Join(crossPkgConfigPaths, ":"),
+		"PKG_CONFIG_LIBDIR=/usr/lib/"+params.ccPrefix+"/pkgconfig",
+	)
 
 	// Set up autoconf cross-compilation configuration
 	if params.hostTriplet != "" && params.buildTriplet != "" {
@@ -817,6 +829,8 @@ func (bb *BaseBuilder) BuildCrossEnvSlice(targetArch string) ([]string, error) {
 // SetupCrossCompilationEnvironment configures environment variables for cross-compilation.
 // This function sets up environment variables for C/C++, Rust, and Go cross-compilation.
 // It uses a mutex to serialize access to os.Setenv to prevent race conditions in parallel builds.
+//
+//nolint:gocyclo,cyclop,nestif // complexity inherent to cross-compilation env setup
 func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error {
 	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
 		// No cross-compilation needed
@@ -849,7 +863,7 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	}
 
 	// Compute cross-compilation parameters
-	params := bb.buildCrossParams(targetArch, toolchainPackages)
+	params := bb.buildCrossParams(targetArch, &toolchainPackages)
 
 	// Serialize access to os.Setenv to prevent race conditions in parallel builds
 	envMutex.Lock()
@@ -908,8 +922,10 @@ func (bb *BaseBuilder) SetupCrossCompilationEnvironment(targetArch string) error
 	// CMAKE_TOOLCHAIN_FILE at it. PKGBUILDs can override this by passing
 	// -DCMAKE_TOOLCHAIN_FILE=... explicitly to cmake, which takes precedence
 	// over the environment variable.
-	if cmakeToolchain, err := writeCMakeToolchainFile(targetArch, params.gccExecutable, params.gppExecutable, params.ccPrefix); err != nil {
-		logger.Warn("failed to write CMake toolchain file", "error", err)
+	cmakeToolchain, cmakeErr := writeCMakeToolchainFile(
+		targetArch, params.gccExecutable, params.gppExecutable, params.ccPrefix)
+	if cmakeErr != nil {
+		logger.Warn("failed to write CMake toolchain file", "error", cmakeErr)
 	} else {
 		if err := setenv("CMAKE_TOOLCHAIN_FILE", cmakeToolchain); err != nil {
 			return err

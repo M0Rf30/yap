@@ -93,7 +93,7 @@ func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, m
 	// Set up ccache and cross-compilation environment for the build stage.
 	// Use the new slice-based methods (BuildCcacheEnvSlice, BuildCrossEnvSlice)
 	// which do NOT call os.Setenv, making them safe for parallel builds.
-	if stage == "build" {
+	if stage == "build" { //nolint:nestif
 		// Create a temporary BaseBuilder to access the environment slice methods
 		format := constants.DistroFormat(builder.PKGBUILD.Distro)
 		tempBuilder := &common.BaseBuilder{
@@ -104,6 +104,7 @@ func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, m
 		// Collect ccache env vars without mutating os.Setenv
 		if ccacheEnv := tempBuilder.BuildCcacheEnvSlice(); len(ccacheEnv) > 0 {
 			pkgEnv = append(pkgEnv, ccacheEnv...)
+
 			logger.Info(i18n.T("logger.setupccache.info.ccache_enabled_for_build_1"),
 				"package", pkgName)
 		}
@@ -285,7 +286,7 @@ func (builder *Builder) processFunctionInFakeroot(ctx context.Context, pkgbuildF
 
 // getSources detects sources provided by a single project source array and
 // downloads them in parallel with enhanced progress tracking. It returns any error if occurred.
-func (builder *Builder) getSources(ctx context.Context) error {
+func (builder *Builder) getSources(_ context.Context) error {
 	if len(builder.PKGBUILD.SourceURI) == 0 {
 		return nil
 	}

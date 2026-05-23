@@ -47,12 +47,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"mvdan.cc/sh/v3/interp"
 	rpmutils "github.com/sassoftware/go-rpmutils"
+	"mvdan.cc/sh/v3/interp"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+)
+
+const (
+	cmdJar    = "jar"
+	cmdGunzip = "gunzip"
 )
 
 // archiveExecHandler returns an interp.ExecHandlerFunc that intercepts
@@ -65,24 +70,24 @@ func archiveExecHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 
 		cmd := filepath.Base(args[0])
 
-	switch cmd {
-	case "unzip":
-		return handleUnzip(ctx, args)
-	case "unrar":
-		return handleUnrar(ctx, args)
-	case "7z", "7za":
-		return handle7z(ctx, args)
-	case "jar":
-		return handleJar(ctx, args)
-	case "gunzip", "gzip":
-		return handleGunzip(ctx, args)
-	case "dpkg-deb":
-		return handleDpkgDeb(ctx, args, next)
-	case "rpm2cpio":
-		return handleRpm2Cpio(ctx, args)
-	default:
-		return next(ctx, args)
-	}
+		switch cmd {
+		case "unzip":
+			return handleUnzip(ctx, args)
+		case "unrar":
+			return handleUnrar(ctx, args)
+		case "7z", "7za":
+			return handle7z(ctx, args)
+		case cmdJar:
+			return handleJar(ctx, args)
+		case cmdGunzip, "gzip":
+			return handleGunzip(ctx, args)
+		case "dpkg-deb":
+			return handleDpkgDeb(ctx, args, next)
+		case "rpm2cpio":
+			return handleRpm2Cpio(ctx, args)
+		default:
+			return next(ctx, args)
+		}
 	}
 }
 
@@ -410,6 +415,7 @@ func handleDpkgDeb(ctx context.Context, args []string, next interp.ExecHandlerFu
 
 	// Find the mode flag (-x, --extract, -X)
 	extract := false
+
 	var positional []string
 
 	for i := 1; i < len(args); i++ {
@@ -424,6 +430,7 @@ func handleDpkgDeb(ctx context.Context, args []string, next interp.ExecHandlerFu
 				// unsupported flag — fall through
 				return next(ctx, args)
 			}
+
 			positional = append(positional, arg)
 		}
 	}
@@ -439,6 +446,7 @@ func handleDpkgDeb(ctx context.Context, args []string, next interp.ExecHandlerFu
 	if !filepath.IsAbs(archivePath) {
 		archivePath = filepath.Join(hc.Dir, archivePath)
 	}
+
 	if !filepath.IsAbs(destDir) {
 		destDir = filepath.Join(hc.Dir, destDir)
 	}
@@ -486,5 +494,6 @@ func handleRpm2Cpio(ctx context.Context, args []string) error {
 	}
 
 	_, err = io.Copy(hc.Stdout, payload)
+
 	return err
 }
