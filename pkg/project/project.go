@@ -346,7 +346,7 @@ func (mpc *MultipleProject) installRuntimeDeps(runtimeDepends []string) error {
 		return mpc.packageManager.Prepare(runtimeDepends, mpc.Opts.TargetArch)
 	}
 
-	return extractor.DownloadAndExtractCrossDeps(context.Background(), runtimeDepends, mpc.Opts.TargetArch)
+	return extractor.DownloadAndExtractCrossDeps(runtimeDepends, mpc.Opts.TargetArch)
 }
 
 // applyJSONDefaults merges yap.json fields into BuildOptions.

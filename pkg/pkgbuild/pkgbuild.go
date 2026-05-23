@@ -476,12 +476,7 @@ func filterInstalledRPMSubprocess(packages []string) []string {
 // GetDepends reads the package manager name, its arguments and all the
 // dependencies required to build the package. It returns any error if
 // encountered.
-func (pkgBuild *PKGBUILD) GetDepends(
-	ctx context.Context,
-	packageManager string,
-	args,
-	makeDepends []string,
-) error {
+func (pkgBuild *PKGBUILD) GetDepends(packageManager string, args, makeDepends []string) error {
 	if len(makeDepends) == 0 {
 		return nil
 	}
@@ -518,7 +513,7 @@ func (pkgBuild *PKGBUILD) GetDepends(
 	// silently falling back to a different code path.
 	switch packageManager {
 	case apkPM:
-		if err := apkindex.Install(ctx, missingPackages); err != nil {
+		if err := apkindex.Install(context.Background(), missingPackages); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "apkindex install failed").
 				WithOperation("GetDepends")
 		}
@@ -526,7 +521,7 @@ func (pkgBuild *PKGBUILD) GetDepends(
 		return nil
 
 	case aptGetPM, aptPM:
-		if err := aptinstall.Install(ctx, missingPackages); err != nil {
+		if err := aptinstall.Install(context.Background(), missingPackages); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "aptinstall failed").
 				WithOperation("GetDepends")
 		}
@@ -537,7 +532,7 @@ func (pkgBuild *PKGBUILD) GetDepends(
 	// DNF/YUM: use the in-tree resolver and downloader.
 	switch packageManager {
 	case dnfPM, yumPM:
-		if err := dnfcache.Install(ctx, missingPackages); err != nil {
+		if err := dnfcache.Install(context.Background(), missingPackages); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache install failed").
 				WithOperation("GetDepends")
 		}
@@ -554,7 +549,7 @@ func (pkgBuild *PKGBUILD) GetDepends(
 		"packages", len(missingPackages),
 		"flags", flags)
 
-	return shell.ExecWithSudo(ctx, false, "", packageManager, args...)
+	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
 }
 
 // resolveVirtualPackages checks each dependency and replaces virtual packages
@@ -631,14 +626,10 @@ func stripVersionConstraint(spec string) string {
 // apt-get / apk / pacman use the in-tree readers (pkg/aptrepo,
 // pkg/apkindex, pkg/pacmandb). dnf/yum/zypper still defer to the
 // distro's own update subprocess.
-func (pkgBuild *PKGBUILD) GetUpdates(
-	ctx context.Context,
-	packageManager string,
-	args ...string,
-) error {
+func (pkgBuild *PKGBUILD) GetUpdates(packageManager string, args ...string) error {
 	switch packageManager {
 	case aptGetPM, aptPM:
-		n, err := aptrepo.Update(ctx)
+		n, err := aptrepo.Update(context.Background())
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "aptrepo update failed").
 				WithOperation("GetUpdates")
@@ -655,7 +646,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 		return nil
 
 	case apkPM:
-		if _, err := apkindex.Update(ctx); err != nil {
+		if _, err := apkindex.Update(context.Background()); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "apkindex update failed").
 				WithOperation("GetUpdates")
 		}
@@ -663,7 +654,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 		return nil
 
 	case "pacman":
-		n, err := pacmandb.Sync(ctx)
+		n, err := pacmandb.Sync(context.Background())
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "pacmandb sync failed").
 				WithOperation("GetUpdates")
@@ -679,7 +670,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 		return nil
 
 	case dnfPM, yumPM:
-		if err := dnfcache.Update(ctx); err != nil {
+		if err := dnfcache.Update(context.Background()); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache update failed").
 				WithOperation("GetUpdates")
 		}
@@ -692,7 +683,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 	logger.Info("delegating package-manager update to subprocess",
 		"pm", packageManager, "args", args)
 
-	return shell.ExecWithSudo(ctx, false, "", packageManager, args...)
+	return shell.ExecWithSudo(context.Background(), false, "", packageManager, args...)
 }
 
 // Init initializes the PKGBUILD struct.
