@@ -1,0 +1,77 @@
+// Package container provides an abstraction layer for container runtimes,
+// allowing YAP to operate with podman, docker, or a built-in rootless runner.
+package container
+
+import (
+	"os/exec"
+
+	"github.com/M0Rf30/yap/v2/pkg/container/internal/runtimetype"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
+)
+
+// RuntimeType identifies which container backend is in use.
+type RuntimeType = runtimetype.RuntimeType
+
+const (
+	// RuntimeCLI uses the system podman or docker CLI.
+	RuntimeCLI = runtimetype.CLI
+	// RuntimeRootless uses the built-in rootless runner (go-containerregistry + rootlesskit).
+	RuntimeRootless = runtimetype.Rootless
+)
+
+// Runtime is the interface every container backend must satisfy.
+type Runtime interface {
+	// Pull downloads the container image for the given distribution tag.
+	Pull(distro string) error
+
+	// Run executes the given command inside the distro container, mounting
+	// workDir as /workspace inside the container.
+	Run(distro, workDir string, args []string) error
+
+	// Type returns the runtime identifier.
+	Type() RuntimeType
+}
+
+// Detect returns the best available Runtime.
+// Priority: podman → docker → built-in rootless.
+// Pass override = "" to use auto-detection; pass "cli" or "rootless" to force.
+func Detect(override string) (Runtime, error) {
+	switch RuntimeType(override) {
+	case RuntimeCLI:
+		return newCLIRuntime()
+	case RuntimeRootless:
+		return NewRootlessRuntime()
+	case "":
+		// auto-detect
+	default:
+		return nil, errors.New(errors.ErrTypeConfiguration,
+			"unknown runtime: "+override).
+			WithOperation("Detect")
+	}
+
+	// Try CLI runtimes first.
+	if rt, err := newCLIRuntime(); err == nil {
+		logger.Debug("container runtime auto-detected", "type", "cli", "backend", rt.(*cliRuntime).bin)
+
+		return rt, nil
+	}
+
+	// Fall back to built-in rootless runner.
+	logger.Info("no podman/docker found, using built-in rootless runner")
+
+	return NewRootlessRuntime()
+}
+
+// newCLIRuntime returns a CLI runtime if podman or docker is available.
+func newCLIRuntime() (Runtime, error) {
+	for _, bin := range []string{"podman", "docker"} {
+		if path, err := exec.LookPath(bin); err == nil {
+			return &cliRuntime{bin: path}, nil
+		}
+	}
+
+	return nil, errors.New(errors.ErrTypeFileSystem,
+		"no container CLI found (podman or docker)").
+		WithOperation("newCLIRuntime")
+}

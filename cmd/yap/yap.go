@@ -10,6 +10,11 @@ import (
 // It does not take any parameters.
 // It does not return any values.
 func main() {
+	// Handle rootlesskit child re-execution before anything else.
+	// When yap is re-executed as the rootlesskit child process, this call
+	// completes the namespace setup and exits — cobra never runs in that path.
+	initRootless()
+
 	// Pre-parse -l/--language before cobra runs so the correct locale is
 	// active when InitializeLocalizedDescriptions sets all command strings
 	// (including the --help path, which never fires PersistentPreRun).

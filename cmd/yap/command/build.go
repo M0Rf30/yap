@@ -22,6 +22,9 @@ import (
 // sshPassword is the local holder for the --ssh-password flag value.
 var sshPassword string
 
+// noContainer disables automatic container dispatch for build/prepare.
+var noContainer bool
+
 // compressionDeb is the local holder for the --compression-deb flag value.
 var compressionDeb string
 
@@ -94,6 +97,25 @@ var buildCmd = &cobra.Command{
 
 			logArgs = append(logArgs, "path", fullJSONPath)
 			logger.Info(i18n.T("logger.build.building_for_distribution"), logArgs...)
+		}
+
+		// Dispatch to container when a distro was explicitly requested and
+		// we are not already inside a container. Use --no-container to skip.
+		if userProvidedDistro && !noContainer {
+			distroTag := distro
+			if release != "" {
+				distroTag = distro + "-" + release
+			}
+
+			// Pass sub-command + distro + workspace path.
+			// The container ENTRYPOINT is "yap", so we pass args only.
+			// YAP_IN_CONTAINER=1 (injected by the runtime) prevents re-dispatch.
+			// -s skips apt-get update (already done by prepare).
+			// -d skips makedep installation (handled by prepare).
+			subArgs := []string{buildCommand, distroTag, "/workspace", "-s", "-d"}
+			if RunCommandInContainer(distroTag, fullJSONPath, subArgs) {
+				return nil
+			}
 		}
 
 		// Initialize MultipleProject and attach build options
@@ -404,4 +426,9 @@ func init() {
 	// regardless of this flag.
 	buildCmd.Flags().BoolVarP(&buildOpts.AllowUnverifiedRepos,
 		"allow-unverified-repos", "U", false, "")
+
+	// CONTAINER FLAGS
+	buildCmd.Flags().BoolVar(&noContainer,
+		"no-container", false,
+		"skip container dispatch and build natively on the host")
 }
