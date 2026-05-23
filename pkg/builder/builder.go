@@ -18,7 +18,8 @@ import (
 
 // Builder maps PKGBUILD to generic functions aimed at artifacts generation.
 type Builder struct {
-	PKGBUILD *pkgbuild.PKGBUILD
+	PKGBUILD      *pkgbuild.PKGBUILD
+	SkipHashCheck bool
 }
 
 // Compile manages all the instructions that lead to a single project artifact.
@@ -338,6 +339,7 @@ func (builder *Builder) getSources() error {
 				SourceItemURI:  sourceURI,
 				SrcDir:         builder.PKGBUILD.SourceDir,
 				SourceItemPath: "",
+				SkipHashCheck:  builder.SkipHashCheck,
 			}
 
 			sourceChan <- sourceTask{
