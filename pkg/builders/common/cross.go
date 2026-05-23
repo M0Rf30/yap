@@ -766,10 +766,12 @@ export -f configure_cross 2>/dev/null || true
 
 	// Set up autoconf cross-compilation configuration
 	if hostTriplet != "" && buildTriplet != "" {
-		// Configure autoconf for cross-compilation
-		// These environment variables inform autoconf that we're cross-compiling
-		_ = os.Setenv("ac_cv_host", hostTriplet)
-		_ = os.Setenv("ac_cv_build", buildTriplet)
+		// Do NOT set ac_cv_host / ac_cv_build as environment variables.
+		// Autoconf derives them from --host / --build flags passed to configure.
+		// Setting them in the environment poisons every sub-configure in the
+		// same process tree: packages like ICU run a native sub-build
+		// (icu-native/) that needs ac_cv_host=x86_64-linux-gnu, but would
+		// inherit aarch64-linux-gnu from the environment and fail.
 
 		// Pre-populate autoconf type-size cache variables. When cross-compiling,
 		// configure cannot execute test binaries to probe sizes; without these

@@ -152,15 +152,28 @@ func configureCrossArchAndSources(
 // refreshCrossAptIndexes refreshes the apt index via pure-Go aptrepo. There is
 // no subprocess fallback: a failure here means the cross-arch ports repo
 // could not be reached and later install steps would fail anyway.
+//
+// Partial-success policy: if at least one index was fetched (n > 0) and the
+// only errors are unknown-signer / no-trust-anchor failures from third-party
+// repos, we treat those as non-fatal warnings. The cross-arch setup only
+// requires the ports indexes to succeed; a third-party repo whose key is not
+// in the container's trust store should not block the build.
 func refreshCrossAptIndexes() error {
 	ctx, cancel := context.WithTimeout(context.Background(), aptCommandTimeout)
 	defer cancel()
 
 	n, err := aptrepo.Update(ctx)
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeBuild,
-			"repo: cross apt update via aptrepo").
-			WithOperation("SetupCrossAPT")
+		if n > 0 && aptrepo.IsVerificationError(err) {
+			// Some indexes succeeded (ports fetched) and the only failures
+			// are signature/trust issues on other repos — non-fatal.
+			logger.Warn("repo: cross apt update: some sources failed signature check (non-fatal)",
+				"indexes_ok", n, "error", err)
+		} else {
+			return errors.Wrap(err, errors.ErrTypeBuild,
+				"repo: cross apt update via aptrepo").
+				WithOperation("SetupCrossAPT")
+		}
 	}
 
 	logger.Info("repo: cross apt indexes refreshed via aptrepo", "indexes", n)

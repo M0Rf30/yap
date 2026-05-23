@@ -147,6 +147,21 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 	return succeeded, firstErr
 }
 
+// IsVerificationError reports whether err is solely a signature verification
+// failure (unknown signer or no trust anchor) rather than a network or I/O
+// error. Callers that have already fetched enough indexes for their purposes
+// can use this to downgrade such errors to warnings instead of aborting.
+func IsVerificationError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := err.Error()
+
+	return strings.Contains(msg, ErrUnknownSigner.Error()) ||
+		strings.Contains(msg, ErrNoTrustAnchor.Error())
+}
+
 // updateSource fetches Release and component indexes for a single source+arch.
 //
 // SECURITY: Signature verification is performed by fetchRelease against
