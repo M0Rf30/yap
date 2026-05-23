@@ -19,11 +19,11 @@ func TestConstants(t *testing.T) {
 		t.Errorf("Git constant should be 'git', got '%s'", Git)
 	}
 
-	if GoArchiveURL == "" {
+	if GoArchiveURL() == "" {
 		t.Error("GoArchiveURL constant is empty")
 	}
 
-	if !strings.Contains(GoArchiveURL, "https://") {
+	if !strings.Contains(GoArchiveURL(), "https://") {
 		t.Error("GoArchiveURL should be a valid HTTPS URL")
 	}
 

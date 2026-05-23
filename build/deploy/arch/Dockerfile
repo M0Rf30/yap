@@ -25,7 +25,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build \
     -buildvcs=false \
-    -ldflags "-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
+    -ldflags "-w -s -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Version=${VERSION} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Commit=${COMMIT} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.BuildTime=${BUILD_TIME}" \
     -o /usr/bin/yap \
     ./cmd/yap && \
     upx --best --lzma /usr/bin/yap
@@ -47,19 +47,18 @@ ARG GO_VERSION=1.26.1
 
 # Metadata labels
 LABEL org.opencontainers.image.title="yap-arch"
-LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Arch with Go runtime 📦🐹"
+LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Arch Linux with Go runtime 📦🐹"
 LABEL org.opencontainers.image.vendor="M0Rf30"
 LABEL org.opencontainers.image.source="https://github.com/M0Rf30/yap"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${VERSION}"
-
 
 # Install minimal runtime dependencies
 RUN pacman -Syu --noconfirm && pacman -S --noconfirm \
     bash-completion \
     ca-certificates \
     sudo && \
-    pacman -Scc --noconfirm && rm -rf /var/cache/pacman/pkg/*
+    rm -rf /var/cache/pacman/pkg/*
 
 # Create non-root user
 RUN groupadd -g 1000 yap && \

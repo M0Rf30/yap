@@ -98,9 +98,7 @@ jobs:
             IMAGES="$IMAGES
           ${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}"
           fi
-          echo "list<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$IMAGES" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          { echo "list<<EOF"; echo "$IMAGES"; echo "EOF"; } >> "$GITHUB_OUTPUT"
 
       - name: 📋 Extract metadata
         id: meta
@@ -121,12 +119,20 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
+      - name: 📋 Resolve build platforms
+        id: platforms
+        run: |
+          case "${{ matrix.os }}" in
+            ubuntu-jammy) echo "list=linux/amd64,linux/arm64" >> "$GITHUB_OUTPUT" ;;
+            *)            echo "list=linux/amd64"             >> "$GITHUB_OUTPUT" ;;
+          esac
+
       - name: 🔨 Build and push Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ steps.platforms.outputs.list }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -199,9 +205,7 @@ jobs:
             IMAGES="$IMAGES
           ${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}"
           fi
-          echo "list<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$IMAGES" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          { echo "list<<EOF"; echo "$IMAGES"; echo "EOF"; } >> "$GITHUB_OUTPUT"
 
       - name: 📋 Extract metadata
         id: meta
@@ -221,18 +225,32 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
+      - name: 📋 Resolve build platforms
+        id: platforms
+        run: |
+          case "${{ matrix.os }}" in
+            ubuntu-jammy-g) echo "list=linux/amd64" >> "$GITHUB_OUTPUT" ;;
+            *)              echo "list=linux/amd64"             >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: 📋 Compute lowercase registry
+        id: registry
+        run: |
+          owner="${{ github.repository_owner }}"
+          echo "base=${{ env.REGISTRY }}/${owner,,}/yap" >> "$GITHUB_OUTPUT"
+
       - name: 🔨 Build and push Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ steps.platforms.outputs.list }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            REGISTRY=${{ env.REGISTRY }}/${{ github.repository_owner }}/yap
+            REGISTRY=${{ steps.registry.outputs.base }}
             BASE_TAG=${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
             VERSION=${{ github.ref_name }}

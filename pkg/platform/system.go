@@ -169,7 +169,7 @@ func GOSetup() error {
 
 	if err := download.WithResumeContext(
 		goArchivePath,
-		constants.GoArchiveURL,
+		constants.GoArchiveURL(),
 		0,
 		"yap", "go-toolchain",
 		shell.MultiPrinter.Writer); err != nil {

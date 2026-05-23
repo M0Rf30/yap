@@ -25,7 +25,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build \
     -buildvcs=false \
-    -ldflags "-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
+    -ldflags "-w -s -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Version=${VERSION} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Commit=${COMMIT} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.BuildTime=${BUILD_TIME}" \
     -o /usr/bin/yap \
     ./cmd/yap && \
     upx --best --lzma /usr/bin/yap
@@ -40,21 +40,21 @@ RUN if [ "${TARGETARCH}" = "$(go env GOARCH)" ]; then \
 # Runtime stage
 FROM ubuntu:resolute
 
-# Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
 # Build arguments for runtime stage
 ARG VERSION=dev
 ARG TARGETARCH=amd64
 ARG GO_VERSION=1.26.1
 
 # Metadata labels
-LABEL org.opencontainers.image.title="yap-ubuntu-26.04"
-LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Ubuntu 26.04 LTS with Go runtime 📦🐹"
+LABEL org.opencontainers.image.title="yap-ubuntu-resolute"
+LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Ubuntu 25.04 with Go runtime 📦🐹"
 LABEL org.opencontainers.image.vendor="M0Rf30"
 LABEL org.opencontainers.image.source="https://github.com/M0Rf30/yap"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${VERSION}"
+
+# Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive

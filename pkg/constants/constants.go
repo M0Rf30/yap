@@ -2,6 +2,8 @@
 package constants
 
 import (
+	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/set"
@@ -12,11 +14,16 @@ const (
 	DockerOrg = "docker.io/m0rf30/yap-"
 	// Git defines the git command name.
 	Git = "git"
-	// GoArchiveURL defines the URL for the Go programming language archive.
-	GoArchiveURL = "https://go.dev/dl/go1.26.1.linux-amd64.tar.gz"
+	// goVersion defines the Go toolchain version to download.
+	goVersion = "1.26.1"
 	// YAPVersion defines the current version of YAP.
 	YAPVersion = "v2.0.0"
 )
+
+// GoArchiveURL returns the Go archive download URL for the current architecture.
+func GoArchiveURL() string {
+	return fmt.Sprintf("https://go.dev/dl/go%s.linux-%s.tar.gz", goVersion, runtime.GOARCH)
+}
 
 var (
 	// Releases contains the supported Linux distribution IDs as defined in /etc/os-release.

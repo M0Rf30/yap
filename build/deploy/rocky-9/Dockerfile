@@ -25,7 +25,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build \
     -buildvcs=false \
-    -ldflags "-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
+    -ldflags "-w -s -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Version=${VERSION} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Commit=${COMMIT} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.BuildTime=${BUILD_TIME}" \
     -o /usr/bin/yap \
     ./cmd/yap && \
     upx --best --lzma /usr/bin/yap
@@ -53,9 +53,8 @@ LABEL org.opencontainers.image.source="https://github.com/M0Rf30/yap"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${VERSION}"
 
-
 # Install minimal runtime dependencies. EPEL must be enabled first because
-# ccache lives there on Rocky 9; the package is not available in the base
+# ccache lives there on rocky-9; the package is not available in the base
 # repos and dnf does not refresh metadata within a single transaction.
 RUN dnf -y update && \
     dnf -y install \
