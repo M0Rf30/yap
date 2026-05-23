@@ -86,6 +86,9 @@ type Source struct {
 	// their archives, matching makepkg's noextract semantics: exact basename
 	// match, file is still symlinked into $srcdir but archive.Extract is skipped.
 	NoExtract []string
+	// SkipHashCheck disables sha256/sha512 integrity verification for this
+	// source item. Equivalent to setting the checksum to SKIP in the PKGBUILD.
+	SkipHashCheck bool
 }
 
 // Get retrieves the source file from the specified URI.
@@ -316,7 +319,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 			WithContext("path", sourceFilePath)
 	}
 
-	if src.Hash == skipValue {
+	if src.Hash == skipValue || src.SkipHashCheck {
 		logger.Info(i18n.T("logger.skip_integrity_check_for"),
 			"source", src.SourceItemURI)
 

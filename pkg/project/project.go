@@ -74,6 +74,11 @@ type BuildOptions struct {
 	// exists and fails to verify is *always* fatal, regardless of this
 	// flag — a forged signature is strictly worse than no signature.
 	AllowUnverifiedRepos bool
+	// SkipHashCheck disables sha256/sha512 integrity verification of
+	// downloaded source files. Equivalent to setting every checksum to
+	// SKIP in the PKGBUILD. Useful during development when iterating on
+	// sources before finalising checksums.
+	SkipHashCheck bool
 }
 
 // extractPackageName extracts the package name from a dependency string,
@@ -1100,7 +1105,7 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 
 		proj := &Project{
 			Name:           child.Name,
-			Builder:        &builder.Builder{PKGBUILD: pkgbuildFile},
+			Builder:        &builder.Builder{PKGBUILD: pkgbuildFile, SkipHashCheck: mpc.Opts.SkipHashCheck},
 			PackageManager: mpc.packageManager,
 			HasToInstall:   child.HasToInstall,
 		}

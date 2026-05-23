@@ -220,9 +220,9 @@
   translation: "Remove source directory before building"
 - id: flags.build.from
   translation: "Start building from this distribution"
-- id: flags.build.nobuild
+- id: flags.build.no_build
   translation: "Skip building packages (prepare only)"
-- id: flags.build.nomakedeps
+- id: flags.build.no_makedeps
   translation: "Skip make dependencies installation"
 - id: flags.build.parallel
   translation: "Enable parallel dependency resolution and concurrent package building"
@@ -260,6 +260,10 @@
   translation: "Passphrase for private key (prefer env var YAP_SIGN_PASSPHRASE)"
 - id: flags.build.sign_key_name
   translation: "Key name for APK signing (e.g., 'mykey')"
+- id: flags.build.skip_hash_check
+  translation: "Skip sha256/sha512 integrity verification of source files"
+- id: flags.build.allow_unverified_repos
+  translation: "Permit apt repos with no usable OpenPGP trust anchor (still refuses repos whose signature is present but invalid). Also settable via YAP_ALLOW_UNVERIFIED_REPOS=1"
 - id: flags.build.compression_deb
   translation: "DEB compression algorithm: zstd|gzip|xz"
 - id: flags.build.compression_rpm
