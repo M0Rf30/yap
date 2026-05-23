@@ -121,12 +121,20 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
+      - name: 📋 Resolve build platforms
+        id: platforms
+        run: |
+          case "${{ matrix.os }}" in
+            ubuntu-jammy) echo "list=linux/amd64,linux/arm64" >> "$GITHUB_OUTPUT" ;;
+            *)            echo "list=linux/amd64"             >> "$GITHUB_OUTPUT" ;;
+          esac
+
       - name: 🔨 Build and push Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ steps.platforms.outputs.list }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -221,12 +229,20 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
+      - name: 📋 Resolve build platforms
+        id: platforms
+        run: |
+          case "${{ matrix.os }}" in
+            ubuntu-jammy-g) echo "list=linux/amd64,linux/arm64" >> "$GITHUB_OUTPUT" ;;
+            *)              echo "list=linux/amd64"             >> "$GITHUB_OUTPUT" ;;
+          esac
+
       - name: 🔨 Build and push Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ steps.platforms.outputs.list }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
