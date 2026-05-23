@@ -12,6 +12,7 @@ import (
 	"github.com/M0Rf30/rpmpack"
 	"github.com/m0rf30/ar"
 
+	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -315,8 +316,8 @@ func TestExtractRPM(t *testing.T) {
 		t.Fatalf("mkdir dest: %v", err)
 	}
 
-	if err := extractRPM(rpmPath, destDir); err != nil {
-		t.Fatalf("extractRPM failed: %v", err)
+	if err := archive.ExtractRPM(rpmPath, destDir); err != nil {
+		t.Fatalf("ExtractRPM failed: %v", err)
 	}
 
 	expected := []string{
@@ -381,8 +382,8 @@ func TestExtractRPM_AbsoluteEntryNames(t *testing.T) {
 		t.Fatalf("mkdir dest: %v", err)
 	}
 
-	if err := extractRPM(rpmPath, destDir); err != nil {
-		t.Fatalf("extractRPM with absolute entry failed: %v", err)
+	if err := archive.ExtractRPM(rpmPath, destDir); err != nil {
+		t.Fatalf("ExtractRPM with absolute entry failed: %v", err)
 	}
 
 	want := filepath.Join(destDir, "opt", "zextras", "common", "bin", "x264")
@@ -402,7 +403,7 @@ func TestExtractRPM_InvalidFile(t *testing.T) {
 		t.Fatalf("write invalid rpm: %v", err)
 	}
 
-	err := extractRPM(invalid, filepath.Join(tmpDir, "dest"))
+	err := archive.ExtractRPM(invalid, filepath.Join(tmpDir, "dest"))
 	if err == nil {
 		t.Error("expected error for invalid RPM input, got nil")
 	}

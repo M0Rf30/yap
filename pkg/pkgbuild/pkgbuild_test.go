@@ -119,7 +119,10 @@ func TestPKGBUILD_ComputeArchitecture(t *testing.T) {
 
 	// Test "any" architecture
 	pb.Arch = []string{"any"}
-	pb.ComputeArchitecture()
+	err := pb.ComputeArchitecture()
+	if err != nil {
+		t.Errorf("ComputeArchitecture returned error: %v", err)
+	}
 
 	if pb.ArchComputed != "any" {
 		t.Errorf("Expected ArchComputed 'any', got '%s'", pb.ArchComputed)
@@ -127,7 +130,11 @@ func TestPKGBUILD_ComputeArchitecture(t *testing.T) {
 
 	// Test with x86_64 (assuming this is the current architecture)
 	pb.Arch = []string{"x86_64", "amd64"}
-	pb.ComputeArchitecture()
+	err = pb.ComputeArchitecture()
+	if err != nil {
+		t.Errorf("ComputeArchitecture returned error: %v", err)
+	}
+
 	// ArchComputed should be set to the current architecture if supported
 	if pb.ArchComputed == "" {
 		t.Error("ArchComputed should not be empty for supported architecture")
@@ -611,7 +618,10 @@ func TestPKGBUILD_Integration(t *testing.T) {
 	}
 
 	// Test architecture computation
-	pb.ComputeArchitecture()
+	err = pb.ComputeArchitecture()
+	if err != nil {
+		t.Errorf("ComputeArchitecture failed: %v", err)
+	}
 
 	// Test folder setup
 	pb.SetMainFolders()
@@ -1668,7 +1678,10 @@ func TestPKGBUILD_ComputeArchitecture_EdgeCases(t *testing.T) {
 			}
 			pb.Init()
 
-			pb.ComputeArchitecture()
+			err := pb.ComputeArchitecture()
+			if err != nil {
+				t.Errorf("ComputeArchitecture failed: %v", err)
+			}
 
 			// Architecture should be computed (not empty)
 			if len(pb.Arch) == 0 {

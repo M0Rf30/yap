@@ -3,9 +3,10 @@ package shell
 
 // archiveExecHandler intercepts archive-extraction commands inside build
 // scripts and replaces them with pure-Go implementations from pkg/archive
-// (stdlib archive/tar + archive/zip + compress/bzip2 + klauspost/compress +
-// ulikunitz/xz + bodgit/sevenzip + nwaples/rardecode). This eliminates the
-// need for the corresponding system binaries in build containers.
+// and pkg/builders/common (stdlib archive/tar + archive/zip + compress/bzip2 +
+// klauspost/compress + ulikunitz/xz + bodgit/sevenzip + nwaples/rardecode).
+// This eliminates the need for the corresponding system binaries in build
+// containers.
 //
 // All handled formats are pure-Go (no binary needed):
 //   - unzip       → stdlib archive/zip
@@ -13,6 +14,8 @@ package shell
 //   - gunzip/gzip → stdlib compress/gzip
 //   - unrar       → nwaples/rardecode/v2
 //   - 7z, 7za     → bodgit/sevenzip
+//   - dpkg-deb    → pkg/builders/common.ExtractDEB (ar + tar)
+//   - rpm2cpio    → github.com/sassoftware/go-rpmutils (raw cpio stream)
 //
 // For any command not in the intercept list the handler falls through to the
 // next handler (which will invoke the OS binary as usual).
@@ -25,9 +28,16 @@ package shell
 //	7za x [-o<destdir>] <archive>
 //	jar xf <archive>
 //	gunzip [-c] [-d] [-k] [file]
+//	dpkg-deb -x <deb> <dir>
+//	dpkg-deb --extract <deb> <dir>
+//	dpkg-deb -X <deb> <dir>
+//	rpm2cpio <rpm>
 //
 // For any command not in the intercept list the handler falls through to the
 // next handler (which will invoke the OS binary as usual).
+//
+// Note: alien (format conversion) is not supported and will fall through to
+// the next handler (which will fail if alien is not installed).
 
 import (
 	"compress/gzip"
@@ -38,6 +48,7 @@ import (
 	"strings"
 
 	"mvdan.cc/sh/v3/interp"
+	rpmutils "github.com/sassoftware/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -54,20 +65,24 @@ func archiveExecHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 
 		cmd := filepath.Base(args[0])
 
-		switch cmd {
-		case "unzip":
-			return handleUnzip(ctx, args)
-		case "unrar":
-			return handleUnrar(ctx, args)
-		case "7z", "7za":
-			return handle7z(ctx, args)
-		case "jar":
-			return handleJar(ctx, args)
-		case "gunzip", "gzip":
-			return handleGunzip(ctx, args)
-		default:
-			return next(ctx, args)
-		}
+	switch cmd {
+	case "unzip":
+		return handleUnzip(ctx, args)
+	case "unrar":
+		return handleUnrar(ctx, args)
+	case "7z", "7za":
+		return handle7z(ctx, args)
+	case "jar":
+		return handleJar(ctx, args)
+	case "gunzip", "gzip":
+		return handleGunzip(ctx, args)
+	case "dpkg-deb":
+		return handleDpkgDeb(ctx, args, next)
+	case "rpm2cpio":
+		return handleRpm2Cpio(ctx, args)
+	default:
+		return next(ctx, args)
+	}
 	}
 }
 
@@ -386,4 +401,90 @@ func handleJar(ctx context.Context, args []string) error {
 	logger.Info("archive handler: jar", "archive", archivePath, "dest", destDir)
 
 	return archive.Extract(ctx, archivePath, destDir)
+}
+
+// handleDpkgDeb handles: dpkg-deb -x <deb> <dir>
+// Falls through to next handler for unsupported sub-commands (e.g. -c, --info).
+func handleDpkgDeb(ctx context.Context, args []string, next interp.ExecHandlerFunc) error {
+	hc := interp.HandlerCtx(ctx)
+
+	// Find the mode flag (-x, --extract, -X)
+	extract := false
+	var positional []string
+
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "-x", "--extract", "-X":
+			extract = true
+		case "--vextract":
+			extract = true
+		default:
+			if strings.HasPrefix(arg, "-") {
+				// unsupported flag — fall through
+				return next(ctx, args)
+			}
+			positional = append(positional, arg)
+		}
+	}
+
+	if !extract || len(positional) < 2 {
+		// Not an extract command, or missing args — let the binary handle it
+		return next(ctx, args)
+	}
+
+	archivePath := positional[0]
+	destDir := positional[1]
+
+	if !filepath.IsAbs(archivePath) {
+		archivePath = filepath.Join(hc.Dir, archivePath)
+	}
+	if !filepath.IsAbs(destDir) {
+		destDir = filepath.Join(hc.Dir, destDir)
+	}
+
+	logger.Info("archive handler: dpkg-deb -x", "archive", archivePath, "dest", destDir)
+
+	return archive.ExtractDEB(archivePath, destDir)
+}
+
+// handleRpm2Cpio handles: rpm2cpio <rpm>
+// Writes the decompressed cpio payload to stdout (matching rpm2cpio's behaviour).
+func handleRpm2Cpio(ctx context.Context, args []string) error {
+	hc := interp.HandlerCtx(ctx)
+
+	if len(args) < 2 {
+		return errors.New(errors.ErrTypeBuild, "rpm2cpio: no rpm file specified").
+			WithOperation("handleRpm2Cpio")
+	}
+
+	archivePath := args[1]
+	if !filepath.IsAbs(archivePath) {
+		archivePath = filepath.Join(hc.Dir, archivePath)
+	}
+
+	logger.Info("archive handler: rpm2cpio", "archive", archivePath)
+
+	f, err := os.Open(filepath.Clean(archivePath)) // #nosec G304 -- user-supplied build script path
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "rpm2cpio: open").
+			WithOperation("handleRpm2Cpio")
+	}
+	defer func() { _ = f.Close() }()
+
+	rpm, err := rpmutils.ReadRpm(f)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "rpm2cpio: read rpm header").
+			WithOperation("handleRpm2Cpio")
+	}
+
+	// Get the raw decompressed cpio payload stream.
+	payload, err := rpm.PayloadReader()
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "rpm2cpio: open payload").
+			WithOperation("handleRpm2Cpio")
+	}
+
+	_, err = io.Copy(hc.Stdout, payload)
+	return err
 }

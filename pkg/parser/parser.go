@@ -147,7 +147,13 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 
 				err = pkgBuild.AddItem(nodeType.Name.Value, arrayDecl)
 			} else {
-				varDecl, _ = shell.Expand(set.StringifyAssign(nodeType), os.Getenv)
+				strVal, strErr := set.StringifyAssign(nodeType)
+				if strErr != nil {
+					err = strErr
+					return false
+				}
+
+				varDecl, _ = shell.Expand(strVal, os.Getenv)
 				err = pkgBuild.AddItem(nodeType.Name.Value, varDecl)
 			}
 		}
@@ -168,7 +174,12 @@ func processFunctions(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) 
 			// Variables will be resolved at runtime via the preamble emitted by
 			// BuildScriptPreamble() and the environment variables set by
 			// SetEnvironmentVariables().
-			funcDecl := set.StringifyFuncDecl(nodeType)
+			funcDecl, funcErr := set.StringifyFuncDecl(nodeType)
+			if funcErr != nil {
+				err = funcErr
+				return false
+			}
+
 			err = pkgBuild.AddItem(nodeType.Name.Value, pkgbuild.FuncBody(funcDecl))
 
 			// Do not recurse into nested function declarations.

@@ -369,7 +369,7 @@ func logScriptContent(cmds string) {
 
 // RunScript executes a shell script from a string.
 func RunScript(cmds string) error {
-	return RunScriptWithPackage(cmds, "")
+	return RunScriptWithPackage(context.Background(), cmds, "")
 }
 
 // RunScriptWithPackage executes a shell script with package-specific output formatting.
@@ -379,7 +379,7 @@ func RunScript(cmds string) error {
 // from parallel build goroutines.
 //
 //nolint:gocyclo,cyclop // RunScriptWithPackage handles multiple script edge cases inline
-func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error {
+func RunScriptWithPackage(ctx context.Context, cmds, packageName string, extraEnv ...[]string) error {
 	start := time.Now()
 
 	if packageName != "" {
@@ -466,7 +466,7 @@ func RunScriptWithPackage(cmds, packageName string, extraEnv ...[]string) error 
 
 	logger.Debug(i18n.T("logger.runscriptwithpackage.debug.starting_script_execution_1"))
 
-	err = runner.Run(context.Background(), script)
+	err = runner.Run(ctx, script)
 	duration := time.Since(start)
 
 	return logScriptResult(err, packageName, duration, &outputBuf, "RunScriptWithPackage")
@@ -597,7 +597,7 @@ func fakerootExecEnv(env expand.Environ) []string {
 // Use this for the package() stage of PKGBUILD execution.
 //
 //nolint:gocyclo,cyclop // mirrors RunScriptWithPackage complexity
-func RunScriptInFakeroot(cmds, packageName string, extraEnv ...[]string) error {
+func RunScriptInFakeroot(ctx context.Context, cmds, packageName string, extraEnv ...[]string) error {
 	start := time.Now()
 
 	if packageName != "" {
@@ -673,7 +673,7 @@ func RunScriptInFakeroot(cmds, packageName string, extraEnv ...[]string) error {
 
 	logger.Debug(i18n.T("logger.runscriptwithpackage.debug.starting_script_execution_1"))
 
-	err = runner.Run(context.Background(), script)
+	err = runner.Run(ctx, script)
 	duration := time.Since(start)
 
 	return logScriptResult(err, packageName, duration, &outputBuf, "RunScriptInFakeroot")

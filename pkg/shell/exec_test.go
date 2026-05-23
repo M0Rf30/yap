@@ -267,7 +267,7 @@ func TestRunScript(t *testing.T) {
 
 func TestRunScriptWithPackage(t *testing.T) {
 	// Test with a simple echo command and package name
-	err := RunScriptWithPackage("echo 'test script'", "test-package")
+	err := RunScriptWithPackage(context.Background(), "echo 'test script'", "test-package")
 	if err != nil {
 		t.Fatalf("RunScriptWithPackage failed: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestExecWithSudoContextValidation(t *testing.T) {
 
 func TestRunScriptInFakeroot(t *testing.T) {
 	// Basic echo — should succeed under fakeroot user namespace.
-	err := RunScriptInFakeroot("echo 'fakeroot test'", "test-package")
+	err := RunScriptInFakeroot(context.Background(), "echo 'fakeroot test'", "test-package")
 	if err != nil {
 		t.Fatalf("RunScriptInFakeroot failed: %v", err)
 	}
@@ -368,21 +368,21 @@ func TestRunScriptInFakerootOwnership(t *testing.T) {
 	script := "touch " + dir + "/src.txt\n" +
 		"install -o root -g root -m 0644 " + dir + "/src.txt " + dir + "/dst.txt\n"
 
-	err := RunScriptInFakeroot(script, "test-package")
+	err := RunScriptInFakeroot(context.Background(), script, "test-package")
 	if err != nil {
 		t.Fatalf("RunScriptInFakeroot ownership test failed: %v", err)
 	}
 }
 
 func TestRunScriptInFakerootEmpty(t *testing.T) {
-	err := RunScriptInFakeroot("", "test-package")
+	err := RunScriptInFakeroot(context.Background(), "", "test-package")
 	if err != nil {
 		t.Fatalf("RunScriptInFakeroot with empty script failed: %v", err)
 	}
 }
 
 func TestRunScriptInFakerootInvalidSyntax(t *testing.T) {
-	err := RunScriptInFakeroot("echo 'unclosed quote", "test-package")
+	err := RunScriptInFakeroot(context.Background(), "echo 'unclosed quote", "test-package")
 	if err == nil {
 		t.Fatal("Expected error for invalid script syntax, got nil")
 	}

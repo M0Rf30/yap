@@ -225,25 +225,27 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 
 // ComputeArchitecture checks if the specified architecture is supported.
 // If "any", sets to "any". Otherwise, checks if current architecture is supported.
-// Logs error if not supported, then sets to current architecture if supported.
-func (pkgBuild *PKGBUILD) ComputeArchitecture() {
+// Returns an error if not supported.
+func (pkgBuild *PKGBUILD) ComputeArchitecture() error {
 	isSupported := set.Contains(pkgBuild.Arch, ArchAny)
 	if isSupported {
 		pkgBuild.ArchComputed = ArchAny
 
-		return
+		return nil
 	}
 
 	currentArch := platform.GetArchitecture()
 
 	isSupported = set.Contains(pkgBuild.Arch, currentArch)
 	if !isSupported {
-		logger.Fatal(i18n.T("errors.pkgbuild.unsupported_architecture"),
-			"pkgname", pkgBuild.PkgName,
-			"arch", strings.Join(pkgBuild.Arch, " "))
+		return errors.New(errors.ErrTypeConfiguration, i18n.T("errors.pkgbuild.unsupported_architecture")).
+			WithContext("pkgname", pkgBuild.PkgName).
+			WithContext("arch", strings.Join(pkgBuild.Arch, " "))
 	}
 
 	pkgBuild.ArchComputed = currentArch
+
+	return nil
 }
 
 // CreateSpec reads the filepath where the specfile will be written and the
@@ -874,7 +876,8 @@ func (pkgBuild *PKGBUILD) applyOverrideAssign(node syntax.Node) {
 
 		_ = pkgBuild.AddItem(name, arrVal)
 	} else {
-		varVal, _ := mvdanshell.Expand(set.StringifyAssign(assign), os.Getenv)
+		strVal, _ := set.StringifyAssign(assign)
+		varVal, _ := mvdanshell.Expand(strVal, os.Getenv)
 		_ = pkgBuild.AddItem(name, varVal)
 	}
 }
@@ -1634,8 +1637,9 @@ func (pkgBuild *PKGBUILD) mapVariables(key string, data any) {
 	}
 
 	if err != nil {
-		logger.Fatal(i18n.T("errors.pkgbuild.failed_to_set_variable"),
-			"variable", key)
+		logger.Error(i18n.T("errors.pkgbuild.failed_to_set_variable"),
+			"variable", key,
+			"error", err)
 	}
 }
 

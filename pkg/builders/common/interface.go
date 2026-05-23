@@ -501,6 +501,34 @@ func (bb *BaseBuilder) Update() error {
 // cross- and non-cross-arch builds will not re-run ccache setup between
 // them — that pattern was already racy with the process-global os.Setenv
 // approach and is tracked separately.
+// BuildCcacheEnvSlice returns ccache environment variables as a "KEY=VALUE" slice
+// for safe concurrent use. Unlike SetupCcache, it does NOT mutate the process
+// environment (no os.Setenv calls). Returns nil if ccache is not available.
+func (bb *BaseBuilder) BuildCcacheEnvSlice() []string {
+	// Check if ccache is available in the system using Go's exec.LookPath
+	_, err := exec.LookPath("ccache")
+	if err != nil {
+		// ccache not available
+		return nil
+	}
+
+	// Build ccache environment variables as a slice without calling os.Setenv.
+	// CC/CXX are wrapped only when the build is not cross-compiling — for cross
+	// builds SetupCrossCompilationEnvironment runs after this function and
+	// substitutes the bare cross-compiler, relying on the /usr/lib/ccache
+	// (or /usr/lib64/ccache) symlinks to invoke ccache.
+	return []string{
+		"CC=ccache gcc",
+		"CXX=ccache g++",
+		"CCACHE_BASEDIR=" + bb.PKGBUILD.StartDir,
+		"CCACHE_SLOPPINESS=time_macros,include_file_mtime",
+		"CCACHE_NOHASHDIR=1",
+		// CCACHE_DIR is intentionally left unset so ccache resolves to its default
+		// $HOME/.cache/ccache. Persistent caches (e.g. Kubernetes volumes) mounted
+		// at that path are then shared across builds within the same user account.
+	}
+}
+
 func (bb *BaseBuilder) SetupCcache() error {
 	// Already configured for this process — skip.
 	if os.Getenv("YAP_CCACHE_SETUP") == "1" {
@@ -517,7 +545,9 @@ func (bb *BaseBuilder) SetupCcache() error {
 	if !ccacheAvailable {
 		// ccache not found, log and continue without ccache.
 		// Mark "setup attempted" so subsequent packages don't repeat the lookup.
-		_ = os.Setenv("YAP_CCACHE_SETUP", "1")
+		if err := setenv("YAP_CCACHE_SETUP", "1"); err != nil {
+			return err
+		}
 
 		logger.Info(i18n.T("logger.setupccache.info.ccache_not_found_skipping_1"),
 			"package", bb.PKGBUILD.PkgName)
@@ -533,11 +563,25 @@ func (bb *BaseBuilder) SetupCcache() error {
 	// build is not cross-compiling — for cross builds SetupCrossCompilationEnvironment
 	// runs after this function and substitutes the bare cross-compiler, relying
 	// on the /usr/lib/ccache (or /usr/lib64/ccache) symlinks to invoke ccache.
-	_ = os.Setenv("CC", "ccache gcc")
-	_ = os.Setenv("CXX", "ccache g++")
-	_ = os.Setenv("CCACHE_BASEDIR", bb.PKGBUILD.StartDir)
-	_ = os.Setenv("CCACHE_SLOPPINESS", "time_macros,include_file_mtime")
-	_ = os.Setenv("CCACHE_NOHASHDIR", "1")
+	if err := setenv("CC", "ccache gcc"); err != nil {
+		return err
+	}
+
+	if err := setenv("CXX", "ccache g++"); err != nil {
+		return err
+	}
+
+	if err := setenv("CCACHE_BASEDIR", bb.PKGBUILD.StartDir); err != nil {
+		return err
+	}
+
+	if err := setenv("CCACHE_SLOPPINESS", "time_macros,include_file_mtime"); err != nil {
+		return err
+	}
+
+	if err := setenv("CCACHE_NOHASHDIR", "1"); err != nil {
+		return err
+	}
 
 	// CCACHE_DIR is intentionally left unset so ccache resolves to its default
 	// $HOME/.cache/ccache. Persistent caches (e.g. Kubernetes volumes) mounted
@@ -545,7 +589,9 @@ func (bb *BaseBuilder) SetupCcache() error {
 
 	// Mark setup so subsequent packages in the same process skip the full
 	// re-configuration. See the function-level comment for rationale.
-	_ = os.Setenv("YAP_CCACHE_SETUP", "1")
+	if err := setenv("YAP_CCACHE_SETUP", "1"); err != nil {
+		return err
+	}
 
 	logger.Info(i18n.T("logger.setupccache.info.ccache_enabled_for_build_1"),
 		"package", bb.PKGBUILD.PkgName)
