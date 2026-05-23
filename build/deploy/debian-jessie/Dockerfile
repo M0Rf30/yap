@@ -25,7 +25,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build \
     -buildvcs=false \
-    -ldflags "-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
+    -ldflags "-w -s -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Version=${VERSION} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Commit=${COMMIT} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.BuildTime=${BUILD_TIME}" \
     -o /usr/bin/yap \
     ./cmd/yap && \
     upx --best --lzma /usr/bin/yap
@@ -45,42 +45,26 @@ ARG VERSION=dev
 ARG TARGETARCH=amd64
 ARG GO_VERSION=1.26.1
 
-# Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
 # Metadata labels
 LABEL org.opencontainers.image.title="yap-debian-jessie"
-LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Debian 8 (Jessie) with Go runtime 📦🐹"
+LABEL org.opencontainers.image.description="YAP - Yet Another Packager for Debian Jessie with Go runtime 📦🐹"
 LABEL org.opencontainers.image.vendor="M0Rf30"
 LABEL org.opencontainers.image.source="https://github.com/M0Rf30/yap"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${VERSION}"
 
+# Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Preseed debconf to prevent resolvconf postinst failure in containers
-RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
-
-# Add arm64 multiarch support
-RUN dpkg --add-architecture arm64 && \
-    sed -i 's/^deb http/deb [arch=amd64] http/g' /etc/apt/sources.list && \
-    echo "deb [arch=arm64] http://deb.debian.org/debian-ports/ jessie main" >> /etc/apt/sources.list && \
-    apt-get update && \
-    rm -rf /var/lib/apt/lists/*
-
 # Install minimal runtime dependencies
 RUN apt-get update && \
-    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
     bash-completion \
-    binutils \
     ca-certificates \
     sudo && \
-    # Set timezone
-    ln -sf /usr/share/zoneinfo/UTC /etc/localtime && \
-    # Clean up
-    apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

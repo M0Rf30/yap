@@ -25,7 +25,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build \
     -buildvcs=false \
-    -ldflags "-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
+    -ldflags "-w -s -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Version=${VERSION} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Commit=${COMMIT} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.BuildTime=${BUILD_TIME}" \
     -o /usr/bin/yap \
     ./cmd/yap && \
     upx --best --lzma /usr/bin/yap
@@ -40,9 +40,6 @@ RUN if [ "${TARGETARCH}" = "$(go env GOARCH)" ]; then \
 # Runtime stage
 FROM ubuntu:focal
 
-# Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
 # Build arguments for runtime stage
 ARG VERSION=dev
 ARG TARGETARCH=amd64
@@ -56,20 +53,14 @@ LABEL org.opencontainers.image.source="https://github.com/M0Rf30/yap"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${VERSION}"
 
+# Use bash with pipefail for safer pipes in RUN instructions (hadolint DL4006)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Preseed debconf to prevent resolvconf postinst failure in containers
 RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
-
-# Add arm64 multiarch support
-RUN dpkg --add-architecture arm64 && \
-    sed -i 's/^deb http/deb [arch=amd64] http/g' /etc/apt/sources.list && \
-    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal-security main restricted universe multiverse" >> /etc/apt/sources.list && \
-    apt-get update && \
-    rm -rf /var/lib/apt/lists/*
 
 # Install minimal runtime dependencies
 RUN apt-get update && \
@@ -78,6 +69,7 @@ RUN apt-get update && \
     bash-completion \
     binutils \
     ca-certificates \
+    ccache \
     sudo && \
     # Set timezone
     ln -sf /usr/share/zoneinfo/UTC /etc/localtime && \
@@ -86,11 +78,16 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Make ccache visible to every compiler invocation. The Debian/Ubuntu ccache
+# package installs compiler symlinks under /usr/lib/ccache; placing that
+# directory first in PATH wraps gcc/g++ and cross-compilers transparently.
+ENV PATH="/usr/lib/ccache:${PATH}"
+
 # Remove default ubuntu user and create yap user at uid/gid 1000
 RUN userdel -r ubuntu 2>/dev/null || true && \
     groupadd -g 1000 yap && \
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
-    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get' >> /etc/sudoers
+    echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get, /usr/bin/dpkg, /usr/sbin/update-ccache-symlinks' >> /etc/sudoers
 
 # Copy binary and completion from builder
 COPY --from=builder /usr/bin/yap /usr/bin/yap
