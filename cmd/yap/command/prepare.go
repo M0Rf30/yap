@@ -52,6 +52,17 @@ var (
 			distro, _ = ResolveDistroRelease(distro, release,
 				"logger.prepare.no_distribution_specified")
 
+			// Dispatch to container when a distro was explicitly requested and
+			// we are not already inside a container. Use --no-container to skip.
+			if len(args) > 0 && !noContainer {
+				distroTag := args[0]
+				// YAP_IN_CONTAINER=1 (injected by the runtime) prevents re-dispatch.
+				subArgs := []string{prepareCommand, distroTag}
+				if RunCommandInContainer(distroTag, ".", subArgs) {
+					return
+				}
+			}
+
 			packageManager, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
 			if err != nil {
 				logger.Error(err.Error(), "error", err)
@@ -129,4 +140,9 @@ func init() {
 		"repo", nil,
 		"Extra repository spec (repeatable): name=<n>,url=<u>,suite=<s>,components=<a+b>,"+
 			"keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>")
+
+	// CONTAINER FLAGS
+	prepareCmd.Flags().BoolVar(&noContainer,
+		"no-container", false,
+		"skip container dispatch and prepare natively on the host")
 }

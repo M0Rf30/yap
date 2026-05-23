@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/container"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
 
 const (
@@ -32,10 +32,15 @@ var pullCmd = &cobra.Command{
 			logger.Fatal(i18n.T("logger.pull.specify_codename"))
 		}
 
-		err := platform.PullContainers(args[0])
+		rt, err := container.Detect(ContainerRuntimeOverride())
 		if err != nil {
-			logger.Fatal(i18n.T("logger.pull.failed_to_pull"),
-				"error", err)
+			logger.Fatal(i18n.T("logger.pull.failed_to_pull"), "error", err)
+		}
+
+		logger.Info("using container runtime", "type", string(rt.Type()))
+
+		if err := rt.Pull(args[0]); err != nil {
+			logger.Fatal(i18n.T("logger.pull.failed_to_pull"), "error", err)
 		}
 	},
 }

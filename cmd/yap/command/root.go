@@ -13,9 +13,10 @@ import (
 const languageFlag = "--language"
 
 var (
-	verbose  bool
-	noColor  bool
-	language string
+	verbose          bool
+	noColor          bool
+	language         string
+	containerRuntime string // "cli", "rootless", or "" (auto-detect)
 )
 
 // rootCmd represents the base command when called without any subcommands.
@@ -194,6 +195,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "")
 	rootCmd.PersistentFlags().StringVarP(&language, "language", "l", "",
 		"set language (en, it) - defaults to system locale")
+	rootCmd.PersistentFlags().StringVar(&containerRuntime, "runtime", "",
+		"container runtime to use: cli (podman/docker) or rootless (built-in, no daemon required)")
 
 	// Configure completion options
 	rootCmd.CompletionOptions.DisableDefaultCmd = false
@@ -208,4 +211,10 @@ func init() {
 // IsNoColorEnabled returns true if the --no-color flag was set.
 func IsNoColorEnabled() bool {
 	return noColor
+}
+
+// ContainerRuntimeOverride returns the value of the --runtime flag.
+// Empty string means auto-detect.
+func ContainerRuntimeOverride() string {
+	return containerRuntime
 }
