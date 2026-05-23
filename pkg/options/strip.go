@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	binutil "github.com/M0Rf30/yap/v2/pkg/binary"
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -15,10 +16,16 @@ import (
 )
 
 // debugDir holds the output directory for separated debug symbols.
-var debugDir string
+var (
+	debugDir   string
+	debugDirMu sync.RWMutex
+)
 
 // SetDebugDir sets the output directory for debug symbols.
+// This function is safe to call concurrently from multiple goroutines.
 func SetDebugDir(dir string) {
+	debugDirMu.Lock()
+	defer debugDirMu.Unlock()
 	debugDir = dir
 }
 
@@ -78,8 +85,13 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	}
 
 	// Separate debug info before stripping, if a debug directory is configured.
-	if debugDir != "" {
-		debugFile, sepErr := binutil.SeparateDebugInfo(binary, debugDir)
+	// Read debugDir under lock to prevent races with SetDebugDir in parallel builds.
+	debugDirMu.RLock()
+	localDebugDir := debugDir
+	debugDirMu.RUnlock()
+
+	if localDebugDir != "" {
+		debugFile, sepErr := binutil.SeparateDebugInfo(binary, localDebugDir)
 		if sepErr != nil {
 			logger.Warn("failed to separate debug info",
 				"binary", binary, "error", sepErr)

@@ -2,6 +2,7 @@
 package builder
 
 import (
+	"context"
 	"sync"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
@@ -24,7 +25,7 @@ type Builder struct {
 
 // Compile manages all the instructions that lead to a single project artifact.
 // It returns any error if occurred.
-func (builder *Builder) Compile(noBuild bool) error {
+func (builder *Builder) Compile(ctx context.Context, noBuild bool) error {
 	pkgName := builder.PKGBUILD.PkgName
 	pkgVer := builder.PKGBUILD.PkgVer
 	pkgRel := builder.PKGBUILD.PkgRel
@@ -43,7 +44,7 @@ func (builder *Builder) Compile(noBuild bool) error {
 		"pkgver", builder.PKGBUILD.PkgVer,
 		"pkgrel", builder.PKGBUILD.PkgRel)
 
-	err = builder.getSources()
+	err = builder.getSources(ctx)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.failed_to_retrieve_sources")).
 			WithContext("package", pkgName).
@@ -62,7 +63,7 @@ func (builder *Builder) Compile(noBuild bool) error {
 	}
 
 	if !noBuild {
-		return builder.runBuildStages()
+		return builder.runBuildStages(ctx)
 	}
 
 	return nil
@@ -72,7 +73,7 @@ func (builder *Builder) Compile(noBuild bool) error {
 //
 // It takes three parameters: pkgbuildFunction string, message string, stage string.
 // It returns an error if the build stage fails.
-func (builder *Builder) processFunction(pkgbuildFunction, message, stage string) error {
+func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, message, stage string) error {
 	if pkgbuildFunction == "" {
 		return nil
 	}
@@ -89,33 +90,32 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	// Use logger for consistent formatting
 	logger.Info(i18n.T(message), "pkgver", pkgVer, "pkgrel", pkgRel)
 
-	// Set up ccache for the build stage if ccache is available.
-	// SetupCcache / SetupCrossCompilationEnvironment still call os.Setenv, so
-	// capture the resulting env *after* they run and before the shell interpreter
-	// snapshots it, reducing (but not fully eliminating) the race window for
-	// cross-compilation / ccache vars.  A full fix for those helpers is tracked
-	// separately.
+	// Set up ccache and cross-compilation environment for the build stage.
+	// Use the new slice-based methods (BuildCcacheEnvSlice, BuildCrossEnvSlice)
+	// which do NOT call os.Setenv, making them safe for parallel builds.
 	if stage == "build" {
-		// Create a temporary BaseBuilder to access the SetupCcache and
-		// SetupCrossCompilationEnvironment methods
+		// Create a temporary BaseBuilder to access the environment slice methods
 		format := constants.DistroFormat(builder.PKGBUILD.Distro)
 		tempBuilder := &common.BaseBuilder{
 			PKGBUILD: builder.PKGBUILD,
 			Format:   format,
 		}
 
-		err := tempBuilder.SetupCcache()
-		if err != nil {
-			logger.Warn(i18n.T("logger.setupccache.warn.ccache_setup_failed_1"),
-				"package", pkgName, "error", err)
+		// Collect ccache env vars without mutating os.Setenv
+		if ccacheEnv := tempBuilder.BuildCcacheEnvSlice(); len(ccacheEnv) > 0 {
+			pkgEnv = append(pkgEnv, ccacheEnv...)
+			logger.Info(i18n.T("logger.setupccache.info.ccache_enabled_for_build_1"),
+				"package", pkgName)
 		}
 
-		// Set up cross-compilation environment if target architecture is specified
+		// Collect cross-compilation env vars without mutating os.Setenv
 		if builder.PKGBUILD.IsCrossCompilation() {
-			err = tempBuilder.SetupCrossCompilationEnvironment(builder.PKGBUILD.TargetArch)
+			crossEnv, err := tempBuilder.BuildCrossEnvSlice(builder.PKGBUILD.TargetArch)
 			if err != nil {
 				logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
 					"package", pkgName, "target_arch", builder.PKGBUILD.TargetArch, "error", err)
+			} else if len(crossEnv) > 0 {
+				pkgEnv = append(pkgEnv, crossEnv...)
 			}
 		}
 	}
@@ -132,7 +132,7 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 	// produce no output on failure — only an exit status).
 	// Pass pkgEnv so the interpreter receives per-package dirs/names without
 	// relying on the (racy) global os environment.
-	err := shell.RunScriptWithPackage("  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)
+	err := shell.RunScriptWithPackage(ctx, "  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).
@@ -146,26 +146,26 @@ func (builder *Builder) processFunction(pkgbuildFunction, message, stage string)
 }
 
 // runBuildStages executes prepare → build → package (or split-package) stages.
-func (builder *Builder) runBuildStages() error {
-	if err := builder.processFunction(builder.PKGBUILD.Prepare, "logger.preparing_sources", "prepare"); err != nil {
+func (builder *Builder) runBuildStages(ctx context.Context) error {
+	if err := builder.processFunction(ctx, builder.PKGBUILD.Prepare, "logger.preparing_sources", "prepare"); err != nil {
 		return err
 	}
 
-	if err := builder.processFunction(builder.PKGBUILD.Build, "logger.building", "build"); err != nil {
+	if err := builder.processFunction(ctx, builder.PKGBUILD.Build, "logger.building", "build"); err != nil {
 		return err
 	}
 
 	if builder.PKGBUILD.IsSplitPackage() {
-		return builder.compileSplitPackages()
+		return builder.compileSplitPackages(ctx)
 	}
 
-	return builder.processFunctionInFakeroot(builder.PKGBUILD.Package, "logger.generating_package", "package")
+	return builder.processFunctionInFakeroot(ctx, builder.PKGBUILD.Package, "logger.generating_package", "package")
 }
 
 // compileSplitPackages runs the package_<name>() function for each sub-package
 // defined in a split PKGBUILD (pkgname=('foo' 'bar' ...)). Each sub-package
 // gets its own PackageDir so the install trees are kept separate.
-func (builder *Builder) compileSplitPackages() error {
+func (builder *Builder) compileSplitPackages(ctx context.Context) error {
 	pkgVer := builder.PKGBUILD.PkgVer
 	pkgRel := builder.PKGBUILD.PkgRel
 
@@ -218,7 +218,7 @@ func (builder *Builder) compileSplitPackages() error {
 		}
 
 		if err := shell.RunScriptInFakeroot(
-			"  set -e\n  set -x\n"+preamble+funcBody, subName, pkgEnv,
+			ctx, "  set -e\n  set -x\n"+preamble+funcBody, subName, pkgEnv,
 		); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 				WithContext("package", subName).
@@ -236,7 +236,7 @@ func (builder *Builder) compileSplitPackages() error {
 // inside a Linux user-namespace fakeroot so that ownership operations such as
 // `install -o root -g root` succeed without real root privileges.
 // Use this for the package() stage.
-func (builder *Builder) processFunctionInFakeroot(pkgbuildFunction, message, stage string) error {
+func (builder *Builder) processFunctionInFakeroot(ctx context.Context, pkgbuildFunction, message, stage string) error {
 	if pkgbuildFunction == "" {
 		return nil
 	}
@@ -251,7 +251,7 @@ func (builder *Builder) processFunctionInFakeroot(pkgbuildFunction, message, sta
 
 	// Propagate cross-compilation environment to the package() stage so that
 	// tools like strip/objcopy use the cross-prefixed variants when packaging
-	// cross-compiled binaries.
+	// cross-compiled binaries. Use the slice-based method which does NOT call os.Setenv.
 	if builder.PKGBUILD.IsCrossCompilation() {
 		format := constants.DistroFormat(builder.PKGBUILD.Distro)
 		tempBuilder := &common.BaseBuilder{
@@ -259,15 +259,18 @@ func (builder *Builder) processFunctionInFakeroot(pkgbuildFunction, message, sta
 			Format:   format,
 		}
 
-		if err := tempBuilder.SetupCrossCompilationEnvironment(builder.PKGBUILD.TargetArch); err != nil {
+		crossEnv, err := tempBuilder.BuildCrossEnvSlice(builder.PKGBUILD.TargetArch)
+		if err != nil {
 			logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
 				"package", pkgName, "target_arch", builder.PKGBUILD.TargetArch, "error", err)
+		} else if len(crossEnv) > 0 {
+			pkgEnv = append(pkgEnv, crossEnv...)
 		}
 	}
 
 	preamble := builder.PKGBUILD.BuildScriptPreamble()
 
-	err := shell.RunScriptInFakeroot("  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)
+	err := shell.RunScriptInFakeroot(ctx, "  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).
@@ -282,7 +285,7 @@ func (builder *Builder) processFunctionInFakeroot(pkgbuildFunction, message, sta
 
 // getSources detects sources provided by a single project source array and
 // downloads them in parallel with enhanced progress tracking. It returns any error if occurred.
-func (builder *Builder) getSources() error {
+func (builder *Builder) getSources(ctx context.Context) error {
 	if len(builder.PKGBUILD.SourceURI) == 0 {
 		return nil
 	}

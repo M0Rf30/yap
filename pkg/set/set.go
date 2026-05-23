@@ -7,6 +7,7 @@ import (
 
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -108,43 +109,42 @@ func StringifyArray(node *syntax.Assign) []string {
 // StringifyAssign returns a string representation of the given *syntax.Assign node.
 //
 // It takes a pointer to a *syntax.Assign node as its parameter.
-// It returns a string.
-func StringifyAssign(node *syntax.Assign) string {
+// It returns a string and an error.
+func StringifyAssign(node *syntax.Assign) (string, error) {
 	out := &strings.Builder{}
 	printer := syntax.NewPrinter(syntax.Indent(2))
 
 	if node.Value == nil {
-		logger.Fatal(i18n.T("errors.set.empty_variable"),
-			"path", node.Name.Value)
+		return "", errors.New(errors.ErrTypeConfiguration, i18n.T("errors.set.empty_variable")).
+			WithContext("variable", node.Name.Value)
 	}
 
 	err := printer.Print(out, node.Value)
 	if err != nil {
-		return ""
+		return "", err
 	}
 
-	return strings.Trim(out.String(), "\"")
+	return strings.Trim(out.String(), "\""), nil
 }
 
 // StringifyFuncDecl converts a syntax.FuncDecl node to a string representation.
 //
-// It takes a pointer to a syntax.FuncDecl node as a parameter and returns a string.
-func StringifyFuncDecl(node *syntax.FuncDecl) string {
+// It takes a pointer to a syntax.FuncDecl node as a parameter and returns a string and an error.
+func StringifyFuncDecl(node *syntax.FuncDecl) (string, error) {
 	out := &strings.Builder{}
 	printer := syntax.NewPrinter(syntax.Indent(2), syntax.SwitchCaseIndent(true))
 
 	err := printer.Print(out, node.Body)
 	if err != nil {
-		logger.Error(i18n.T("logger.stringifyfuncdecl.error.unable_to_parse_function_1"),
-			"path", out.String())
+		return "", err
 	}
 
 	funcDecl := strings.Trim(out.String(), "{\n}")
 
 	if funcDecl == "" {
-		logger.Fatal(i18n.T("errors.set.empty_function"),
-			"path", node.Name.Value)
+		return "", errors.New(errors.ErrTypeConfiguration, i18n.T("errors.set.empty_function")).
+			WithContext("function", node.Name.Value)
 	}
 
-	return funcDecl
+	return funcDecl, nil
 }

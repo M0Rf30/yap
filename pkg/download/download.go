@@ -38,7 +38,10 @@ func Download(destination, uri string, writer io.Writer) error {
 
 	resp := client.Do(req)
 	if resp.HTTPResponse == nil {
-		logger.Fatal(i18n.T("errors.download.download_failed_no_response"), "error", resp.Err())
+		return errors.New(errors.ErrTypeNetwork, i18n.T("errors.download.download_failed_no_response")).
+			WithOperation("Download").
+			WithContext("uri", uri).
+			WithContext("error", resp.Err())
 	}
 
 	// start download

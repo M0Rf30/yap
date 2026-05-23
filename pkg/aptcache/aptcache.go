@@ -955,61 +955,64 @@ func (c *Cache) mergeFrom(other *Cache) {
 			continue
 		}
 
-		// Field-level merge: prefer non-empty values from the new cache.
-		if info.Architecture != "" {
-			existing.Architecture = info.Architecture
-		}
-
-		if info.MultiArch != "" {
-			existing.MultiArch = info.MultiArch
-		}
-
-		if info.Essential {
-			existing.Essential = true
-		}
-
-		if info.HasCandidate {
-			existing.HasCandidate = true
-		}
-
-		if info.Filename != "" {
-			existing.Filename = info.Filename
-			// BaseURL must follow Filename when the incoming entry is for a
-			// different (non-all) architecture: e.g. arm64 Filename from
-			// ports.ubuntu.com must not be downloaded from archive.ubuntu.com.
-			//
-			// Exception: Architecture: all packages have the same _all.deb
-			// filename in every arch index. Overwriting BaseURL for those
-			// would replace archive.ubuntu.com with ports.ubuntu.com, causing
-			// the host-arch install of arch-all tools (patch, autoconf, …) to
-			// pull arm64 debs and overwrite host binaries.
-			//
-			// Rule: update BaseURL only when the incoming arch is non-empty
-			// and not "all" — meaning it is a genuine arch-specific entry.
-			if info.BaseURL != "" && info.Architecture != "" && info.Architecture != "all" {
-				existing.BaseURL = info.BaseURL
-			}
-		}
-
-		if info.SHA256 != "" {
-			existing.SHA256 = info.SHA256
-		}
-
-		if info.Size > 0 {
-			existing.Size = info.Size
-		}
-
-		if len(info.Depends) > 0 {
-			existing.Depends = info.Depends
-		}
-
-		if len(info.PreDepends) > 0 {
-			existing.PreDepends = info.PreDepends
-		}
+		mergeEntryFields(existing, info)
 	}
 
 	for virt, providers := range other.providers {
 		c.providers[virt] = append(c.providers[virt], providers...)
+	}
+}
+
+// mergeEntryFields applies a field-level last-writer-wins merge of info into
+// existing, preferring non-empty / non-zero values from info. Split out of
+// mergeFrom to keep that loop body below the cyclomatic-complexity threshold.
+func mergeEntryFields(existing, info *PackageInfo) {
+	if info.Architecture != "" {
+		existing.Architecture = info.Architecture
+	}
+
+	if info.MultiArch != "" {
+		existing.MultiArch = info.MultiArch
+	}
+
+	if info.Essential {
+		existing.Essential = true
+	}
+
+	if info.HasCandidate {
+		existing.HasCandidate = true
+	}
+
+	if info.Filename != "" {
+		existing.Filename = info.Filename
+		// BaseURL must follow Filename when the incoming entry is for a
+		// different (non-all) architecture: e.g. arm64 Filename from
+		// ports.ubuntu.com must not be downloaded from archive.ubuntu.com.
+		//
+		// Exception: Architecture: all packages have the same _all.deb
+		// filename in every arch index. Overwriting BaseURL for those
+		// would replace archive.ubuntu.com with ports.ubuntu.com, causing
+		// the host-arch install of arch-all tools (patch, autoconf, …) to
+		// pull arm64 debs and overwrite host binaries.
+		if info.BaseURL != "" && info.Architecture != "" && info.Architecture != "all" {
+			existing.BaseURL = info.BaseURL
+		}
+	}
+
+	if info.SHA256 != "" {
+		existing.SHA256 = info.SHA256
+	}
+
+	if info.Size > 0 {
+		existing.Size = info.Size
+	}
+
+	if len(info.Depends) > 0 {
+		existing.Depends = info.Depends
+	}
+
+	if len(info.PreDepends) > 0 {
+		existing.PreDepends = info.PreDepends
 	}
 }
 
@@ -1163,7 +1166,6 @@ func (c *Cache) parseDeb822(r io.Reader, dpkgStatus bool, baseURL string) error 
 	return scanner.Err()
 }
 
-// applyField sets the appropriate stanza field from a parsed deb822 field line.
 // applyField sets the appropriate stanza field from a parsed deb822 field line.
 // Dispatches to applyCommonField or applyStatusField based on field type.
 func applyField(s *stanza, field, value string, dpkgStatus bool) {

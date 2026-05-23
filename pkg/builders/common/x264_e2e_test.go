@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/M0Rf30/yap/v2/pkg/archive"
 )
 
 // TestExtractRPM_RealCarbonioX264 is an opt-in end-to-end test against the
@@ -23,8 +25,8 @@ func TestExtractRPM_RealCarbonioX264(t *testing.T) {
 
 	dest := t.TempDir()
 
-	if err := extractRPM(rpmPath, dest); err != nil {
-		t.Fatalf("extractRPM on real RPM failed: %v", err)
+	if err := archive.ExtractRPM(rpmPath, dest); err != nil {
+		t.Fatalf("ExtractRPM on real RPM failed: %v", err)
 	}
 
 	// Walk and assert at least one binary lands under opt/zextras/common.

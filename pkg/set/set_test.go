@@ -342,7 +342,12 @@ func TestStringifyAssignWithMockData(t *testing.T) {
 	}
 
 	// Test StringifyAssign
-	result := StringifyAssign(varAssign)
+	result, err := StringifyAssign(varAssign)
+	if err != nil {
+		t.Errorf("StringifyAssign returned error: %v", err)
+		return
+	}
+
 	if result == "" {
 		t.Error("StringifyAssign should return non-empty result for valid assignment")
 	}
@@ -388,14 +393,13 @@ func TestStringifyFuncDeclWithMockData(t *testing.T) {
 		return
 	}
 
-	// Test StringifyFuncDecl - this may fail due to logger.Fatal calls
-	defer func() {
-		if r := recover(); r != nil {
-			t.Logf("StringifyFuncDecl panicked (may be expected due to logger.Fatal): %v", r)
-		}
-	}()
+	// Test StringifyFuncDecl
+	result, err := StringifyFuncDecl(funcDecl)
+	if err != nil {
+		t.Errorf("StringifyFuncDecl returned error: %v", err)
+		return
+	}
 
-	result := StringifyFuncDecl(funcDecl)
 	if result == "" {
 		t.Error("StringifyFuncDecl should return non-empty result for valid function")
 	}

@@ -1,6 +1,7 @@
 package builder_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,7 +72,7 @@ func TestBuilder_initDirs(t *testing.T) {
 			}
 
 			// Test directory creation through Compile method with noBuild=true
-			err := bldr.Compile(true)
+			err := bldr.Compile(context.Background(), true)
 			if testCase.wantErr {
 				require.Error(t, err)
 			} else {
@@ -258,14 +259,14 @@ func TestBuilder_CompileWithSources(t *testing.T) {
 					Build:      "",
 					Package:    "",
 				},
-			}
+		}
 
-			err := bldr.Compile(tt.noBuild)
-			if tt.wantErr {
-				assert.Error(t, err, "Expected error for test case: %s", tt.name)
-			} else {
-				assert.NoError(t, err, "Unexpected error for test case: %s", tt.name)
-			}
+		err := bldr.Compile(context.Background(), tt.noBuild)
+		if tt.wantErr {
+			assert.Error(t, err, "Expected error for test case: %s", tt.name)
+		} else {
+			assert.NoError(t, err, "Unexpected error for test case: %s", tt.name)
+		}
 		})
 	}
 }
@@ -320,15 +321,15 @@ func TestBuilder_CompileWithHTTPSources(t *testing.T) {
 					Build:      "",
 					Package:    "",
 				},
-			}
+		}
 
-			err := bldr.Compile(tt.noBuild)
-			if tt.wantErr {
-				assert.Error(t, err, "Expected error for test case: %s", tt.name)
-				// Check for error context - the error might not contain the package name directly
-				// but should be a meaningful error message
-				assert.NotEmpty(t, err.Error(), "Error message should not be empty")
-			} else {
+		err := bldr.Compile(context.Background(), tt.noBuild)
+		if tt.wantErr {
+			assert.Error(t, err, "Expected error for test case: %s", tt.name)
+			// Check for error context - the error might not contain the package name directly
+			// but should be a meaningful error message
+			assert.NotEmpty(t, err.Error(), "Error message should not be empty")
+		} else {
 				assert.NoError(t, err, "Unexpected error for test case: %s", tt.name)
 			}
 		})
@@ -390,14 +391,14 @@ func TestBuilder_Compile(t *testing.T) {
 					Build:     testCase.build,
 					Package:   testCase.pkg,
 				},
-			}
+		}
 
-			err := bldr.Compile(testCase.noBuild)
-			if testCase.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
+		err := bldr.Compile(context.Background(), testCase.noBuild)
+		if testCase.wantErr {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+		}
 
 			// Verify source directory was created
 			_, err = os.Stat(sourceDir)
@@ -421,7 +422,7 @@ func TestBuilder_CompileWithFailingInitDirs(t *testing.T) {
 		},
 	}
 
-	err := bldr.Compile(false)
+	err := bldr.Compile(context.Background(), false)
 	require.Error(t, err)
 	assert.Contains(t, strings.ToLower(err.Error()), "failed to initialize directories")
 }
@@ -446,7 +447,7 @@ func TestBuilder_CompileErrorContexts(t *testing.T) {
 		},
 	}
 
-	err := bldr.Compile(false)
+	err := bldr.Compile(context.Background(), false)
 	require.Error(t, err)
 
 	// The error message format may vary, so let's check the actual error structure
