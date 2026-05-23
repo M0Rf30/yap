@@ -261,12 +261,24 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 // libavcodec.so has DT_NEEDED entries for libvpx.so / libx264.so which
 // come from sibling packages (carbonio-libvpx, carbonio-x264) the
 // PKGBUILD did not declare.
-func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch string) error {
+func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
+	ctx context.Context,
+	deps []string,
+	targetArch string,
+) error {
 	if bb.Format != constants.FormatDEB {
 		// Non-DEB formats: fall back to normal install (no cross-arch conflict).
+		// RPM/APK/Pacman don't have a multiarch install story like dpkg, so we
+		// don't do the download+extract dance — we just let the native package
+		// manager install the deps as if it were a host build.
+		logger.Info("cross-build deps: using native install (no closure extract)",
+			"format", bb.Format,
+			"target_arch", targetArch,
+			"deps", len(deps))
+
 		installArgs := constants.GetInstallArgs(bb.Format)
 
-		return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, deps)
+		return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, deps)
 	}
 
 	// Use the extract-safe partitioning: since we download+extract (not dpkg -i),
@@ -280,11 +292,16 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(deps []string, targetArch str
 	seeds = append(seeds, qualified...)
 
 	if len(seeds) == 0 {
+		logger.Info("cross-build deps: no runtime deps to fetch",
+			"target_arch", targetArch)
+
 		return nil
 	}
 
 	logger.Info("fetching cross-build runtime deps",
 		"target_arch", targetArch,
+		"arch_specific_count", len(qualified),
+		"arch_all_count", len(archAll),
 		"arch_specific", strings.Join(qualified, ", "),
 		"arch_all", strings.Join(archAll, ", "))
 
@@ -379,25 +396,32 @@ func countDirect(resolved []*aptcache.PackageInfo, seedSet map[string]bool) int 
 // arch-specific (target-arch) packages are installed — this satisfies
 // transitive dependencies that arch-specific packages may have on arch-all
 // packages (e.g. carbonio-openldap:arm64 → carbonio-core which is arch:all).
-func (bb *BaseBuilder) installCrossDeps(makeDepends, installArgs []string, targetArch string) error {
+func (bb *BaseBuilder) installCrossDeps(
+	ctx context.Context,
+	makeDepends,
+	installArgs []string,
+	targetArch string,
+) error {
 	archSpecific, archAll := partitionArchAllDeps(makeDepends)
 	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
 
 	logger.Info("Qualifying makedepends for target architecture",
 		"target_arch", targetArch,
 		"format", bb.Format,
+		"arch_specific_count", len(qualified),
+		"arch_all_count", len(archAll),
 		"arch_specific", strings.Join(qualified, ", "),
 		"arch_all", strings.Join(archAll, ", "))
 
 	// Install arch-all (host) packages first so they are available to
 	// satisfy transitive dependencies of the target-arch packages.
 	if len(archAll) > 0 {
-		if err := bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, archAll); err != nil {
+		if err := bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, archAll); err != nil {
 			return err
 		}
 	}
 
-	return bb.PKGBUILD.GetDepends(getPackageManager(bb.Format), installArgs, qualified)
+	return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, qualified)
 }
 
 // ensureCrossArchRepo registers the foreign architecture (dpkg
@@ -438,9 +462,14 @@ func (bb *BaseBuilder) getCrossCompilerDependencies(targetArch string) []string 
 	return (&toolchain).GetAllPackages()
 }
 
-// handleCrossCompilation handles cross-compilation setup including validation and dependency collection.
-// This helper reduces nesting complexity in PrepareEnvironmentWithValidation.
-func (bb *BaseBuilder) handleCrossCompilation(targetArch string, skipValidation bool, allArgs *[]string) error {
+// handleCrossCompilation handles cross-compilation setup including validation
+// and dependency collection. This helper reduces nesting complexity in
+// prepareEnvironmentWithValidation.
+func (bb *BaseBuilder) handleCrossCompilation(
+	targetArch string,
+	skipValidation bool,
+	deps *[]string,
+) error {
 	logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
 		"target_arch", targetArch,
 		"build_arch", bb.PKGBUILD.ArchComputed)
@@ -457,12 +486,14 @@ func (bb *BaseBuilder) handleCrossCompilation(targetArch string, skipValidation 
 	// Add cross-compilation dependencies
 	crossDeps := bb.getCrossCompilerDependencies(targetArch)
 	if len(crossDeps) > 0 {
-		logger.Info(i18n.T("logger.cross_compilation.installing_cross_compiler_packages"),
+		logger.Info(
+			i18n.T(
+				"logger.cross_compilation.installing_cross_compiler_packages"),
 			"target_arch", targetArch,
 			"packages", strings.Join(crossDeps, ", "))
 	}
 
-	*allArgs = append(*allArgs, crossDeps...)
+	*deps = append(*deps, crossDeps...)
 
 	return nil
 }

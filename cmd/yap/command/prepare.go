@@ -83,6 +83,8 @@ var (
 			err = packageManager.PrepareEnvironment(GoLang, TargetArch)
 			if err != nil {
 				logger.Error(err.Error())
+
+				return
 			}
 
 			logger.Info(i18n.T("logger.unknown.info.basic_build_environment_successfully_1"))

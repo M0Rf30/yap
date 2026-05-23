@@ -346,7 +346,7 @@ func (mpc *MultipleProject) installRuntimeDeps(runtimeDepends []string) error {
 		return mpc.packageManager.Prepare(runtimeDepends, mpc.Opts.TargetArch)
 	}
 
-	return extractor.DownloadAndExtractCrossDeps(runtimeDepends, mpc.Opts.TargetArch)
+	return extractor.DownloadAndExtractCrossDeps(context.Background(), runtimeDepends, mpc.Opts.TargetArch)
 }
 
 // applyJSONDefaults merges yap.json fields into BuildOptions.
@@ -990,6 +990,11 @@ func (mpc *MultipleProject) getRuntimeDeps() []string {
 	internalPackages := make(map[string]bool)
 	for _, proj := range source {
 		internalPackages[proj.Builder.PKGBUILD.PkgName] = true
+		// Also register all split-package names so that sibling packages
+		// declared in the same PKGBUILD are not treated as external deps.
+		for _, name := range proj.Builder.PKGBUILD.PkgNames {
+			internalPackages[name] = true
+		}
 	}
 
 	// Use a map to track unique dependencies and prevent duplicates

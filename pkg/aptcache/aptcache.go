@@ -168,6 +168,24 @@ func (c *Cache) Lookup(name string) (PackageInfo, bool) {
 	return *p, true
 }
 
+// PackageCount returns the number of packages indexed in the cache. Useful for
+// diagnostic logging after a Reload to surface how many entries were parsed.
+func (c *Cache) PackageCount() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return len(c.entries)
+}
+
+// CapabilityCount returns the number of virtual package names (Provides) in
+// the providers index.
+func (c *Cache) CapabilityCount() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return len(c.providers)
+}
+
 // ResolveVirtual returns the first concrete provider of a virtual package, or
 // the original name if the package is real (has a candidate) or unknown.
 // This replaces the `apt-cache policy` + `apt-cache showpkg` two-step.

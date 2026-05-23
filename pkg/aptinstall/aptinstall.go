@@ -177,7 +177,15 @@ func resolveAndPrepare(
 		return nil, "", nil, nil
 	}
 
-	logger.Info("resolved dependencies", "count", len(pkgs))
+	var totalBytes int64
+	for _, p := range pkgs {
+		totalBytes += p.Size
+	}
+
+	logger.Info("aptinstall: resolved dependencies",
+		"seeds", len(names),
+		"to_install", len(pkgs),
+		"total_bytes", totalBytes)
 
 	tmpDir, err = os.MkdirTemp("", "yap-aptinstall-*")
 	if err != nil {
@@ -321,20 +329,40 @@ func installPackage(
 			WithOperation("installPackage")
 	}
 
-	if err := runMaintainerScript(
+	// postinst failures are non-fatal: match dpkg's behaviour where a
+	// configure failure leaves the package in "install ok unpacked" state
+	// (files extracted, but not marked configured). The build can still
+	// proceed and a user can run `dpkg --configure -a` later to retry.
+	// Real-world offenders: man-db (update-mandb wants a usable /proc),
+	// debconf-driven scripts that hit unconfigured tty, packages that
+	// shell out to systemctl in a container without systemd.
+	postinstErr := runMaintainerScript(
 		ctx, "postinst", pkgName, arch, contents, oldVersion,
-	); err != nil {
-		return err
+	)
+
+	finalState := "install ok installed"
+
+	if postinstErr != nil {
+		logger.Warn("postinst failed; leaving package unpacked but not configured",
+			"package", pkgName,
+			"arch", arch,
+			"error", postinstErr,
+			"hint", "run `dpkg --configure -a` after install to retry")
+
+		finalState = "install ok unpacked"
 	}
 
-	// Update dpkg status (fully installed).
-	if err := updateDpkgStatusForPackage(pkgName, arch, contents.Control, "install ok installed"); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "update dpkg status (installed)").
+	if err := updateDpkgStatusForPackage(pkgName, arch, contents.Control, finalState); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "update dpkg status (final)").
 			WithContext("package", pkgName).
 			WithOperation("installPackage")
 	}
 
-	logger.Info("installed", "package", pkgName, "arch", arch)
+	if postinstErr == nil {
+		logger.Info("installed", "package", pkgName, "arch", arch)
+	} else {
+		logger.Info("installed (unconfigured)", "package", pkgName, "arch", arch)
+	}
 
 	return nil
 }

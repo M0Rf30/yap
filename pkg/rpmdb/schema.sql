@@ -10,3 +10,11 @@ CREATE TABLE Name (
 );
 
 CREATE INDEX nameindex ON Name (name ASC);
+
+CREATE TABLE Providename (
+    key TEXT NOT NULL,
+    hnum INTEGER NOT NULL REFERENCES Packages(hnum),
+    idx INTEGER NOT NULL
+);
+
+CREATE INDEX providenameindex ON Providename (key ASC);

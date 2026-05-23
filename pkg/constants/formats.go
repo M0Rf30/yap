@@ -107,7 +107,19 @@ func GetInstallArgs(format string) []string {
 	case FormatAPK:
 		return []string{"add", "--allow-untrusted"}
 	case FormatDEB:
-		return []string{"--allow-downgrades", "--assume-yes", "--no-install-recommends", installArg}
+		// --allow-unauthenticated lets apt install packages from repos whose
+		// Release file lacks a valid signature against the trust set (e.g.
+		// --repo extras added at runtime). Without it, apt aborts with
+		// "E: There were unauthenticated packages and -y was used without
+		// --allow-unauthenticated" the moment a single dep comes from an
+		// unsigned source.
+		return []string{
+			"--allow-downgrades",
+			"--allow-unauthenticated",
+			"--assume-yes",
+			"--no-install-recommends",
+			installArg,
+		}
 	case FormatRPM:
 		return []string{"-y", installArg}
 	case FormatPacman:

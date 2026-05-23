@@ -140,3 +140,12 @@ func (d *DB) FilterInstalled(ctx context.Context, names []string) []string {
 func (d *DB) ListInstalled(ctx context.Context) ([]string, error) {
 	return d.queries.ListInstalledNames(ctx)
 }
+
+// ListInstalledProvides returns the set of capabilities (Provides) currently
+// satisfied by installed packages. Includes virtual package names like
+// "coreutils" provided by "coreutils-single" on minimal images.
+func (d *DB) ListInstalledProvides(
+	ctx context.Context,
+) ([]string, error) {
+	return d.queries.ListInstalledProvides(ctx)
+}
