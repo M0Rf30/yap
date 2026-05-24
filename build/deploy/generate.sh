@@ -130,7 +130,7 @@ ENV PATH="/usr/lib/ccache:\${PATH}"
 RUN userdel -r ubuntu 2>/dev/null || true && \\
     groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 APT
 }
@@ -156,7 +156,7 @@ RUN apt-get update && \\
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 DEB
 }
@@ -176,7 +176,7 @@ RUN dnf -y update && \\
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 DNF
 }
@@ -207,7 +207,7 @@ ENV PATH="/usr/lib64/ccache:\${PATH}"
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 ROCKY
 }
@@ -226,7 +226,7 @@ RUN yum -y update && yum -y install \\
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 YUM
 }
@@ -244,7 +244,7 @@ RUN zypper -n update && zypper -n install \\
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 ZYPPER
 }
@@ -262,7 +262,7 @@ RUN pacman -Syu --noconfirm && pacman -S --noconfirm \\
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 PACMAN
 }
@@ -280,7 +280,7 @@ RUN apk add --no-cache \\
 # Create non-root user
 RUN addgroup -g 1000 yap && \\
     adduser -D -u 1000 -G yap -s /bin/bash yap && \\
-    echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 APK
 }
