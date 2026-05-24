@@ -101,6 +101,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive
+ENV YAP_IN_CONTAINER=1
 
 # Preseed debconf to prevent resolvconf postinst failure in containers
 RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
@@ -130,7 +131,7 @@ ENV PATH="/usr/lib/ccache:\${PATH}"
 RUN userdel -r ubuntu 2>/dev/null || true && \\
     groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 APT
 }
@@ -143,6 +144,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive
+ENV YAP_IN_CONTAINER=1
 
 # Install minimal runtime dependencies
 RUN apt-get update && \\
@@ -153,10 +155,12 @@ RUN apt-get update && \\
     apt-get clean && \\
     rm -rf /var/lib/apt/lists/*
 
+ENV YAP_IN_CONTAINER=1
+
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 DEB
 }
@@ -173,10 +177,12 @@ RUN dnf -y update && \\
         sudo && \\
     dnf clean all && rm -rf /var/cache/dnf
 
+ENV YAP_IN_CONTAINER=1
+
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 DNF
 }
@@ -204,10 +210,12 @@ RUN dnf -y update && \\
 # placing that directory first in PATH wraps gcc/g++ transparently.
 ENV PATH="/usr/lib64/ccache:\${PATH}"
 
+ENV YAP_IN_CONTAINER=1
+
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 ROCKY
 }
@@ -223,10 +231,12 @@ RUN yum -y update && yum -y install \\
     sudo && \\
     yum clean all && rm -rf /var/cache/yum
 
+ENV YAP_IN_CONTAINER=1
+
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 YUM
 }
@@ -241,10 +251,12 @@ RUN zypper -n update && zypper -n install \\
     sudo && \\
     zypper clean -a
 
+ENV YAP_IN_CONTAINER=1
+
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 ZYPPER
 }
@@ -259,10 +271,12 @@ RUN pacman -Syu --noconfirm && pacman -S --noconfirm \\
     sudo && \\
     rm -rf /var/cache/pacman/pkg/*
 
+ENV YAP_IN_CONTAINER=1
+
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 PACMAN
 }
@@ -277,10 +291,12 @@ RUN apk add --no-cache \\
     ca-certificates \\
     sudo
 
+ENV YAP_IN_CONTAINER=1
+
 # Create non-root user
 RUN addgroup -g 1000 yap && \\
     adduser -D -u 1000 -G yap -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 APK
 }

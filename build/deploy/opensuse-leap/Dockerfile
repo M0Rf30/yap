@@ -60,10 +60,12 @@ RUN zypper -n update && zypper -n install \
     sudo && \
     zypper clean -a
 
+ENV YAP_IN_CONTAINER=1
+
 # Create non-root user
 RUN groupadd -g 1000 yap && \
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/zypper' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/zypper' >> /etc/sudoers
 
 # Copy binary and completion from builder
 COPY --from=builder /usr/bin/yap /usr/bin/yap

@@ -58,6 +58,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive
+ENV YAP_IN_CONTAINER=1
 
 # Install minimal runtime dependencies
 RUN apt-get update && \
@@ -68,10 +69,12 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+ENV YAP_IN_CONTAINER=1
+
 # Create non-root user
 RUN groupadd -g 1000 yap && \
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER"' >> /etc/sudoers && echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /usr/bin/apt-get' >> /etc/sudoers
 
 # Copy binary and completion from builder
 COPY --from=builder /usr/bin/yap /usr/bin/yap
