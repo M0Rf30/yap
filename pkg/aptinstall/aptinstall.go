@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
@@ -211,7 +210,11 @@ func resolveAndPrepare(
 
 	pkgNames := make([]string, 0, len(pkgs))
 	for _, p := range pkgs {
-		pkgNames = append(pkgNames, p.Name)
+		if p.Architecture == "" || p.Architecture == "all" {
+			pkgNames = append(pkgNames, p.Name)
+		} else {
+			pkgNames = append(pkgNames, p.Name+":"+p.Architecture)
+		}
 	}
 
 	if err := cache.Download(ctx, tmpDir, pkgNames); err != nil {
@@ -431,36 +434,15 @@ func runMaintainerScript(
 	return nil
 }
 
-// goarchToDebArch maps Go's GOARCH values to Debian architecture names.
-func goarchToDebArch() string {
-	switch runtime.GOARCH {
-	case "amd64":
-		return "amd64"
-	case "arm64":
-		return "arm64"
-	case "arm":
-		return "armhf"
-	case "386":
-		return "i386"
-	case "ppc64le":
-		return "ppc64el"
-	case "s390x":
-		return "s390x"
-	default:
-		return runtime.GOARCH
-	}
-}
-
 // filterForeignArchPackages removes packages from the list that are foreign-arch
-// and not Multi-Arch: same. These are spuriously pulled in by ResolveDeps when
-// the apt cache has arm64 entries overwriting amd64 entries (last-writer-wins),
-// causing the transitive resolver to follow arm64 deps and include non-executable
-// foreign binaries (e.g. gcc:arm64 on an amd64 host).
+// and not Multi-Arch: same.
 //
-// Multi-Arch: same packages (dev libraries) are kept because they are
-// legitimately installed for the foreign arch alongside the host-arch version.
+// WITH the arch-aware cache (name:arch keys + ResolveDeps arch inheritance),
+// this function now acts as a safety net rather than the primary fix. It
+// catches any remaining foreign-arch packages that slipped through (e.g.
+// packages where the seed explicitly requested the foreign arch).
 func filterForeignArchPackages(pkgs []*aptcache.PackageInfo) []*aptcache.PackageInfo {
-	hostArch := goarchToDebArch()
+	hostArch := aptcache.GoarchToDebArch()
 
 	filtered := pkgs[:0]
 

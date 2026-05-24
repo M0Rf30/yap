@@ -79,9 +79,12 @@ type PackageInfo struct {
 	PreDepends []string
 }
 
+// archAll is the Debian "Architecture: all" constant.
+const archAll = "all"
+
 // ArchitectureAll reports whether the package is architecture-independent.
 func (p PackageInfo) ArchitectureAll() bool { //nolint:gocritic
-	return strings.EqualFold(p.Architecture, "all")
+	return strings.EqualFold(p.Architecture, archAll)
 }
 
 // MultiArchForeign reports whether a single host-arch copy of this package
@@ -165,6 +168,39 @@ func NewEmptyCache() *Cache {
 	}
 }
 
+// GoarchToDebArch returns the Debian architecture name for the current
+// runtime.GOARCH. Used by Lookup and ResolveDeps to default to the host
+// architecture during multi-arch resolution.
+func GoarchToDebArch() string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return "amd64"
+	case "arm64":
+		return "arm64"
+	case "arm":
+		return "armhf"
+	case "386":
+		return "i386"
+	case "ppc64le":
+		return "ppc64el"
+	case "s390x":
+		return "s390x"
+	default:
+		return runtime.GOARCH
+	}
+}
+
+// entryKey builds the cache-internal key for a package, combining name
+// and architecture. Architecture: all and empty-arch entries are stored
+// under the bare name for backward compatibility.
+func entryKey(name, arch string) string {
+	if arch == "" || arch == archAll {
+		return name
+	}
+
+	return name + ":" + arch
+}
+
 // AddEntry inserts or replaces a PackageInfo entry in the cache.
 // Intended for test setup; not safe for concurrent use during population.
 func (c *Cache) AddEntry(info *PackageInfo) {
@@ -172,7 +208,7 @@ func (c *Cache) AddEntry(info *PackageInfo) {
 	defer c.mu.Unlock()
 
 	cp := *info
-	c.entries[info.Name] = &cp
+	c.entries[entryKey(info.Name, info.Architecture)] = &cp
 }
 
 // StoreGlobal replaces the process-global cache returned by Load.
@@ -183,17 +219,55 @@ func StoreGlobal(c *Cache) {
 }
 
 // Lookup returns the PackageInfo for the named package and whether it was found.
-// The name must be the bare package name without version constraints or arch qualifiers.
+// The name may include an arch qualifier (e.g., "gcc-11:arm64").
+// Without a qualifier, it tries the host architecture, "all", then any arch.
 func (c *Cache) Lookup(name string) (PackageInfo, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	p, ok := c.entries[name]
-	if !ok {
-		return PackageInfo{}, false
+	// If the name has an explicit arch qualifier, look up the exact key.
+	if idx := strings.IndexByte(name, ':'); idx >= 0 {
+		p, ok := c.entries[name]
+		if ok {
+			return *p, true
+		}
+		// Fall through to try unqualified name.
+		name = name[:idx]
 	}
 
-	return *p, true
+	// Try bare name (for arch:all, empty-arch, or old-style entries).
+	p, ok := c.entries[name]
+	if ok {
+		return *p, true
+	}
+
+	// Try host arch.
+	hostKey := name + ":" + GoarchToDebArch()
+
+	p, ok = c.entries[hostKey]
+	if ok {
+		return *p, true
+	}
+
+	// Try "all" arch.
+	allKey := name + ":all"
+
+	p, ok = c.entries[allKey]
+	if ok {
+		return *p, true
+	}
+
+	// Last resort: scan for any entry matching name:*.
+	// This handles edge cases where a package only exists for a foreign
+	// architecture (e.g. a test or cross-build situation with arm64-only
+	// packages on an amd64 host).
+	for key, candidate := range c.entries {
+		if bare, _, has := strings.Cut(key, ":"); has && bare == name {
+			return *candidate, true
+		}
+	}
+
+	return PackageInfo{}, false
 }
 
 // PackageCount returns the number of packages indexed in the cache. Useful for
@@ -221,9 +295,19 @@ func (c *Cache) ResolveVirtual(name string) string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	// If the package has a real candidate in the index, it is not virtual.
-	if p, ok := c.entries[name]; ok && p.HasCandidate {
-		return name
+	// Try name as-is, then with host arch, then with "all" arch.
+	candidates := []string{name, name + ":" + GoarchToDebArch(), name + ":all"}
+	for _, key := range candidates {
+		if p, ok := c.entries[key]; ok && p.HasCandidate {
+			return name
+		}
+		// If the key has an explicit arch qualifier, also try bare name.
+		if strings.Contains(key, ":") {
+			bare, _, _ := strings.Cut(key, ":")
+			if p, ok := c.entries[bare]; ok && p.HasCandidate {
+				return name
+			}
+		}
 	}
 
 	// Look up the reverse-provides index.
@@ -243,8 +327,12 @@ func (c *Cache) ResolveVirtual(name string) string {
 // still traversed for completeness, but the package itself is not added to
 // the install list).
 //
-// Implementation: post-order DFS keyed by package name. Cycles are
-// short-circuited via the `seen` map (set before recursion). Go's growable
+// Seeds may include an arch qualifier ("libc6-dev:arm64"). The arch is
+// preserved and inherited by all transitive dependencies, ensuring correct
+// multi-arch resolution when both amd64 and arm64 indexes are loaded.
+//
+// Implementation: post-order DFS keyed by package name:arch. Cycles are
+// short-circuited via the `visited` map (set before recursion). Go's growable
 // goroutine stack handles real-world Debian dep depths (typically <20)
 // comfortably; an iterative variant would only be worth the complexity for
 // a pathologically deep graph.
@@ -252,29 +340,32 @@ func (c *Cache) ResolveDeps(seeds []string) ([]*PackageInfo, []string, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	seen := make(map[string]bool)
+	visited := make(map[string]bool)
 
 	var (
 		order []*PackageInfo
 		unres []string
 	)
 
-	// Create a visitor function that captures seen, order, and unres.
-	visitor := c.makeDepVisitor(seen, &order, &unres)
+	// Create a visitor function that captures visited, order, and unres.
+	visitor := c.makeDepVisitor(visited, &order, &unres)
 
 	for _, seed := range seeds {
 		seed = strings.TrimSpace(seed)
 
-		// Strip arch qualifier and version constraint.
+		// Split off arch qualifier but preserve it.
+		arch := ""
 		if i := strings.Index(seed, ":"); i >= 0 {
+			arch = seed[i+1:]
 			seed = seed[:i]
 		}
 
+		// Strip version constraint "(>= 1.0)".
 		if i := strings.Index(seed, "("); i >= 0 {
 			seed = strings.TrimSpace(seed[:i])
 		}
 
-		if err := visitor(seed); err != nil {
+		if err := visitor(seed, arch); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -282,24 +373,61 @@ func (c *Cache) ResolveDeps(seeds []string) ([]*PackageInfo, []string, error) {
 	return order, unres, nil
 }
 
-// makeDepVisitor creates a closure that performs DFS traversal for dependency resolution.
-// The closure captures seen, order, and unres to track visited packages and results.
-func (c *Cache) makeDepVisitor(seen map[string]bool, order *[]*PackageInfo, unres *[]string) func(string) error {
-	var visit func(name string) error
+// makeDepVisitor creates a closure that performs DFS traversal for dependency
+// resolution. The closure captures visited, order, and unres to track
+// visited packages and results.
+//
+// The returned visitor accepts (name, arch) where arch is the architecture
+// for the target package. Empty arch means "any" (use host arch or --all).
+func (c *Cache) makeDepVisitor(visited map[string]bool, order *[]*PackageInfo, unres *[]string,
+) func(string, string) error {
+	var visit func(name, arch string) error
 
-	visit = func(name string) error {
+	visit = func(name, arch string) error {
 		name = strings.TrimSpace(name)
-		if name == "" || seen[name] {
+		if name == "" {
 			return nil
 		}
 
-		seen[name] = true
+		// Use host arch if none specified.
+		if arch == "" {
+			arch = GoarchToDebArch()
+		}
 
-		info, ok := c.entries[name]
+		// Build the cache lookup key.
+		key := entryKey(name, arch)
+
+		if visited[key] {
+			return nil
+		}
+
+		visited[key] = true
+
+		info, ok := c.entries[key]
+		if !ok {
+			// Fall back to bare name (arch:all or backward compat).
+			info, ok = c.entries[name]
+		}
+
+		if !ok {
+			// Fall back to host arch. This handles the case where
+			// qualifyDepsForTargetArch added :arm64 to a host-only package
+			// like gcc-aarch64-linux-gnu (which has no arm64 variant).
+			hostKey := name + ":" + GoarchToDebArch()
+			info, ok = c.entries[hostKey]
+		}
+
+		if !ok {
+			// Last resort: scan for any entry matching name:*.
+			// Handles edge cases where a package only exists for a foreign
+			// arch (test scenarios, cross-build with arm64-only packages).
+			info, ok = c.scanEntryByName(name)
+		}
+
 		if !ok {
 			// Try virtual resolution.
 			if resolved := c.tryResolveVirtual(name); resolved != "" {
-				return visit(resolved)
+				return visit(resolved, arch)
 			}
 
 			*unres = append(*unres, name)
@@ -307,8 +435,16 @@ func (c *Cache) makeDepVisitor(seen map[string]bool, order *[]*PackageInfo, unre
 			return nil
 		}
 
-		// Recurse on dependencies.
-		if err := c.visitDeps(info, visit); err != nil {
+		// If the found package has a different architecture than the requested
+		// one (e.g., found arm64 entry when requesting amd64), use the actual
+		// package's architecture for child dependencies so transitive deps
+		// resolve to the correct arch.
+		if info.Architecture != "" && info.Architecture != arch && info.Architecture != archAll {
+			arch = info.Architecture
+		}
+
+		// Recurse on dependencies, inheriting the architecture.
+		if err := c.visitDeps(info, arch, visit); err != nil {
 			return err
 		}
 
@@ -333,19 +469,37 @@ func (c *Cache) tryResolveVirtual(name string) string {
 	return ""
 }
 
+// scanEntryByName performs a linear scan of the cache entries looking for any
+// package whose name (after stripping the arch qualifier) matches the given
+// name. Returns the first match and true, or nil and false if none found.
+//
+// This is an O(n) scan and should only be used as a last-resort fallback when
+// the targeted name:arch and bare-name lookups have already failed.
+func (c *Cache) scanEntryByName(name string) (*PackageInfo, bool) {
+	for k, candidate := range c.entries {
+		if bare, _, has := strings.Cut(k, ":"); has && bare == name {
+			return candidate, true
+		}
+	}
+
+	return nil, false
+}
+
 // visitDeps recursively visits all dependencies of a package.
+// The arch parameter is inherited by all child dependencies so that
+// multi-arch resolution is consistent through the dependency graph.
 // Handles both installed and uninstalled packages appropriately.
-func (c *Cache) visitDeps(info *PackageInfo, visit func(string) error) error {
+func (c *Cache) visitDeps(info *PackageInfo, arch string, visit func(string, string) error) error {
 	// Always visit Pre-Depends.
 	for _, d := range info.PreDepends {
-		if err := visit(d); err != nil {
+		if err := visit(d, arch); err != nil {
 			return err
 		}
 	}
 
 	// Always visit Depends.
 	for _, d := range info.Depends {
-		if err := visit(d); err != nil {
+		if err := visit(d, arch); err != nil {
 			return err
 		}
 	}
@@ -979,7 +1133,7 @@ func mergeEntryFields(existing, info *PackageInfo) {
 		// would replace archive.ubuntu.com with ports.ubuntu.com, causing
 		// the host-arch install of arch-all tools (patch, autoconf, …) to
 		// pull arm64 debs and overwrite host binaries.
-		if info.BaseURL != "" && info.Architecture != "" && info.Architecture != "all" {
+		if info.BaseURL != "" && info.Architecture != "" && info.Architecture != archAll {
 			existing.BaseURL = info.BaseURL
 		}
 	}
@@ -1186,7 +1340,9 @@ func applyIndexField(s *stanza, field, value string, dpkgStatus bool) {
 	}
 }
 
-// flushStanza merges a completed stanza into the cache.
+// flushStanza merges a completed stanza into the cache using an
+// architecture-qualified key (name:arch) to prevent arm64 entries from
+// overwriting amd64 entries when both repositories are loaded.
 // Delegates field merging to mergePackageInfo helper.
 func (c *Cache) flushStanza(s *stanza, dpkgStatus bool) {
 	if s.pkgName == "" {
@@ -1196,10 +1352,12 @@ func (c *Cache) flushStanza(s *stanza, dpkgStatus bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	existing, ok := c.entries[s.pkgName]
+	key := entryKey(s.pkgName, s.arch)
+
+	existing, ok := c.entries[key]
 	if !ok {
 		existing = &PackageInfo{}
-		c.entries[s.pkgName] = existing
+		c.entries[key] = existing
 	}
 
 	mergePackageInfo(existing, s, dpkgStatus)
@@ -1360,7 +1518,11 @@ func (c *Cache) DownloadClosure(
 
 	names := make([]string, 0, len(resolved))
 	for _, p := range resolved {
-		names = append(names, p.Name)
+		if p.Architecture == "" || p.Architecture == archAll {
+			names = append(names, p.Name)
+		} else {
+			names = append(names, p.Name+":"+p.Architecture)
+		}
 	}
 
 	if err := c.Download(ctx, destDir, names); err != nil {
@@ -1439,8 +1601,12 @@ func (c *Cache) buildDownloadRequests(
 	requests := make([]*grab.Request, 0, len(pkgs))
 
 	for _, pkg := range pkgs {
-		name, _, _ := strings.Cut(pkg, ":")
-		name, _, _ = strings.Cut(name, " (")
+		name := pkg
+		// Strip version constraint "(>= 1.0)" but preserve any arch qualifier.
+		if i := strings.Index(name, "("); i >= 0 {
+			name = strings.TrimSpace(name[:i])
+		}
+
 		name = strings.TrimSpace(name)
 
 		info, ok := c.Lookup(name)
