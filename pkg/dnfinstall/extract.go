@@ -85,7 +85,16 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 
 	var files []installedFile
 
-	hardlinkSources := make(map[uint64]string)
+	// hardlinkData tracks the path of the data-bearing entry per inode.
+	// hardlinkPlaceholders collects paths of hardlink-only entries seen
+	// before the data entry, so they can be linked once data is written.
+	// CPIO payload ordering is arbitrary: any entry may carry the file
+	// content while others (IsLink) are zero-length hardlink references.
+	// The old single-placeholder approach failed when 3+ hardlinks shared
+	// the same inode — subsequent IsLink entries tried to link to an
+	// un-written placeholder instead of queuing.
+	hardlinkData := make(map[uint64]string)
+	hardlinkPlaceholders := make(map[uint64][]string)
 
 	for {
 		if err := ctx.Err(); err != nil {
@@ -153,27 +162,28 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 
 		case rpmTypeReg, 0:
 			if pr.IsLink() {
-				// Hardlink with no contents — record placeholder; the last
-				// file in the link group carries the bytes.
-				if src, ok := hardlinkSources[inodeKey]; ok {
-					if err := makeHardlink(src, targetPath); err != nil {
+				if data, ok := hardlinkData[inodeKey]; ok {
+					// Data already written — create hardlink now.
+					if err := makeHardlink(data, targetPath); err != nil {
 						return nil, err
 					}
 				} else {
-					hardlinkSources[inodeKey] = targetPath
+					// Data not yet seen — queue for later linking.
+					hardlinkPlaceholders[inodeKey] = append(hardlinkPlaceholders[inodeKey], targetPath)
 				}
 			} else {
 				if err := writeRegularFile(pr, targetPath, perm); err != nil {
 					return nil, err
 				}
 
-				if placeholder, ok := hardlinkSources[inodeKey]; ok && placeholder != targetPath {
+				hardlinkData[inodeKey] = targetPath
+
+				// Link queued placeholders to the newly written data file.
+				for _, placeholder := range hardlinkPlaceholders[inodeKey] {
 					if err := makeHardlink(targetPath, placeholder); err != nil {
 						return nil, err
 					}
 				}
-
-				hardlinkSources[inodeKey] = targetPath
 			}
 
 		default:
