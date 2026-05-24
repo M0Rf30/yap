@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
@@ -178,6 +179,15 @@ func resolveAndPrepare(
 			fmt.Sprintf("unresolvable packages: %v", unresolved)).
 			WithOperation("Install")
 	}
+
+	// Filter out foreign-arch packages that are not Multi-Arch: same.
+	// The cache uses unqualified names as keys, so when both amd64 and arm64
+	// indexes are loaded the arm64 entry can overwrite the amd64 one.
+	// ResolveDeps then follows arm64 transitive deps (e.g. gcc:arm64) and
+	// adds them to the install list even though they are not executable on
+	// the host. Multi-Arch: same packages (dev libraries) are intentionally
+	// kept because they are legitimately installed for the foreign arch.
+	pkgs = filterForeignArchPackages(pkgs)
 
 	if len(pkgs) == 0 {
 		return nil, "", nil, nil
@@ -419,6 +429,63 @@ func runMaintainerScript(
 	}
 
 	return nil
+}
+
+// goarchToDebArch maps Go's GOARCH values to Debian architecture names.
+func goarchToDebArch() string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return "amd64"
+	case "arm64":
+		return "arm64"
+	case "arm":
+		return "armhf"
+	case "386":
+		return "i386"
+	case "ppc64le":
+		return "ppc64el"
+	case "s390x":
+		return "s390x"
+	default:
+		return runtime.GOARCH
+	}
+}
+
+// filterForeignArchPackages removes packages from the list that are foreign-arch
+// and not Multi-Arch: same. These are spuriously pulled in by ResolveDeps when
+// the apt cache has arm64 entries overwriting amd64 entries (last-writer-wins),
+// causing the transitive resolver to follow arm64 deps and include non-executable
+// foreign binaries (e.g. gcc:arm64 on an amd64 host).
+//
+// Multi-Arch: same packages (dev libraries) are kept because they are
+// legitimately installed for the foreign arch alongside the host-arch version.
+func filterForeignArchPackages(pkgs []*aptcache.PackageInfo) []*aptcache.PackageInfo {
+	hostArch := goarchToDebArch()
+
+	filtered := pkgs[:0]
+
+	for _, p := range pkgs {
+		arch := p.Architecture
+		// "all" packages are arch-independent — always keep.
+		if arch == "all" || arch == "" || arch == hostArch {
+			filtered = append(filtered, p)
+			continue
+		}
+
+		// Foreign arch: keep only Multi-Arch: same (co-installable dev libs).
+		if p.MultiArchSame() {
+			filtered = append(filtered, p)
+			continue
+		}
+
+		logger.Debug("aptinstall: skipping foreign-arch non-multiarch package",
+			"package", p.Name,
+			"arch", arch,
+			"multi_arch", p.MultiArch,
+			"host_arch", hostArch)
+	}
+
+	return filtered
 }
 
 // RefreshLDCache runs ldconfig to refresh the dynamic linker cache.
