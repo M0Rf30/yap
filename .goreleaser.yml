@@ -11,7 +11,7 @@ before:
     - go generate ./...
 
 builds:
-  - main: ./cmd/yap/yap.go
+  - main: ./cmd/yap
     env:
       - CGO_ENABLED=0
     goos:
