@@ -1492,7 +1492,7 @@ func (c *Cache) buildDownloadRequests(
 // maxDebBytes caps an individual .deb download. Real Debian packages top
 // out around 500 MB (e.g. texlive-full); 2 GiB is generous head-room while
 // still defending against an unbounded mirror stream.
-const maxDebBytes = 2 << 30
+const maxDebBytes int64 = 2 << 30
 
 // downloadAndVerify downloads a file from pkgURL to destFile and verifies its
 // SHA-256 checksum and size.
