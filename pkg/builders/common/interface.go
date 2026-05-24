@@ -28,8 +28,8 @@ const (
 
 // Ccache environment variable values shared between BuildCcacheEnvSlice and tests.
 const (
-	ccacheEnvCC         = "CC=ccache gcc"
-	ccacheEnvCXX        = "CXX=ccache g++"
+	ccacheEnvCC         = "CC=gcc"
+	ccacheEnvCXX        = "CXX=g++"
 	ccacheEnvSloppiness = "CCACHE_SLOPPINESS=time_macros,include_file_mtime"
 	ccacheEnvNoHashDir  = "CCACHE_NOHASHDIR=1"
 )
@@ -507,6 +507,12 @@ func (bb *BaseBuilder) installRPMDeps(ctx context.Context, deps []string) error 
 // BuildCcacheEnvSlice returns ccache environment variables as a "KEY=VALUE" slice
 // for safe concurrent use. Unlike SetupCcache, it does NOT mutate the process
 // environment (no os.Setenv calls). Returns nil if ccache is not available.
+//
+// CC/CXX are set to bare compiler names (gcc, g++). ccache wrapping is achieved
+// by prepending the ccache symlink directory to PATH, matching the approach used
+// by the cross-compilation path (BuildCrossEnvSlice). This avoids the
+// "CC=ccache gcc" pattern which breaks some autoconf configure scripts that
+// perform word-splitting on $CC in ways that fail with multi-word values.
 func (bb *BaseBuilder) BuildCcacheEnvSlice() []string {
 	// Check if ccache is available in the system using Go's exec.LookPath
 	_, err := exec.LookPath("ccache")
@@ -516,11 +522,10 @@ func (bb *BaseBuilder) BuildCcacheEnvSlice() []string {
 	}
 
 	// Build ccache environment variables as a slice without calling os.Setenv.
-	// CC/CXX are wrapped only when the build is not cross-compiling — for cross
-	// builds SetupCrossCompilationEnvironment runs after this function and
-	// substitutes the bare cross-compiler, relying on the /usr/lib/ccache
-	// (or /usr/lib64/ccache) symlinks to invoke ccache.
-	return []string{
+	// CC/CXX are set to the bare compiler (e.g. CC=gcc). ccache wrapping is
+	// achieved via PATH — we prepend the ccache symlink directory so that
+	// resolving "gcc" finds /usr/lib*/ccache/gcc → /usr/bin/ccache first.
+	vars := []string{
 		ccacheEnvCC,
 		ccacheEnvCXX,
 		"CCACHE_BASEDIR=" + bb.PKGBUILD.StartDir,
@@ -530,6 +535,20 @@ func (bb *BaseBuilder) BuildCcacheEnvSlice() []string {
 		// $HOME/.cache/ccache. Persistent caches (e.g. Kubernetes volumes) mounted
 		// at that path are then shared across builds within the same user account.
 	}
+
+	// Prepend ccache symlink directory to PATH so compilers resolve through
+	// ccache transparently. Check both common locations used by RHEL/Fedora
+	// (/usr/lib64/ccache) and Debian/Ubuntu (/usr/lib/ccache).
+	for _, dir := range []string{"/usr/lib64/ccache", "/usr/lib/ccache"} {
+		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
+			currentPath := os.Getenv("PATH")
+			vars = append(vars, "PATH="+dir+":"+currentPath)
+
+			break
+		}
+	}
+
+	return vars
 }
 
 // PrepareScriptletWithHelpers prepends the PKGBUILD helper function preamble to a scriptlet body.

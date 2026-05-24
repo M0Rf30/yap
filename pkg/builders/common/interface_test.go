@@ -325,8 +325,8 @@ func TestBuildCcacheEnvSlice(t *testing.T) {
 
 	// Verify the expected environment variables are in the slice
 	expectedVars := map[string]bool{
-		"CC=ccache gcc":  false,
-		"CXX=ccache g++": false,
+		"CC=gcc":  false,
+		"CXX=g++": false,
 		"CCACHE_SLOPPINESS=time_macros,include_file_mtime": false,
 		"CCACHE_NOHASHDIR=1": false,
 	}
@@ -401,8 +401,8 @@ func TestBuildCcacheEnvSliceWithRealEnvironment(t *testing.T) {
 
 	// Verify expected environment variables are in the slice
 	expectedVars := map[string]bool{
-		"CC=ccache gcc":  false,
-		"CXX=ccache g++": false,
+		"CC=gcc":  false,
+		"CXX=g++": false,
 		"CCACHE_SLOPPINESS=time_macros,include_file_mtime": false,
 		"CCACHE_NOHASHDIR=1": false,
 	}

@@ -250,6 +250,8 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 	return order, unres, nil
 }
 
+const archNoarch = "noarch"
+
 // newCache allocates an empty Cache.
 func newCache() *Cache {
 	return &Cache{
@@ -262,14 +264,21 @@ func newCache() *Cache {
 // providers index from its Provides list.
 // Must be called with c.mu held (write).
 func (c *Cache) addPackage(p *PackageInfo) {
+	hostArch := goArchToRPM()
+
 	existing, ok := c.packages[p.Name]
-	if !ok || p.LocationHref != "" {
+	switch {
+	case !ok:
+		c.packages[p.Name] = p
+	case existing.LocationHref == "" && p.LocationHref != "":
 		// Prefer entries that are actually downloadable.
-		if !ok {
-			c.packages[p.Name] = p
-		} else if existing.LocationHref == "" && p.LocationHref != "" {
-			c.packages[p.Name] = p
-		}
+		c.packages[p.Name] = p
+	case existing.Arch != p.Arch && p.Arch == hostArch:
+		// Prefer the host architecture entry over a foreign-arch one.
+		c.packages[p.Name] = p
+	case existing.Arch != p.Arch && p.Arch == archNoarch && existing.Arch != hostArch:
+		// Prefer noarch over foreign-arch when no host-arch entry exists.
+		c.packages[p.Name] = p
 	}
 
 	for _, prov := range p.Provides {

@@ -71,26 +71,33 @@ func TestCrossCompilationWithCcache(t *testing.T) {
 				return
 			}
 
-			// Verify ccache is in the slice
-			ccFound := false
-			cxxFound := false
+			// Verify CC/CXX are bare compiler names and PATH has
+			// a ccache symlink dir — consistent with PATH-based approach.
+			ccOk := false
+			cxxOk := false
+			pathCcache := false
 
 			for _, envVar := range ccacheEnv {
-				if strings.HasPrefix(envVar, "CC=") && strings.Contains(envVar, "ccache") {
-					ccFound = true
-				}
-
-				if strings.HasPrefix(envVar, "CXX=") && strings.Contains(envVar, "ccache") {
-					cxxFound = true
+				switch {
+				case strings.HasPrefix(envVar, "CC=gcc"):
+					ccOk = true
+				case strings.HasPrefix(envVar, "CXX=g++"):
+					cxxOk = true
+				case strings.HasPrefix(envVar, "PATH="):
+					pathCcache = strings.Contains(envVar, "/ccache")
 				}
 			}
 
-			if !ccFound {
-				t.Errorf("Expected CC to contain 'ccache' in ccache env slice")
+			if !ccOk {
+				t.Errorf("Expected CC=gcc in ccache env slice, got %v", ccacheEnv)
 			}
 
-			if !cxxFound {
-				t.Errorf("Expected CXX to contain 'ccache' in ccache env slice")
+			if !cxxOk {
+				t.Errorf("Expected CXX=g++ in ccache env slice, got %v", ccacheEnv)
+			}
+
+			if !pathCcache {
+				t.Log("ccache symlink directory not found; PATH not modified")
 			}
 
 			// Now build cross-compilation environment slice
