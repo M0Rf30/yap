@@ -137,10 +137,11 @@ func RunInRootless(distro, workDir string, args []string) error {
 
 	// Set env vars that the re-executed child will read.
 	for k, v := range map[string]string{
-		envExecMode:     "1",
-		envChildRootfs:  rootfs,
-		envChildWorkDir: workDir,
-		envChildArgs:    joinNUL(args),
+		envExecMode:        "1",
+		envChildRootfs:     rootfs,
+		envChildWorkDir:    workDir,
+		envChildArgs:       joinNUL(args),
+		"YAP_IN_CONTAINER": "1",
 	} {
 		if err := os.Setenv(k, v); err != nil {
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set environment variable").

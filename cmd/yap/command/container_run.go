@@ -9,14 +9,50 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
+// cgroupContainerMarkers are substrings in /proc/self/cgroup that indicate
+// we are running inside a container managed by Docker, containerd, or k8s.
+var cgroupContainerMarkers = []string{"docker", "kubepods", "containerd", "lxc"}
+
 // inContainerEnv is set by the container runtime when launching yap inside a
 // container or rootless namespace. Its presence prevents infinite re-dispatch.
 const inContainerEnv = "YAP_IN_CONTAINER"
 
 // IsInsideContainer returns true when the process is already running inside
-// a YAP builder container or rootless namespace.
+// a YAP builder container or rootless namespace, or inside any OCI/Docker
+// container environment (detected via standard indicators).
 func IsInsideContainer() bool {
-	return os.Getenv(inContainerEnv) != ""
+	if os.Getenv(inContainerEnv) != "" {
+		return true
+	}
+
+	// Detect standard container environments so we don't try to re-dispatch
+	// when yap is already running inside a CI container (Docker/Podman/LXC/k8s).
+	if os.Getenv("container") != "" {
+		return true
+	}
+
+	// Kubernetes: service-account token dir is always present in pods.
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		return true
+	}
+
+	// Docker: /.dockerenv is created by the Docker runtime.
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+
+	// Fallback: inspect /proc/self/cgroup for container runtime markers.
+	// This catches containerd/CRI-O k8s pods and Docker when /.dockerenv is absent.
+	if data, err := os.ReadFile("/proc/self/cgroup"); err == nil {
+		content := string(data)
+		for _, marker := range cgroupContainerMarkers {
+			if strings.Contains(content, marker) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // RunCommandInContainer re-invokes the given yap sub-command inside the
