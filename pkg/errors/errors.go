@@ -4,8 +4,9 @@
 package errors
 
 import (
-	"errors"
 	"fmt"
+	"sort"
+	"strings"
 )
 
 // ErrorType represents different categories of errors in the application.
@@ -41,26 +42,45 @@ type YapError struct {
 
 // Error implements the error interface.
 func (e *YapError) Error() string {
-	if e.Cause != nil {
-		return fmt.Sprintf("%s: %s (caused by: %v)", e.Type, e.Message, e.Cause)
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "%s: %s", e.Type, e.Message)
+
+	if e.Operation != "" {
+		fmt.Fprintf(&b, " [op=%s]", e.Operation)
 	}
 
-	return fmt.Sprintf("%s: %s", e.Type, e.Message)
+	if len(e.Context) > 0 {
+		keys := make([]string, 0, len(e.Context))
+		for k := range e.Context {
+			keys = append(keys, k)
+		}
+
+		sort.Strings(keys)
+
+		b.WriteString(" {")
+
+		for i, k := range keys {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+
+			fmt.Fprintf(&b, "%s=%v", k, e.Context[k])
+		}
+
+		b.WriteString("}")
+	}
+
+	if e.Cause != nil {
+		fmt.Fprintf(&b, " (caused by: %v)", e.Cause)
+	}
+
+	return b.String()
 }
 
 // Unwrap returns the underlying cause for error unwrapping.
 func (e *YapError) Unwrap() error {
 	return e.Cause
-}
-
-// Is implements error comparison for errors.Is.
-func (e *YapError) Is(target error) bool {
-	var yerr *YapError
-	if errors.As(target, &yerr) {
-		return e.Type == yerr.Type
-	}
-
-	return false
 }
 
 // WithContext adds context information to the error.

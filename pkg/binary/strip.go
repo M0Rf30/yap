@@ -110,11 +110,31 @@ func ReadBuildID(path string) string {
 	return ""
 }
 
-// SeparateDebugInfo extracts debug information from the binary into a separate
+// lookupEnv returns env[key] if present, otherwise os.Getenv(key).
+// Allows callers to override STRIP/OBJCOPY without mutating the process env.
+func lookupEnv(env map[string]string, key string) string {
+	if env != nil {
+		if v, ok := env[key]; ok {
+			return v
+		}
+	}
+
+	return os.Getenv(key)
+}
+
+// SeparateDebugInfo extracts debug information from the binary using OBJCOPY
+// from os.Getenv. See SeparateDebugInfoWithEnv for the env-overlay variant.
+func SeparateDebugInfo(binary, debugDir string) (string, error) {
+	return SeparateDebugInfoWithEnv(binary, debugDir, nil)
+}
+
+// SeparateDebugInfoWithEnv extracts debug information from the binary into a separate
 // file organized by build-id, then adds a .gnu_debuglink to the original binary.
 // The debug file is stored at <debugDir>/.build-id/<prefix>/<suffix>.debug.
 // Returns the path to the debug file, or empty string if no build-id was found.
-func SeparateDebugInfo(binary, debugDir string) (string, error) {
+// OBJCOPY is read from env (with os.Getenv fallback) to support parallel builds
+// without process-env mutation.
+func SeparateDebugInfoWithEnv(binary, debugDir string, env map[string]string) (string, error) {
 	buildID := ReadBuildID(binary)
 	if buildID == "" || len(buildID) < 3 {
 		return "", nil
@@ -131,8 +151,8 @@ func SeparateDebugInfo(binary, debugDir string) (string, error) {
 
 	debugFile := filepath.Join(debugSubDir, suffix+".debug")
 
-	// Use cross-compilation objcopy if OBJCOPY environment variable is set
-	objcopyCmd := os.Getenv("OBJCOPY")
+	// Use cross-compilation objcopy if OBJCOPY is set (env-map overlay or os.Getenv).
+	objcopyCmd := lookupEnv(env, "OBJCOPY")
 	if objcopyCmd == "" {
 		objcopyCmd = "objcopy"
 	}
@@ -156,21 +176,33 @@ func SeparateDebugInfo(binary, debugDir string) (string, error) {
 // StripFile removes debugging symbols from a binary file.
 // It respects the STRIP environment variable for cross-compilation support.
 func StripFile(path string, args ...string) error {
-	return strip(path, args...)
+	return stripWithEnv(path, nil, args...)
+}
+
+// StripFileWithEnv is the env-overlay variant of StripFile. STRIP is read from
+// env first (parallel-build safe), with os.Getenv as fallback.
+func StripFileWithEnv(path string, env map[string]string, args ...string) error {
+	return stripWithEnv(path, env, args...)
 }
 
 // StripLTO removes LTO (Link Time Optimization) sections from a binary file.
 // It respects the STRIP environment variable for cross-compilation support.
 func StripLTO(path string, args ...string) error {
-	return strip(
-		path,
+	return stripWithEnv(
+		path, nil,
 		append(args, "-R", ".gnu.lto_*", "-R", ".gnu.debuglto_*", "-N", "__gnu_lto_v1")...)
 }
 
-func strip(path string, args ...string) error {
-	// Use cross-compilation strip if STRIP environment variable is set.
-	// This allows stripping binaries compiled for foreign architectures.
-	stripCmd := os.Getenv("STRIP")
+// StripLTOWithEnv is the env-overlay variant of StripLTO.
+func StripLTOWithEnv(path string, env map[string]string, args ...string) error {
+	return stripWithEnv(
+		path, env,
+		append(args, "-R", ".gnu.lto_*", "-R", ".gnu.debuglto_*", "-N", "__gnu_lto_v1")...)
+}
+
+func stripWithEnv(path string, env map[string]string, args ...string) error {
+	// Use cross-compilation strip if STRIP is configured (env-map overlay or os.Getenv).
+	stripCmd := lookupEnv(env, "STRIP")
 
 	switch {
 	case stripCmd == "":

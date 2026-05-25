@@ -10,8 +10,9 @@ import (
 // NewCacheForTesting creates an empty Cache suitable for unit tests.
 func NewCacheForTesting() *Cache {
 	return &Cache{
-		entries:   make(map[string]*PackageInfo),
-		providers: make(map[string][]string),
+		entries:    make(map[string]*PackageInfo),
+		providers:  make(map[string][]string),
+		byBareName: make(map[string][]string),
 	}
 }
 

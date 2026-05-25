@@ -30,16 +30,32 @@ func SetDebugDir(dir string) {
 	debugDir = dir
 }
 
-// Strip walks through the directory to process each file.
+// Strip walks through the directory to process each file. STRIP/OBJCOPY are
+// read from the process environment.
 func Strip(packageDir string) error {
-	logger.Info(i18n.T("logger.strip.info.stripping_binaries_1"))
-
-	return filepath.WalkDir(packageDir, processFile)
+	return StripWithEnv(packageDir, nil)
 }
 
-// processFile Processes a single file, checking for stripping and LTO
-// operations if applicable.
+// StripWithEnv is the env-overlay variant of Strip. STRIP/OBJCOPY are looked up
+// in env first, falling back to os.Getenv when absent. Makes parallel builds
+// safe: each goroutine can pass its own toolchain env without process-env
+// mutation.
+func StripWithEnv(packageDir string, env map[string]string) error {
+	logger.Info(i18n.T("logger.strip.info.stripping_binaries_1"))
+
+	return filepath.WalkDir(packageDir, func(p string, d fs.DirEntry, err error) error {
+		return processFileWithEnv(p, d, err, env)
+	})
+}
+
+// processFile is the legacy entry point that reads STRIP/OBJCOPY from os.Getenv.
 func processFile(binary string, dirEntry fs.DirEntry, err error) error {
+	return processFileWithEnv(binary, dirEntry, err, nil)
+}
+
+// processFileWithEnv processes a single file with an optional env overlay for
+// STRIP/OBJCOPY. env=nil falls back to os.Getenv (legacy behavior).
+func processFileWithEnv(binary string, dirEntry fs.DirEntry, err error, env map[string]string) error {
 	if err != nil {
 		return err
 	}
@@ -94,7 +110,7 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	debugDirMu.RUnlock()
 
 	if localDebugDir != "" {
-		debugFile, sepErr := binutil.SeparateDebugInfo(binary, localDebugDir)
+		debugFile, sepErr := binutil.SeparateDebugInfoWithEnv(binary, localDebugDir, env)
 		if sepErr != nil {
 			logger.Warn("failed to separate debug info",
 				"binary", binary, "error", sepErr)
@@ -110,7 +126,7 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 		"about to strip binary",
 		"file", binary, "flags", stripFlags)
 
-	err = binutil.StripFile(binary, stripFlags)
+	err = binutil.StripFileWithEnv(binary, env, stripFlags)
 	if err != nil {
 		logger.Error(
 			"strip command failed",
@@ -120,7 +136,7 @@ func processFile(binary string, dirEntry fs.DirEntry, err error) error {
 	}
 
 	if stripLTO {
-		err := binutil.StripLTO(binary)
+		err := binutil.StripLTOWithEnv(binary, env)
 		if err != nil {
 			return err
 		}

@@ -1,6 +1,7 @@
 package project_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -31,7 +32,7 @@ func BenchmarkTopologicalSort50Packages(b *testing.B) {
 	for range b.N {
 		// BuildAll with Parallel=true triggers topologicalSort internally
 		// We ignore the error since we're benchmarking the sort, not the build
-		_ = mpc.BuildAll()
+		_ = mpc.BuildAll(context.Background())
 	}
 }
 
@@ -47,7 +48,7 @@ func BenchmarkTopologicalSort200Packages(b *testing.B) {
 	for range b.N {
 		// BuildAll with Parallel=true triggers topologicalSort internally
 		// We ignore the error since we're benchmarking the sort, not the build
-		_ = mpc.BuildAll()
+		_ = mpc.BuildAll(context.Background())
 	}
 }
 

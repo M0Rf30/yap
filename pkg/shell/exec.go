@@ -782,20 +782,7 @@ func ExecWithSudoContext(
 	ctx context.Context, excludeStdout bool, dir, name string, args ...string,
 ) error {
 	// Validate command name for security - only allow known package managers
-	allowedCommands := map[string]bool{
-		"pacman":  true,
-		"dnf":     true,
-		"yum":     true,
-		"apt-get": true,
-		"apt":     true,
-		"apk":     true,
-		"dpkg":    true,
-		"rpm":     true,
-		"makepkg": true,
-		"zypper":  true,
-	}
-
-	if !allowedCommands[name] {
+	if !constants.SudoAllowedCommands[name] {
 		return errors.New(errors.ErrTypeBuild, fmt.Sprintf(i18n.T("errors.shell.command_not_allowed_for_sudo"), name)).
 			WithOperation("ExecWithSudoContext").
 			WithContext("command", name)

@@ -209,7 +209,7 @@ func TestGetRelease(t *testing.T) {
 	pkg := NewBuilder(pkgBuild, "")
 
 	originalRel := pkg.PKGBUILD.PkgRel
-	pkg.getRelease()
+	pkg.FormatRelease(map[string]string{})
 
 	if pkg.PKGBUILD.PkgRel == originalRel {
 		t.Error("Release was not modified")
@@ -227,7 +227,7 @@ func TestGetReleaseWithDistro(t *testing.T) {
 	pkg := NewBuilder(pkgBuild, "")
 
 	originalRel := pkg.PKGBUILD.PkgRel
-	pkg.getRelease()
+	pkg.FormatRelease(map[string]string{})
 
 	if !strings.Contains(pkg.PKGBUILD.PkgRel, pkg.PKGBUILD.Distro) {
 		t.Error("Distro was not added to release")

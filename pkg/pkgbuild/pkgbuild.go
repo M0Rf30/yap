@@ -24,7 +24,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
-	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pacmandb"
@@ -1098,61 +1097,6 @@ func (pkgBuild *PKGBUILD) BuildEnvironmentSlice() []string {
 	}
 
 	return env
-}
-
-// SetEnvironmentVariables sets the environment variables for the PKGBUILD execution context.
-// This should be called just before executing build/package functions to ensure
-// each package uses its own directories, even when building multiple packages.
-//
-// NOTE: For parallel builds, prefer BuildEnvironmentSlice() which does not mutate
-// the global process environment and is safe to call from multiple goroutines.
-//
-// It returns an error if setting any environment variable fails.
-func (pkgBuild *PKGBUILD) SetEnvironmentVariables() error {
-	err := os.Setenv("pkgdir", pkgBuild.PackageDir)
-	if err != nil {
-		return err
-	}
-
-	err = os.Setenv("srcdir", pkgBuild.SourceDir)
-	if err != nil {
-		return err
-	}
-
-	err = os.Setenv("startdir", pkgBuild.StartDir)
-	if err != nil {
-		return err
-	}
-
-	err = os.Setenv("CARCH", pkgBuild.GetTargetArchitecture())
-	if err != nil {
-		return err
-	}
-
-	// Always refresh pkgname/pkgver/pkgrel so that scripts for each package
-	// in a multi-package build see their own values, not stale ones left in
-	// the environment by the previously built package.
-	err = os.Setenv("pkgname", pkgBuild.PkgName)
-	if err != nil {
-		return err
-	}
-
-	err = os.Setenv("pkgver", pkgBuild.PkgVer)
-	if err != nil {
-		return err
-	}
-
-	err = os.Setenv("pkgrel", pkgBuild.PkgRel)
-	if err != nil {
-		return err
-	}
-
-	// Resolve and export SOURCE_DATE_EPOCH for reproducible builds.
-	// If already set in the environment (by the user or CI), it is preserved;
-	// otherwise it is derived from the PKGBUILD file modification time.
-	_, err = files.ResolveSourceDateEpoch(pkgBuild.Home)
-
-	return err
 }
 
 // ValidateGeneral checks that mandatory items are correctly provided by the PKGBUILD

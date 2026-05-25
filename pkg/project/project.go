@@ -175,9 +175,8 @@ type Project struct {
 // packages with HasToInstall set are installed immediately after being built.
 // When Parallel is true, a topological sort determines build order and packages
 // are built concurrently using a worker pool.
-func (mpc *MultipleProject) BuildAll() error {
-	ctx := context.Background()
-
+// The context is used for cancellation (e.g., Ctrl-C / SIGTERM).
+func (mpc *MultipleProject) BuildAll(ctx context.Context) error {
 	if !mpc.singleProject {
 		if err := mpc.checkPkgsRange(mpc.Opts.FromPkgName, mpc.Opts.ToPkgName); err != nil {
 			return err
@@ -487,6 +486,10 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 
 // createSinglePackage handles the PrepareFakeroot → BuildPackage → post-build
 // pipeline for a non-split (single) package.
+// Note: This method is called from createPackage which is called from the build
+// pipeline. The context is created at the top level in BuildAll and passed through.
+// For now, we use context.Background() as a fallback, but ideally this would be
+// threaded through the call chain.
 func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
 	ctx := context.Background()
 

@@ -2,8 +2,12 @@
 package command
 
 import (
+	"context"
 	"errors"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -57,6 +61,10 @@ var buildCmd = &cobra.Command{
 	Args:    cobra.RangeArgs(1, 2),                             // Allow 1-2 arguments
 	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
+		// Set up signal-cancellation context for Ctrl-C / SIGTERM
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+
 		// Propagate ssh-password flag value to the source package.
 		source.SetSSHPassword(sshPassword)
 
@@ -171,7 +179,7 @@ var buildCmd = &cobra.Command{
 		// Build packages with timestamp logging
 		logger.Info(i18n.T("logger.build.building_packages"))
 
-		err = mpc.BuildAll()
+		err = mpc.BuildAll(ctx)
 		if err != nil {
 			var yapErr *yapErrors.YapError
 			if errors.As(err, &yapErr) {

@@ -36,14 +36,20 @@ import (
 //
 // WriteSystemRpmdb: if true, ALSO write to /var/lib/rpm/rpmdb.sqlite (SQLite
 // hosts only — Fedora 33+, RHEL 9+, Rocky 9+). Default is false; YAP uses
-// yapdb for state tracking instead. On BDB systems or if the SQLite rpmdb
-// doesn't exist, the write is skipped with a warning.
+// yapdb for state tracking instead. NOTE: writer integration is not yet
+// wired (see install.go writeSystemRpmdb); enabling this currently fails
+// the install rather than silently swallowing the stub error.
+//
+// StrictScriptlets: if true, %pretrans/%post/%posttrans failures are treated
+// as fatal. RPM convention is non-fatal; this flag is intended for build-time
+// makedepends provisioning where a broken scriptlet poisons later builds.
 type Options struct {
 	RootDir             string
 	AllowRootInstall    bool
 	AllowUnverifiedRPMs bool
 	RunLDConfig         bool
 	SkipScriptlets      bool
+	StrictScriptlets    bool
 	KeyringPath         string
 	WriteSystemRpmdb    bool
 }

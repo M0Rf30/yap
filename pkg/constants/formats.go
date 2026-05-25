@@ -101,6 +101,21 @@ func DistroFormat(distro string) string {
 	return distroFormatMap[strings.ToLower(distro)]
 }
 
+// SudoAllowedCommands is a set of package manager commands allowed to run with sudo.
+// This is a security allowlist to prevent arbitrary command execution.
+var SudoAllowedCommands = map[string]bool{
+	PMPacman:  true,
+	PMDnf:     true,
+	PMYum:     true,
+	"apt-get": true,
+	PMApt:     true,
+	FormatAPK: true,
+	"dpkg":    true,
+	FormatRPM: true,
+	"makepkg": true,
+	PMZypper:  true,
+}
+
 // GetInstallArgs returns the package manager install arguments.
 func GetInstallArgs(format string) []string {
 	switch format {

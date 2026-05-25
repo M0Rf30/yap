@@ -116,6 +116,11 @@ type Cache struct {
 	// providers maps a virtual package name to the list of concrete packages
 	// that provide it (populated from the Provides field in apt index files).
 	providers map[string][]string
+	// byBareName maps a bare package name (without arch qualifier) to a slice of
+	// entry keys (e.g., "gcc-11:amd64", "gcc-11:arm64"). Used to optimize
+	// scanEntryByName from O(n) to O(1) lookup + O(k) iteration where k is the
+	// number of architectures for that package.
+	byBareName map[string][]string
 }
 
 // global singleton so the expensive file scan happens at most once per
@@ -163,8 +168,9 @@ func Reload() *Cache {
 // Use StoreGlobal to make it the active singleton returned by Load.
 func NewEmptyCache() *Cache {
 	return &Cache{
-		entries:   make(map[string]*PackageInfo),
-		providers: make(map[string][]string),
+		entries:    make(map[string]*PackageInfo),
+		providers:  make(map[string][]string),
+		byBareName: make(map[string][]string),
 	}
 }
 
@@ -201,6 +207,17 @@ func entryKey(name, arch string) string {
 	return name + ":" + arch
 }
 
+// addToBareName adds an entry key to the byBareName secondary index.
+// Must be called with c.mu already held.
+func (c *Cache) addToBareName(name, key string) {
+	// Only add to secondary index if the key is different from the bare name
+	// (i.e., it has an arch qualifier). Bare names and arch:all entries are
+	// stored directly under the bare name, so they don't need indexing.
+	if key != name {
+		c.byBareName[name] = append(c.byBareName[name], key)
+	}
+}
+
 // AddEntry inserts or replaces a PackageInfo entry in the cache.
 // Intended for test setup; not safe for concurrent use during population.
 func (c *Cache) AddEntry(info *PackageInfo) {
@@ -208,7 +225,9 @@ func (c *Cache) AddEntry(info *PackageInfo) {
 	defer c.mu.Unlock()
 
 	cp := *info
-	c.entries[entryKey(info.Name, info.Architecture)] = &cp
+	key := entryKey(info.Name, info.Architecture)
+	c.entries[key] = &cp
+	c.addToBareName(info.Name, key)
 }
 
 // StoreGlobal replaces the process-global cache returned by Load.
@@ -469,17 +488,23 @@ func (c *Cache) tryResolveVirtual(name string) string {
 	return ""
 }
 
-// scanEntryByName performs a linear scan of the cache entries looking for any
-// package whose name (after stripping the arch qualifier) matches the given
-// name. Returns the first match and true, or nil and false if none found.
+// scanEntryByName performs a lookup in the byBareName secondary index to find
+// any package matching the given bare name. Returns the first match and true,
+// or nil and false if none found.
 //
-// This is an O(n) scan and should only be used as a last-resort fallback when
-// the targeted name:arch and bare-name lookups have already failed.
+// This is now O(1) lookup + O(k) iteration where k is the number of
+// architectures for that package (typically 1-3), replacing the previous O(n)
+// full-map scan.
 func (c *Cache) scanEntryByName(name string) (*PackageInfo, bool) {
-	for k, candidate := range c.entries {
-		if bare, _, has := strings.Cut(k, ":"); has && bare == name {
-			return candidate, true
-		}
+	// Look up the secondary index for this bare name.
+	keys, ok := c.byBareName[name]
+	if !ok || len(keys) == 0 {
+		return nil, false
+	}
+
+	// Return the first entry found for this bare name.
+	if candidate, ok := c.entries[keys[0]]; ok {
+		return candidate, true
 	}
 
 	return nil, false
@@ -948,8 +973,9 @@ func flushDeb822RepoStanza(
 // loadFromDisk reads all apt list files and the dpkg status file.
 func loadFromDisk() *Cache {
 	c := &Cache{
-		entries:   make(map[string]*PackageInfo),
-		providers: make(map[string][]string),
+		entries:    make(map[string]*PackageInfo),
+		providers:  make(map[string][]string),
+		byBareName: make(map[string][]string),
 	}
 
 	// Load source schemes first (for BaseURL resolution)
@@ -1037,8 +1063,9 @@ func (c *Cache) loadAptLists(dir string, sources map[string]sourceInfo) error {
 
 			for idx := range jobCh {
 				local := &Cache{
-					entries:   make(map[string]*PackageInfo),
-					providers: make(map[string][]string),
+					entries:    make(map[string]*PackageInfo),
+					providers:  make(map[string][]string),
+					byBareName: make(map[string][]string),
 				}
 				// Skip unreadable/corrupt index files — apt itself is tolerant.
 				_ = local.parseFile(jobs[idx].path, false, jobs[idx].baseURL)
@@ -1090,6 +1117,10 @@ func (c *Cache) mergeFrom(other *Cache) {
 			// Copy the pointer; partial cache won't be touched after
 			// this point.
 			c.entries[name] = info
+			// Also merge the secondary index entry for this key.
+			if keys, ok := other.byBareName[info.Name]; ok {
+				c.byBareName[info.Name] = append(c.byBareName[info.Name], keys...)
+			}
 
 			continue
 		}
@@ -1362,6 +1393,7 @@ func (c *Cache) flushStanza(s *stanza, dpkgStatus bool) {
 
 	mergePackageInfo(existing, s, dpkgStatus)
 	c.flushProvides(s.pkgName, s.provides)
+	c.addToBareName(s.pkgName, key)
 }
 
 // mergePackageInfo merges fields from a parsed stanza into an existing PackageInfo.

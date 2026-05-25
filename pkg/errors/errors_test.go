@@ -60,13 +60,17 @@ func TestYapError_Unwrap(t *testing.T) {
 func TestYapError_Is(t *testing.T) {
 	t.Parallel()
 
-	err1 := &YapError{Type: ErrTypeValidation, Message: "test"}
-	err2 := &YapError{Type: ErrTypeValidation, Message: "different"}
-	err3 := &YapError{Type: ErrTypeFileSystem, Message: "test"}
+	// YapError relies on the default errors.Is chain-walking via Unwrap.
+	// errors.Is must find the wrapped sentinel cause through Unwrap.
+	sentinel := errors.New("boom")
+	wrapped := Wrap(sentinel, ErrTypeValidation, "context")
 
-	assert.True(t, err1.Is(err2))
-	assert.False(t, err1.Is(err3))
-	assert.False(t, err1.Is(errors.New("regular error")))
+	assert.True(t, errors.Is(wrapped, sentinel))
+	assert.False(t, errors.Is(wrapped, errors.New("different")))
+
+	// A YapError with no cause does not match unrelated errors.
+	bare := New(ErrTypeValidation, "test")
+	assert.False(t, errors.Is(bare, sentinel))
 }
 
 func TestYapError_WithContext(t *testing.T) {

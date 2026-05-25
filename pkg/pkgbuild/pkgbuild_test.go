@@ -167,10 +167,17 @@ func TestPKGBUILD_SetMainFolders(t *testing.T) {
 
 	pb.SetMainFolders()
 
-	// Set environment variables (now a separate step)
-	err := pb.SetEnvironmentVariables()
-	if err != nil {
-		t.Fatalf("Failed to set environment variables: %v", err)
+	// Get environment variables as a slice (safe for parallel builds)
+	env := pb.BuildEnvironmentSlice()
+	if env == nil {
+		t.Fatalf("BuildEnvironmentSlice() returned nil")
+	}
+
+	// Set them in the environment for testing
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			_ = os.Setenv(k, v)
+		}
 	}
 
 	// Check environment variables were set
@@ -1546,10 +1553,17 @@ func TestPKGBUILD_SetMainFolders_Alpine(t *testing.T) {
 		t.Errorf("Expected PackageDir '%s', got '%s'", expectedPackageDir, pb.PackageDir)
 	}
 
-	// Set environment variables (now a separate step)
-	err := pb.SetEnvironmentVariables()
-	if err != nil {
-		t.Fatalf("Failed to set environment variables: %v", err)
+	// Get environment variables as a slice (safe for parallel builds)
+	env := pb.BuildEnvironmentSlice()
+	if env == nil {
+		t.Fatalf("BuildEnvironmentSlice() returned nil")
+	}
+
+	// Set them in the environment for testing
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			_ = os.Setenv(k, v)
+		}
 	}
 
 	// Check environment variables are set
@@ -2235,41 +2249,7 @@ func TestPKGBUILD_parseArchitectureOnly_NativeArch(t *testing.T) {
 	}
 }
 
-// Test 3: SetEnvironmentVariables exports CARCH
-func TestPKGBUILD_SetEnvironmentVariables_ExportsCARCH(t *testing.T) {
-	pb := &PKGBUILD{
-		TargetArch:     "aarch64",
-		ArchComputed:   "x86_64",
-		StartDir:       t.TempDir(),
-		SourceDir:      t.TempDir(),
-		PkgName:        "test",
-		PkgVer:         "1.0",
-		PkgRel:         "1",
-		Distro:         "ubuntu",
-		FullDistroName: "ubuntu_focal",
-	}
-	pb.Init()
-
-	// Save original CARCH env var
-	originalCARCH := os.Getenv("CARCH")
-	defer func() {
-		_ = os.Setenv("CARCH", originalCARCH)
-	}()
-
-	pb.SetMainFolders()
-
-	err := pb.SetEnvironmentVariables()
-	if err != nil {
-		t.Fatalf("SetEnvironmentVariables() returned error: %v", err)
-	}
-
-	// Assert CARCH is set to TargetArch (aarch64)
-	if os.Getenv("CARCH") != "aarch64" {
-		t.Errorf("Expected CARCH='aarch64', got '%s'", os.Getenv("CARCH"))
-	}
-}
-
-// Test 4: BuildEnvironmentSlice exports CARCH
+// Test 3: BuildEnvironmentSlice exports CARCH
 func TestPKGBUILD_BuildEnvironmentSlice_ExportsCARCH(t *testing.T) {
 	pb := &PKGBUILD{
 		TargetArch:     "aarch64",

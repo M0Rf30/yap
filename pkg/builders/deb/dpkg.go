@@ -104,10 +104,9 @@ func (d *Package) BuildPackage(ctx context.Context, artifactsPath string, target
 // It retrieves architecture and release information, cleans up the debDir, creates necessary
 // resources, and strips binaries. The method returns an error if any step fails.
 func (d *Package) PrepareFakeroot(ctx context.Context, _ string, targetArch string) error {
-	d.getRelease()
+	d.FormatRelease(map[string]string{})
 	d.LogCrossCompilation(targetArch)
 	d.SetTargetArchitecture(targetArch)
-	d.SetupCrossStripEnv(targetArch)
 
 	err := os.RemoveAll(d.debDir)
 	if err != nil {
@@ -119,7 +118,7 @@ func (d *Package) PrepareFakeroot(ctx context.Context, _ string, targetArch stri
 		return err
 	}
 
-	return d.ApplyOptions()
+	return d.ApplyOptionsWithEnv(d.CrossStripEnvMap(targetArch))
 }
 
 // addArFile adds a file to an archive writer with the specified name, body,
@@ -479,23 +478,4 @@ func (d *Package) createDebResources() error {
 	}
 
 	return nil
-}
-
-// getRelease updates the package release with distribution-specific suffix.
-// Unlike FormatRelease in BaseBuilder, this method always appends a distro suffix
-// (either codename or distro name) to ensure proper Debian repository targeting.
-// This divergence is intentional: DEB requires a distro suffix for repo selection,
-// while RPM only appends when codename is explicitly set.
-func (d *Package) getRelease() {
-	var suffix string
-	if d.PKGBUILD.Codename != "" {
-		suffix = d.PKGBUILD.Codename
-	} else {
-		suffix = d.PKGBUILD.Distro
-	}
-
-	// Guard against double-append when called multiple times for split packages.
-	if !strings.HasSuffix(d.PKGBUILD.PkgRel, suffix) {
-		d.PKGBUILD.PkgRel += suffix
-	}
 }

@@ -3,7 +3,9 @@ package builder
 
 import (
 	"context"
-	"sync"
+	"runtime"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -286,7 +288,7 @@ func (builder *Builder) processFunctionInFakeroot(ctx context.Context, pkgbuildF
 
 // getSources detects sources provided by a single project source array and
 // downloads them in parallel with enhanced progress tracking. It returns any error if occurred.
-func (builder *Builder) getSources(_ context.Context) error {
+func (builder *Builder) getSources(ctx context.Context) error {
 	if len(builder.PKGBUILD.SourceURI) == 0 {
 		return nil
 	}
@@ -295,78 +297,46 @@ func (builder *Builder) getSources(_ context.Context) error {
 	pkgVer := builder.PKGBUILD.PkgVer
 	pkgRel := builder.PKGBUILD.PkgRel
 
-	// Process all sources using the original method with enhanced downloads
-	maxWorkers := min(len(builder.PKGBUILD.SourceURI), 4)
+	// Concurrency: source fetch is network-bound; cap at NumCPU but never above 8.
+	// First error cancels in-flight workers.
+	maxWorkers := min(len(builder.PKGBUILD.SourceURI), max(2, min(runtime.NumCPU(), 8)))
 
-	type sourceTask struct {
-		index  int
-		source source.Source
-	}
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(maxWorkers)
 
-	sourceChan := make(chan sourceTask, len(builder.PKGBUILD.SourceURI))
-	errorChan := make(chan error, len(builder.PKGBUILD.SourceURI))
+	for index, sourceURI := range builder.PKGBUILD.SourceURI {
+		sourceObj := source.Source{
+			StartDir:       builder.PKGBUILD.StartDir,
+			Hash:           builder.PKGBUILD.HashSums[index],
+			NoExtract:      builder.PKGBUILD.NoExtract,
+			PkgName:        builder.PKGBUILD.PkgName,
+			SourceItemURI:  sourceURI,
+			SrcDir:         builder.PKGBUILD.SourceDir,
+			SourceItemPath: "",
+			SkipHashCheck:  builder.SkipHashCheck,
+		}
 
-	var waitGroup sync.WaitGroup
-
-	// Start workers for source processing (including enhanced downloads)
-	for range maxWorkers {
-		waitGroup.Go(func() {
-			for task := range sourceChan {
-				err := task.source.Get()
-				if err != nil {
-					wrappedErr := errors.Wrap(err, errors.ErrTypeBuild,
-						i18n.T("errors.build.failed_to_retrieve_source")).
-						WithContext("package", pkgName).
-						WithContext("version", pkgVer).
-						WithContext("release", pkgRel).
-						WithContext("source_index", task.index).
-						WithContext("source_uri", task.source.SourceItemURI).
-						WithOperation("source_processing")
-					errorChan <- wrappedErr
-
-					return
-				}
+		g.Go(func() error {
+			if err := gctx.Err(); err != nil {
+				return err
 			}
+
+			if err := sourceObj.Get(); err != nil {
+				return errors.Wrap(err, errors.ErrTypeBuild,
+					i18n.T("errors.build.failed_to_retrieve_source")).
+					WithContext("package", pkgName).
+					WithContext("version", pkgVer).
+					WithContext("release", pkgRel).
+					WithContext("source_index", index).
+					WithContext("source_uri", sourceObj.SourceItemURI).
+					WithOperation("source_processing")
+			}
+
+			return nil
 		})
 	}
 
-	// Send tasks to workers
-	go func() {
-		defer close(sourceChan)
-
-		for index, sourceURI := range builder.PKGBUILD.SourceURI {
-			sourceObj := source.Source{
-				StartDir:       builder.PKGBUILD.StartDir,
-				Hash:           builder.PKGBUILD.HashSums[index],
-				NoExtract:      builder.PKGBUILD.NoExtract,
-				PkgName:        builder.PKGBUILD.PkgName,
-				SourceItemURI:  sourceURI,
-				SrcDir:         builder.PKGBUILD.SourceDir,
-				SourceItemPath: "",
-				SkipHashCheck:  builder.SkipHashCheck,
-			}
-
-			sourceChan <- sourceTask{
-				index:  index,
-				source: sourceObj,
-			}
-		}
-	}()
-
-	// Wait for completion
-	go func() {
-		waitGroup.Wait()
-		close(errorChan)
-	}()
-
-	// Check for errors
-	for err := range errorChan {
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return g.Wait()
 }
 
 // initDirs creates mandatory fakeroot folders (src, pkg) for a single project.

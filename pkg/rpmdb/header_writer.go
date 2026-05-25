@@ -21,7 +21,7 @@ type headerEntry struct {
 // This is a partial serializer — it handles the tags required for rpm -q,
 // rpm -qf, and rpm -e to work. Full byte-identity round-trip is not a goal.
 //
-//nolint:gocyclo,cyclop // header serialization dispatch is inherently large
+//nolint:gocyclo,cyclop // RPM header serialization is inherently a long sequential write of many distinct tag types
 func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	entries := make(map[int]headerEntry)
 	blobs := new(bytes.Buffer)
@@ -149,57 +149,30 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	vendor, _ := rpm.Header.GetString(rpmutils.VENDOR)
 	buildhost, _ := rpm.Header.GetString(rpmutils.BUILDHOST)
 
-	// Write basic string tags
-	if err := writeString(rpmutils.NAME, name); err != nil {
-		return nil, err
+	// Table-driven basic string tags
+	stringTags := []struct {
+		tag   int
+		value string
+	}{
+		{rpmutils.NAME, name},
+		{rpmutils.VERSION, version},
+		{rpmutils.RELEASE, release},
+		{rpmutils.ARCH, arch},
+		{rpmutils.OS, os},
+		{rpmutils.SUMMARY, summary},
+		{rpmutils.DESCRIPTION, description},
+		{rpmutils.LICENSE, license},
+		{rpmutils.GROUP, group},
+		{rpmutils.URL, url},
+		{rpmutils.PACKAGER, packager},
+		{rpmutils.VENDOR, vendor},
+		{rpmutils.BUILDHOST, buildhost},
 	}
 
-	if err := writeString(rpmutils.VERSION, version); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.RELEASE, release); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.ARCH, arch); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.OS, os); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.SUMMARY, summary); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.DESCRIPTION, description); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.LICENSE, license); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.GROUP, group); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.URL, url); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.PACKAGER, packager); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.VENDOR, vendor); err != nil {
-		return nil, err
-	}
-
-	if err := writeString(rpmutils.BUILDHOST, buildhost); err != nil {
-		return nil, err
+	for _, st := range stringTags {
+		if err := writeString(st.tag, st.value); err != nil {
+			return nil, err
+		}
 	}
 
 	// EPOCH (optional)
@@ -218,86 +191,78 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 		return nil, err
 	}
 
-	// Note: INSTALLTIME is not a standard RPM tag in go-rpmutils.
-	// It's computed by rpm at install time and stored in the rpmdb separately.
-	// We skip it here as it's not required for rpm -q / -qf / -e to work.
-
 	// SIZE (uncompressed payload size)
 	size, _ := rpm.Header.InstalledSize()
 	if err := writeInt64Array(rpmutils.SIZE, []int64{size}); err != nil {
 		return nil, err
 	}
 
-	// PROVIDES
-	provides, _ := rpm.Header.GetStrings(rpmutils.PROVIDENAME)
-	if err := writeStringArray(rpmutils.PROVIDENAME, provides); err != nil {
-		return nil, err
+	// Helper to write a dependency group (name + flags + versions)
+	writeDepGroup := func(
+		nameTag, flagsTag, versionTag int,
+		names []string,
+	) error {
+		if err := writeStringArray(nameTag, names); err != nil {
+			return err
+		}
+
+		if len(names) > 0 {
+			flags, _ := rpm.Header.GetUint32s(flagsTag)
+			if err := writeInt32Array(flagsTag, toInt32Slice(flags)); err != nil {
+				return err
+			}
+
+			versions, _ := rpm.Header.GetStrings(versionTag)
+			if err := writeStringArray(versionTag, versions); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
-	if len(provides) > 0 {
-		provideFlags, _ := rpm.Header.GetUint32s(rpmutils.PROVIDEFLAGS)
-		if err := writeInt32Array(rpmutils.PROVIDEFLAGS, toInt32Slice(provideFlags)); err != nil {
-			return nil, err
-		}
-
-		provideVersions, _ := rpm.Header.GetStrings(rpmutils.PROVIDEVERSION)
-		if err := writeStringArray(rpmutils.PROVIDEVERSION, provideVersions); err != nil {
-			return nil, err
-		}
+	// PROVIDES
+	provides, _ := rpm.Header.GetStrings(rpmutils.PROVIDENAME)
+	if err := writeDepGroup(
+		rpmutils.PROVIDENAME,
+		rpmutils.PROVIDEFLAGS,
+		rpmutils.PROVIDEVERSION,
+		provides,
+	); err != nil {
+		return nil, err
 	}
 
 	// REQUIRES
 	requires, _ := rpm.Header.GetStrings(rpmutils.REQUIRENAME)
-	if err := writeStringArray(rpmutils.REQUIRENAME, requires); err != nil {
+	if err := writeDepGroup(
+		rpmutils.REQUIRENAME,
+		rpmutils.REQUIREFLAGS,
+		rpmutils.REQUIREVERSION,
+		requires,
+	); err != nil {
 		return nil, err
-	}
-
-	if len(requires) > 0 {
-		requireFlags, _ := rpm.Header.GetUint32s(rpmutils.REQUIREFLAGS)
-		if err := writeInt32Array(rpmutils.REQUIREFLAGS, toInt32Slice(requireFlags)); err != nil {
-			return nil, err
-		}
-
-		requireVersions, _ := rpm.Header.GetStrings(rpmutils.REQUIREVERSION)
-		if err := writeStringArray(rpmutils.REQUIREVERSION, requireVersions); err != nil {
-			return nil, err
-		}
 	}
 
 	// CONFLICTS
 	conflicts, _ := rpm.Header.GetStrings(rpmutils.CONFLICTNAME)
-	if err := writeStringArray(rpmutils.CONFLICTNAME, conflicts); err != nil {
+	if err := writeDepGroup(
+		rpmutils.CONFLICTNAME,
+		rpmutils.CONFLICTFLAGS,
+		rpmutils.CONFLICTVERSION,
+		conflicts,
+	); err != nil {
 		return nil, err
-	}
-
-	if len(conflicts) > 0 {
-		conflictFlags, _ := rpm.Header.GetUint32s(rpmutils.CONFLICTFLAGS)
-		if err := writeInt32Array(rpmutils.CONFLICTFLAGS, toInt32Slice(conflictFlags)); err != nil {
-			return nil, err
-		}
-
-		conflictVersions, _ := rpm.Header.GetStrings(rpmutils.CONFLICTVERSION)
-		if err := writeStringArray(rpmutils.CONFLICTVERSION, conflictVersions); err != nil {
-			return nil, err
-		}
 	}
 
 	// OBSOLETES
 	obsoletes, _ := rpm.Header.GetStrings(rpmutils.OBSOLETENAME)
-	if err := writeStringArray(rpmutils.OBSOLETENAME, obsoletes); err != nil {
+	if err := writeDepGroup(
+		rpmutils.OBSOLETENAME,
+		rpmutils.OBSOLETEFLAGS,
+		rpmutils.OBSOLETEVERSION,
+		obsoletes,
+	); err != nil {
 		return nil, err
-	}
-
-	if len(obsoletes) > 0 {
-		obsoleteFlags, _ := rpm.Header.GetUint32s(rpmutils.OBSOLETEFLAGS)
-		if err := writeInt32Array(rpmutils.OBSOLETEFLAGS, toInt32Slice(obsoleteFlags)); err != nil {
-			return nil, err
-		}
-
-		obsoleteVersions, _ := rpm.Header.GetStrings(rpmutils.OBSOLETEVERSION)
-		if err := writeStringArray(rpmutils.OBSOLETEVERSION, obsoleteVersions); err != nil {
-			return nil, err
-		}
 	}
 
 	// FILE METADATA
@@ -342,47 +307,42 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 			filemtimes[i] = int32(f.MTime.Unix()) //nolint:gosec
 		}
 
-		if err := writeStringArray(rpmutils.BASENAMES, basenames); err != nil {
-			return nil, err
+		// Table-driven file metadata tags
+		fileStringTags := []struct {
+			tag    int
+			values []string
+		}{
+			{rpmutils.BASENAMES, basenames},
+			{rpmutils.DIRNAMES, dirnames},
+			{rpmutils.FILEDIGESTS, filedigests},
+			{rpmutils.FILELINKTOS, filelinktos},
+			{rpmutils.FILEUSERNAME, fileusers},
+			{rpmutils.FILEGROUPNAME, filegroups},
 		}
 
-		if err := writeStringArray(rpmutils.DIRNAMES, dirnames); err != nil {
-			return nil, err
+		for _, fst := range fileStringTags {
+			if err := writeStringArray(fst.tag, fst.values); err != nil {
+				return nil, err
+			}
 		}
 
-		if err := writeInt32Array(rpmutils.DIRINDEXES, dirindexes); err != nil {
-			return nil, err
+		fileInt32Tags := []struct {
+			tag    int
+			values []int32
+		}{
+			{rpmutils.DIRINDEXES, dirindexes},
+			{rpmutils.FILEMODES, filemodes},
+			{rpmutils.FILEFLAGS, fileflags},
+			{rpmutils.FILEMTIMES, filemtimes},
+		}
+
+		for _, fit := range fileInt32Tags {
+			if err := writeInt32Array(fit.tag, fit.values); err != nil {
+				return nil, err
+			}
 		}
 
 		if err := writeInt64Array(rpmutils.FILESIZES, filesizes); err != nil {
-			return nil, err
-		}
-
-		if err := writeInt32Array(rpmutils.FILEMODES, filemodes); err != nil {
-			return nil, err
-		}
-
-		if err := writeStringArray(rpmutils.FILEDIGESTS, filedigests); err != nil {
-			return nil, err
-		}
-
-		if err := writeStringArray(rpmutils.FILELINKTOS, filelinktos); err != nil {
-			return nil, err
-		}
-
-		if err := writeInt32Array(rpmutils.FILEFLAGS, fileflags); err != nil {
-			return nil, err
-		}
-
-		if err := writeStringArray(rpmutils.FILEUSERNAME, fileusers); err != nil {
-			return nil, err
-		}
-
-		if err := writeStringArray(rpmutils.FILEGROUPNAME, filegroups); err != nil {
-			return nil, err
-		}
-
-		if err := writeInt32Array(rpmutils.FILEMTIMES, filemtimes); err != nil {
 			return nil, err
 		}
 	}

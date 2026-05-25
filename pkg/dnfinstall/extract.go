@@ -33,6 +33,58 @@ type installedFile struct {
 	LinkTarget  string
 }
 
+// hardlinkTracker manages hardlink resolution during RPM extraction.
+// CPIO payload ordering is arbitrary: any entry may carry the file content
+// while others (IsLink) are zero-length hardlink references. This tracker
+// ensures all hardlinks are resolved correctly regardless of entry order.
+type hardlinkTracker struct {
+	// data maps inode key to the path of the data-bearing entry.
+	data map[uint64]string
+	// placeholders maps inode key to paths of hardlink-only entries seen
+	// before the data entry, so they can be linked once data is written.
+	placeholders map[uint64][]string
+}
+
+// newHardlinkTracker creates a new hardlink tracker.
+func newHardlinkTracker() *hardlinkTracker {
+	return &hardlinkTracker{
+		data:         make(map[uint64]string),
+		placeholders: make(map[uint64][]string),
+	}
+}
+
+// handleHardlink processes a hardlink entry. If the data-bearing entry has
+// already been written, it creates the hardlink immediately. Otherwise, it
+// queues the path for linking once the data is written.
+func (ht *hardlinkTracker) handleHardlink(inodeKey uint64,
+	targetPath string) error {
+	if data, ok := ht.data[inodeKey]; ok {
+		// Data already written — create hardlink now.
+		return makeHardlink(data, targetPath)
+	}
+
+	// Data not yet seen — queue for later linking.
+	ht.placeholders[inodeKey] = append(ht.placeholders[inodeKey], targetPath)
+
+	return nil
+}
+
+// materializeData writes the data-bearing entry and links all queued
+// placeholders to it.
+func (ht *hardlinkTracker) materializeData(inodeKey uint64,
+	targetPath string) error {
+	ht.data[inodeKey] = targetPath
+
+	// Link queued placeholders to the newly written data file.
+	for _, placeholder := range ht.placeholders[inodeKey] {
+		if err := makeHardlink(targetPath, placeholder); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // extractRPM opens an .rpm at path and extracts its CPIO payload to rootDir.
 //
 //nolint:unparam // opts kept for API symmetry with extractRPMWithHeader; current callers pass Options{}
@@ -63,6 +115,22 @@ const (
 	rpmTypeReg  = 0o100000
 )
 
+// handleRegularEntry processes a regular file or hardlink entry.
+// If pr.IsLink() is true, it handles hardlink resolution via the tracker.
+// Otherwise, it writes the file data and materializes any queued hardlinks.
+func handleRegularEntry(pr rpmutils.PayloadReader, targetPath string,
+	perm os.FileMode, inodeKey uint64, tracker *hardlinkTracker) error {
+	if pr.IsLink() {
+		return tracker.handleHardlink(inodeKey, targetPath)
+	}
+
+	if err := writeRegularFile(pr, targetPath, perm); err != nil {
+		return err
+	}
+
+	return tracker.materializeData(inodeKey, targetPath)
+}
+
 // extractRPMWithHeader extracts an already-parsed RPM to rootDir using
 // rpmutils' own PayloadReader, which handles cpio framing internally.
 //
@@ -85,16 +153,7 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 
 	var files []installedFile
 
-	// hardlinkData tracks the path of the data-bearing entry per inode.
-	// hardlinkPlaceholders collects paths of hardlink-only entries seen
-	// before the data entry, so they can be linked once data is written.
-	// CPIO payload ordering is arbitrary: any entry may carry the file
-	// content while others (IsLink) are zero-length hardlink references.
-	// The old single-placeholder approach failed when 3+ hardlinks shared
-	// the same inode — subsequent IsLink entries tried to link to an
-	// un-written placeholder instead of queuing.
-	hardlinkData := make(map[uint64]string)
-	hardlinkPlaceholders := make(map[uint64][]string)
+	tracker := newHardlinkTracker()
 
 	for {
 		if err := ctx.Err(); err != nil {
@@ -161,29 +220,9 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 			}
 
 		case rpmTypeReg, 0:
-			if pr.IsLink() {
-				if data, ok := hardlinkData[inodeKey]; ok {
-					// Data already written — create hardlink now.
-					if err := makeHardlink(data, targetPath); err != nil {
-						return nil, err
-					}
-				} else {
-					// Data not yet seen — queue for later linking.
-					hardlinkPlaceholders[inodeKey] = append(hardlinkPlaceholders[inodeKey], targetPath)
-				}
-			} else {
-				if err := writeRegularFile(pr, targetPath, perm); err != nil {
-					return nil, err
-				}
-
-				hardlinkData[inodeKey] = targetPath
-
-				// Link queued placeholders to the newly written data file.
-				for _, placeholder := range hardlinkPlaceholders[inodeKey] {
-					if err := makeHardlink(targetPath, placeholder); err != nil {
-						return nil, err
-					}
-				}
+			if err := handleRegularEntry(pr, targetPath, perm, inodeKey,
+				tracker); err != nil {
+				return nil, err
 			}
 
 		default:

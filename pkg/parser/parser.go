@@ -197,8 +197,8 @@ func processFunctions(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) 
 			// Store the raw function body wrapped in pkgbuild.FuncBody so that
 			// mapFunctions can distinguish it from plain string variables.
 			// Variables will be resolved at runtime via the preamble emitted by
-			// BuildScriptPreamble() and the environment variables set by
-			// SetEnvironmentVariables().
+			// BuildScriptPreamble() and the environment variables provided by
+			// BuildEnvironmentSlice().
 			funcDecl, funcErr := set.StringifyFuncDecl(nodeType)
 			if funcErr != nil {
 				err = funcErr

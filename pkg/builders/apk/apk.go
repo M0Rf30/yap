@@ -186,7 +186,7 @@ func (a *Apk) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 func (a *Apk) createPkgInfo() error {
 	tmpl := a.PKGBUILD.RenderSpec(dotPkginfo)
 
-	pkginfoPath := filepath.Join(a.PKGBUILD.PackageDir, ".PKGINFO")
+	pkginfoPath := filepath.Join(a.PKGBUILD.PackageDir, pkginfoFileName)
 
 	return a.PKGBUILD.CreateSpec(pkginfoPath, tmpl)
 }
@@ -201,6 +201,9 @@ func (a *Apk) createInstallScript() error {
 	return a.PKGBUILD.CreateSpec(scriptPath, tmpl)
 }
 
+// pkginfoFileName is the canonical archive name for the APK metadata file.
+const pkginfoFileName = ".PKGINFO"
+
 // isControlFile determines if a file is a control/metadata file.
 // Control files use USTAR format, data files use PAX with checksums.
 func isControlFile(name string) bool {
@@ -212,6 +215,27 @@ func isControlFile(name string) bool {
 		strings.HasPrefix(name, ".trigger")
 }
 
+// writeFilteredMembers writes tar members matching a predicate to the tar writer.
+// It's used to write either control or data files to their respective streams.
+func (a *Apk) writeFilteredMembers(
+	ctx context.Context,
+	tw *tar.Writer,
+	fileList []apkFile,
+	predicate func(apkFile) bool,
+) error {
+	for _, file := range fileList {
+		if !predicate(file) {
+			continue
+		}
+
+		if err := a.writeFileWithChecksum(ctx, tw, file); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // createTarGzWithChecksums creates an APK package following Alpine's format:
 // The APK is a concatenation of control.tar.gz and data.tar.gz.
 // The datahash in .PKGINFO is the SHA256 of data.tar.gz.
@@ -219,7 +243,7 @@ func isControlFile(name string) bool {
 // This implements the Alpine APK format with APK-TOOLS.checksum.SHA1 headers.
 // Streams tar.gz archives directly to temp files to minimize memory usage.
 //
-//nolint:gocyclo,cyclop // APK format requires specific two-stream construction
+//nolint:gocyclo,cyclop // dual-stream orchestration with two temp-file flushes is inherently sequential
 func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFile string) error {
 	// Walk source directory once
 	fileList, err := walkAPKFiles(sourceDir)
@@ -257,17 +281,12 @@ func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFil
 	gzData.ModTime = time.Unix(0, 0)
 	twData := tar.NewWriter(gzData)
 
-	for _, file := range fileList {
-		if isControlFile(file.nameInArchive) {
-			continue
-		}
+	if err := a.writeFilteredMembers(ctx, twData, fileList,
+		func(f apkFile) bool { return !isControlFile(f.nameInArchive) }); err != nil {
+		_ = twData.Close()
+		_ = gzData.Close()
 
-		if err := a.writeFileWithChecksum(ctx, twData, file); err != nil {
-			_ = twData.Close()
-			_ = gzData.Close()
-
-			return err
-		}
+		return err
 	}
 
 	if err := twData.Close(); err != nil {
@@ -287,15 +306,19 @@ func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFil
 		return err
 	}
 
-	// Reload file list to get updated .PKGINFO
-	fileList2, err := walkAPKFiles(sourceDir)
-	if err != nil {
-		return err
-	}
+	// Update .PKGINFO entry in fileList with new stat info from disk
+	pkginfoPath := filepath.Join(sourceDir, pkginfoFileName)
 
-	for i := range fileList2 {
-		if fileList2[i].IsDir() && !strings.HasSuffix(fileList2[i].nameInArchive, "/") {
-			fileList2[i].nameInArchive += "/"
+	pkginfoInfo, err := os.Stat(pkginfoPath)
+	if err == nil {
+		// Find and update the .PKGINFO entry in fileList
+		for i := range fileList {
+			if fileList[i].nameInArchive == pkginfoFileName {
+				fileList[i].FileInfo = pkginfoInfo
+				fileList[i].diskPath = pkginfoPath
+
+				break
+			}
 		}
 	}
 
@@ -319,17 +342,12 @@ func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFil
 	gzControl.ModTime = time.Unix(0, 0)
 	twControl := tar.NewWriter(gzControl)
 
-	for _, file := range fileList2 {
-		if !isControlFile(file.nameInArchive) {
-			continue
-		}
+	if err := a.writeFilteredMembers(ctx, twControl, fileList,
+		func(f apkFile) bool { return isControlFile(f.nameInArchive) }); err != nil {
+		_ = twControl.Close()
+		_ = gzControl.Close()
 
-		if err := a.writeFileWithChecksum(ctx, twControl, file); err != nil {
-			_ = twControl.Close()
-			_ = gzControl.Close()
-
-			return err
-		}
+		return err
 	}
 
 	if err := twControl.Close(); err != nil {

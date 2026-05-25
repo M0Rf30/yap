@@ -36,6 +36,9 @@ func (mpc *MultipleProject) signArtifact(proj *Project, artifactPath string) err
 		"artifact", artifactPath,
 		"format", string(format))
 
+	// Note: signArtifact is called from runPostBuildHooks which is called from the
+	// build pipeline. The context should ideally be threaded through, but for now
+	// we use context.Background() as a fallback.
 	if err := signer.Sign(context.Background(), artifactPath); err != nil {
 		return yerrors.Wrap(err, yerrors.ErrTypeBuild, "failed to sign artifact").
 			WithOperation("signArtifact").

@@ -50,6 +50,8 @@ const (
 	PMApt = "apt"
 	// PMPacman is the Arch Linux package manager.
 	PMPacman = "pacman"
+	// PMDnf is the modern RPM-based package manager (Fedora, Rocky, RHEL).
+	PMDnf = "dnf"
 	// PMYum is the legacy RPM-based package manager.
 	PMYum = "yum"
 	// PMZypper is the openSUSE package manager.

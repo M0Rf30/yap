@@ -244,20 +244,31 @@ func (bb *BaseBuilder) LogPackageCreated(artifactPath string) {
 }
 
 // FormatRelease formats the package release string with distribution-specific suffixes.
+// For DEB packages: always appends a distro suffix (codename or distro name) for proper
+// repository targeting. The suffix is guarded against double-append for split packages.
 // For RPM packages: appends RPM distro suffix and codename (only when codename is set)
 // For other formats: returns release unchanged
-// Note: DEB has its own getRelease() method in pkg/builders/deb/dpkg.go with different
-// fallback behavior—it always appends a distro suffix (codename or distro name) for
-// proper repository targeting, while this method only appends when codename is set.
 func (bb *BaseBuilder) FormatRelease(distroSuffixMap map[string]string) {
-	if bb.PKGBUILD.Codename == "" {
-		return
-	}
-
 	switch bb.Format {
 	case formatDeb:
-		bb.PKGBUILD.PkgRel += bb.PKGBUILD.Codename
+		// DEB always appends a distro suffix for proper repository targeting
+		var suffix string
+		if bb.PKGBUILD.Codename != "" {
+			suffix = bb.PKGBUILD.Codename
+		} else {
+			suffix = bb.PKGBUILD.Distro
+		}
+
+		// Guard against double-append when called multiple times for split packages
+		if suffix != "" && !strings.HasSuffix(bb.PKGBUILD.PkgRel, suffix) {
+			bb.PKGBUILD.PkgRel += suffix
+		}
 	case constants.FormatRPM:
+		// RPM only appends when codename is set and distro is in the map
+		if bb.PKGBUILD.Codename == "" {
+			return
+		}
+
 		if suffix, exists := distroSuffixMap[bb.PKGBUILD.Distro]; exists {
 			bb.PKGBUILD.PkgRel += suffix + bb.PKGBUILD.Codename
 		}
@@ -562,15 +573,17 @@ func (bb *BaseBuilder) PrepareScriptletWithHelpers(body string) string {
 	return preamble + body
 }
 
-// SetupCrossStripEnv sets STRIP and OBJCOPY in the process environment so that
-// the Go-side strip/objcopy pass (options.Apply → binary.StripFile) uses the
-// cross-compilation binutils rather than the host tools.
+// BuildCrossStripEnvSlice returns STRIP and OBJCOPY environment variables as a
+// "KEY=VALUE" slice for safe concurrent use. Unlike SetupCrossStripEnv, it does NOT
+// mutate the process environment (no os.Setenv calls). Returns nil if no cross-compilation
+// is active or if the toolchain cannot be resolved.
 //
-// This must be called before ApplyOptions() whenever a cross-compilation target
-// is active. It is a no-op when targetArch is empty or equals the build arch.
-func (bb *BaseBuilder) SetupCrossStripEnv(targetArch string) {
+// The returned slice can be passed to ApplyOptions() to configure cross-compilation
+// binutils for the strip/objcopy pass, making it safe to call from multiple goroutines
+// simultaneously (parallel builds).
+func (bb *BaseBuilder) BuildCrossStripEnvSlice(targetArch string) []string {
 	if targetArch == "" || targetArch == bb.PKGBUILD.ArchComputed {
-		return
+		return nil
 	}
 
 	toolchain, err := bb.resolveToolchainPackages(targetArch)
@@ -578,35 +591,61 @@ func (bb *BaseBuilder) SetupCrossStripEnv(targetArch string) {
 		logger.Warn("cross-strip env: failed to resolve toolchain, strip will use native tools",
 			"target_arch", targetArch, "error", err)
 
-		return
+		return nil
 	}
 
 	prefix := toolchain.binutilsPrefix()
 	if prefix == "" {
+		return nil
+	}
+
+	logger.Debug("cross-strip env configured",
+		"STRIP", prefix+"-strip",
+		"OBJCOPY", prefix+"-objcopy")
+
+	return []string{
+		"STRIP=" + prefix + "-strip",
+		"OBJCOPY=" + prefix + "-objcopy",
+	}
+}
+
+// SetupCrossStripEnv sets STRIP and OBJCOPY in the process environment so that
+// any code path that still reads them via os.Getenv (e.g. external tooling)
+// sees the cross-compilation binutils. Internal callers should prefer
+// CrossStripEnvMap + ApplyOptionsWithEnv, which is parallel-safe.
+// No-op when targetArch is empty or equals the build arch. Guarded by envMutex
+// to serialize concurrent invocations.
+func (bb *BaseBuilder) SetupCrossStripEnv(targetArch string) {
+	env := bb.BuildCrossStripEnvSlice(targetArch)
+	if env == nil {
 		return
 	}
 
 	envMutex.Lock()
 	defer envMutex.Unlock()
 
-	if err := os.Setenv("STRIP", prefix+"-strip"); err != nil {
-		logger.Warn("cross-strip env: failed to set STRIP", "error", err)
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			if err := os.Setenv(k, v); err != nil {
+				logger.Warn("cross-strip env: failed to set "+k, "error", err)
+			}
+		}
 	}
-
-	if err := os.Setenv("OBJCOPY", prefix+"-objcopy"); err != nil {
-		logger.Warn("cross-strip env: failed to set OBJCOPY", "error", err)
-	}
-
-	logger.Debug("cross-strip env configured",
-		"STRIP", prefix+"-strip",
-		"OBJCOPY", prefix+"-objcopy")
 }
 
 // ApplyOptions runs the PKGBUILD option handlers (strip, docs, libtool, etc.)
-// against the package directory. This consolidates the duplicated options.Apply
-// call across DEB, RPM, and Pacman builders.
+// against the package directory using the process environment for STRIP/OBJCOPY.
+// Prefer ApplyOptionsWithEnv for parallel builds.
 func (bb *BaseBuilder) ApplyOptions() error {
-	return options.Apply(bb.PKGBUILD.PackageDir, options.Options{
+	return bb.ApplyOptionsWithEnv(nil)
+}
+
+// ApplyOptionsWithEnv is the env-overlay variant of ApplyOptions. The env map
+// is consulted before os.Getenv for STRIP/OBJCOPY during the strip pass.
+// Pair with BuildCrossStripEnvSlice() (parsed to a map) to scope cross-strip
+// toolchain selection without mutating the global process environment.
+func (bb *BaseBuilder) ApplyOptionsWithEnv(env map[string]string) error {
+	return options.ApplyWithEnv(bb.PKGBUILD.PackageDir, options.Options{
 		DebugEnabled:     bb.PKGBUILD.DebugEnabled,
 		DocsEnabled:      bb.PKGBUILD.DocsEnabled,
 		EmptyDirsEnabled: bb.PKGBUILD.EmptyDirsEnabled,
@@ -615,5 +654,23 @@ func (bb *BaseBuilder) ApplyOptions() error {
 		StaticEnabled:    bb.PKGBUILD.StaticEnabled,
 		StripEnabled:     bb.PKGBUILD.StripEnabled,
 		ZipManEnabled:    bb.PKGBUILD.ZipManEnabled,
-	})
+	}, env)
+}
+
+// CrossStripEnvMap parses BuildCrossStripEnvSlice into a map[K]V usable with
+// ApplyOptionsWithEnv. Returns nil if no cross-strip env is needed.
+func (bb *BaseBuilder) CrossStripEnvMap(targetArch string) map[string]string {
+	slice := bb.BuildCrossStripEnvSlice(targetArch)
+	if slice == nil {
+		return nil
+	}
+
+	m := make(map[string]string, len(slice))
+	for _, kv := range slice {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			m[k] = v
+		}
+	}
+
+	return m
 }

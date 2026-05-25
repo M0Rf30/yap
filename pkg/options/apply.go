@@ -13,10 +13,19 @@ type Options struct {
 }
 
 // Apply runs all enabled/disabled option handlers against packageDir in the
-// correct order (strip first, then cleanup passes).
+// correct order (strip first, then cleanup passes). STRIP/OBJCOPY are read
+// from the process environment; use ApplyWithEnv for parallel-safe overrides.
 func Apply(packageDir string, o Options) error {
+	return ApplyWithEnv(packageDir, o, nil)
+}
+
+// ApplyWithEnv is the env-overlay variant of Apply. The env map is consulted
+// before os.Getenv for STRIP/OBJCOPY during the strip pass, allowing parallel
+// builds to scope cross-compilation toolchain selection without mutating the
+// global process environment.
+func ApplyWithEnv(packageDir string, o Options, env map[string]string) error {
 	if o.StripEnabled {
-		if err := Strip(packageDir); err != nil {
+		if err := StripWithEnv(packageDir, env); err != nil {
 			return err
 		}
 	}
@@ -60,9 +69,7 @@ func Apply(packageDir string, o Options) error {
 
 	// NOTE: DebugEnabled is intentionally not handled here. Debug symbol separation
 	// is handled separately via the --debug-dir flag and the Strip() function in
-	// strip.go, which calls binutil.SeparateDebugInfo() when a debug directory is
-	// configured. The DebugEnabled flag controls whether debug symbols are preserved
-	// during stripping, not whether they are separated into a separate directory.
+	// strip.go.
 
 	return nil
 }

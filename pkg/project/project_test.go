@@ -1,6 +1,7 @@
 package project_test
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -458,7 +459,7 @@ package() {
 
 	// Test BuildAll (should not panic even if there are errors)
 	assert.NotPanics(t, func() {
-		buildErr := mpc.BuildAll()
+		buildErr := mpc.BuildAll(context.Background())
 		// BuildAll might return errors due to missing dependencies
 		if buildErr != nil {
 			t.Logf("BuildAll returned error (may be expected): %v", buildErr)
@@ -758,7 +759,7 @@ depends=("mylib")
 		assert.NotEmpty(t, mpc.Projects)
 		// Test that BuildAll doesn't panic even with dependencies
 		assert.NotPanics(t, func() {
-			buildErr := mpc.BuildAll()
+			buildErr := mpc.BuildAll(context.Background())
 			if buildErr != nil {
 				t.Logf("BuildAll returned error (may be expected): %v", buildErr)
 			}
@@ -813,7 +814,7 @@ func TestMultipleProjectWithFromToPkgName(t *testing.T) {
 	}
 
 	assert.NotPanics(t, func() {
-		buildErr := mpc.BuildAll()
+		buildErr := mpc.BuildAll(context.Background())
 		if buildErr != nil {
 			t.Logf("BuildAll returned error (may be expected): %v", buildErr)
 		}
@@ -1097,7 +1098,7 @@ makedepends=("gcc" "make")
 
 	// Test BuildAll with complex dependencies
 	assert.NotPanics(t, func() {
-		buildErr := mpc.BuildAll()
+		buildErr := mpc.BuildAll(context.Background())
 		if buildErr != nil {
 			t.Logf("BuildAll returned error (may be expected): %v", buildErr)
 		}
@@ -1166,7 +1167,7 @@ package() {
 
 	// BuildAll must not panic and must not return an error when NoBuild=true skips compilation
 	assert.NotPanics(t, func() {
-		buildErr := mpc.BuildAll()
+		buildErr := mpc.BuildAll(context.Background())
 		if buildErr != nil {
 			t.Logf("BuildAll returned error (may be expected): %v", buildErr)
 		}
@@ -1249,7 +1250,7 @@ package() {
 
 		// Sequential path never calls resolveDependencies, so circular deps are not detected.
 		if len(mpc.Projects) > 0 {
-			buildErr := mpc.BuildAll()
+			buildErr := mpc.BuildAll(context.Background())
 			// A nil error or any non-circular error is acceptable — what must NOT happen
 			// is an ErrCircularDependency, since that is only raised in the parallel path.
 			if buildErr != nil {
@@ -1275,7 +1276,7 @@ package() {
 
 		// Parallel path calls resolveDependencies which must detect the cycle.
 		if len(mpc.Projects) > 0 {
-			buildErr := mpc.BuildAll()
+			buildErr := mpc.BuildAll(context.Background())
 			require.Error(t, buildErr, "parallel path must detect circular dependency")
 			assert.True(t, errors.Is(buildErr, project.ErrCircularDependency),
 				"expected ErrCircularDependency, got: %v", buildErr)

@@ -96,6 +96,8 @@ func downloadRPM(ctx context.Context, _ *dnfcache.Cache, pkg *dnfcache.PackageIn
 
 // installPackage extracts a single RPM file to rootDir.
 // Implements the full install sequence: verify → %pretrans → %pre → extract → %post → yapdb → rpmdb → %posttrans.
+//
+//nolint:gocyclo,cyclop // sequential install phases each guarded by a strict/non-strict scriptlet branch
 func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) (retErr error) {
 	// Acquire install lock to prevent concurrent modifications.
 	release, err := acquireLock(ctx, rootDir)
@@ -141,6 +143,12 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 	// continue on failure so a quirky third-party package doesn't abort
 	// the build environment provisioning.
 	if err := runScriptlet(ctx, scriptletPreTrans, rpm, rootDir, opts); err != nil {
+		if opts.StrictScriptlets {
+			return errors.Wrap(err, errors.ErrTypeBuild, "pretrans scriptlet failed").
+				WithOperation("installPackage").
+				WithContext("package", pkgName)
+		}
+
 		logger.Warn("pretrans scriptlet failed (continuing)",
 			"package", pkgName, "error", err.Error())
 	}
@@ -163,6 +171,12 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 	// Run %post scriptlet (after file extraction).
 	// Per RPM convention, %post failures are non-fatal: log and continue.
 	if err := runScriptlet(ctx, scriptletPostIn, rpm, rootDir, opts); err != nil {
+		if opts.StrictScriptlets {
+			return errors.Wrap(err, errors.ErrTypeBuild, "postin scriptlet failed").
+				WithOperation("installPackage").
+				WithContext("package", pkgName)
+		}
+
 		logger.Warn("postin scriptlet failed (continuing)",
 			"package", pkgName, "error", err.Error())
 	}
@@ -176,17 +190,28 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 			WithContext("package", pkgName)
 	}
 
-	// Optionally write system rpmdb (SQLite only; warn-and-continue on BDB).
+	// Optionally write system rpmdb (SQLite only).
+	// Currently unimplemented: the writer stub always errors. To avoid silent
+	// data-integrity surprises, opting in is treated as a hard failure.
 	if opts.WriteSystemRpmdb {
-		//nolint:staticcheck // SA4023: writeSystemRpmdb stub always returns a non-nil error today; kept for future wiring
+		//nolint:staticcheck // SA4023: stub always returns non-nil error; kept for future wiring
 		if err := writeSystemRpmdb(ctx, rpm, entry, rootDir); err != nil {
-			logger.Warn("system rpmdb write skipped", "error", err.Error(), "package", pkgName)
+			return errors.Wrap(err, errors.ErrTypeInternal,
+				"WriteSystemRpmdb requested but not implemented").
+				WithOperation("installPackage").
+				WithContext("package", pkgName)
 		}
 	}
 
 	// Run %posttrans scriptlet (after everything).
 	// Per RPM convention, %posttrans failures are non-fatal: log and continue.
 	if err := runScriptlet(ctx, scriptletPostTrans, rpm, rootDir, opts); err != nil {
+		if opts.StrictScriptlets {
+			return errors.Wrap(err, errors.ErrTypeBuild, "posttrans scriptlet failed").
+				WithOperation("installPackage").
+				WithContext("package", pkgName)
+		}
+
 		logger.Warn("posttrans scriptlet failed (continuing)",
 			"package", pkgName, "error", err.Error())
 	}

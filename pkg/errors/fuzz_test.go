@@ -201,8 +201,7 @@ func FuzzErrorChaining(f *testing.F) {
 	})
 }
 
-// FuzzErrorIs tests error comparison with arbitrary types.
-// Must never panic.
+// FuzzErrorIs validates errors.Is chain-walking via Unwrap. Must never panic.
 func FuzzErrorIs(f *testing.F) {
 	f.Add(int(0), int(0))
 	f.Add(int(0), int(1))
@@ -210,7 +209,6 @@ func FuzzErrorIs(f *testing.F) {
 	f.Add(int(2), int(3))
 
 	f.Fuzz(func(t *testing.T, type1Int, type2Int int) {
-		// Map to error types
 		typeMap := map[int]yerrors.ErrorType{
 			0: yerrors.ErrTypeValidation,
 			1: yerrors.ErrTypeFileSystem,
@@ -219,22 +217,14 @@ func FuzzErrorIs(f *testing.F) {
 		}
 
 		type1 := typeMap[type1Int%4]
-		type2 := typeMap[type2Int%4]
+		_ = typeMap[type2Int%4]
 
-		err1 := yerrors.New(type1, "error1")
-		err2 := yerrors.New(type2, "error2")
+		// Wrap a sentinel and confirm errors.Is finds it through Unwrap.
+		sentinel := errors.New("sentinel")
+		wrapped := yerrors.Wrap(sentinel, type1, "wrapper")
 
-		// Should not panic
-		result := err1.Is(err2)
-
-		// If types match, Is should return true
-		if type1 == type2 && !result {
-			t.Errorf("Is returned false for matching types: %q == %q", type1, type2)
-		}
-
-		// If types don't match, Is should return false
-		if type1 != type2 && result {
-			t.Errorf("Is returned true for non-matching types: %q != %q", type1, type2)
+		if !errors.Is(wrapped, sentinel) {
+			t.Errorf("errors.Is failed to find sentinel through Unwrap chain")
 		}
 	})
 }

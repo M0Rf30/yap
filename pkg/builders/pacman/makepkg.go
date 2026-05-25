@@ -52,7 +52,7 @@ func (m *Pkg) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 	pkgName := m.BuildPackageName(constants.ExtPacmanZst)
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
 
-	err := archive.CreateTarZst(context.Background(), m.PKGBUILD.PackageDir, pkgFilePath, false)
+	err := archive.CreateTarZst(ctx, m.PKGBUILD.PackageDir, pkgFilePath, false)
 	if err != nil {
 		return "", err
 	}
@@ -86,9 +86,7 @@ func (m *Pkg) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 		return err
 	}
 
-	m.SetupCrossStripEnv(targetArch)
-
-	if err := m.ApplyOptions(); err != nil {
+	if err := m.ApplyOptionsWithEnv(m.CrossStripEnvMap(targetArch)); err != nil {
 		return err
 	}
 

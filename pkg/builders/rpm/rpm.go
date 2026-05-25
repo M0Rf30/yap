@@ -147,9 +147,8 @@ func (r *RPM) PrepareFakeroot(ctx context.Context, _ string, targetArch string) 
 	r.getRelease()
 	r.LogCrossCompilation(targetArch)
 	r.SetTargetArchitecture(targetArch)
-	r.SetupCrossStripEnv(targetArch)
 
-	return r.ApplyOptions()
+	return r.ApplyOptionsWithEnv(r.CrossStripEnvMap(targetArch))
 }
 
 // createFilesInsideRPM prepares and adds files to the specified RPM object.
