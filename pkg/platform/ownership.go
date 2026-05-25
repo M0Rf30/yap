@@ -155,7 +155,21 @@ func PreserveOwnership(path string) error {
 }
 
 // PreserveOwnershipRecursive recursively changes ownership to original user if under sudo.
+//
+// In container environments (detected via YAP_IN_CONTAINER=1, baked into all
+// yap Docker images by build/deploy/generate.sh) the chown is skipped. The
+// container's runtime user is already the intended build user, so chowning the
+// source tree adds nothing and on overlayfs can trigger copy-up races that
+// cause execve() of freshly-chowned scripts to return ENOEXEC (observed in
+// k3s/Fedora CoreOS Jenkins pods).
 func PreserveOwnershipRecursive(path string) error {
+	if os.Getenv("YAP_IN_CONTAINER") == "1" {
+		logger.Debug("skipping recursive ownership preservation in container",
+			"path", path)
+
+		return nil
+	}
+
 	originalUser, err := GetOriginalUser()
 	if err != nil {
 		logger.Warn(i18n.T("logger.platform.warn.get_user"), "error", err)
