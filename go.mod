@@ -7,8 +7,7 @@ toolchain go1.26.1
 require (
 	github.com/M0Rf30/rpmpack v0.0.0-20260516153039-ce80a51ac79c
 	github.com/ProtonMail/go-crypto v1.4.1
-	github.com/bodgit/sevenzip v1.6.3
-	github.com/cavaliergopher/cpio v1.0.1
+	github.com/bodgit/sevenzip v1.6.4
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.7.0
 	github.com/go-git/go-git/v5 v5.19.1
@@ -18,7 +17,7 @@ require (
 	github.com/klauspost/pgzip v1.2.6
 	github.com/m0rf30/ar v1.0.0
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
-	github.com/nwaples/rardecode/v2 v2.2.2
+	github.com/nwaples/rardecode/v2 v2.2.3
 	github.com/otiai10/copy v1.14.1
 	github.com/pierrec/lz4/v4 v4.1.26
 	github.com/rootless-containers/rootlesskit/v2 v2.3.6
@@ -42,6 +41,7 @@ require (
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
+	github.com/cavaliergopher/cpio v1.0.1 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/containernetworking/plugins v1.9.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
