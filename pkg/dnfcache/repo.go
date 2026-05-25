@@ -181,6 +181,12 @@ type primaryLocation struct {
 type primaryFormat struct {
 	Requires []primaryEntry `xml:"requires>entry"`
 	Provides []primaryEntry `xml:"provides>entry"`
+	// Files are file paths owned by the package and embedded in primary.xml
+	// by createrepo_c's "primary files" subset (mostly /etc/*, /usr/bin/*,
+	// /usr/sbin/*, /bin/*, /sbin/* and a few sendmail-style exceptions).
+	// They are indexed as virtual providers so file-based Requires such as
+	// "/usr/bin/perl" resolve to the owning package the way real dnf does.
+	Files []string `xml:"file"`
 }
 
 type primaryEntry struct {
@@ -792,19 +798,31 @@ func buildPackageInfo(pkg *primaryPackage, baseURL string) *PackageInfo {
 
 	for _, req := range pkg.Format.Requires {
 		name := StripRPMConstraint(req.Name)
-		// Skip rpmlib() and path-style deps — not resolvable from index.
-		if name == "" || strings.HasPrefix(name, "rpmlib(") || strings.HasPrefix(name, "/") {
+		// Skip rpmlib() deps — they describe rpm-format features, not packages.
+		// Path-style deps (e.g. "/usr/bin/perl") are kept and resolved via the
+		// file paths indexed from <file> entries in primary.xml.
+		if name == "" || strings.HasPrefix(name, "rpmlib(") {
 			continue
 		}
 
 		requires = append(requires, name)
 	}
 
-	provides := make([]string, 0, len(pkg.Format.Provides))
+	provides := make([]string, 0, len(pkg.Format.Provides)+len(pkg.Format.Files))
 
 	for _, prov := range pkg.Format.Provides {
 		if prov.Name != "" {
 			provides = append(provides, prov.Name)
+		}
+	}
+
+	// Owned file paths act as virtual providers so file-based Requires
+	// resolve to the package that owns the file. createrepo_c only embeds a
+	// curated subset of paths in primary.xml; the full filelist lives in
+	// filelists.xml and is intentionally not loaded here (size).
+	for _, f := range pkg.Format.Files {
+		if f != "" {
+			provides = append(provides, f)
 		}
 	}
 

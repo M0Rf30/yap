@@ -171,3 +171,67 @@ func TestLoadInstalledProvidesSubprocessReturnsMap(t *testing.T) {
 	result := loadInstalledProvidesSubprocess(ctx)
 	assert.NotNil(t, result, "loadInstalledProvidesSubprocess should return non-nil map")
 }
+
+// ---- file-based Requires (e.g. "/usr/bin/perl") ----
+
+// TestParsePrimaryXMLFilePathRequires mirrors the Rocky 9 autoconf scenario:
+// autoconf declares `Requires: /usr/bin/perl` (a file-path requirement) and the
+// perl-interpreter package owns `/usr/bin/perl` via a `<file>` entry in
+// primary.xml. The resolver must walk autoconf → /usr/bin/perl →
+// perl-interpreter so perl-interpreter gets pulled into the install closure.
+func TestParsePrimaryXMLFilePathRequires(t *testing.T) {
+	const primary = `<?xml version="1.0" encoding="UTF-8"?>
+<metadata xmlns="http://linux.duke.edu/metadata/common"
+          xmlns:rpm="http://linux.duke.edu/metadata/rpm">
+  <package type="rpm">
+    <name>autoconf</name>
+    <arch>noarch</arch>
+    <version epoch="0" ver="2.71" rel="9.el9"/>
+    <checksum type="sha256" pkgid="YES">aaaa</checksum>
+    <size package="700000"/>
+    <location href="Packages/a/autoconf-2.71-9.el9.noarch.rpm"/>
+    <format>
+      <rpm:provides><rpm:entry name="autoconf"/></rpm:provides>
+      <rpm:requires>
+        <rpm:entry name="/usr/bin/perl"/>
+        <rpm:entry name="m4" flags="GE" ver="1.4.16"/>
+        <rpm:entry name="rpmlib(CompressedFileNames)" flags="LE" ver="3.0.4-1"/>
+      </rpm:requires>
+    </format>
+  </package>
+  <package type="rpm">
+    <name>perl-interpreter</name>
+    <arch>x86_64</arch>
+    <version epoch="4" ver="5.32.1" rel="481.el9"/>
+    <checksum type="sha256" pkgid="YES">bbbb</checksum>
+    <size package="80000"/>
+    <location href="Packages/p/perl-interpreter-5.32.1-481.el9.x86_64.rpm"/>
+    <format>
+      <rpm:provides><rpm:entry name="perl-interpreter"/></rpm:provides>
+      <file>/usr/bin/perl</file>
+    </format>
+  </package>
+</metadata>`
+
+	c := newCache()
+	require.NoError(t, c.parsePrimaryXML(strings.NewReader(primary), "http://mirror/"))
+
+	// autoconf must keep /usr/bin/perl as a require (not stripped).
+	autoconf, ok := c.Lookup("autoconf")
+	require.True(t, ok, "autoconf not indexed")
+	assert.Contains(t, autoconf.Requires, "/usr/bin/perl",
+		"path-style requires must survive parsing")
+
+	// /usr/bin/perl must be indexed as a virtual provider of perl-interpreter.
+	c.mu.RLock()
+	providers := c.providers["/usr/bin/perl"]
+	c.mu.RUnlock()
+	require.Len(t, providers, 1, "expected one provider for /usr/bin/perl")
+	assert.Equal(t, "perl-interpreter", providers[0].Name)
+
+	// rpmlib() requires must still be filtered out.
+	for _, r := range autoconf.Requires {
+		assert.NotContains(t, r, "rpmlib(",
+			"rpmlib() requires should be stripped, got %q", r)
+	}
+}

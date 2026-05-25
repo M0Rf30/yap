@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -1129,8 +1130,11 @@ func TestBuildPackageInfoSkipsRpmlibDeps(t *testing.T) {
 	}
 }
 
-// TestBuildPackageInfoSkipsPathDeps tests that path-style deps (/usr/bin/...) are filtered.
-func TestBuildPackageInfoSkipsPathDeps(t *testing.T) {
+// TestBuildPackageInfoKeepsPathDeps verifies that path-style requires such as
+// "/usr/bin/python3" are kept in Requires so the resolver can match them
+// against the file paths indexed from <file> entries in primary.xml. rpmlib()
+// requires must still be filtered.
+func TestBuildPackageInfoKeepsPathDeps(t *testing.T) {
 	pkg := &primaryPackage{
 		Name: "myapp",
 		Arch: "x86_64",
@@ -1144,6 +1148,7 @@ func TestBuildPackageInfoSkipsPathDeps(t *testing.T) {
 				{Name: "/usr/bin/python3"},
 				{Name: "/bin/sh"},
 				{Name: "glibc"},
+				{Name: "rpmlib(CompressedFileNames)"},
 			},
 		},
 	}
@@ -1153,14 +1158,9 @@ func TestBuildPackageInfoSkipsPathDeps(t *testing.T) {
 		t.Fatal("buildPackageInfo should not return nil for valid package")
 	}
 
-	for _, req := range info.Requires {
-		if req != "" && req[0] == '/' {
-			t.Errorf("path dep should be filtered out, got %q", req)
-		}
-	}
-
-	if len(info.Requires) != 1 || info.Requires[0] != "glibc" {
-		t.Errorf("expected only [glibc] in Requires, got %v", info.Requires)
+	want := []string{"/usr/bin/python3", "/bin/sh", "glibc"}
+	if !reflect.DeepEqual(info.Requires, want) {
+		t.Errorf("expected Requires=%v, got %v", want, info.Requires)
 	}
 }
 
