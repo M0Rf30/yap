@@ -492,22 +492,15 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 		"closure", len(resolved),
 		"transitive", len(resolved)-countDirect(resolved, seedSet))
 
-	// Filter the closure to only packages that are safe to extract to /.
-	// Foreign-arch packages overwrite host binaries if extracted blindly
-	// (e.g. bash:arm64 ships /bin/bash which would shadow the running shell),
-	// so apply the same dpkg co-installability rule: only Multi-Arch: same
-	// foreign-arch packages may be extracted — they live in arch-qualified
-	// paths (/usr/lib/<triplet>/, /lib/<triplet>/, /usr/include/<triplet>/)
-	// and cannot collide with host files. Everything else is dropped: the
-	// host copy already satisfies the dependency for build-time linking.
-	extractable := filterExtractableClosure(resolved)
-
-	logger.Info("filtered cross-deps closure for extraction",
-		"resolved", len(resolved),
-		"extractable", len(extractable),
-		"dropped", len(resolved)-len(extractable))
-
-	for _, info := range extractable {
+	// Extract every resolved foreign-arch package. The closure is already
+	// clean of host tools because aptcache.ResolveDeps redirects
+	// Multi-Arch: foreign packages to host-arch (they're host-only by
+	// definition, already installed). What remains is target-arch runtime
+	// libraries that the build needs to link against — safe to overlay
+	// because they live in either arch-qualified paths (libc6:arm64 →
+	// /lib/aarch64-linux-gnu/) or vendor-isolated prefixes
+	// (carbonio-libxml2 → /opt/zextras/common/).
+	for _, info := range resolved {
 		if info == nil || info.Filename == "" {
 			continue
 		}
@@ -532,61 +525,6 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 	}
 
 	return nil
-}
-
-// filterExtractableClosure returns the subset of resolved closure entries
-// that are safe to extract directly to "/" without dpkg.
-//
-// dpkg's pre-unpack co-installability check rejects any package that would
-// overwrite a file owned by another arch unless both copies are Multi-Arch: same
-// (and byte-identical). DownloadAndExtractCrossDeps bypasses dpkg, so we
-// replicate the rule manually:
-//
-//   - Architecture: all → safe (arch-independent, would just re-extract).
-//   - host-arch packages → safe (they ARE the host install).
-//   - foreign-arch + Multi-Arch: same → safe (files live in /usr/lib/<triplet>/
-//     so they cannot collide with the host arch's copy).
-//   - foreign-arch + Multi-Arch: foreign/no/allowed → DROP. These ship files
-//     in unqualified paths (/bin/bash, /usr/bin/perl, /usr/lib/libfoo.so) and
-//     would clobber the running host binaries or libraries.
-//   - Essential foreign-arch → DROP. Essential packages always ship in
-//     unqualified paths and overwriting them breaks the build environment.
-func filterExtractableClosure(resolved []*aptcache.PackageInfo) []*aptcache.PackageInfo {
-	const archAll = "all"
-
-	hostArch := aptcache.GoarchToDebArch()
-
-	out := resolved[:0]
-
-	for _, p := range resolved {
-		if p == nil {
-			continue
-		}
-
-		arch := p.Architecture
-
-		// Architecture: all or host arch — safe to extract.
-		if arch == "" || arch == archAll || arch == hostArch {
-			out = append(out, p)
-			continue
-		}
-
-		// Foreign arch: only Multi-Arch: same packages live in arch-qualified
-		// paths and can be safely extracted alongside the host copy.
-		if p.MultiArchSame() && !p.Essential {
-			out = append(out, p)
-			continue
-		}
-
-		logger.Debug("dropping foreign-arch package from cross-deps extract",
-			"package", p.Name,
-			"arch", arch,
-			"multi_arch", p.MultiArch,
-			"essential", p.Essential,
-			"reason", "would overwrite host files")
-	}
-
-	return out
 }
 
 // countDirect returns the number of resolved entries whose name appears in

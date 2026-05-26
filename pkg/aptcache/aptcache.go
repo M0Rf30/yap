@@ -454,6 +454,9 @@ func (c *Cache) makeDepVisitor(visited map[string]bool, order *[]*PackageInfo, u
 			return nil
 		}
 
+		// Redirect Multi-Arch: foreign packages to host-arch (see helper).
+		info, arch = c.redirectForeignToHost(info, name, arch)
+
 		// If the found package has a different architecture than the requested
 		// one (e.g., found arm64 entry when requesting amd64), use the actual
 		// package's architecture for child dependencies so transitive deps
@@ -476,6 +479,32 @@ func (c *Cache) makeDepVisitor(visited map[string]bool, order *[]*PackageInfo, u
 	}
 
 	return visit
+}
+
+// redirectForeignToHost redirects Multi-Arch: foreign packages to host-arch.
+//
+// Multi-Arch: foreign means "a single copy of this package satisfies
+// dependencies from any architecture" — by definition a host tool (gawk,
+// perl, m4, autoconf, debianutils, …). When a foreign-arch build pulls one
+// in transitively, resolve it to host-arch so the cross-extract step
+// doesn't overlay an arm64 gawk on top of the host x86_64 gawk and break
+// later configure scripts with "Exec format error".
+//
+// Returns the (possibly redirected) info and arch.
+func (c *Cache) redirectForeignToHost(
+	info *PackageInfo, name, arch string,
+) (resolved *PackageInfo, resolvedArch string) {
+	hostArch := GoarchToDebArch()
+	if !info.MultiArchForeign() || arch == hostArch {
+		return info, arch
+	}
+
+	hostInfo, ok := c.entries[entryKey(name, hostArch)]
+	if !ok {
+		return info, arch
+	}
+
+	return hostInfo, hostArch
 }
 
 // tryResolveVirtual attempts to resolve a virtual package name to a concrete provider.
