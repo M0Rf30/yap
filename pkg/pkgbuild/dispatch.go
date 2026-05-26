@@ -85,6 +85,15 @@ var scalarHandlers = map[string]scalarHandler{
 	"host_arch": {
 		apply: func(p *PKGBUILD, v string) { p.HostArch = v },
 	},
+	"multiarch": {
+		apply: func(p *PKGBUILD, v string) { p.MultiArch = v },
+	},
+	"source_pkg": {
+		apply: func(p *PKGBUILD, v string) { p.SourcePkg = v },
+	},
+	"bugs": {
+		apply: func(p *PKGBUILD, v string) { p.Bugs = v },
+	},
 }
 
 // arrayHandlers maps PKGBUILD array variable names to their handlers.
@@ -125,6 +134,18 @@ var arrayHandlers = map[string]arrayHandler{
 	},
 	"replaces": func(p *PKGBUILD, v []string, _ int) {
 		p.Replaces = v
+	},
+	"breaks": func(p *PKGBUILD, v []string, _ int) {
+		p.Breaks = v
+	},
+	"predepends": func(p *PKGBUILD, v []string, _ int) {
+		p.PreDepends = v
+	},
+	"suggests": func(p *PKGBUILD, v []string, _ int) {
+		p.Suggests = v
+	},
+	"builtusing": func(p *PKGBUILD, v []string, _ int) {
+		p.BuiltUsing = v
 	},
 	sourceKey: func(p *PKGBUILD, v []string, priority int) {
 		if priority > priorityBase {

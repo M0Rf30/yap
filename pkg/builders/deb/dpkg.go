@@ -4,9 +4,12 @@ package deb
 import (
 	"compress/gzip"
 	"context"
+	"crypto/md5" //nolint:gosec // Debian Policy requires md5sums file format.
+	"encoding/hex"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -477,5 +480,107 @@ func (d *Package) createDebResources() error {
 		return err
 	}
 
-	return nil
+	// md5sums must be the last control resource generated: it hashes every
+	// regular file under PackageDir, which means changelog.Debian.gz and any
+	// other generated data-tar contents must already be in place.
+	return d.createMd5sums()
+}
+
+// createMd5sums walks the package payload (everything under PackageDir except
+// the control directory DEBIAN/) and writes a Debian-Policy-compliant md5sums
+// file into DEBIAN/. Lines are "<hex md5>  <relative path>\n", paths are
+// relative to the filesystem root (i.e. no leading slash), sorted lexically
+// to match dpkg-deb -b output. Symlinks, directories, and special files are
+// skipped per Policy §3.9.
+func (d *Package) createMd5sums() error {
+	type entry struct {
+		path string
+		sum  string
+	}
+
+	var entries []entry
+
+	root := d.PKGBUILD.PackageDir
+
+	err := filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		// Skip the DEBIAN control directory entirely.
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return relErr
+		}
+
+		if rel == "DEBIAN" || strings.HasPrefix(rel, "DEBIAN"+string(filepath.Separator)) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+
+			return nil
+		}
+
+		// Only hash regular files. Skip dirs, symlinks, devices, fifos, etc.
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+
+		sum, sumErr := md5File(path)
+		if sumErr != nil {
+			return sumErr
+		}
+
+		// Debian md5sums paths are relative to / (no leading slash) and use
+		// forward slashes regardless of host OS.
+		entries = append(entries, entry{
+			path: filepath.ToSlash(rel),
+			sum:  sum,
+		})
+
+		return nil
+	})
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to walk package dir for md5sums").
+			WithOperation("createMd5sums")
+	}
+
+	if len(entries) == 0 {
+		return nil
+	}
+
+	// Sort for reproducibility / byte-identical output across runs.
+	sort.Slice(entries, func(i, j int) bool { return entries[i].path < entries[j].path })
+
+	var buf strings.Builder
+
+	for _, e := range entries {
+		buf.WriteString(e.sum)
+		buf.WriteString("  ")
+		buf.WriteString(e.path)
+		buf.WriteByte('\n')
+	}
+
+	return files.CreateWrite(filepath.Join(d.debDir, "md5sums"), buf.String())
+}
+
+// md5File streams a file through md5 and returns the hex digest.
+func md5File(path string) (string, error) {
+	f, err := os.Open(filepath.Clean(path))
+	if err != nil {
+		return "", err
+	}
+
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			logger.Warn("failed to close file", "path", path, "error", cerr)
+		}
+	}()
+
+	h := md5.New() //nolint:gosec // Debian Policy mandates md5 for the md5sums file.
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

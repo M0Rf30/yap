@@ -12,16 +12,24 @@ Priority: {{.Priority}}
 {{- if .ArchComputed}}
 Architecture: {{.ArchComputed}}
 {{- end }}
-{{- if eq .ArchComputed "all"}}
+{{- if .MultiArch}}
+Multi-Arch: {{.MultiArch}}
+{{- else if eq .ArchComputed "all"}}
 Multi-Arch: foreign
 {{- end }}
 {{- /* Optional fields */ -}}
 {{- if .Maintainer}}
 Maintainer: {{.Maintainer}}
 {{- end }}
+{{- if .SourcePkg}}
+Source: {{.SourcePkg}}
+{{- end }}
 Installed-Size: {{.InstalledSize}}
 {{- with .Provides}}
 Provides: {{join .}}
+{{- end }}
+{{- with .PreDepends}}
+Pre-Depends: {{join .}}
 {{- end }}
 {{- with .Depends}}
 Depends: {{join .}}
@@ -29,14 +37,29 @@ Depends: {{join .}}
 {{- with .Conflicts}}
 Conflicts: {{join .}}
 {{- end }}
+{{- with .Breaks}}
+Breaks: {{join .}}
+{{- end }}
 {{- with .Replaces}}
 Replaces: {{join .}}
 {{- end }}
 {{- with .OptDepends}}
 Recommends: {{join .}}
 {{- end }}
+{{- with .Suggests}}
+Suggests: {{join .}}
+{{- end }}
+{{- with .Enhances}}
+Enhances: {{join .}}
+{{- end }}
+{{- with .BuiltUsing}}
+Built-Using: {{join .}}
+{{- end }}
 {{- if .URL}}
 Homepage: {{.URL}}
+{{- end }}
+{{- if .Bugs}}
+Bugs: {{.Bugs}}
 {{- end }}
 {{- /* Mandatory fields */}}
 Description: {{multiline .PkgDesc}}

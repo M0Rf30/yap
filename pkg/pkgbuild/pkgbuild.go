@@ -117,6 +117,13 @@ type PKGBUILD struct {
 	Codename        string
 	Commit          string
 	Conflicts       []string
+	Breaks          []string
+	PreDepends      []string
+	Suggests        []string
+	BuiltUsing      []string
+	MultiArch       string
+	SourcePkg       string
+	Bugs            string
 	Copyright       []string
 	CustomArrays    map[string][]string
 	CustomVariables map[string]string
