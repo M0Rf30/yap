@@ -62,8 +62,6 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 		epoch = uint64(rpmpack.NoEpoch)
 	}
 
-	copyright := strings.Join(r.PKGBUILD.Copyright, "; ")
-	copyright = strings.TrimSuffix(copyright, " ")
 	license := strings.Join(r.PKGBUILD.License, " ")
 
 	pkgFilePath := filepath.Join(artifactsPath, pkgName)
@@ -82,17 +80,28 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 		Version:     r.PKGBUILD.PkgVer,
 		Release:     r.PKGBUILD.PkgRel,
 		Arch:        r.PKGBUILD.ArchComputed,
-		Vendor:      copyright,
 		URL:         r.PKGBUILD.URL,
 		Packager:    r.PKGBUILD.Maintainer,
 		Group:       r.PKGBUILD.Section,
 		Compressor:  r.compression,
 		Licence:     license,
+		// BuildHost is fixed for reproducibility — rpmpack would otherwise
+		// embed the build machine's hostname, leaking build-infra detail
+		// and breaking byte-identical rebuilds.
+		BuildHost: "yap",
+		// Distribution is the target distro flavour the package was built for.
+		// FullDistroName looks like "rocky_9" / "ubuntu_jammy"; close enough
+		// to what `rpm -qi`'s Distribution tag is meant to convey.
+		Distribution: r.PKGBUILD.FullDistroName,
+		// BugURL maps directly from the `bugs=` PKGBUILD scalar (also wired
+		// to deb Bugs:).
+		BugURL:      r.PKGBUILD.Bugs,
 		Obsoletes:   rel.obsoletes,
 		Provides:    rel.provides,
 		Requires:    rel.requires,
 		Conflicts:   rel.conflicts,
 		Recommends:  rel.recommends,
+		Suggests:    rel.suggests,
 		Enhances:    rel.enhances,
 		Supplements: rel.supplements,
 		BuildTime:   files.SourceDateEpochFromEnv(),
@@ -429,8 +438,8 @@ func (r *RPM) getRelease() {
 // Grouping them avoids 7 sequential local variables in BuildPackage and makes the
 // build-up phase trivially testable in isolation.
 type rpmRelations struct {
-	obsoletes, provides, requires, conflicts rpmpack.Relations
-	recommends, enhances, supplements        rpmpack.Relations
+	obsoletes, provides, requires, conflicts    rpmpack.Relations
+	recommends, suggests, enhances, supplements rpmpack.Relations
 }
 
 // buildDependencyRelations computes every dependency relation needed by the RPM
@@ -447,6 +456,7 @@ func (r *RPM) buildDependencyRelations() (rpmRelations, error) {
 		{&rel.requires, r.PKGBUILD.Depends},
 		{&rel.conflicts, r.PKGBUILD.Conflicts},
 		{&rel.recommends, r.PKGBUILD.OptDepends},
+		{&rel.suggests, r.PKGBUILD.Suggests},
 		{&rel.enhances, r.PKGBUILD.Enhances},
 		{&rel.supplements, r.PKGBUILD.Supplements},
 	}
