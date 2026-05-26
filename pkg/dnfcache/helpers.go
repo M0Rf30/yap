@@ -194,6 +194,7 @@ const (
 	archX8664   = "x86_64"
 	archPPC64LE = "ppc64le"
 	archS390X   = "s390x"
+	archI686    = "i686"
 )
 
 // goArchToRPM maps GOARCH values to RPM $basearch strings.
@@ -204,7 +205,7 @@ func goArchToRPM() string {
 	case "arm64":
 		return "aarch64"
 	case "386":
-		return "i686"
+		return archI686
 	case "arm":
 		return "armhfp"
 	case "ppc64le": //nolint:goconst

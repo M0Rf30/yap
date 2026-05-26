@@ -208,13 +208,15 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 		if !ok {
 			// Try virtual/capability resolution.
 			if providers, ok2 := c.providers[name]; ok2 && len(providers) > 0 {
+				chosen := pickProvider(providers)
 				logger.Debug("dnfcache: resolved virtual",
 					"capability", name,
-					"provider", providers[0].Name)
+					"provider", chosen.Name,
+					"arch", chosen.Arch)
 
 				resolvedViaVirtual++
 
-				visit(providers[0].Name)
+				visit(chosen.Name)
 
 				return
 			}
@@ -282,6 +284,32 @@ func (c *Cache) isBlockedByModuleFilter(p *PackageInfo) bool {
 	nvra := packageNVRA(p.Name, p.Epoch, p.Version, p.Release, p.Arch)
 
 	return !c.modules.allowedNVRA[nvra]
+}
+
+// pickProvider chooses the best concrete provider from a list, preferring
+// host-arch over noarch over any foreign-arch entry. Prevents foreign-arch
+// (e.g. i686) packages from being pulled in via virtual capability lookup
+// during native builds.
+func pickProvider(providers []*PackageInfo) *PackageInfo {
+	hostArch := goArchToRPM()
+
+	var noarchPick *PackageInfo
+
+	for _, p := range providers {
+		if p.Arch == hostArch {
+			return p
+		}
+
+		if p.Arch == archNoarch && noarchPick == nil {
+			noarchPick = p
+		}
+	}
+
+	if noarchPick != nil {
+		return noarchPick
+	}
+
+	return providers[0]
 }
 
 // addPackage inserts or updates a package in the cache and populates the

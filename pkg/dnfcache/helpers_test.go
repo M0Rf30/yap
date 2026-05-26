@@ -1519,3 +1519,38 @@ func TestAddPackageProviderSelfSkipped(t *testing.T) {
 		t.Error("non-self capability should be in providers index")
 	}
 }
+
+// TestPickProviderPrefersHostArch verifies that pickProvider returns the
+// host-arch provider when both host-arch and foreign-arch candidates exist,
+// preventing i686 packages from being pulled via virtual-capability lookup
+// on x86_64 builders.
+func TestPickProviderPrefersHostArch(t *testing.T) {
+	host := goArchToRPM()
+	foreign := "i686"
+
+	if host == foreign {
+		t.Skip("host arch is i686")
+	}
+
+	i686 := &PackageInfo{Name: "libfoo", Arch: foreign}
+	hostPkg := &PackageInfo{Name: "libfoo", Arch: host}
+	noarch := &PackageInfo{Name: "libfoo", Arch: archNoarch}
+
+	// i686 first, host-arch second → must pick host-arch
+	if got := pickProvider([]*PackageInfo{i686, hostPkg}); got != hostPkg {
+		t.Errorf("expected host-arch, got %+v", got)
+	}
+
+	// noarch over foreign when no host-arch present
+	if got := pickProvider([]*PackageInfo{i686, noarch}); got != noarch {
+		t.Errorf("expected noarch, got %+v", got)
+	}
+
+	// only foreign → fallback to first
+	if got := pickProvider([]*PackageInfo{i686}); got != i686 {
+		t.Errorf("expected i686 fallback, got %+v", got)
+	}
+
+	// empty-safe path is the caller's contract (len>0 checked there);
+	// not exercised here.
+}
