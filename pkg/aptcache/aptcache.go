@@ -1533,8 +1533,8 @@ func (c *Cache) flushProvides(pkgName, provides string) {
 //
 //	ld: warning: libvpx.so.12, needed by libavcodec.so, not found
 //
-// because PKGBUILDs only declare the direct dep (carbonio-ffmpeg) while
-// the transitive arch-specific libs (carbonio-libvpx, carbonio-x264) are
+// because PKGBUILDs only declare the direct dep (vendor-ffmpeg) while
+// the transitive arch-specific libs (vendor-libvpx, vendor-x264) are
 // not surfaced unless we walk the dep graph ourselves.
 func (c *Cache) DownloadClosure(
 	ctx context.Context, destDir string, seeds []string,

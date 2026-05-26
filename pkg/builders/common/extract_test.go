@@ -255,7 +255,7 @@ func TestExtractDEB_MissingDataTar(t *testing.T) {
 
 // createTestRPM builds a minimal but real RPM in tmpDir via rpmpack and returns
 // its path. The payload contains a couple of representative files (including a
-// pkgconfig .pc file mirroring the carbonio-libopus scenario that surfaced the
+// pkgconfig .pc file mirroring the vendor-libopus scenario that surfaced the
 // silent no-op bug fixed in extractRPM).
 func createTestRPM(t *testing.T, tmpDir string) string {
 	t.Helper()
@@ -274,12 +274,12 @@ func createTestRPM(t *testing.T, tmpDir string) string {
 	}
 
 	rpm.AddFile(rpmpack.RPMFile{
-		Name: "/opt/zextras/common/lib/pkgconfig/opus.pc",
+		Name: "/opt/vendor/common/lib/pkgconfig/opus.pc",
 		Body: []byte("Name: opus\nVersion: 1.5.2\n"),
 		Mode: 0o100644,
 	})
 	rpm.AddFile(rpmpack.RPMFile{
-		Name: "/opt/zextras/common/lib/libopus.so",
+		Name: "/opt/vendor/common/lib/libopus.so",
 		Body: []byte("stub shared object"),
 		Mode: 0o100755,
 	})
@@ -322,8 +322,8 @@ func TestExtractRPM(t *testing.T) {
 	}
 
 	expected := []string{
-		filepath.Join(destDir, "opt", "zextras", "common", "lib", "pkgconfig", "opus.pc"),
-		filepath.Join(destDir, "opt", "zextras", "common", "lib", "libopus.so"),
+		filepath.Join(destDir, "opt", "vendor", "common", "lib", "pkgconfig", "opus.pc"),
+		filepath.Join(destDir, "opt", "vendor", "common", "lib", "libopus.so"),
 	}
 
 	for _, path := range expected {
@@ -341,7 +341,7 @@ func TestExtractRPM(t *testing.T) {
 
 // TestExtractRPM_AbsoluteEntryNames is the regression guard for the
 // 'invalid cpio path "/opt/..."' failure: rpmpack writes absolute entry names
-// like "/opt/zextras/common/bin/x264", but go-rpmutils' bundled ExpandPayload
+// like "/opt/vendor/common/bin/x264", but go-rpmutils' bundled ExpandPayload
 // rejects them whenever destDir is "/" (its containment check builds
 // dest+"/" → "//" which fails to prefix-match the absolute target).
 //
@@ -358,9 +358,9 @@ func TestExtractRPM_AbsoluteEntryNames(t *testing.T) {
 		t.Fatalf("rpmpack.NewRPM: %v", err)
 	}
 
-	// Mimic the exact carbonio-x264 entry that triggered the bug.
+	// Mimic the exact vendor-x264 entry that triggered the bug.
 	rpm.AddFile(rpmpack.RPMFile{
-		Name: "/opt/zextras/common/bin/x264",
+		Name: "/opt/vendor/common/bin/x264",
 		Body: []byte("stub binary"),
 		Mode: 0o100755,
 	})
@@ -387,7 +387,7 @@ func TestExtractRPM_AbsoluteEntryNames(t *testing.T) {
 		t.Fatalf("ExtractRPM with absolute entry failed: %v", err)
 	}
 
-	want := filepath.Join(destDir, "opt", "zextras", "common", "bin", "x264")
+	want := filepath.Join(destDir, "opt", "vendor", "common", "bin", "x264")
 	if _, err := os.Stat(want); err != nil {
 		t.Fatalf("expected payload not extracted at %s: %v", want, err)
 	}
@@ -459,8 +459,8 @@ func createTestAPK(t *testing.T, tmpDir string) string {
 		".SIGN.RSA.test.rsa.pub": "stub sig",
 	})
 	data := buildAPKMember(t, map[string]string{
-		"opt/zextras/common/lib/pkgconfig/test.pc": "Name: test\nVersion: 1.0\n",
-		"opt/zextras/common/lib/libtest.so":        "stub library",
+		"opt/vendor/common/lib/pkgconfig/test.pc": "Name: test\nVersion: 1.0\n",
+		"opt/vendor/common/lib/libtest.so":        "stub library",
 	})
 
 	apkPath := filepath.Join(tmpDir, "test.apk")
@@ -493,8 +493,8 @@ func TestExtractAPK(t *testing.T) {
 
 	// Data payload must be extracted.
 	expected := []string{
-		filepath.Join(destDir, "opt", "zextras", "common", "lib", "pkgconfig", "test.pc"),
-		filepath.Join(destDir, "opt", "zextras", "common", "lib", "libtest.so"),
+		filepath.Join(destDir, "opt", "vendor", "common", "lib", "pkgconfig", "test.pc"),
+		filepath.Join(destDir, "opt", "vendor", "common", "lib", "libtest.so"),
 	}
 
 	for _, path := range expected {
@@ -571,7 +571,7 @@ func TestIsAPKControlEntry(t *testing.T) {
 		{".post-install", true},
 		{".install", true},
 		{".trigger", true},
-		{"opt/zextras/common/lib/libtest.so", false},
+		{"opt/vendor/common/lib/libtest.so", false},
 		{"./usr/bin/foo", false},
 		{".PKGINFO.bak", true}, // prefix match — acceptable false-positive
 		{"PKGINFO", false},

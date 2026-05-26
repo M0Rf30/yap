@@ -12,7 +12,7 @@ import (
 // complete repository specification with all supported fields.
 func TestParseFlagsAcceptsFullSpec(t *testing.T) {
 	tokens := []string{
-		"name=carbonio,url=https://repo.example.com/ubuntu,suite=jammy,components=main+contrib,keyURL=https://repo.example.com/key.gpg,distros=ubuntu+debian,format=deb,gpgCheck=true",
+		"name=vendor,url=https://repo.example.com/ubuntu,suite=jammy,components=main+contrib,keyURL=https://repo.example.com/key.gpg,distros=ubuntu+debian,format=deb,gpgCheck=true",
 	}
 
 	repos, err := ParseFlags(tokens)
@@ -25,7 +25,7 @@ func TestParseFlagsAcceptsFullSpec(t *testing.T) {
 	}
 
 	want := Repo{
-		Name:       "carbonio",
+		Name:       "vendor",
 		URL:        "https://repo.example.com/ubuntu",
 		Suite:      "jammy",
 		Components: []string{"main", "contrib"},

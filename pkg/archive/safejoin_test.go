@@ -80,12 +80,12 @@ func TestSafeJoin_RootDestination(t *testing.T) {
 		t.Skip("rooted destination test is POSIX-specific")
 	}
 
-	got, err := safeJoin("/", "opt/zextras/common/lib/libfoo.so")
+	got, err := safeJoin("/", "opt/vendor/common/lib/libfoo.so")
 	if err != nil {
 		t.Fatalf("safeJoin from / failed: %v", err)
 	}
 
-	want := "/opt/zextras/common/lib/libfoo.so"
+	want := "/opt/vendor/common/lib/libfoo.so"
 	if got != want {
 		t.Fatalf("safeJoin from /: got %q, want %q", got, want)
 	}
@@ -119,7 +119,7 @@ func TestSafeSymlinkTarget(t *testing.T) {
 		// ships opt/.../sbin/slapacl -> ../libexec/slapd).
 		{
 			"sibling via parent dir",
-			"opt/zextras/common/sbin/slapacl",
+			"opt/vendor/common/sbin/slapacl",
 			"../libexec/slapd",
 			false,
 		},

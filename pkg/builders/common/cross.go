@@ -384,7 +384,7 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 // DownloadAndExtractCrossDeps downloads runtime dependencies and extracts them
 // directly to the root filesystem without registering them in the dpkg database.
 // This avoids the circular dependency problem where arch-all meta-packages
-// (e.g. carbonio-core) depend on arch-specific packages (e.g. carbonio-openldap)
+// (e.g. vendor-core) depend on arch-specific packages (e.g. vendor-openldap)
 // that conflict with the target-arch variants needed for cross-compilation.
 //
 // The function partitions deps the same way as installCrossDeps: arch-all
@@ -395,9 +395,9 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 // **Transitive resolution**: the declared PKGBUILD dependencies are walked
 // through aptcache.DownloadClosure so transitive runtime libraries that
 // the declared deps themselves need are pulled in too. Without this, a
-// PKGBUILD listing only carbonio-ffmpeg fails to cross-link because
+// PKGBUILD listing only vendor-ffmpeg fails to cross-link because
 // libavcodec.so has DT_NEEDED entries for libvpx.so / libx264.so which
-// come from sibling packages (carbonio-libvpx, carbonio-x264) the
+// come from sibling packages (vendor-libvpx, vendor-x264) the
 // PKGBUILD did not declare.
 func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 	ctx context.Context,
@@ -608,7 +608,7 @@ func countDirect(resolved []*aptcache.PackageInfo, seedSet map[string]bool) int 
 // Architecture:all packages are installed first so they are present when
 // arch-specific (target-arch) packages are installed — this satisfies
 // transitive dependencies that arch-specific packages may have on arch-all
-// packages (e.g. carbonio-openldap:arm64 → carbonio-core which is arch:all).
+// packages (e.g. vendor-openldap:arm64 → vendor-core which is arch:all).
 func (bb *BaseBuilder) installCrossDeps(
 	ctx context.Context,
 	makeDepends,

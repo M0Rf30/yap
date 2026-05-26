@@ -268,12 +268,12 @@ pkgver='2.0.0'
 func TestExtractScalarVars_InlineComment(t *testing.T) {
 	// Renovate-style inline comments must not bleed into the value.
 	content := `pkgver="1.30.1" # renovate: datasource=github-tags depName=nginx/nginx
-pkgname="carbonio-nginx"
+pkgname="vendor-nginx"
 `
 	expand := gensum.ExtractScalarVarsExported(content)
 
 	assert.Equal(t, "1.30.1", expand("pkgver"))
-	assert.Equal(t, "carbonio-nginx", expand("pkgname"))
+	assert.Equal(t, "vendor-nginx", expand("pkgname"))
 }
 
 func TestExtractScalarVars_MissingVarFallsBackToEnv(t *testing.T) {

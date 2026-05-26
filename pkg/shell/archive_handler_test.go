@@ -168,7 +168,7 @@ func TestArchiveHandler_Unzip_WithFilters(t *testing.T) {
 	}
 
 	// Only extract conf/* — other/skip.txt should NOT appear.
-	// Real carbonio form: unzip -o <archive> <filters...> -d <destdir>
+	// Real vendor form: unzip -o <archive> <filters...> -d <destdir>
 	script := "unzip -o " + zipPath + " 'conf/*' -d " + destDir
 
 	if err := runScript(t, dir, script); err != nil {

@@ -16,36 +16,36 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 )
 
-// The carbonio-ffmpeg cross-build failure is the motivating real case:
-// PKGBUILD declares carbonio-ffmpeg only, but libavcodec.so has DT_NEEDED
+// The vendor-ffmpeg cross-build failure is the motivating real case:
+// PKGBUILD declares vendor-ffmpeg only, but libavcodec.so has DT_NEEDED
 // entries for libvpx.so / libx264.so which come from sibling packages
-// (carbonio-libvpx, carbonio-x264) the PKGBUILD does not declare. Without
+// (vendor-libvpx, vendor-x264) the PKGBUILD does not declare. Without
 // transitive resolution, ld fails at cross-link time.
 //
 // We mimic that shape with three packages plus an already-installed libc6
 // to confirm the "skip installed" path also works.
-const carbonioPackagesStanza = `Package: carbonio-ffmpeg
+const vendorPackagesStanza = `Package: vendor-ffmpeg
 Architecture: arm64
 Version: 5.1.4
-Filename: pool/main/c/carbonio-ffmpeg/carbonio-ffmpeg_5.1.4_arm64.deb
+Filename: pool/main/c/vendor-ffmpeg/vendor-ffmpeg_5.1.4_arm64.deb
 Size: 5
 SHA256: %s
-Depends: carbonio-libvpx, carbonio-x264, libc6
-Description: ffmpeg with carbonio patches
+Depends: vendor-libvpx, vendor-x264, libc6
+Description: ffmpeg with vendor patches
 
-Package: carbonio-libvpx
+Package: vendor-libvpx
 Architecture: arm64
 Version: 1.13.1
-Filename: pool/main/c/carbonio-libvpx/carbonio-libvpx_1.13.1_arm64.deb
+Filename: pool/main/c/vendor-libvpx/vendor-libvpx_1.13.1_arm64.deb
 Size: 5
 SHA256: %s
 Depends: libc6
 Description: VP8/VP9 codec library
 
-Package: carbonio-x264
+Package: vendor-x264
 Architecture: arm64
 Version: 164
-Filename: pool/main/c/carbonio-x264/carbonio-x264_164_arm64.deb
+Filename: pool/main/c/vendor-x264/vendor-x264_164_arm64.deb
 Size: 5
 SHA256: %s
 Depends: libc6
@@ -53,7 +53,7 @@ Description: H.264 codec library
 
 `
 
-const carbonioInstalledStanza = `Package: libc6
+const vendorInstalledStanza = `Package: libc6
 Status: install ok installed
 Architecture: arm64
 Version: 2.35-0ubuntu3
@@ -62,10 +62,10 @@ Description: GNU C Library
 `
 
 // TestDownloadClosurePullsTransitiveDeps is the regression test for the
-// carbonio-ffmpeg cross-build failure described above.
+// vendor-ffmpeg cross-build failure described above.
 //
-// Setup: declare only carbonio-ffmpeg as a seed. Expectation:
-//   - closure also contains carbonio-libvpx and carbonio-x264;
+// Setup: declare only vendor-ffmpeg as a seed. Expectation:
+//   - closure also contains vendor-libvpx and vendor-x264;
 //   - libc6 is NOT in the closure because it is marked Installed;
 //   - all three transitive .deb files land in destDir.
 func TestDownloadClosurePullsTransitiveDeps(t *testing.T) {
@@ -89,18 +89,18 @@ func TestDownloadClosurePullsTransitiveDeps(t *testing.T) {
 		_, _ = w.Write([]byte(debBody))
 	})
 
-	packages := strings.ReplaceAll(carbonioPackagesStanza, "%s", hashHex)
+	packages := strings.ReplaceAll(vendorPackagesStanza, "%s", hashHex)
 
 	c := aptcache.NewCacheForTesting()
 	require.NoError(t, c.ParseDeb822WithBaseURLForTesting(
 		strings.NewReader(packages), false, srv.URL+"/"))
 	require.NoError(t, c.ParseDeb822ForTesting(
-		strings.NewReader(carbonioInstalledStanza), true))
+		strings.NewReader(vendorInstalledStanza), true))
 
 	destDir := t.TempDir()
 
 	resolved, unresolved, err := c.DownloadClosure(
-		context.Background(), destDir, []string{"carbonio-ffmpeg"})
+		context.Background(), destDir, []string{"vendor-ffmpeg"})
 	require.NoError(t, err)
 	assert.Empty(t, unresolved, "all deps should resolve")
 
@@ -109,21 +109,21 @@ func TestDownloadClosurePullsTransitiveDeps(t *testing.T) {
 		names = append(names, p.Name)
 	}
 
-	assert.Contains(t, names, "carbonio-ffmpeg", "the declared seed must be in the closure")
-	assert.Contains(t, names, "carbonio-libvpx", "transitive dep must be pulled")
-	assert.Contains(t, names, "carbonio-x264", "transitive dep must be pulled")
+	assert.Contains(t, names, "vendor-ffmpeg", "the declared seed must be in the closure")
+	assert.Contains(t, names, "vendor-libvpx", "transitive dep must be pulled")
+	assert.Contains(t, names, "vendor-x264", "transitive dep must be pulled")
 	assert.NotContains(t, names, "libc6",
 		"already-installed deps must be skipped (their edges still walked)")
 
 	// Three .deb files must actually have been fetched.
-	assert.Equal(t, 1, served["carbonio-ffmpeg_5.1.4_arm64.deb"])
-	assert.Equal(t, 1, served["carbonio-libvpx_1.13.1_arm64.deb"])
-	assert.Equal(t, 1, served["carbonio-x264_164_arm64.deb"])
+	assert.Equal(t, 1, served["vendor-ffmpeg_5.1.4_arm64.deb"])
+	assert.Equal(t, 1, served["vendor-libvpx_1.13.1_arm64.deb"])
+	assert.Equal(t, 1, served["vendor-x264_164_arm64.deb"])
 
 	// Dependency order: a dependency must appear before its dependents.
-	posFfmpeg := indexOf(names, "carbonio-ffmpeg")
-	posVpx := indexOf(names, "carbonio-libvpx")
-	posX264 := indexOf(names, "carbonio-x264")
+	posFfmpeg := indexOf(names, "vendor-ffmpeg")
+	posVpx := indexOf(names, "vendor-libvpx")
+	posX264 := indexOf(names, "vendor-x264")
 
 	assert.Less(t, posVpx, posFfmpeg, "libvpx must come before ffmpeg")
 	assert.Less(t, posX264, posFfmpeg, "x264 must come before ffmpeg")

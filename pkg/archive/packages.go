@@ -111,7 +111,7 @@ const (
 // ExpandPayload because the bundled cpio.Extract refuses entries whose names
 // begin with "/" once destDir is "/" (its containment check compares against
 // dest+"/", which becomes "//"). YAP's rpmpack emits absolute paths like
-// "/opt/zextras/common/bin/x264", so ExpandPayload errors out with
+// "/opt/vendor/common/bin/x264", so ExpandPayload errors out with
 // 'invalid cpio path "/opt/..."' on every package targeted to /.
 //
 // Streaming entries ourselves also lets us reuse SafeJoin for

@@ -22,7 +22,48 @@ import (
 	"sync/atomic"
 
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+
+	rpmutils "github.com/sassoftware/go-rpmutils"
 )
+
+// evrString builds an "epoch:version-release" string for rpmutils.Vercmp.
+func evrString(p *PackageInfo) string {
+	epoch := p.Epoch
+	if epoch == "" {
+		epoch = "0"
+	}
+
+	return epoch + ":" + p.Version + "-" + p.Release
+}
+
+// newerEVR reports whether candidate has a strictly higher EVR than existing.
+func newerEVR(existing, candidate *PackageInfo) bool {
+	return rpmutils.Vercmp(evrString(candidate), evrString(existing)) > 0
+}
+
+// shouldReplace reports whether candidate should overwrite existing in the
+// cache. Priority: downloadable > host-arch > noarch (when no host-arch
+// candidate) > higher EVR on same arch. Matches dnf's "newest wins" semantics.
+func shouldReplace(existing, candidate *PackageInfo) bool {
+	if existing.LocationHref == "" && candidate.LocationHref != "" {
+		return true
+	}
+
+	hostArch := goArchToRPM()
+	if existing.Arch != candidate.Arch {
+		if candidate.Arch == hostArch {
+			return true
+		}
+
+		if candidate.Arch == archNoarch && existing.Arch != hostArch {
+			return true
+		}
+
+		return false
+	}
+
+	return newerEVR(existing, candidate)
+}
 
 // PackageInfo holds the subset of primary.xml fields needed for dep
 // resolution and download.
@@ -320,20 +361,8 @@ func (c *Cache) addPackage(p *PackageInfo) {
 		return
 	}
 
-	hostArch := goArchToRPM()
-
 	existing, ok := c.packages[p.Name]
-	switch {
-	case !ok:
-		c.packages[p.Name] = p
-	case existing.LocationHref == "" && p.LocationHref != "":
-		// Prefer entries that are actually downloadable.
-		c.packages[p.Name] = p
-	case existing.Arch != p.Arch && p.Arch == hostArch:
-		// Prefer the host architecture entry over a foreign-arch one.
-		c.packages[p.Name] = p
-	case existing.Arch != p.Arch && p.Arch == archNoarch && existing.Arch != hostArch:
-		// Prefer noarch over foreign-arch when no host-arch entry exists.
+	if !ok || shouldReplace(existing, p) {
 		c.packages[p.Name] = p
 	}
 
