@@ -16,6 +16,7 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
+      - darwin
     goarch:
       - amd64
       - arm64
@@ -24,6 +25,10 @@ upx:
   - enabled: true
     compress: best
     lzma: true
+    # Scope UPX to Linux only — macOS Gatekeeper rejects upx-packed Mach-O
+    # binaries, and upx support for darwin/arm64 is unreliable.
+    goos:
+      - linux
 
 archives:
   - formats: tar.gz

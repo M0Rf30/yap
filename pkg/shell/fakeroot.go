@@ -1,3 +1,5 @@
+//go:build linux
+
 // Package shell provides process execution and shell operations.
 package shell
 
