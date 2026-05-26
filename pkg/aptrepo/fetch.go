@@ -29,6 +29,20 @@ func fetchComponentIndex(ctx context.Context, src *aptcache.SourceEntry, comp, a
 			continue
 		}
 
+		// Warm-cache fast path: if /var/lib/apt/lists/ already holds a file
+		// for this (src, suite, relPath) whose size and SHA256 match the
+		// freshly-verified Release entry, skip the download entirely. This
+		// avoids re-fetching unchanged Packages.xz files on every refresh —
+		// the typical case when the repo's InRelease hasn't moved.
+		encoded := encodeListFilename(src.URL, src.Suite, relPath)
+		destPath := filepath.Join(aptListsDir, encoded)
+
+		if cached, ok := readMatchingFile(destPath, entry.Size, entry.Hash); ok {
+			_ = cached // already on disk and verified; nothing to do
+
+			return nil
+		}
+
 		url := strings.TrimRight(src.URL, "/") + "/dists/" + src.Suite + "/" + relPath
 
 		data, err := httpFetch(ctx, url)
@@ -56,10 +70,6 @@ func fetchComponentIndex(ctx context.Context, src *aptcache.SourceEntry, comp, a
 				WithContext("expected", entry.Hash)
 		}
 
-		// Write to /var/lib/apt/lists/.
-		encoded := encodeListFilename(src.URL, src.Suite, relPath)
-
-		destPath := filepath.Join(aptListsDir, encoded)
 		if err := os.WriteFile(destPath, data, 0o644); err != nil { //nolint:gosec
 			return err
 		}
@@ -71,4 +81,28 @@ func fetchComponentIndex(ctx context.Context, src *aptcache.SourceEntry, comp, a
 		WithOperation("fetchComponentIndex").
 		WithContext("component", comp).
 		WithContext("arch", arch)
+}
+
+// readMatchingFile returns (data, true) when destPath exists on disk with
+// the expected size and SHA256. It's the warm-cache shortcut that avoids
+// re-downloading unchanged Packages indexes. Returns (nil, false) on any
+// stat / read / hash mismatch — the caller will then fall through to the
+// normal HTTP fetch path.
+func readMatchingFile(destPath string, expectedSize int64, expectedHash string) ([]byte, bool) {
+	fi, err := os.Stat(destPath)
+	if err != nil || fi.Size() != expectedSize {
+		return nil, false
+	}
+
+	data, err := os.ReadFile(destPath) //nolint:gosec
+	if err != nil {
+		return nil, false
+	}
+
+	sum := sha256.Sum256(data)
+	if hex.EncodeToString(sum[:]) != expectedHash {
+		return nil, false
+	}
+
+	return data, true
 }

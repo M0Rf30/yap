@@ -246,13 +246,40 @@ func updateSource(ctx context.Context, src *aptcache.SourceEntry, arch string, o
 
 	// 3. For each component, find the Packages.* entry in rel.SHA256.
 	// Prefer .xz > .gz > .bz2 > uncompressed (smallest first).
-	n := 0
+	//
+	// Components fan out concurrently — within one source they all hit the
+	// same mirror, so the shared http.Transport's MaxConnsPerHost limit is
+	// what actually caps parallelism. Going from serial to fan-out roughly
+	// halves the per-source wall time on ubuntu (main + universe +
+	// multiverse + restricted).
+	type compResult struct {
+		comp string
+		err  error
+	}
+
+	resCh := make(chan compResult, len(src.Components))
+
+	var wg sync.WaitGroup
 
 	for _, comp := range src.Components {
-		if err := fetchComponentIndex(ctx, src, comp, arch, rel); err != nil {
-			// Log warning, continue with other components.
+		wg.Add(1)
+
+		go func(comp string) {
+			defer wg.Done()
+
+			resCh <- compResult{comp: comp, err: fetchComponentIndex(ctx, src, comp, arch, rel)}
+		}(comp)
+	}
+
+	wg.Wait()
+	close(resCh)
+
+	n := 0
+
+	for res := range resCh {
+		if res.err != nil {
 			logger.Warn("apt component fetch failed",
-				"url", src.URL, "component", comp, "arch", arch, "error", err)
+				"url", src.URL, "component", res.comp, "arch", arch, "error", res.err)
 
 			continue
 		}
