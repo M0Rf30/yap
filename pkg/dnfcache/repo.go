@@ -271,15 +271,37 @@ func fetchAllRepos(ctx context.Context) error {
 	return firstErr
 }
 
-// fetchRepo fetches repomd.xml and the primary.xml.gz for a single repo.
-func fetchRepo(ctx context.Context, repo RepoEntry) error {
+// fetchModules downloads modules.yaml when present. Always non-fatal: a
+// missing or unfetchable modules index just disables module-stream
+// filtering for that repo.
+func fetchModules(ctx context.Context, repo RepoEntry, baseURL, repoCache, href, checksum string) {
+	if href == "" {
+		return
+	}
+
+	modulesURL := baseURL + "/" + strings.TrimPrefix(href, "/")
+	modulesDest := filepath.Join(repoCache, filepath.Base(href))
+
+	if err := downloadVerified(ctx, modulesURL, modulesDest, checksum); err != nil {
+		logger.Warn("dnfcache: failed to fetch modules.yaml",
+			"repo", repo.ID,
+			"error", err)
+
+		return
+	}
+
+	logger.Debug("dnfcache: modules index path", "repo", repo.ID, "file", modulesDest)
+}
+
+// resolveRepoBaseURL returns the concrete base URL for a repo, resolving
+// mirrorlist/metalink if no baseurl was set.
+func resolveRepoBaseURL(ctx context.Context, repo RepoEntry) (string, error) {
 	baseURL := expandRepoVars(repo.BaseURL)
 
-	// Resolve mirrorlist to a concrete base URL if no baseurl was set.
 	if baseURL == "" && repo.MirrorList != "" {
 		resolved, err := resolveMirrorList(ctx, expandRepoVars(repo.MirrorList))
 		if err != nil {
-			return apperrors.Wrap(err, apperrors.ErrTypeNetwork, "resolve mirrorlist").
+			return "", apperrors.Wrap(err, apperrors.ErrTypeNetwork, "resolve mirrorlist").
 				WithOperation("fetchRepo").
 				WithContext("repo_id", repo.ID)
 		}
@@ -288,49 +310,78 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 	}
 
 	if baseURL == "" {
-		return apperrors.New(apperrors.ErrTypeConfiguration, "no baseurl or mirrorlist for repo").
+		return "", apperrors.New(apperrors.ErrTypeConfiguration, "no baseurl or mirrorlist for repo").
 			WithOperation("fetchRepo").
 			WithContext("repo_id", repo.ID)
 	}
 
-	baseURL = strings.TrimSuffix(baseURL, "/")
-	repomdURL := baseURL + "/repodata/repomd.xml"
+	return strings.TrimSuffix(baseURL, "/"), nil
+}
 
-	repomdData, err := fetchBytes(ctx, repomdURL)
+// repomdRefs holds the href + sha256 pair for one repodata entry.
+type repomdRefs struct {
+	primaryHref, primarySHA256 string
+	modulesHref, modulesSHA256 string
+}
+
+// parseRepoMD downloads and decodes repomd.xml, returning the locations
+// and checksums of the primary and modules data entries.
+func parseRepoMD(ctx context.Context, repo RepoEntry, baseURL string) (repomdRefs, error) {
+	var refs repomdRefs
+
+	repomdData, err := fetchBytes(ctx, baseURL+"/repodata/repomd.xml")
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.ErrTypeNetwork, "fetch repomd.xml").
+		return refs, apperrors.Wrap(err, apperrors.ErrTypeNetwork, "fetch repomd.xml").
 			WithOperation("fetchRepo").
 			WithContext("repo_id", repo.ID)
 	}
 
 	var rmd repoMD
 	if err := xml.Unmarshal(repomdData, &rmd); err != nil {
-		return apperrors.Wrap(err, apperrors.ErrTypeParser, "parse repomd.xml").
+		return refs, apperrors.Wrap(err, apperrors.ErrTypeParser, "parse repomd.xml").
 			WithOperation("fetchRepo").
 			WithContext("repo_id", repo.ID)
 	}
 
-	// Find the primary data entry.
-	var primaryHref, primarySHA256 string
-
 	for _, d := range rmd.Data {
-		if d.Type == "primary" {
-			primaryHref = d.Location.Href
-			if strings.EqualFold(d.Checksum.Type, "sha256") {
-				primarySHA256 = d.Checksum.Value
-			}
+		sha := ""
+		if strings.EqualFold(d.Checksum.Type, "sha256") {
+			sha = d.Checksum.Value
+		}
 
-			break
+		switch d.Type {
+		case "primary":
+			refs.primaryHref = d.Location.Href
+			refs.primarySHA256 = sha
+		case "modules":
+			refs.modulesHref = d.Location.Href
+			refs.modulesSHA256 = sha
 		}
 	}
 
-	if primaryHref == "" {
-		return apperrors.New(apperrors.ErrTypeParser, "no primary data in repomd.xml").
+	if refs.primaryHref == "" {
+		return refs, apperrors.New(apperrors.ErrTypeParser, "no primary data in repomd.xml").
 			WithOperation("fetchRepo").
 			WithContext("repo_id", repo.ID)
 	}
 
-	primaryURL := baseURL + "/" + strings.TrimPrefix(primaryHref, "/")
+	return refs, nil
+}
+
+// fetchRepo fetches repomd.xml, primary.xml.gz, and (when present)
+// modules.yaml for a single repo.
+func fetchRepo(ctx context.Context, repo RepoEntry) error {
+	baseURL, err := resolveRepoBaseURL(ctx, repo)
+	if err != nil {
+		return err
+	}
+
+	refs, err := parseRepoMD(ctx, repo, baseURL)
+	if err != nil {
+		return err
+	}
+
+	primaryURL := baseURL + "/" + strings.TrimPrefix(refs.primaryHref, "/")
 
 	// Destination: /var/cache/dnf/<repoID>/repodata/<filename>
 	repoCache := filepath.Join(dnfCacheDir, repo.ID, "repodata")
@@ -345,9 +396,9 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 		return err
 	}
 
-	destFile := filepath.Join(repoCache, filepath.Base(primaryHref))
+	destFile := filepath.Join(repoCache, filepath.Base(refs.primaryHref))
 
-	if err := downloadVerified(ctx, primaryURL, destFile, primarySHA256); err != nil {
+	if err := downloadVerified(ctx, primaryURL, destFile, refs.primarySHA256); err != nil {
 		return apperrors.Wrap(err, apperrors.ErrTypeNetwork, "download primary.xml").
 			WithOperation("fetchRepo").
 			WithContext("repo_id", repo.ID)
@@ -363,6 +414,8 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 	}
 
 	logger.Debug("dnfcache: primary index path", "repo", repo.ID, "file", destFile)
+
+	fetchModules(ctx, repo, baseURL, repoCache, refs.modulesHref, refs.modulesSHA256)
 
 	return nil
 }
@@ -563,6 +616,10 @@ func fileMatchesSHA256(path, expected string) (bool, error) {
 // loadFromDisk scans the DNF cache directory for primary.xml* files and
 // parses them into the cache. Repos are parsed concurrently.
 func (c *Cache) loadFromDisk() {
+	// Load module-stream metadata FIRST so addPackage can filter
+	// non-default-stream modular packages while parsing primary.xml.
+	c.modules = loadModuleIndex()
+
 	jobs := collectPrimaryFiles()
 
 	if len(jobs) == 0 {

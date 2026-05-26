@@ -58,6 +58,7 @@ type Cache struct {
 	mu        sync.RWMutex
 	packages  map[string]*PackageInfo   // name → best candidate
 	providers map[string][]*PackageInfo // virtual/capability → providers
+	modules   *moduleIndex              // module-stream filter (never nil after newCache)
 }
 
 var (
@@ -257,13 +258,44 @@ func newCache() *Cache {
 	return &Cache{
 		packages:  make(map[string]*PackageInfo),
 		providers: make(map[string][]*PackageInfo),
+		modules:   newModuleIndex(),
 	}
+}
+
+// isBlockedByModuleFilter reports whether p is a modular package belonging
+// to a non-default stream and should therefore be excluded from the cache.
+// Returns false for non-modular packages and when no module metadata is
+// loaded (non-AppStream repos).
+func (c *Cache) isBlockedByModuleFilter(p *PackageInfo) bool {
+	if c.modules == nil || len(c.modules.defaultStream) == 0 {
+		return false
+	}
+
+	if !isModularPackage(p.Release) {
+		return false
+	}
+
+	if _, hasDefault := c.modules.defaultStream[p.Name]; !hasDefault {
+		return false
+	}
+
+	nvra := packageNVRA(p.Name, p.Epoch, p.Version, p.Release, p.Arch)
+
+	return !c.modules.allowedNVRA[nvra]
 }
 
 // addPackage inserts or updates a package in the cache and populates the
 // providers index from its Provides list.
 // Must be called with c.mu held (write).
 func (c *Cache) addPackage(p *PackageInfo) {
+	// Filter non-default modular streams (e.g. perl 5.24 on Rocky 8 where
+	// 5.26 is the default) so they neither shadow non-modular variants nor
+	// surface as virtual providers — matching `dnf install` without
+	// `module enable`.
+	if c.isBlockedByModuleFilter(p) {
+		return
+	}
+
 	hostArch := goArchToRPM()
 
 	existing, ok := c.packages[p.Name]
