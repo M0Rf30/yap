@@ -77,14 +77,34 @@ changelog:
   # Regex use RE2 syntax as defined here: https://github.com/google/re2/wiki/Syntax.
   groups:
     - title: 🚀 Features
-      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      regexp: '^.*?feat(\([[:word:]/.-]+\))??!?:.+$'
       order: 0
-    - title: "🐛 Bug Fixes"
-      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+    - title: 🐛 Bug Fixes
+      regexp: '^.*?fix(\([[:word:]/.-]+\))??!?:.+$'
       order: 1
-    - title: "📘 Documentation"
-      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
-      order: 1
-    - title: 🧰 Miscellaneous Tasks
-      regexp: '^.*?chore(\([[:word:]]+\))??!?:.+$'
+    - title: ⚡ Performance
+      regexp: '^.*?perf(\([[:word:]/.-]+\))??!?:.+$'
+      order: 2
+    - title: ♻️  Refactor
+      regexp: '^.*?refactor(\([[:word:]/.-]+\))??!?:.+$'
+      order: 3
+    - title: 📘 Documentation
+      regexp: '^.*?docs(\([[:word:]/.-]+\))??!?:.+$'
+      order: 4
+    - title: 🧪 Tests
+      regexp: '^.*?test(\([[:word:]/.-]+\))??!?:.+$'
+      order: 5
+    - title: 🔧 CI & Build
+      regexp: '^.*?(ci|build)(\([[:word:]/.-]+\))??!?:.+$'
+      order: 6
+    - title: ⏪ Reverts
+      regexp: '^.*?revert(\([[:word:]/.-]+\))??!?:.+$'
+      order: 7
+    - title: 🧰 Miscellaneous
       order: 999
+  filters:
+    exclude:
+      - '^Merge '
+      - '^wip:'
+      - '^bump:'
+      - '^style:'

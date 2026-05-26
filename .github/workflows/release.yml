@@ -121,7 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [validate, goreleaser]
-    if: github.ref_type == 'tag' && !needs.validate.outputs.is-prerelease
+    if: github.ref_type == 'tag' && needs.validate.outputs.is-prerelease != 'true'
 
     steps:
       - name: 📂 Checkout code
