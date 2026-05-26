@@ -95,12 +95,12 @@ data:
 		t.Errorf("default stream perl=%q want 5.26", got)
 	}
 
-	if !idx.allowedNVRA["perl-0:5.26.3-419.module+el8.5.0+728+2c8a1bd2.x86_64"] {
-		t.Errorf("expected perl-5.26 NVRA in allowed set")
+	if idx.blockedNVRA["perl-0:5.26.3-419.module+el8.5.0+728+2c8a1bd2.x86_64"] {
+		t.Errorf("perl-5.26 (default stream) NVRA must NOT be blocked")
 	}
 
-	if idx.allowedNVRA["perl-0:5.24.4-404.module+el8.6.0+882+2fa1e48f.x86_64"] {
-		t.Errorf("perl-5.24 NVRA must NOT be in allowed set")
+	if !idx.blockedNVRA["perl-0:5.24.4-404.module+el8.6.0+882+2fa1e48f.x86_64"] {
+		t.Errorf("expected perl-5.24 (non-default stream) NVRA to be blocked")
 	}
 }
 
@@ -126,9 +126,9 @@ func TestParseModulesFileRocky8(t *testing.T) {
 	}
 
 	// The 5.24 perl NVRA from the failing build must NOT be allowed.
-	bad := "perl-0:5.24.4-404.module+el8.6.0+882+2fa1e48f.x86_64"
-	if idx.allowedNVRA[bad] {
-		t.Errorf("perl-5.24 NVRA must NOT be allowed: %s", bad)
+	bad := "perl-4:5.24.4-404.module+el8.6.0+882+2fa1e48f.x86_64"
+	if !idx.blockedNVRA[bad] {
+		t.Errorf("perl-5.24 NVRA must be blocked: %s", bad)
 	}
 
 	// All non-default perl-libs NVRAs (5.24, 5.30, 5.32) must be blocked.
@@ -140,10 +140,10 @@ func TestParseModulesFileRocky8(t *testing.T) {
 		"perl-libs-4:5.30.1-452.module+el8.6.0+878+f93dfff7.x86_64",
 		"perl-libs-4:5.32.1-473.module+el8.10.0+1616+0d20cc68.x86_64",
 	} {
-		if idx.allowedNVRA[bad] {
-			t.Errorf("non-default perl-libs NVRA must NOT be allowed: %s", bad)
+		if !idx.blockedNVRA[bad] {
+			t.Errorf("non-default perl-libs NVRA must be blocked: %s", bad)
 		}
 	}
 
-	t.Logf("defaults=%d allowed_nvra=%d", len(idx.defaultStream), len(idx.allowedNVRA))
+	t.Logf("defaults=%d blocked_nvra=%d", len(idx.defaultStream), len(idx.blockedNVRA))
 }

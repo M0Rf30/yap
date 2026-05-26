@@ -252,5 +252,5 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             REGISTRY=${{ steps.registry.outputs.base }}
-            BASE_TAG=${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+            BASE_TAG=${{ github.ref_name == 'main' && 'latest' || steps.meta.outputs.version }}
             VERSION=${{ github.ref_name }}

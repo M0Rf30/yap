@@ -36,14 +36,21 @@ import (
 // moduleIndex holds the parsed module-defaults and the allowed NVRAs.
 // Empty index = no filtering (non-modular repos).
 type moduleIndex struct {
-	defaultStream map[string]string // module -> stream
-	allowedNVRA   map[string]bool   // NVRA strings from default streams
+	defaultStream map[string]string // module -> default stream
+	// blockedNVRA: NVRAs that belong to a *non-default* stream of a module
+	// that has a default. These packages are filtered out (matching `dnf
+	// install` without explicit `dnf module enable`). NVRAs absent from
+	// this set are allowed, including default-stream NVRAs and modular
+	// packages whose default stream lists no artifacts (e.g. Rocky 8.10
+	// perl:5.26 where the default-stream doc has an empty artifacts list
+	// but the .module+el8 RPMs still ship in AppStream repodata).
+	blockedNVRA map[string]bool
 }
 
 func newModuleIndex() *moduleIndex {
 	return &moduleIndex{
 		defaultStream: make(map[string]string),
-		allowedNVRA:   make(map[string]bool),
+		blockedNVRA:   make(map[string]bool),
 	}
 }
 
@@ -115,12 +122,28 @@ func parseModulesYAML(r io.Reader, idx *moduleIndex) {
 		}
 	}
 
-	// Pass 2: keep only rpms from the default stream of each module.
-	for module, stream := range idx.defaultStream {
-		key := module + ":" + stream
+	buildBlockedNVRA(idx, streamRPMs)
+}
 
-		for _, nvra := range streamRPMs[key] {
-			idx.allowedNVRA[nvra] = true
+// buildBlockedNVRA fills idx.blockedNVRA with NVRAs from NON-default streams
+// of each module. Denylist (not allowlist) because some Rocky/RHEL 8 minor
+// releases (e.g. 8.10) ship the default-stream modulemd document with an
+// empty artifacts list while the default-stream `.module+` RPMs still live
+// in primary.xml — an allowlist would over-filter and drop them entirely
+// (e.g. perl-interpreter on Rocky 8.10).
+func buildBlockedNVRA(idx *moduleIndex, streamRPMs map[string][]string) {
+	for module, defaultStream := range idx.defaultStream {
+		prefix := module + ":"
+		defaultKey := prefix + defaultStream
+
+		for key, rpms := range streamRPMs {
+			if !strings.HasPrefix(key, prefix) || key == defaultKey {
+				continue
+			}
+
+			for _, nvra := range rpms {
+				idx.blockedNVRA[nvra] = true
+			}
 		}
 	}
 }
@@ -245,7 +268,7 @@ func loadModuleIndex() *moduleIndex {
 		logger.Info("dnfcache: module index loaded",
 			"files", len(files),
 			"defaults", len(idx.defaultStream),
-			"allowed_nvra", len(idx.allowedNVRA))
+			"blocked_nvra", len(idx.blockedNVRA))
 	}
 
 	return idx

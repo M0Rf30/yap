@@ -277,13 +277,9 @@ func (c *Cache) isBlockedByModuleFilter(p *PackageInfo) bool {
 		return false
 	}
 
-	if _, hasDefault := c.modules.defaultStream[p.Name]; !hasDefault {
-		return false
-	}
-
 	nvra := packageNVRA(p.Name, p.Epoch, p.Version, p.Release, p.Arch)
 
-	return !c.modules.allowedNVRA[nvra]
+	return c.modules.blockedNVRA[nvra]
 }
 
 // pickProvider chooses the best concrete provider from a list, preferring
