@@ -37,16 +37,28 @@ jobs:
           echo 'matrix=["alpine","arch","rocky-8","rocky-9","rocky-10","ubuntu-jammy","ubuntu-noble","ubuntu-resolute"]' >> "$GITHUB_OUTPUT"
           echo 'matrix-g=["alpine-g","arch-g","rocky-8-g","rocky-9-g","rocky-10-g","ubuntu-jammy-g","ubuntu-noble-g","ubuntu-resolute-g"]' >> "$GITHUB_OUTPUT"
 
-  # Build each OS image
+  # Build each OS image. ubuntu-jammy is built per-platform on a native
+  # runner (linux/amd64 on ubuntu-latest, linux/arm64 on ubuntu-24.04-arm)
+  # and pushed by digest; the docker-merge-jammy job then assembles the
+  # multi-arch manifest. QEMU cross-build under amd64 used to take ~15-20
+  # minutes; native arm64 brings it down to ~3-4.
   docker-build:
-    name: 🐳 ${{ matrix.os }}
+    name: 🐳 ${{ matrix.os }}${{ matrix.platform-suffix }}
     needs: matrix-prep
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: ${{ fromJson(needs.matrix-prep.outputs.matrix) }}
+        runner: [ubuntu-latest]
+        platform: [linux/amd64]
+        platform-suffix: [""]
+        include:
+          - os: ubuntu-jammy
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            platform-suffix: " (arm64)"
 
     steps:
       - name: 📂 Checkout code
@@ -55,6 +67,8 @@ jobs:
           fetch-depth: 0
 
       - name: 🔍 Lint Dockerfile
+        # Lint once per OS on the amd64 runner — Dockerfile is arch-agnostic.
+        if: matrix.platform == 'linux/amd64'
         uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
@@ -63,7 +77,7 @@ jobs:
           format: sarif
 
       - name: 📋 Upload Hadolint results
-        if: always()
+        if: always() && matrix.platform == 'linux/amd64'
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -93,12 +107,16 @@ jobs:
       - name: 📋 Prepare image list
         id: images
         run: |
-          IMAGES="${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.os }}"
+          REPO_LC="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          IMAGES="${{ env.REGISTRY }}/${REPO_LC}-${{ matrix.os }}"
+          CSV="$IMAGES"
           if [ -n "${{ secrets.DOCKER_USERNAME }}" ]; then
             IMAGES="$IMAGES
           ${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}"
+            CSV="$CSV,${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}"
           fi
           { echo "list<<EOF"; echo "$IMAGES"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+          echo "csv=$CSV" >> "$GITHUB_OUTPUT"
 
       - name: 📋 Extract metadata
         id: meta
@@ -119,20 +137,50 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
-      - name: 📋 Resolve build platforms
-        id: platforms
-        run: |
-          case "${{ matrix.os }}" in
-            ubuntu-jammy) echo "list=linux/amd64,linux/arm64" >> "$GITHUB_OUTPUT" ;;
-            *)            echo "list=linux/amd64"             >> "$GITHUB_OUTPUT" ;;
-          esac
-
-      - name: 🔨 Build and push Docker image
+      - name: 🔨 Build and push by digest (jammy multi-arch)
+        if: matrix.os == 'ubuntu-jammy' && github.event_name != 'pull_request'
+        id: build-digest
         uses: docker/build-push-action@v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
-          platforms: ${{ steps.platforms.outputs.list }}
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Push each platform by digest; the merge job assembles the manifest.
+          # IMPORTANT: name= must be a comma-separated list (single line). Using
+          # the newline-separated images.outputs.list breaks buildx's CSV parser.
+          outputs: type=image,"name=${{ steps.images.outputs.csv }}",push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.os }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.os }}-${{ matrix.platform }}
+          build-args: |
+            GO_VERSION=${{ env.GO_VERSION }}
+            VERSION=${{ github.ref_name }}
+            BUILD_TIME=${{ github.run_id }}
+            COMMIT=${{ github.sha }}
+
+      - name: 📦 Export digest (jammy multi-arch)
+        if: matrix.os == 'ubuntu-jammy' && github.event_name != 'pull_request'
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build-digest.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: ⬆️  Upload digest (jammy multi-arch)
+        if: matrix.os == 'ubuntu-jammy' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.os }}-${{ matrix.platform-suffix == ' (arm64)' && 'arm64' || 'amd64' }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: 🔨 Build and push Docker image (single-arch)
+        if: matrix.os != 'ubuntu-jammy'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: build/deploy/${{ matrix.os }}/Dockerfile
+          platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -143,6 +191,100 @@ jobs:
             VERSION=${{ github.ref_name }}
             BUILD_TIME=${{ github.run_id }}
             COMMIT=${{ github.sha }}
+
+      - name: 🔨 Build jammy (PR — single platform, no push)
+        if: matrix.os == 'ubuntu-jammy' && github.event_name == 'pull_request' && matrix.platform == 'linux/amd64'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: build/deploy/${{ matrix.os }}/Dockerfile
+          platforms: linux/amd64
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.os }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.os }}-${{ matrix.platform }}
+          build-args: |
+            GO_VERSION=${{ env.GO_VERSION }}
+            VERSION=${{ github.ref_name }}
+            BUILD_TIME=${{ github.run_id }}
+            COMMIT=${{ github.sha }}
+
+  # Combine the per-platform jammy digests into a multi-arch manifest.
+  docker-merge-jammy:
+    name: 🧬 ubuntu-jammy (manifest)
+    needs: docker-build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: ⬇️  Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-ubuntu-jammy-*
+          merge-multiple: true
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: 🔐 Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔐 Log in to Docker Hub
+        continue-on-error: true
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 📋 Prepare image list
+        id: images
+        run: |
+          REPO_LC="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          IMAGES="${{ env.REGISTRY }}/${REPO_LC}-ubuntu-jammy"
+          if [ -n "${{ secrets.DOCKER_USERNAME }}" ]; then
+            IMAGES="$IMAGES
+          ${{ secrets.DOCKER_USERNAME }}/yap-ubuntu-jammy"
+          fi
+          { echo "list<<EOF"; echo "$IMAGES"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+
+      - name: 📋 Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.images.outputs.list }}
+          tags: |
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: 🧬 Create multi-arch manifest
+        working-directory: /tmp/digests
+        env:
+          METADATA_JSON: ${{ steps.meta.outputs.json }}
+          IMAGES_LIST: ${{ steps.images.outputs.list }}
+        run: |
+          # For every registry image (ghcr + optional dockerhub), create a
+          # manifest list under that registry pointing at the per-platform
+          # digests pushed by the docker-build jobs.
+          while IFS= read -r image; do
+            [ -z "$image" ] && continue
+            tag_args=$(jq -cr --arg img "$image" \
+              '.tags | map(select(startswith($img + ":"))) | map("-t " + .) | join(" ")' \
+              <<< "$METADATA_JSON")
+            [ -z "$tag_args" ] && continue
+            srcs=$(printf "${image}@sha256:%s " *)
+            echo "Creating manifest: $image"
+            # shellcheck disable=SC2086
+            docker buildx imagetools create $tag_args $srcs
+          done <<< "$IMAGES_LIST"
 
   # Build prepared (-g) images after base images are pushed
   docker-build-g:
@@ -200,7 +342,8 @@ jobs:
       - name: 📋 Prepare image list
         id: images
         run: |
-          IMAGES="${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.os }}"
+          REPO_LC="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          IMAGES="${{ env.REGISTRY }}/${REPO_LC}-${{ matrix.os }}"
           if [ -n "${{ secrets.DOCKER_USERNAME }}" ]; then
             IMAGES="$IMAGES
           ${{ secrets.DOCKER_USERNAME }}/yap-${{ matrix.os }}"
