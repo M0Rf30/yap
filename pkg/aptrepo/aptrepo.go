@@ -17,6 +17,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
@@ -98,7 +99,19 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		"sources", len(sources),
 		"allow_unverified", opts.AllowUnverifiedRepos)
 
-	var firstErr error
+	// Flatten (source, arch) into a single job list so all combinations run
+	// concurrently. With several sources × 1-2 archs each, sequential
+	// execution made apt-get update wall-clock-dominated by mirror latency
+	// even though every fetch is independent. The shared http.Transport
+	// (see pkg/httpclient) caps per-host parallelism, so even when two
+	// sources share a mirror (e.g. archive.ubuntu.com main + security)
+	// we won't hammer it past MaxConnsPerHost.
+	type job struct {
+		src  *aptcache.SourceEntry
+		arch string
+	}
+
+	var jobs []job
 
 	for i := range sources {
 		src := &sources[i]
@@ -109,28 +122,80 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		}
 
 		for _, arch := range archs {
-			logger.Debug("aptrepo: fetching source",
-				"url", src.URL,
-				"suite", src.Suite,
-				"components", src.Components,
-				"arch", arch)
-
-			n, err := updateSource(ctx, src, arch, opts)
-			succeeded += n
-
-			if err != nil {
-				logger.Warn("aptrepo: source fetch failed",
-					"url", src.URL, "suite", src.Suite, "arch", arch, "error", err)
-
-				if firstErr == nil {
-					firstErr = err
-				}
-			} else {
-				logger.Info("aptrepo: source fetched",
-					"url", src.URL, "suite", src.Suite, "arch", arch, "components", n)
-			}
+			jobs = append(jobs, job{src: src, arch: arch})
 		}
 	}
+
+	// 8 workers comfortably covers the typical source set (main, security,
+	// updates, backports, plus a few vendor repos × 1-2 archs) without
+	// thrashing any single mirror.
+	concurrency := min(min(runtime.GOMAXPROCS(0)*2, 8), len(jobs))
+	if concurrency == 0 {
+		return 0, nil
+	}
+
+	jobCh := make(chan job, len(jobs))
+	for _, j := range jobs {
+		jobCh <- j
+	}
+
+	close(jobCh)
+
+	type result struct {
+		src  *aptcache.SourceEntry
+		arch string
+		n    int
+		err  error
+	}
+
+	resCh := make(chan result, len(jobs))
+
+	var wg sync.WaitGroup
+
+	wg.Add(concurrency)
+
+	for range concurrency {
+		go func() {
+			defer wg.Done()
+
+			for j := range jobCh {
+				logger.Debug("aptrepo: fetching source",
+					"url", j.src.URL,
+					"suite", j.src.Suite,
+					"components", j.src.Components,
+					"arch", j.arch)
+
+				n, err := updateSource(ctx, j.src, j.arch, opts)
+				resCh <- result{src: j.src, arch: j.arch, n: n, err: err}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(resCh)
+
+	var (
+		firstErr    error
+		succeeded64 int64
+	)
+
+	for res := range resCh {
+		succeeded64 += int64(res.n)
+
+		if res.err != nil {
+			logger.Warn("aptrepo: source fetch failed",
+				"url", res.src.URL, "suite", res.src.Suite, "arch", res.arch, "error", res.err)
+
+			if firstErr == nil {
+				firstErr = res.err
+			}
+		} else {
+			logger.Info("aptrepo: source fetched",
+				"url", res.src.URL, "suite", res.src.Suite, "arch", res.arch, "components", res.n)
+		}
+	}
+
+	succeeded = int(succeeded64)
 
 	// Refresh the in-process aptcache singleton so subsequent Lookup /
 	// ResolveDeps calls see the fresh indexes. Without this the singleton
