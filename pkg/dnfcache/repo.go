@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
@@ -329,14 +330,48 @@ type repomdRefs struct {
 
 // parseRepoMD downloads and decodes repomd.xml, returning the locations
 // and checksums of the primary and modules data entries.
+//
+// Warm-cache: when a cached repomd.xml already exists under
+// /var/cache/dnf/<repoID>/repodata/, its mtime is used as
+// If-Modified-Since. On HTTP 304 the cached file is parsed directly and
+// no body is downloaded — the typical case when the repo's repomd hasn't
+// moved. The cached file is refreshed (with the same content) on 200.
 func parseRepoMD(ctx context.Context, repo RepoEntry, baseURL string) (repomdRefs, error) {
 	var refs repomdRefs
 
-	repomdData, err := fetchBytes(ctx, baseURL+"/repodata/repomd.xml")
+	repomdURL := baseURL + "/repodata/repomd.xml"
+	cachedPath := filepath.Join(dnfCacheDir, repo.ID, "repodata", "repomd.xml")
+
+	var ifModSince time.Time
+	if fi, err := os.Stat(cachedPath); err == nil {
+		ifModSince = fi.ModTime()
+	}
+
+	repomdData, notModified, err := httpclient.FetchBytesConditional(
+		ctx, repomdURL, 64<<20, ifModSince,
+	)
 	if err != nil {
 		return refs, apperrors.Wrap(err, apperrors.ErrTypeNetwork, "fetch repomd.xml").
 			WithOperation("fetchRepo").
 			WithContext("repo_id", repo.ID)
+	}
+
+	if notModified {
+		// Server confirmed cache is current; use on-disk copy.
+		cached, readErr := os.ReadFile(cachedPath) //nolint:gosec
+		if readErr != nil {
+			return refs, apperrors.Wrap(readErr, apperrors.ErrTypeFileSystem,
+				"read cached repomd.xml").
+				WithOperation("fetchRepo").
+				WithContext("repo_id", repo.ID)
+		}
+
+		repomdData = cached
+	} else {
+		// Persist fresh repomd.xml so the next call can use If-Modified-Since.
+		if mkErr := os.MkdirAll(filepath.Dir(cachedPath), 0o755); mkErr == nil {
+			_ = os.WriteFile(cachedPath, repomdData, 0o644) //nolint:gosec
+		}
 	}
 
 	var rmd repoMD
