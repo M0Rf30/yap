@@ -205,7 +205,10 @@ func fetchAllRepos(ctx context.Context) error {
 		err error
 	}
 
-	concurrency := min(min(runtime.GOMAXPROCS(0), 4), len(repos))
+	// 8 workers comfortably covers the typical repo set (baseos, appstream,
+	// extras, crb, epel, plus a few vendor repos) without overwhelming any
+	// single mirror — sharedTransport already caps per-host connections.
+	concurrency := min(min(runtime.GOMAXPROCS(0)*2, 8), len(repos))
 	if concurrency == 0 {
 		logger.Info("dnfcache: no enabled repos found")
 

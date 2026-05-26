@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"time"
 )
@@ -49,8 +50,33 @@ func (e *HTTPStatusError) IsClientError() bool {
 	return e.Code >= 400 && e.Code < 500
 }
 
+// sharedTransport tunes the default transport for metadata-heavy workloads:
+// many small fetches against a handful of repo mirrors. The stdlib default
+// keeps only 2 idle connections per host, which serializes any concurrent
+// fetch hitting the same mirror behind a fresh TLS handshake every time.
+//
+// Bumping MaxIdleConnsPerHost (and MaxConnsPerHost to match) lets the
+// dnfcache/aptcache fetch pools actually parallelise without choking on
+// TLS setup. ForceAttemptHTTP2 mirrors stdlib's DefaultTransport so TLS
+// mirrors still get H2 multiplexing for free.
+var sharedTransport = &http.Transport{
+	Proxy: http.ProxyFromEnvironment,
+	DialContext: (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext,
+	ForceAttemptHTTP2:     true,
+	MaxIdleConns:          100,
+	MaxIdleConnsPerHost:   16,
+	MaxConnsPerHost:       16,
+	IdleConnTimeout:       90 * time.Second,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+}
+
 var sharedClient = &http.Client{
-	Timeout: DefaultTimeout,
+	Timeout:   DefaultTimeout,
+	Transport: sharedTransport,
 	// Redirects: stdlib default (10) is fine.
 }
 
