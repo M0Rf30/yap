@@ -340,6 +340,39 @@ func (c *Cache) ResolveVirtual(name string) string {
 	return name
 }
 
+// InstalledNames returns the set of package names (bare, without arch
+// qualifier) currently installed on the host according to the merged
+// dpkg status overlay. A name is considered installed if at least one
+// arch variant is marked Installed.
+//
+// Used by cross-build extractors to avoid overlaying foreign-arch
+// payloads onto host binaries whose path is shared across architectures
+// (e.g. /usr/bin/sudo): even though dpkg multi-arch annotates packages
+// with separate entries per arch, the extractor writes to a single root
+// tree where /usr/bin/sudo exists once and is held open by the running
+// sudo process.
+func (c *Cache) InstalledNames() map[string]bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	out := make(map[string]bool)
+
+	for _, info := range c.entries {
+		if !info.Installed {
+			continue
+		}
+
+		name := info.Name
+		if i := strings.Index(name, ":"); i >= 0 {
+			name = name[:i]
+		}
+
+		out[name] = true
+	}
+
+	return out
+}
+
 // ResolveDeps performs transitive dependency resolution starting from the
 // given seed packages. It returns the topologically-ordered list of
 // packages that must be downloaded (deps before dependents), and a list of

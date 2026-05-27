@@ -501,23 +501,64 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 		"closure", len(resolved),
 		"transitive", len(resolved)-countDirect(resolved, seedSet))
 
-	// Extract every resolved foreign-arch package. The closure is already
-	// clean of host tools because aptcache.ResolveDeps redirects
-	// Multi-Arch: foreign packages to host-arch (they're host-only by
-	// definition, already installed). What remains is target-arch runtime
-	// libraries that the build needs to link against — safe to overlay
-	// because they live in either arch-qualified paths (libc6:arm64 →
-	// /lib/aarch64-linux-gnu/) or vendor-isolated prefixes
-	// (carbonio-libxml2 → /opt/zextras/common/).
+	skipped, err := extractCrossDepsToRoot(resolved, seedSet, tmpDir)
+	if err != nil {
+		return err
+	}
+
+	if skipped > 0 {
+		logger.Info("skipped host/transitive arch-all cross-deps",
+			"count", skipped,
+			"target_arch", targetArch)
+	}
+
+	return nil
+}
+
+// debArchAll is the dpkg Architecture value for architecture-independent
+// packages (data, scripts, Perl modules, …).
+const debArchAll = "all"
+
+// extractCrossDepsToRoot extracts target-arch payload from the resolved
+// dep closure into "/". Skips:
+//   - host-arch entries (would clobber running host binaries with arch
+//     mismatch, e.g. /usr/bin/sudo, fail with ETXTBSY when the file is
+//     held open by the parent process)
+//   - transitive arch-all entries (host tools already on the build host)
+//   - target-arch entries whose package name is already installed on the
+//     host in any arch: their payload shares /usr/bin/<name> with the
+//     host variant and would clobber it (the classic sudo:arm64 case —
+//     same /usr/bin/sudo path, no Multi-Arch-aware separation for
+//     binaries).
+//
+// Direct arch-all seeds — declared by the PKGBUILD — are still extracted.
+func extractCrossDepsToRoot(
+	resolved []*aptcache.PackageInfo,
+	seedSet map[string]bool,
+	tmpDir string,
+) (skipped int, err error) {
+	hostArch := aptcache.GoarchToDebArch()
+	installedNames := aptcache.Load().InstalledNames()
+
 	for _, info := range resolved {
 		if info == nil || info.Filename == "" {
 			continue
 		}
 
-		debPath := filepath.Join(tmpDir, filepath.Base(info.Filename))
-		origin := "direct"
+		isSeed := seedSet[info.Name]
+		if shouldSkipCrossDep(info, hostArch, isSeed, installedNames) {
+			logger.Debug("skipping host/transitive arch-all cross-dep",
+				"package", info.Name,
+				"arch", info.Architecture,
+				"seed", isSeed)
 
-		if !seedSet[info.Name] {
+			skipped++
+
+			continue
+		}
+
+		origin := "direct"
+		if !isSeed {
 			origin = "transitive"
 		}
 
@@ -526,14 +567,50 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 			"arch", info.Architecture,
 			"origin", origin)
 
+		debPath := filepath.Join(tmpDir, filepath.Base(info.Filename))
 		if err := ExtractDEB(debPath, "/"); err != nil {
-			return errors.Wrap(err, errors.ErrTypeBuild, "extract cross dep").
+			return skipped, errors.Wrap(err, errors.ErrTypeBuild, "extract cross dep").
 				WithOperation("DownloadAndExtractCrossDeps").
 				WithContext("package", info.Name)
 		}
 	}
 
-	return nil
+	return skipped, nil
+}
+
+// shouldSkipCrossDep reports whether the resolved package must not be
+// extracted to "/".
+//
+// Rules:
+//   - host-arch packages: always skipped (would clobber running host
+//     binaries with cross-arch payload)
+//   - arch-all packages: kept only when directly declared by the
+//     PKGBUILD (transitive arch-all are host tools already on disk)
+//   - target-arch packages whose name is already installed on the host
+//     (any arch): skipped to avoid overlaying a sibling-arch binary onto
+//     the shared /usr/bin/<name> path (sudo:arm64 vs the running
+//     sudo:amd64). Seeds declared by the PKGBUILD bypass this guard:
+//     the user explicitly asked for that package and is responsible for
+//     the collision implications.
+func shouldSkipCrossDep(
+	info *aptcache.PackageInfo,
+	hostArch string,
+	isSeed bool,
+	installedNames map[string]bool,
+) bool {
+	if info.Architecture == hostArch {
+		return true
+	}
+
+	if info.Architecture == debArchAll && !isSeed {
+		return true
+	}
+
+	if !isSeed && installedNames[info.Name] {
+		return true
+	}
+
+	return false
 }
 
 // countDirect returns the number of resolved entries whose name appears in
