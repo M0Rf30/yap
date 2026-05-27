@@ -224,7 +224,15 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 
 	pkgBuild.mapVariables(key, data)
 	pkgBuild.mapArrays(key, data, priority)
-	pkgBuild.mapFunctions(key, data)
+
+	// Functions, unlike arrays, do not accumulate across base/distro-specific
+	// variants — they replace. A previously stored higher-priority variant
+	// (e.g. prepare__ubuntu_jammy) must NOT be overwritten by a later base
+	// prepare() call. Only assign when this directive's priority is at least
+	// as high as the highest seen so far for this key.
+	if priority >= oldPriority {
+		pkgBuild.mapFunctions(key, data)
+	}
 
 	return nil
 }
