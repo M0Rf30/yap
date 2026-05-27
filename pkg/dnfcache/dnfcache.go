@@ -91,6 +91,10 @@ type PackageInfo struct {
 	Requires []string
 	// Provides is the list of capabilities this package provides.
 	Provides []string
+	// Recommends is the list of weak (Recommends) dependencies. dnf installs
+	// them by default; the resolver treats them as best-effort (missing
+	// recommends do not fail the build).
+	Recommends []string
 }
 
 // Cache is an in-memory index of RPM package metadata keyed by package name.
@@ -224,15 +228,27 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 		resolvedViaVirtual int
 	)
 
-	var visit func(name string)
+	var visit func(name string, soft bool)
 
-	visit = func(name string) {
+	visit = func(name string, soft bool) {
 		name = StripRPMConstraint(name)
 		if name == "" || seen[name] {
 			return
 		}
 
 		seen[name] = true
+
+		// Boolean/rich deps like "(gcc-plugin-annobin if gcc)" are not real
+		// package names. Decompose them into candidate tokens and walk each
+		// as a soft dep: missing tokens (e.g. the conditional trigger that
+		// isn't actually being installed) must not break the build.
+		if IsBooleanDep(name) {
+			for _, tok := range ExpandBooleanDep(name) {
+				visit(tok, true)
+			}
+
+			return
+		}
 
 		// Capability already provided by an installed package: do not pull
 		// any alternative provider. Prevents conflicts like coreutils vs
@@ -257,8 +273,13 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 
 				resolvedViaVirtual++
 
-				visit(chosen.Name)
+				visit(chosen.Name, soft)
 
+				return
+			}
+
+			if soft {
+				logger.Debug("dnfcache: unresolved (weak, ignored)", "package", name)
 				return
 			}
 
@@ -270,7 +291,12 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 
 		// Recurse on Requires.
 		for _, req := range info.Requires {
-			visit(req)
+			visit(req, false)
+		}
+
+		// Recurse on Recommends (weak deps): best-effort, mirrors dnf default.
+		for _, rec := range info.Recommends {
+			visit(rec, true)
 		}
 
 		logger.Debug("dnfcache: enqueue install",
@@ -281,7 +307,7 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 	}
 
 	for _, seed := range seeds {
-		visit(StripRPMConstraint(seed))
+		visit(StripRPMConstraint(seed), false)
 	}
 
 	logger.Info("dnfcache: resolved transitive deps",

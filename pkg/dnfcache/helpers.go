@@ -20,12 +20,94 @@ import (
 func StripRPMConstraint(name string) string {
 	name = strings.TrimSpace(name)
 
+	// Boolean/rich deps are kept verbatim so the caller can dispatch to
+	// ExpandBooleanDep. They start with '(' and contain keywords like
+	// "if", "or", "and" — splitting on space here would corrupt them.
+	if strings.HasPrefix(name, "(") {
+		return name
+	}
+
 	// RPM constraints use space-separated operators: "name >= ver"
 	if before, _, ok := strings.Cut(name, " "); ok {
 		return strings.TrimSpace(before)
 	}
 
 	return name
+}
+
+// booleanDepKeywords are the operator tokens used by RPM rich/boolean deps.
+// Reference: http://rpm.org/user_doc/boolean_dependencies.html
+var booleanDepKeywords = map[string]bool{
+	"and": true, "or": true, "if": true, "else": true,
+	"unless": true, "with": true, "without": true, "then": true,
+}
+
+// IsBooleanDep reports whether name is an RPM rich/boolean dependency
+// expression like "(foo if bar)" or "(libA or libB)".
+func IsBooleanDep(name string) bool {
+	return strings.HasPrefix(strings.TrimSpace(name), "(")
+}
+
+// ExpandBooleanDep extracts the candidate package names from an RPM
+// rich/boolean dependency expression. Boolean operators (if/or/and/…) and
+// version constraints are stripped; the remaining tokens are returned as
+// soft (best-effort) dependencies. Returns nil for non-boolean inputs.
+//
+// Example: "(gcc-plugin-annobin if gcc)" → ["gcc-plugin-annobin", "gcc"]
+//
+// The resolver visits each result as a soft dep, so missing tokens (e.g.
+// the conditional trigger that isn't actually being installed) are logged
+// and ignored rather than reported as build-breaking unresolved deps.
+func ExpandBooleanDep(name string) []string {
+	name = strings.TrimSpace(name)
+	if !strings.HasPrefix(name, "(") {
+		return nil
+	}
+
+	// Strip the outermost parentheses; nested ones are flattened by the
+	// tokenizer below since we only care about identifier tokens.
+	name = strings.TrimPrefix(name, "(")
+	name = strings.TrimSuffix(name, ")")
+
+	// Replace structural punctuation with spaces so a simple Fields split
+	// yields candidate tokens. Comparison operators (>=, <=, =, >, <) are
+	// dropped together with their version operands by the keyword/operand
+	// filter below.
+	for _, ch := range []string{"(", ")", ","} {
+		name = strings.ReplaceAll(name, ch, " ")
+	}
+
+	var (
+		result   []string
+		skipNext bool
+	)
+
+	for tok := range strings.FieldsSeq(name) {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+
+		// Version comparison operators: the following token is a version,
+		// not a package name.
+		if tok == ">=" || tok == "<=" || tok == "=" || tok == ">" || tok == "<" || tok == "==" {
+			skipNext = true
+			continue
+		}
+
+		if booleanDepKeywords[strings.ToLower(tok)] {
+			continue
+		}
+
+		// rpmlib() feature deps are not real packages.
+		if strings.HasPrefix(tok, "rpmlib(") {
+			continue
+		}
+
+		result = append(result, tok)
+	}
+
+	return result
 }
 
 // loadInstalledSet returns the set of package names currently installed

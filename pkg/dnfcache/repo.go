@@ -180,8 +180,9 @@ type primaryLocation struct {
 }
 
 type primaryFormat struct {
-	Requires []primaryEntry `xml:"requires>entry"`
-	Provides []primaryEntry `xml:"provides>entry"`
+	Requires   []primaryEntry `xml:"requires>entry"`
+	Provides   []primaryEntry `xml:"provides>entry"`
+	Recommends []primaryEntry `xml:"recommends>entry"`
 	// Files are file paths owned by the package and embedded in primary.xml
 	// by createrepo_c's "primary files" subset (mostly /etc/*, /usr/bin/*,
 	// /usr/sbin/*, /bin/*, /sbin/* and a few sendmail-style exceptions).
@@ -903,6 +904,21 @@ func buildPackageInfo(pkg *primaryPackage, baseURL string) *PackageInfo {
 		requires = append(requires, name)
 	}
 
+	// Recommends are weak dependencies. dnf installs them by default; we mirror
+	// that behaviour so build environments match what an rpmbuild-style install
+	// would produce (e.g. redhat-rpm-config recommends gcc-plugin-annobin,
+	// without which any package using -specs=redhat-annobin-cc1 fails to compile).
+	recommends := make([]string, 0, len(pkg.Format.Recommends))
+
+	for _, rec := range pkg.Format.Recommends {
+		name := StripRPMConstraint(rec.Name)
+		if name == "" || strings.HasPrefix(name, "rpmlib(") {
+			continue
+		}
+
+		recommends = append(recommends, name)
+	}
+
 	provides := make([]string, 0, len(pkg.Format.Provides)+len(pkg.Format.Files))
 
 	for _, prov := range pkg.Format.Provides {
@@ -932,6 +948,7 @@ func buildPackageInfo(pkg *primaryPackage, baseURL string) *PackageInfo {
 		BaseURL:      baseURL,
 		Requires:     requires,
 		Provides:     provides,
+		Recommends:   recommends,
 	}
 
 	if strings.EqualFold(pkg.Checksum.Type, "sha256") {
