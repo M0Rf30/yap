@@ -191,6 +191,11 @@ func isPerlModule(name string) bool {
 	return strings.HasSuffix(name, "-perl")
 }
 
+// partitionArchAllDeps splits deps according to apt Multi-Arch policy. The
+// caller is responsible for ensuring the aptcache singleton is up to date
+// (e.g. via aptcache.Reload after apt-get update or SetupCrossAPT). Tests
+// install a synthetic cache via StoreGlobal and must not be clobbered by an
+// implicit disk reload.
 func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 	cache := aptcache.Load()
 
@@ -424,6 +429,10 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 		return bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, deps)
 	}
 
+	// Same Reload rationale as installCrossDeps: pick up packages from any
+	// extra/cross repos added after the cache was first populated.
+	aptcache.Reload()
+
 	// Use the extract-safe partitioning: since we download+extract (not dpkg -i),
 	// there are no dpkg conflicts, so packages already installed for the host arch
 	// must still be downloaded as target-arch.
@@ -553,6 +562,13 @@ func (bb *BaseBuilder) installCrossDeps(
 	installArgs []string,
 	targetArch string,
 ) error {
+	// Reload to pick up packages from repos added after the singleton was
+	// first populated (e.g. extra --repo flags, cross-arch ports added by
+	// SetupCrossAPT). A stale cache means host-tools like perl (Multi-Arch:
+	// allowed) get misclassified as arch-specific and incorrectly qualified
+	// with the target arch (e.g. perl:arm64), producing a broken build env.
+	aptcache.Reload()
+
 	archSpecific, archAll := partitionArchAllDeps(makeDepends)
 	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
 
