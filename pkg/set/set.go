@@ -139,9 +139,19 @@ func StringifyFuncDecl(node *syntax.FuncDecl) (string, error) {
 		return "", err
 	}
 
-	funcDecl := strings.Trim(out.String(), "{\n}")
+	// Strip the outer braces emitted by the printer for the function body.
+	// IMPORTANT: do NOT use strings.Trim(s, "{\n}") here — Trim treats its
+	// second argument as a *cutset* of characters, which would also strip a
+	// trailing '}' that legitimately closes a parameter expansion such as
+	// ${_tag} on the last line of the body, producing an unbalanced ${ and
+	// a downstream parse error ("reached EOF without matching `${` with `}`").
+	funcDecl := out.String()
+	funcDecl = strings.TrimSpace(funcDecl)
+	funcDecl = strings.TrimPrefix(funcDecl, "{")
+	funcDecl = strings.TrimSuffix(funcDecl, "}")
+	funcDecl = strings.Trim(funcDecl, "\n")
 
-	if funcDecl == "" {
+	if strings.TrimSpace(funcDecl) == "" {
 		return "", errors.New(errors.ErrTypeConfiguration, i18n.T("errors.set.empty_function")).
 			WithContext("function", node.Name.Value)
 	}
