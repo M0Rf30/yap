@@ -77,6 +77,9 @@ type PackageInfo struct {
 	Depends []string
 	// PreDepends is the parsed Pre-Depends field (list of package names without version constraints).
 	PreDepends []string
+	// Version is the raw deb822 Version field. Used to resolve same name:arch
+	// collisions across repositories (highest version wins).
+	Version string
 }
 
 // archAll is the Debian "Architecture: all" constant.
@@ -1162,9 +1165,12 @@ func (c *Cache) mergeFrom(other *Cache) {
 	}
 }
 
-// mergeEntryFields applies a field-level last-writer-wins merge of info into
-// existing, preferring non-empty / non-zero values from info. Split out of
-// mergeFrom to keep that loop body below the cyclomatic-complexity threshold.
+// mergeEntryFields applies a field-level merge of info into existing.
+//
+// When both entries carry a Version, artifact fields are taken from the
+// higher-versioned side per Debian version comparison (ties favor info to
+// fill in fields it may have, e.g. SHA256). Otherwise non-empty values from
+// info win.
 func mergeEntryFields(existing, info *PackageInfo) {
 	if info.Architecture != "" {
 		existing.Architecture = info.Architecture
@@ -1182,17 +1188,41 @@ func mergeEntryFields(existing, info *PackageInfo) {
 		existing.HasCandidate = true
 	}
 
+	if !infoArtifactsWin(existing, info) {
+		return
+	}
+
+	copyInfoArtifacts(existing, info)
+}
+
+// infoArtifactsWin decides whether info should overwrite existing's artifact
+// fields. The chosen side is the one with the higher Debian version; ties and
+// empty-Version edges fall back to "info wins if it carries any artifact data".
+func infoArtifactsWin(existing, info *PackageInfo) bool {
+	switch {
+	case existing.Version == "" && info.Version == "":
+		return info.Filename != "" || info.SHA256 != "" || info.Size > 0 ||
+			len(info.Depends) > 0 || len(info.PreDepends) > 0
+	case existing.Version == "":
+		return true
+	case info.Version == "":
+		return false
+	default:
+		return CompareDebVersion(info.Version, existing.Version) >= 0
+	}
+}
+
+// copyInfoArtifacts overwrites existing's artifact fields with non-empty
+// values from info. BaseURL only follows Filename for non-"all" architectures,
+// to avoid pointing an _all.deb at a foreign-arch mirror (ports.ubuntu.com).
+func copyInfoArtifacts(existing, info *PackageInfo) {
+	if info.Version != "" {
+		existing.Version = info.Version
+	}
+
 	if info.Filename != "" {
 		existing.Filename = info.Filename
-		// BaseURL must follow Filename when the incoming entry is for a
-		// different (non-all) architecture: e.g. arm64 Filename from
-		// ports.ubuntu.com must not be downloaded from archive.ubuntu.com.
-		//
-		// Exception: Architecture: all packages have the same _all.deb
-		// filename in every arch index. Overwriting BaseURL for those
-		// would replace archive.ubuntu.com with ports.ubuntu.com, causing
-		// the host-arch install of arch-all tools (patch, autoconf, …) to
-		// pull arm64 debs and overwrite host binaries.
+
 		if info.BaseURL != "" && info.Architecture != "" && info.Architecture != archAll {
 			existing.BaseURL = info.BaseURL
 		}
@@ -1318,6 +1348,7 @@ type stanza struct {
 	essential  bool
 	installed  bool
 	hasVersion bool
+	version    string
 	filename   string
 	sha256     string
 	size       int64
@@ -1357,6 +1388,7 @@ func applyField(s *stanza, field, value string, dpkgStatus bool) {
 		s.pkgName = value
 	case "Version":
 		s.hasVersion = value != ""
+		s.version = value
 	case "Architecture":
 		s.arch = value
 	case "Essential":
@@ -1426,7 +1458,12 @@ func (c *Cache) flushStanza(s *stanza, dpkgStatus bool) {
 }
 
 // mergePackageInfo merges fields from a parsed stanza into an existing PackageInfo.
-// Handles conditional merging based on field presence and dpkgStatus flag.
+//
+// For apt-index stanzas, when the existing entry already has a candidate, the
+// incoming stanza overwrites artifact fields only when its Version is strictly
+// greater per Debian version comparison. This implements "newest version wins"
+// across multiple repositories indexing the same name:arch (matches apt's
+// default behavior in the absence of explicit pinning).
 func mergePackageInfo(existing *PackageInfo, s *stanza, dpkgStatus bool) {
 	existing.Name = s.pkgName
 
@@ -1446,11 +1483,23 @@ func mergePackageInfo(existing *PackageInfo, s *stanza, dpkgStatus bool) {
 		existing.Installed = true
 	}
 
-	// A stanza with a Version field means the package is a real,
-	// installable package (has a candidate), not a pure virtual.
-	if s.hasVersion {
-		existing.HasCandidate = true
+	if !s.hasVersion {
+		return // pure virtual / dpkg status stanza, no artifact data
 	}
+
+	existing.HasCandidate = true
+
+	if existing.Version != "" && CompareDebVersion(s.version, existing.Version) <= 0 {
+		return // existing wins on version
+	}
+
+	copyStanzaArtifacts(existing, s)
+}
+
+// copyStanzaArtifacts overwrites the artifact fields of existing with values
+// from a stanza. Used when the stanza wins on Debian version comparison.
+func copyStanzaArtifacts(existing *PackageInfo, s *stanza) {
+	existing.Version = s.version
 
 	if s.filename != "" {
 		existing.Filename = s.filename
@@ -1464,9 +1513,7 @@ func mergePackageInfo(existing *PackageInfo, s *stanza, dpkgStatus bool) {
 		existing.Size = s.size
 	}
 
-	// Set BaseURL if not already set (first-writer-wins: apt index takes
-	// precedence over dpkg status, which has no BaseURL).
-	if s.baseURL != "" && existing.BaseURL == "" {
+	if s.baseURL != "" {
 		existing.BaseURL = s.baseURL
 	}
 
