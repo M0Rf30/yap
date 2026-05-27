@@ -256,10 +256,13 @@ func shouldSkipFile(info os.FileInfo, src, dest string) (bool, error) {
 		}
 	}
 
-	// Define a slice of file extensions to skip
+	// Define a slice of file extensions to skip.
+	// Only built distro package outputs are skipped: generic source archives
+	// (.tar.gz/.tar.xz/.tar.bz2/.zip) are legitimate PKGBUILD source=()
+	// entries when checked in next to the PKGBUILD, and must be copied
+	// into StartDir so validateSource() can hash them.
 	skipExtensions := []string{
 		".apk", ".deb", ".pkg.tar.zst", ".rpm",
-		".tar.gz", ".tar.xz", ".tar.bz2", ".zip",
 	}
 	for _, ext := range skipExtensions {
 		if strings.HasSuffix(src, ext) {
