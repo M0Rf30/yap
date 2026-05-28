@@ -96,9 +96,13 @@ func TestValidateCompression(t *testing.T) {
 			shouldError: true,
 		},
 		{
+			// Empty means "use the builder default" and is accepted; the
+			// build command only calls validateCompression when the flag is
+			// non-empty. Matches constants.IsSupportedCompression semantics
+			// shared with the MCP server.
 			name:        "empty compression",
 			compression: "",
-			shouldError: true,
+			shouldError: false,
 		},
 	}
 

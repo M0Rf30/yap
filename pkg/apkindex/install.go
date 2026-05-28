@@ -435,14 +435,21 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 // On reinstall/upgrade the existing stanza for the same package name is
 // replaced rather than appended (which would leak duplicate entries).
 func registerInstalled(pkg *Package, pkgInfo string) error {
-	if err := os.MkdirAll(filepath.Dir(apkInstalledDB), 0o755); err != nil {
+	return registerInstalledAt(apkInstalledDB, pkg, pkgInfo)
+}
+
+// registerInstalledAt is registerInstalled parameterized by the installed-db
+// path. The exported behaviour uses the package-level apkInstalledDB constant;
+// tests drive it against a temp path.
+func registerInstalledAt(dbPath string, pkg *Package, pkgInfo string) error {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create database directory").
 			WithOperation("registerInstalled").
-			WithContext("path", filepath.Dir(apkInstalledDB))
+			WithContext("path", filepath.Dir(dbPath))
 	}
 
 	// Read existing DB → stanza map keyed by package name.
-	existing := readInstalledStanzas()
+	existing := readInstalledStanzasAt(dbPath)
 
 	// Build the new stanza.
 	var stanza string
@@ -467,13 +474,18 @@ func registerInstalled(pkg *Package, pkgInfo string) error {
 
 	existing[pkg.Name] = strings.TrimRight(stanza, "\n") + "\n"
 
-	return writeInstalledStanzas(existing)
+	return writeInstalledStanzasAt(dbPath, existing)
 }
 
 // readInstalledStanzas parses /lib/apk/db/installed into a map of
 // package-name → raw stanza text (newline-terminated, no trailing blank).
 func readInstalledStanzas() map[string]string {
-	f, err := os.Open(apkInstalledDB)
+	return readInstalledStanzasAt(apkInstalledDB)
+}
+
+// readInstalledStanzasAt is readInstalledStanzas parameterized by path.
+func readInstalledStanzasAt(dbPath string) map[string]string {
+	f, err := os.Open(dbPath) //nolint:gosec // caller-controlled db path (constant in prod, temp in tests)
 	if err != nil {
 		return make(map[string]string)
 	}
@@ -518,13 +530,14 @@ func readInstalledStanzas() map[string]string {
 	return stanzas
 }
 
-// writeInstalledStanzas writes the stanza map to /lib/apk/db/installed
+// writeInstalledStanzasAt writes the stanza map to the installed-db at dbPath
 // atomically. Stanzas are written in sorted name order so the output is
-// reproducible.
-func writeInstalledStanzas(stanzas map[string]string) error {
-	tmpPath := apkInstalledDB + ".tmp"
+// reproducible. Production uses the package-level constant; tests pass a
+// temp path.
+func writeInstalledStanzasAt(dbPath string, stanzas map[string]string) error {
+	tmpPath := dbPath + ".tmp"
 
-	// nolint:gosec // G304: constant path
+	//nolint:gosec // G304: caller-controlled db path (constant in prod, temp in tests)
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open database file").
@@ -567,13 +580,13 @@ func writeInstalledStanzas(stanzas map[string]string) error {
 			WithContext("path", tmpPath)
 	}
 
-	if err := os.Rename(tmpPath, apkInstalledDB); err != nil {
+	if err := os.Rename(tmpPath, dbPath); err != nil {
 		_ = os.Remove(tmpPath)
 
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to rename database file").
 			WithOperation("writeInstalledStanzas").
 			WithContext("from", tmpPath).
-			WithContext("to", apkInstalledDB)
+			WithContext("to", dbPath)
 	}
 
 	return nil

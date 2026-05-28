@@ -9,6 +9,8 @@ import (
 
 	rpmutils "github.com/sassoftware/go-rpmutils"
 
+	"github.com/M0Rf30/yap/v2/pkg/rpmdb"
+
 	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -190,14 +192,13 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 			WithContext("package", pkgName)
 	}
 
-	// Optionally write system rpmdb (SQLite only).
-	// Currently unimplemented: the writer stub always errors. To avoid silent
-	// data-integrity surprises, opting in is treated as a hard failure.
+	// Optionally write the system rpmdb (SQLite only). On BDB hosts or when the
+	// SQLite rpmdb is absent this fails; opting in treats that as a hard error
+	// rather than silently diverging from the on-disk system state.
 	if opts.WriteSystemRpmdb {
-		//nolint:staticcheck // SA4023: stub always returns non-nil error; kept for future wiring
 		if err := writeSystemRpmdb(ctx, rpm, entry, rootDir); err != nil {
 			return errors.Wrap(err, errors.ErrTypeInternal,
-				"WriteSystemRpmdb requested but not implemented").
+				"failed to write system rpmdb").
 				WithOperation("installPackage").
 				WithContext("package", pkgName)
 		}
@@ -277,10 +278,9 @@ func writeYapdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir
 }
 
 // writeSystemRpmdb optionally writes to the system rpmdb.sqlite (SQLite only).
-// On BDB systems or if the file doesn't exist, returns an error that is logged as a warning.
-//
-//nolint:staticcheck // SA4023: stub always returns non-nil error today; kept for future wiring
-func writeSystemRpmdb(_ context.Context, _ *rpmutils.Rpm, _ *rpmEntry, rootDir string) error {
+// On BDB systems or if the file doesn't exist, returns an error that is logged
+// as a warning by the caller (opting in is treated as a hard failure).
+func writeSystemRpmdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir string) error {
 	rpmdbPath := filepath.Join(rootDir, "var", "lib", "rpm", "rpmdb.sqlite")
 
 	// Check if the SQLite rpmdb exists.
@@ -289,13 +289,37 @@ func writeSystemRpmdb(_ context.Context, _ *rpmutils.Rpm, _ *rpmEntry, rootDir s
 			WithContext("path", rpmdbPath)
 	}
 
-	// TODO: implement rpmdb.Writer integration
-	// When rpmdb.Writer is ready, call:
-	// writer, err := rpmdb.OpenWriter(ctx, rpmdbPath)
-	// if err != nil { return err }
-	// defer writer.Close()
-	// writer.Install(ctx, rpm, entry.Files)
+	writer, err := rpmdb.OpenWriter(ctx, rpmdbPath)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open system rpmdb").
+			WithOperation("writeSystemRpmdb").
+			WithContext("path", rpmdbPath)
+	}
+	defer func() { _ = writer.Close() }()
 
-	return errors.New(errors.ErrTypeInternal, "system rpmdb write not yet implemented").
-		WithOperation("writeSystemRpmdb")
+	if err := writer.Install(ctx, rpm, toRPMDBFiles(entry.Files)); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write package to system rpmdb").
+			WithOperation("writeSystemRpmdb").
+			WithContext("path", rpmdbPath)
+	}
+
+	return nil
+}
+
+// toRPMDBFiles converts the dnfinstall installedFile slice into the
+// rpmdb.InstalledFile shape expected by rpmdb.Writer.Install.
+func toRPMDBFiles(files []installedFile) []rpmdb.InstalledFile {
+	out := make([]rpmdb.InstalledFile, 0, len(files))
+	for i := range files {
+		f := &files[i]
+		out = append(out, rpmdb.InstalledFile{
+			Path:       f.Path,
+			Size:       f.Size,
+			Mode:       uint32(f.Mode), //nolint:gosec // os.FileMode bits fit uint32
+			SHA256:     f.SHA256,
+			LinkTarget: f.LinkTarget,
+		})
+	}
+
+	return out
 }

@@ -8,6 +8,8 @@ import (
 	"io"
 	"maps"
 	"os"
+
+	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 )
 
 // WriteDeb822FieldForTesting exposes the deb822 field emitter so round-
@@ -331,4 +333,14 @@ type DebContentsForTesting struct {
 	Scriptlets map[string]string
 	Triggers   string
 	Files      []string
+}
+
+// FilterForeignArchPackagesForTesting exposes filterForeignArchPackages for unit tests.
+func FilterForeignArchPackagesForTesting(pkgs []*aptcache.PackageInfo) []*aptcache.PackageInfo {
+	return filterForeignArchPackages(pkgs)
+}
+
+// CurrentInstalledVersionForTesting exposes currentInstalledVersion for unit tests.
+func CurrentInstalledVersionForTesting(pkg *aptcache.PackageInfo) string {
+	return currentInstalledVersion(pkg)
 }

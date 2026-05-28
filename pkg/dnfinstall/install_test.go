@@ -57,7 +57,10 @@ func TestWriteSystemRpmdbMissing(t *testing.T) {
 	assert.Contains(t, err.Error(), "not found")
 }
 
-// TestWriteSystemRpmdbExists tests writeSystemRpmdb when rpmdb.sqlite exists.
+// TestWriteSystemRpmdbExists tests writeSystemRpmdb when a file exists at the
+// rpmdb.sqlite path but is not a valid SQLite database. The writer is now
+// wired (no longer a stub), so opening a non-DB file must fail at the
+// OpenWriter ping stage rather than returning "not yet implemented".
 func TestWriteSystemRpmdbExists(t *testing.T) {
 	ctx := context.Background()
 	rootDir := t.TempDir()
@@ -67,7 +70,7 @@ func TestWriteSystemRpmdbExists(t *testing.T) {
 	err := os.MkdirAll(rpmdbDir, 0o755)
 	require.NoError(t, err)
 
-	// Create a dummy rpmdb.sqlite file.
+	// Create a non-SQLite rpmdb.sqlite file: OpenWriter must reject it.
 	rpmdbPath := filepath.Join(rpmdbDir, "rpmdb.sqlite")
 	err = os.WriteFile(rpmdbPath, []byte("dummy"), 0o644)
 	require.NoError(t, err)
@@ -75,12 +78,11 @@ func TestWriteSystemRpmdbExists(t *testing.T) {
 	rpm := &rpmutils.Rpm{}
 	entry := &rpmEntry{}
 
-	// Call writeSystemRpmdb.
 	err = writeSystemRpmdb(ctx, rpm, entry, rootDir)
 
-	// Should return "not yet implemented" error.
+	// Opening a non-database file fails at the rpmdb open/ping stage.
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not yet implemented")
+	assert.Contains(t, err.Error(), "failed to open system rpmdb")
 }
 
 // TestInstallPackageHappyPath tests installPackage with a valid RPM.

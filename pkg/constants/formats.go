@@ -1,7 +1,10 @@
 // Package constants provides centralized constants and mappings for all package formats.
 package constants
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // Package format constants
 const (
@@ -27,6 +30,29 @@ const (
 	// ExtPacmanZst is the Arch Linux zstd-compressed package file extension.
 	ExtPacmanZst = ".pkg.tar.zst"
 )
+
+// Package compression algorithm constants accepted by the DEB and RPM builders.
+const (
+	CompressionZstd = "zstd"
+	CompressionGzip = "gzip"
+	CompressionXz   = "xz"
+)
+
+// SupportedCompressions is the canonical set of package compression
+// algorithms accepted by the DEB and RPM builders. It is the single source
+// of truth shared by the CLI (cmd/yap/command) and the MCP server (pkg/mcp).
+var SupportedCompressions = []string{CompressionZstd, CompressionGzip, CompressionXz}
+
+// IsSupportedCompression reports whether algo is one of the supported package
+// compression algorithms. The empty string is treated as supported (the
+// builder default is applied downstream).
+func IsSupportedCompression(algo string) bool {
+	if algo == "" {
+		return true
+	}
+
+	return slices.Contains(SupportedCompressions, algo)
+}
 
 // BuildEnvironmentDeps provides build environment dependencies for each package manager.
 type BuildEnvironmentDeps struct {

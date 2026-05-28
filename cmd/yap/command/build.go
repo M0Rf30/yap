@@ -11,6 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+
 	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
@@ -197,18 +199,18 @@ var buildCmd = &cobra.Command{
 	},
 }
 
-// validateCompression validates that the compression algorithm is supported.
+// validateCompression validates that the compression algorithm is supported,
+// using the canonical set in pkg/constants shared with the MCP server.
 func validateCompression(compression string) error {
-	switch compression {
-	case "zstd", "gzip", "xz":
+	if constants.IsSupportedCompression(compression) {
 		return nil
-	default:
-		return yapErrors.New(
-			yapErrors.ErrTypeConfiguration,
-			"unsupported compression algorithm",
-		).WithContext("compression", compression).
-			WithOperation("validateCompression")
 	}
+
+	return yapErrors.New(
+		yapErrors.ErrTypeConfiguration,
+		"unsupported compression algorithm",
+	).WithContext("compression", compression).
+		WithOperation("validateCompression")
 }
 
 // resolveSigning resolves the signing configuration from CLI flags,

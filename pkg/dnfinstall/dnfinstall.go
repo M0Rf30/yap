@@ -36,9 +36,9 @@ import (
 //
 // WriteSystemRpmdb: if true, ALSO write to /var/lib/rpm/rpmdb.sqlite (SQLite
 // hosts only — Fedora 33+, RHEL 9+, Rocky 9+). Default is false; YAP uses
-// yapdb for state tracking instead. NOTE: writer integration is not yet
-// wired (see install.go writeSystemRpmdb); enabling this currently fails
-// the install rather than silently swallowing the stub error.
+// yapdb for state tracking instead. On BDB hosts or when the SQLite rpmdb is
+// absent, enabling this fails the install rather than silently diverging
+// from the on-disk system state.
 //
 // StrictScriptlets: if true, %pretrans/%post/%posttrans failures are treated
 // as fatal. RPM convention is non-fatal; this flag is intended for build-time
@@ -119,8 +119,12 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 	// Refresh dynamic linker cache exactly once per transaction (vs once
 	// per package), iff requested.
 	if opts.RunLDConfig {
-		// TODO: implement ldconfig refresh
-		logger.Debug("ldconfig refresh requested but not yet implemented")
+		if err := runLDConfig(ctx, rootDir); err != nil {
+			// A failed cache refresh should not abort an otherwise-successful
+			// install: log and continue, mirroring rpm's tolerance of a
+			// missing or non-fatal ldconfig.
+			logger.Warn("ldconfig refresh failed (continuing)", "error", err.Error())
+		}
 	}
 
 	logger.Info("installation complete", "count", len(resolved))

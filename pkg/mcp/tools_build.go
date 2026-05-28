@@ -7,6 +7,8 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/M0Rf30/yap/v2/pkg/constants"
+
 	"github.com/M0Rf30/yap/v2/cmd/yap/command"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/container"
@@ -395,25 +397,19 @@ func runNativeBuild(ctx context.Context, buildID string, mpc *project.MultiplePr
 	defaultRegistry.Finish(buildID, BuildStateSucceeded, "")
 }
 
-// validateBuildCompression mirrors cmd/yap/command.validateCompression but is
-// internal to the MCP package to avoid a cyclic dependency on cmd/yap/command.
-// TODO: lift the canonical list into pkg/builders/common so MCP and CLI share
-// one source of truth.
+// validateBuildCompression validates the DEB and RPM compression algorithms
+// against the canonical set in pkg/constants, shared with the CLI.
 func validateBuildCompression(deb, rpm string) error {
 	check := func(label, v string) error {
-		if v == "" {
+		if constants.IsSupportedCompression(v) {
 			return nil
 		}
 
-		switch v {
-		case "zstd", "gzip", "xz":
-			return nil
-		default:
-			return errors.New(errors.ErrTypeValidation,
-				"unsupported "+label+" compression "+v+" (want zstd, gzip, or xz)").
-				WithOperation(toolNameBuild).
-				WithContext("compression", v)
-		}
+		return errors.New(errors.ErrTypeValidation,
+			"unsupported "+label+" compression "+v+" (want "+
+				strings.Join(constants.SupportedCompressions, ", ")+")").
+			WithOperation(toolNameBuild).
+			WithContext("compression", v)
 	}
 
 	if err := check("deb", deb); err != nil {
