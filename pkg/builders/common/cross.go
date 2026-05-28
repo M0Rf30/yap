@@ -1163,8 +1163,44 @@ func ValidateTargetArch(arch string) error {
 
 	knownStr := strings.Join(known, ", ")
 
-	return errors.New(errors.ErrTypeValidation, fmt.Sprintf("unsupported target architecture %q — known: %s", arch, knownStr)). //nolint:lll
-																	WithOperation("ValidateTargetArch")
+	hint := ""
+	if canonical, ok := archAliases[arch]; ok {
+		hint = fmt.Sprintf(" (did you mean %q?)", canonical)
+	}
+
+	return errors.New(errors.ErrTypeValidation,
+		fmt.Sprintf("unsupported target architecture %q%s — known: %s", arch, hint, knownStr)).
+		WithOperation("ValidateTargetArch")
+}
+
+// archAliases maps common non-canonical arch spellings (Go/Debian/etc.) to
+// the canonical name yap accepts. NormalizeTargetArch consults this table
+// before validation so callers can use the spelling they're used to.
+var archAliases = map[string]string{ //nolint:gochecknoglobals // lookup table
+	constants.ArchArm64: constants.ArchAarch64,
+	constants.ArchAmd64: constants.ArchX86_64,
+	"x64":               constants.ArchX86_64,
+	"x86-64":            constants.ArchX86_64,
+	"i386":              constants.ArchI686,
+	"386":               constants.ArchI686,
+	"armhf":             constants.ArchArmv7,
+	"armv7l":            constants.ArchArmv7,
+	"armv7h":            constants.ArchArmv7,
+	"armv6l":            constants.ArchArmv6,
+	"armv6h":            constants.ArchArmv6,
+	"ppc64el":           constants.ArchPpc64le,
+}
+
+// NormalizeTargetArch returns the canonical form of arch, mapping aliases
+// like "arm64" → "aarch64" and "amd64" → "x86_64". Unknown values pass
+// through unchanged so ValidateTargetArch can report them with the full
+// known-arch list.
+func NormalizeTargetArch(arch string) string {
+	if canonical, ok := archAliases[arch]; ok {
+		return canonical
+	}
+
+	return arch
 }
 
 // writeCMakeToolchainFile writes a standard CMake cross-compilation toolchain

@@ -330,6 +330,10 @@ func (mpc *MultipleProject) applyJSONDefaults() error {
 		mpc.Opts.TargetArch = mpc.TargetArch
 	}
 
+	// Normalize common arch aliases (arm64→aarch64, amd64→x86_64, …) before
+	// validation so callers can use Go/Debian-style spellings.
+	mpc.Opts.TargetArch = common.NormalizeTargetArch(mpc.Opts.TargetArch)
+
 	if mpc.Opts.DebugDir == "" && mpc.DebugDir != "" {
 		mpc.Opts.DebugDir = mpc.DebugDir
 	}

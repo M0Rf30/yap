@@ -11,7 +11,20 @@ before:
     - go generate ./...
 
 builds:
-  - main: ./cmd/yap
+  - id: yap
+    main: ./cmd/yap
+    binary: yap
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+  - id: yap-mcp
+    main: ./cmd/yap-mcp
+    binary: yap-mcp
     env:
       - CGO_ENABLED=0
     goos:
@@ -30,11 +43,30 @@ upx:
     goos:
       - linux
 
+checksum:
+  # install.sh fetches the file at this exact name; keep it stable.
+  name_template: "checksums.txt"
+
 archives:
-  - formats: tar.gz
-    # this name template makes the OS and Arch compatible with the results of `uname`.
+  # One archive per binary so install.sh can fetch them independently.
+  # Without per-build archives goreleaser bundles every binary into a single
+  # archive named after ProjectName, which breaks `yap-mcp_<OS>_<ARCH>.tar.gz`
+  # downloads.
+  - id: yap
+    ids: [yap]
+    formats: tar.gz
     name_template: >-
-      {{ .ProjectName }}_
+      yap_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+  - id: yap-mcp
+    ids: [yap-mcp]
+    formats: tar.gz
+    name_template: >-
+      yap-mcp_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386

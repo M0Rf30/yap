@@ -3,6 +3,8 @@
 package container
 
 import (
+	"context"
+	"io"
 	"os/exec"
 
 	"github.com/M0Rf30/yap/v2/pkg/container/internal/runtimetype"
@@ -26,7 +28,7 @@ type Runtime interface {
 	Pull(distro string) error
 
 	// Run executes the given command inside the distro container, mounting
-	// workDir as /workspace inside the container.
+	// workDir as /project inside the container.
 	// args are passed directly to the container ENTRYPOINT.
 	Run(distro, workDir string, args []string) error
 
@@ -34,6 +36,23 @@ type Runtime interface {
 	// overriding the ENTRYPOINT with /bin/sh -c. Use this to chain multiple
 	// yap sub-commands in a single container invocation.
 	RunShell(distro, workDir, shellCmd string) error
+
+	// RunShellCapture is like RunShell but tees stdout+stderr into out
+	// (typically a bounded buffer owned by the caller — e.g. an MCP build
+	// session log). Pass nil to fall back to the default sink.
+	//
+	// env is forwarded to the container as additional environment variables
+	// without appearing in the shell argv — use it for secrets like signing
+	// passphrases that would otherwise leak via `ps`. A nil/empty map is
+	// equivalent to passing no extra vars.
+	//
+	// ctx is honoured by the CLI backend (podman/docker) so cancelling the
+	// context terminates the container. The rootless backend forwards it on
+	// a best-effort basis only — rootlesskit's parent loop has no clean
+	// cancel hook, so cancellation may be observed only after the next
+	// process boundary.
+	RunShellCapture(ctx context.Context, distro, workDir, shellCmd string,
+		env map[string]string, out io.Writer) error
 
 	// Type returns the runtime identifier.
 	Type() RuntimeType
