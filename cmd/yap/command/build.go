@@ -120,7 +120,7 @@ var buildCmd = &cobra.Command{
 			// when the user explicitly requested -s (skip-sync) or -d (no-makedeps),
 			// which implies they have already prepared the environment.
 			skipPrepare := buildOpts.SkipSyncDeps || buildOpts.NoMakeDeps
-			buildArgs := []string{buildCommand, distroTag, "/workspace"}
+			buildArgs := []string{buildCommand, distroTag, "/project"}
 
 			if RunPipelineInContainer(distroTag, fullJSONPath, buildArgs, skipPrepare) {
 				return nil
@@ -275,6 +275,13 @@ func logStructuredError(yapErr *yapErrors.YapError) {
 	}
 
 	msg := strings.Join(parts, ": ")
+
+	// Always include the error's own message; logStructuredError previously
+	// only appended yapErr.Cause, so errors built with errors.New (no Cause)
+	// surfaced just their Operation in parentheses and looked empty.
+	if yapErr.Message != "" {
+		msg += " — " + yapErr.Message
+	}
 
 	if yapErr.Cause != nil {
 		msg += " — " + yapErr.Cause.Error()

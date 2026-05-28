@@ -9,6 +9,8 @@
 | Package | Role |
 |---------|------|
 | `cmd/yap/` | Cobra CLI |
+| `cmd/yap-mcp/` | Stdio entrypoint for the Model Context Protocol server |
+| `pkg/mcp/` | MCP tool/resource/prompt registrations; thin wrappers over yap pkgs |
 | `pkg/project/` | `MultipleProject`, `BuildAll`, multi-package orchestration |
 | `pkg/core/` | Project config struct (`yap.json`) |
 | `pkg/builders/{apk,deb,rpm,pacman}` | Format-specific builders |
@@ -269,6 +271,17 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - `pkg/dnfinstall` does NOT update `/var/lib/rpm/` by default (state lives in yapdb); set `Options.WriteSystemRpmdb=true` to also write to SQLite rpmdb (Fedora 33+/RHEL 9+/Rocky 9+ only — BDB hosts skip with warn)
 - `pkg/aptinstall` does NOT update `/var/lib/dpkg/status` by default (state lives in yapdb); set `Options.WriteDpkgStatus=true` for legacy behavior
 - `pkg/dnfinstall` coverage at ~41% (rpmpack→rpmutils interop blocks happy-path integration tests); pure-unit coverage of helpers is strong, full pipeline validated via `make test-e2e-rpm` on Rocky 8
+
+### MCP surface (`pkg/mcp/`, `cmd/yap-mcp/`)
+
+- Tools: `validate`, `parse_pkgbuild`, `graph`, `build` (async + buildID), `build_status`, `build_wait`, `build_logs` (tail/since/grep), `build_cancel`, `list_artifacts`, `inspect`, `install`, `prepare`, `pull`, `zap`, `list_distros`, `list_images`, `resolve_distro`, `status`.
+- Prompts: `build_single_pkg`, `cross_compile`, `sign_and_release`.
+- Resources: `yap://distros`, `yap://pkgbuild/{path}`.
+- Handlers are intentionally thin wrappers over the existing `pkg/project`, `pkg/parser`, `pkg/packer`, `pkg/container`, `pkg/signing`, `pkg/dnfinstall` packages — do not duplicate build logic in `pkg/mcp`.
+- `BuildSession.Done()` channel is closed by `Finish`; use it instead of polling for new wait-style tools.
+- Tool annotations: `ReadOnlyHint` + `IdempotentHint` for inspectors; `DestructiveHint` for `build`, `install`, `prepare`, `zap`.
+- Skill card lives at `.opencode/skills/yap/SKILL.md`; keep it in sync when adding tools/prompts.
+- Install script: `scripts/install.sh` (curl|sh; Linux/Darwin × amd64/arm64).
 
 ### Development priorities
 1. Wire RPM changelog when rpmpack adds the API

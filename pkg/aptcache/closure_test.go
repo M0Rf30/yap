@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,10 +83,15 @@ func TestDownloadClosurePullsTransitiveDeps(t *testing.T) {
 
 	t.Cleanup(srv.Close)
 
-	served := map[string]int{}
+	var (
+		servedMu sync.Mutex
+		served   = map[string]int{}
+	)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		servedMu.Lock()
 		served[path.Base(r.URL.Path)]++
+		servedMu.Unlock()
 		_, _ = w.Write([]byte(debBody))
 	})
 
@@ -181,10 +187,15 @@ Description: bottom of diamond
 
 	t.Cleanup(srv.Close)
 
-	hits := map[string]int{}
+	var (
+		hitsMu sync.Mutex
+		hits   = map[string]int{}
+	)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		hitsMu.Lock()
 		hits[path.Base(r.URL.Path)]++
+		hitsMu.Unlock()
 		_, _ = w.Write([]byte(debBody))
 	})
 

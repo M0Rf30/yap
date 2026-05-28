@@ -30,7 +30,7 @@ DOCKER_BUILD_FLAGS = --progress=plain --no-cache
 # Available distributions (dynamically retrieved from build/deploy folder)
 DISTROS = $(shell find build/deploy -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
-.PHONY: all build clean test test-coverage test-e2e-rpm bench deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats rpmdb-gen
+.PHONY: all build build-mcp clean test test-coverage test-e2e-rpm bench deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats rpmdb-gen
 
 # Default target
 all: clean deps fmt lint lint-md test doc build
@@ -41,6 +41,14 @@ build:
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
+	@$(MAKE) --no-print-directory build-mcp
+
+# Build the yap-mcp (Model Context Protocol) server binary
+build-mcp:
+	@echo "Building yap-mcp..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/yap-mcp ./cmd/yap-mcp
+	@echo "Build complete: $(BUILD_DIR)/yap-mcp"
 
 # Clean build artifacts
 clean:

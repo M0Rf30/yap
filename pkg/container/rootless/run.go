@@ -107,7 +107,7 @@ func runExec() error {
 }
 
 // RunInRootless runs args inside the distro rootfs using rootlesskit for
-// user-namespace isolation. workDir is bind-mounted as /workspace.
+// user-namespace isolation. workDir is bind-mounted as /project.
 func RunInRootless(distro, workDir string, args []string) error {
 	rootfs, err := rootfsPath(distro)
 	if err != nil {

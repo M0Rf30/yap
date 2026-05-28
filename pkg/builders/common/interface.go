@@ -369,6 +369,29 @@ func (bb *BaseBuilder) Prepare(ctx context.Context, makeDepends []string, target
 		return err
 	}
 
+	// Install the cross-compiler toolchain itself (gcc-<triplet>, g++-<triplet>,
+	// binutils-<triplet>, libc6-dev-<arch>-cross). These are host-arch packages
+	// — they execute on the build host and emit target-arch code — so they go
+	// through the normal (non-:arch-qualified) install path. Without this step
+	// the build sandbox would only get target-arch *libraries* (from the
+	// qualified makedepends below) but no compiler to link them with.
+	crossDeps := bb.getCrossCompilerDependencies(targetArch)
+	if len(crossDeps) > 0 {
+		logger.Info("installing cross-compiler toolchain",
+			"target_arch", targetArch,
+			"packages", strings.Join(crossDeps, ", "))
+
+		installArgs := constants.GetInstallArgs(bb.Format)
+		if err := bb.PKGBUILD.GetDepends(ctx, getPackageManager(bb.Format), installArgs, crossDeps); err != nil {
+			return err
+		}
+
+		// Newly installed cross-compiler binaries (e.g. /usr/bin/aarch64-linux-gnu-gcc)
+		// must be wrapped by ccache symlinks if ccache is in use; otherwise the
+		// /usr/lib/ccache PATH entries silently bypass them.
+		bb.refreshCcacheSymlinks()
+	}
+
 	// Qualify makedepends with the target architecture so the package
 	// manager installs the target-arch variant of each library.
 	//

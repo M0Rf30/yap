@@ -221,6 +221,32 @@ func Exec(ctx context.Context, excludeStdout bool, dir, name string, args ...str
 	return ExecWithContext(ctx, excludeStdout, dir, name, args...)
 }
 
+// ExecCapture runs the command with stdout and stderr written to out. Use
+// this when a caller needs to collect process output into a buffer (e.g.
+// MCP session logs) instead of streaming it via the global MultiPrinter.
+// Internally relies on os/exec.CommandContext with out as the combined sink;
+// no extra dependencies.
+func ExecCapture(ctx context.Context, out io.Writer, dir, name string, args ...string,
+) error {
+	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // internal build system cmd
+	cmd.Stdout = out
+	cmd.Stderr = out
+
+	if dir != "" {
+		cmd.Dir = dir
+	}
+
+	logger.Debug("ExecCapture", "command", name, "args", args, "dir", dir)
+
+	if err := cmd.Run(); err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to execute command").
+			WithOperation("ExecCapture").
+			WithContext("command", name)
+	}
+
+	return nil
+}
+
 // ExecWithContext executes a command with context for cancellation control.
 func ExecWithContext(
 	ctx context.Context, excludeStdout bool, dir, name string, args ...string,

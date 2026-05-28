@@ -26,6 +26,21 @@ YAP builds native packages for multiple GNU/Linux distributions from a single PK
 
 ## Installation
 
+One-liner (Linux/macOS, amd64/arm64):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/M0Rf30/yap/main/scripts/install.sh | sh
+```
+
+Pin a version or install only one tool:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/M0Rf30/yap/main/scripts/install.sh \
+  | sh -s -- --version v2.1.3 --tool yap
+```
+
+Manual download:
+
 ```bash
 wget https://github.com/M0Rf30/yap/releases/latest/download/yap_Linux_x86_64.tar.gz
 tar -xzf yap_Linux_x86_64.tar.gz
@@ -260,6 +275,25 @@ maintainer="John Doe <john@example.com>"
 | `rhel` | `.rpm` | yum |
 | `rocky` | `.rpm` | yum |
 | `ubuntu` | `.deb` | apt |
+
+## Model Context Protocol (MCP)
+
+YAP ships a companion `yap-mcp` binary that exposes the same build pipeline
+over the [Model Context Protocol](https://modelcontextprotocol.io), so any
+MCP-compatible LLM client (Claude Desktop, opencode, Cursor, Zed, Continue,
+Goose, …) can drive yap directly.
+
+Quickstart:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/M0Rf30/yap/main/scripts/install.sh | sh
+# then add { "mcpServers": { "yap": { "command": "yap-mcp" } } } to your client config
+```
+
+The full tool surface, per-client config snippets, security model, and
+troubleshooting are in **[`MCP.md`](MCP.md)**. The shipped skill card at
+[`skills/yap/SKILL.md`](skills/yap/SKILL.md) follows the Anthropic Agent
+Skills layout and gives agents a workflow cheatsheet for free.
 
 ## CLI reference
 

@@ -59,7 +59,7 @@ func IsInsideContainer() bool {
 // appropriate distro container using the configured runtime.
 //
 //   - distro: distribution tag, e.g. "ubuntu-noble"
-//   - workDir: host directory to mount as /workspace (must be absolute)
+//   - workDir: host directory to mount as /project (must be absolute)
 //   - subArgs: the yap sub-command + arguments to run inside, e.g.
 //     ["build", "ubuntu-noble", "/workspace/mypkg"]
 //
@@ -105,7 +105,7 @@ func RunCommandInContainer(distro, workDir string, subArgs []string) bool {
 // are available to build without requiring a persistent container.
 //
 //   - distro: distribution tag, e.g. "ubuntu-noble"
-//   - workDir: host directory to mount as /workspace
+//   - workDir: host directory to mount as /project
 //   - buildArgs: arguments for the inner yap build command (distroTag + path)
 //   - skipPrepare: if true, skip the prepare step (user passed -s or -d)
 //
