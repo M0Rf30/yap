@@ -611,23 +611,51 @@ func (mpc *MultipleProject) getMakeDeps() []string {
 // It filters out internal dependencies (packages within the project) and only
 // collects external dependencies that need to be installed via package manager.
 // Returns the collected external dependencies.
+//
+// Internal classification (hybrid rule):
+//
+//   - Packages currently in the build set (mpc.Projects) are always internal.
+//   - Packages that were filtered out via --from/--to/--only/--skip are
+//     internal only when a built artifact for them is already present in
+//     mpc.Output (i.e. a previous run produced it locally). Otherwise they
+//     are treated as external so the package manager can fetch them.
+//
+// This avoids the previous bug where --from <pkg> caused later yap.json
+// siblings to be silently dropped from apt downloads even though no local
+// artifact for them existed.
 func (mpc *MultipleProject) getRuntimeDeps() []string {
-	// Build the internal package set from the FULL project list (allProjects),
-	// not the filtered build set (Projects). This ensures that packages excluded
-	// via --skip/--only/--from/--to are still recognised as internal and not
-	// mistakenly downloaded from apt.
 	source := mpc.allProjects
 	if len(source) == 0 {
 		source = mpc.Projects // fallback for single-project or test paths
 	}
 
+	// Packages being built in this invocation (post-filter).
+	buildingNow := make(map[string]bool)
+	for _, proj := range mpc.Projects {
+		buildingNow[proj.Builder.PKGBUILD.PkgName] = true
+		for _, name := range proj.Builder.PKGBUILD.PkgNames {
+			buildingNow[name] = true
+		}
+	}
+
 	internalPackages := make(map[string]bool)
 	for _, proj := range source {
-		internalPackages[proj.Builder.PKGBUILD.PkgName] = true
-		// Also register all split-package names so that sibling packages
-		// declared in the same PKGBUILD are not treated as external deps.
-		for _, name := range proj.Builder.PKGBUILD.PkgNames {
-			internalPackages[name] = true
+		names := make([]string, 0, 1+len(proj.Builder.PKGBUILD.PkgNames))
+		names = append(names, proj.Builder.PKGBUILD.PkgName)
+		names = append(names, proj.Builder.PKGBUILD.PkgNames...)
+
+		for _, name := range names {
+			switch {
+			case buildingNow[name]:
+				internalPackages[name] = true
+			case mpc.localArtifactExists(name):
+				internalPackages[name] = true
+				logger.Debug("treating filtered package as internal (local artifact found)",
+					"package", name, "output", mpc.Output)
+			default:
+				logger.Debug("treating filtered package as external (no local artifact)",
+					"package", name, "output", mpc.Output)
+			}
 		}
 	}
 
@@ -656,6 +684,44 @@ func (mpc *MultipleProject) getRuntimeDeps() []string {
 	}
 
 	return result
+}
+
+// localArtifactExists reports whether a built package artifact for pkgName
+// exists in mpc.Output. It uses a digit-anchored glob (`name-[0-9]*` and
+// `name_[0-9]*`) so e.g. `foo-curl` does not falsely match
+// `foo-curl-dev-1.0.0...`. Recognised extensions cover deb, rpm, apk
+// and pacman (zst/xz/gz).
+func (mpc *MultipleProject) localArtifactExists(pkgName string) bool {
+	if mpc.Output == "" || pkgName == "" {
+		return false
+	}
+
+	patterns := []string{
+		pkgName + "-[0-9]*",
+		pkgName + "_[0-9]*",
+	}
+
+	for _, pat := range patterns {
+		matches, err := filepath.Glob(filepath.Join(mpc.Output, pat))
+		if err != nil {
+			continue
+		}
+
+		for _, m := range matches {
+			low := strings.ToLower(m)
+			switch {
+			case strings.HasSuffix(low, ".deb"),
+				strings.HasSuffix(low, ".rpm"),
+				strings.HasSuffix(low, ".apk"),
+				strings.HasSuffix(low, ".pkg.tar.zst"),
+				strings.HasSuffix(low, ".pkg.tar.xz"),
+				strings.HasSuffix(low, ".pkg.tar.gz"):
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // cleanZapArtifacts removes build artifacts for a project when Zap is enabled

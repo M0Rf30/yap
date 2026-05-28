@@ -378,9 +378,10 @@ func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
 	// Setup: 3 packages in yap.json — pkga, pkgb, pkgc.
 	// pkgb depends on pkga (internal).
 	// pkgc depends on pkgb (internal) and libexternal (external).
-	t.Run("skipped package still excluded from runtime deps", func(t *testing.T) {
-		// When --skip removes pkga from the build set, pkga should still be
-		// treated as internal and NOT included in the runtime deps to download.
+	t.Run("skipped package without local artifact becomes external", func(t *testing.T) {
+		// Hybrid rule: when --skip removes pkga and no built artifact for pkga
+		// exists in Output, pkga is treated as external so the package manager
+		// can fetch it. Was previously the inverse; see getRuntimeDeps doc.
 		mpc := &MultipleProject{
 			Projects: []*Project{
 				{
@@ -419,14 +420,19 @@ func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
 		// Get runtime dependencies
 		runtimeDeps := mpc.getRuntimeDeps()
 
-		// pkga should NOT be in runtimeDepends even though pkgb depends on it
-		// and pkga is now skipped/removed from Projects.
-		// This is because allProjects still contains pkga, so it's recognized as internal.
+		// New hybrid behaviour: pkga was filtered out and has no local artifact
+		// in Output, so it MUST appear in runtimeDepends so apt can fetch it.
+		foundPkga := false
+
 		for _, dep := range runtimeDeps {
-			depName := extractPackageName(dep)
-			if depName == "pkga" {
-				t.Errorf("skipped package pkga should not be in runtimeDepends")
+			if extractPackageName(dep) == "pkga" {
+				foundPkga = true
+				break
 			}
+		}
+
+		if !foundPkga {
+			t.Errorf("skipped package pkga without local artifact should be in runtimeDepends")
 		}
 
 		// libexternal SHOULD be in runtimeDepends
@@ -497,14 +503,19 @@ func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
 		// Get runtime dependencies
 		runtimeDeps := mpc.getRuntimeDeps()
 
-		// pkgb should NOT be in runtimeDepends even though pkgc depends on it
-		// and pkgb is not being built. This is because allProjects still contains pkgb,
-		// so it's recognized as internal.
+		// New hybrid behaviour: pkgb is filtered out and has no local artifact,
+		// so it must be downloaded externally.
+		foundPkgb := false
+
 		for _, dep := range runtimeDeps {
-			depName := extractPackageName(dep)
-			if depName == "pkgb" {
-				t.Errorf("internal package pkgb should not be in runtimeDepends")
+			if extractPackageName(dep) == "pkgb" {
+				foundPkgb = true
+				break
 			}
+		}
+
+		if !foundPkgb {
+			t.Errorf("filtered-out pkgb without local artifact should be in runtimeDepends")
 		}
 
 		// libexternal SHOULD be in runtimeDepends
@@ -533,4 +544,63 @@ func TestGetRuntimeDepsWithSkipFilter(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestGetRuntimeDepsLocalArtifactKeepsInternal(t *testing.T) {
+	// When a filtered-out package has a built artifact in Output, it must be
+	// treated as internal (NOT downloaded).
+	outDir := t.TempDir()
+
+	// Drop a fake artifact for pkga.
+	if err := os.WriteFile(filepath.Join(outDir, "pkga-1.0.0-1.x86_64.rpm"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mpc := &MultipleProject{
+		Output: outDir,
+		Projects: []*Project{
+			{Builder: &builder.Builder{PKGBUILD: &pkgbuild.PKGBUILD{PkgName: "pkga"}}},
+			{Builder: &builder.Builder{PKGBUILD: &pkgbuild.PKGBUILD{PkgName: "pkgb", Depends: []string{"pkga", "libexternal"}}}},
+		},
+	}
+
+	mpc.allProjects = append([]*Project(nil), mpc.Projects...)
+	// Simulate --only pkgb
+	mpc.Projects = mpc.Projects[1:]
+
+	deps := mpc.getRuntimeDeps()
+	for _, d := range deps {
+		if extractPackageName(d) == "pkga" {
+			t.Errorf("pkga has a local artifact and must NOT be in runtimeDepends, got %v", deps)
+		}
+	}
+
+	foundExt := false
+
+	for _, d := range deps {
+		if extractPackageName(d) == "libexternal" {
+			foundExt = true
+		}
+	}
+
+	if !foundExt {
+		t.Errorf("libexternal should still be in runtimeDepends")
+	}
+}
+
+func TestLocalArtifactExistsPrefixSafety(t *testing.T) {
+	// foo-curl-dev-1.0.0... must NOT match a query for foo-curl.
+	outDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outDir, "foo-curl-dev-1.0.0-1.x86_64.rpm"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mpc := &MultipleProject{Output: outDir}
+	if mpc.localArtifactExists("foo-curl") {
+		t.Errorf("foo-curl should not match foo-curl-dev artifact")
+	}
+
+	if !mpc.localArtifactExists("foo-curl-dev") {
+		t.Errorf("foo-curl-dev should match its own artifact")
+	}
 }
