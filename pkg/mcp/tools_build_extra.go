@@ -171,8 +171,9 @@ func grepWithContext(in []numberedLine, re *regexp.Regexp, ctx int) []numberedLi
 // ----- build_wait ----------------------------------------------------
 
 type buildWaitArgs struct {
-	BuildID    string `json:"buildID"             jsonschema:"identifier returned by build"`
-	TimeoutSec int    `json:"timeoutSec,omitempty" jsonschema:"max seconds to wait; 0 = wait forever"`
+	BuildID string `json:"buildID"             jsonschema:"identifier returned by build"`
+	//nolint:lll // jsonschema must be readable
+	TimeoutSec int `json:"timeoutSec,omitempty" jsonschema:"max seconds to wait; 0/omitted uses the 50s server cap. Poll again when timedOut=true"`
 }
 
 type buildWaitResult struct {
@@ -230,12 +231,21 @@ func registerBuildWait(srv *mcpsdk.Server) {
 	})
 }
 
+// maxBuildWaitSec caps how long build_wait blocks the JSON-RPC response.
+// MCP clients enforce their own per-request timeout (commonly ~60s) and
+// abort with "-32001 Request timed out" if the server holds the call
+// longer. We always return before that fires; callers poll again when the
+// result reports timedOut=true.
+const maxBuildWaitSec = 50
+
 // buildWaitContext returns a context that is cancelled either when parent
-// is cancelled or when timeoutSec elapses. timeoutSec <= 0 means no
-// extra deadline; the returned cancel func is always non-nil.
+// is cancelled or when the effective deadline elapses. timeoutSec <= 0
+// requests "wait forever", but we always clamp to maxBuildWaitSec so the
+// tool call returns before the MCP client's request timeout. The returned
+// cancel func is always non-nil.
 func buildWaitContext(parent context.Context, timeoutSec int) (context.Context, context.CancelFunc) {
-	if timeoutSec <= 0 {
-		return context.WithCancel(parent)
+	if timeoutSec <= 0 || timeoutSec > maxBuildWaitSec {
+		timeoutSec = maxBuildWaitSec
 	}
 
 	return context.WithTimeout(parent, time.Duration(timeoutSec)*time.Second)
