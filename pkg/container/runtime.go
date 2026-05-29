@@ -6,6 +6,8 @@ import (
 	"context"
 	"io"
 	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/container/internal/runtimetype"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -60,19 +62,26 @@ type Runtime interface {
 
 // Detect returns the best available Runtime.
 // Priority: podman → docker → built-in rootless.
-// Pass override = "" to use auto-detection; pass "cli" or "rootless" to force.
+//
+// Pass override = "" to use auto-detection. Accepted explicit values:
+//   - "cli": force the system podman/docker CLI (auto-pick between them)
+//   - "podman" / "docker": force that specific CLI backend
+//   - "rootless": force the built-in rootless runner
 func Detect(override string) (Runtime, error) {
 	switch RuntimeType(override) {
 	case RuntimeCLI:
 		return newCLIRuntime()
 	case RuntimeRootless:
 		return NewRootlessRuntime()
+	case "podman", "docker":
+		return newCLIRuntimeFor(override)
 	case "":
 		// auto-detect
 	default:
 		return nil, errors.New(errors.ErrTypeConfiguration,
 			"unknown runtime: "+override).
-			WithOperation("Detect")
+			WithOperation("Detect").
+			WithContext("accepted", "cli, podman, docker, rootless")
 	}
 
 	// Try CLI runtimes first.
@@ -83,20 +92,75 @@ func Detect(override string) (Runtime, error) {
 	}
 
 	// Fall back to built-in rootless runner.
-	logger.Info("no podman/docker found, using built-in rootless runner")
+	logger.Info("no usable podman/docker found, using built-in rootless runner")
 
 	return NewRootlessRuntime()
 }
 
-// newCLIRuntime returns a CLI runtime if podman or docker is available.
+// newCLIRuntime returns a CLI runtime for the first podman/docker backend that
+// is not only installed but actually reachable. A binary present in $PATH is
+// not sufficient: on macOS `podman` is a remote client to a VM, so the binary
+// exists even when `podman machine` is stopped and every `podman run` fails
+// with a socket error. We probe each candidate with `<bin> info` and skip ones
+// that cannot connect to their daemon/machine, falling through to the next.
 func newCLIRuntime() (Runtime, error) {
+	var found []string
+
 	for _, bin := range []string{"podman", "docker"} {
-		if path, err := exec.LookPath(bin); err == nil {
+		path, err := exec.LookPath(bin)
+		if err != nil {
+			continue
+		}
+
+		found = append(found, bin)
+
+		if cliRuntimeReady(path) {
 			return &cliRuntime{bin: path}, nil
 		}
+
+		logger.Warn("container CLI installed but not reachable, trying next backend",
+			"backend", bin, "hint", "daemon/machine not running")
+	}
+
+	if len(found) > 0 {
+		return nil, errors.New(errors.ErrTypeFileSystem,
+			"container CLI found but none are reachable").
+			WithOperation("newCLIRuntime").
+			WithContext("found", strings.Join(found, ", ")).
+			WithContext("hint", "start the docker daemon or run `podman machine start`")
 	}
 
 	return nil, errors.New(errors.ErrTypeFileSystem,
 		"no container CLI found (podman or docker)").
 		WithOperation("newCLIRuntime")
+}
+
+// newCLIRuntimeFor forces a specific CLI backend ("podman" or "docker") as
+// requested via --runtime. The binary must exist; readiness is not probed so
+// the caller sees the backend's real error if its daemon/machine is down.
+func newCLIRuntimeFor(bin string) (Runtime, error) {
+	path, err := exec.LookPath(bin)
+	if err != nil {
+		return nil, errors.New(errors.ErrTypeFileSystem,
+			"requested container runtime not found: "+bin).
+			WithOperation("newCLIRuntimeFor").
+			WithContext("runtime", bin)
+	}
+
+	return &cliRuntime{bin: path}, nil
+}
+
+// cliRuntimeReady reports whether a podman/docker binary can actually reach its
+// backend. `<bin> info` returns non-zero quickly when the podman machine or
+// docker daemon is not running. Output is discarded; only the exit status
+// matters. A short timeout guards against a hung daemon.
+func cliRuntimeReady(bin string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, bin, "info")
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	return cmd.Run() == nil
 }

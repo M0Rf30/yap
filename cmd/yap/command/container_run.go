@@ -80,8 +80,7 @@ func RunCommandInContainer(distro, workDir string, subArgs []string) bool {
 	rt, err := container.Detect(ContainerRuntimeOverride())
 	if err != nil {
 		logger.Error("failed to detect container runtime", "error", err)
-
-		return false
+		os.Exit(1)
 	}
 
 	logger.Info("dispatching to container",
@@ -128,8 +127,7 @@ func RunPipelineInContainer(distro, workDir string, buildArgs, prepareArgs []str
 	rt, err := container.Detect(ContainerRuntimeOverride())
 	if err != nil {
 		logger.Error("failed to detect container runtime", "error", err)
-
-		return false
+		os.Exit(1)
 	}
 
 	logger.Info("dispatching pipeline to container",
