@@ -16,6 +16,11 @@ builds:
     binary: yap
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Version=v{{.Version}}
+      - -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Commit={{.ShortCommit}}
+      - -X github.com/M0Rf30/yap/v2/pkg/buildinfo.BuildTime={{.Date}}
     goos:
       - linux
       - darwin
@@ -27,6 +32,11 @@ builds:
     binary: yap-mcp
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Version=v{{.Version}}
+      - -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Commit={{.ShortCommit}}
+      - -X github.com/M0Rf30/yap/v2/pkg/buildinfo.BuildTime={{.Date}}
     goos:
       - linux
       - darwin
