@@ -24,6 +24,12 @@ const (
 	RuntimeRootless = runtimetype.Rootless
 )
 
+// Supported CLI backend binary names, in auto-detection priority order.
+const (
+	binPodman = "podman"
+	binDocker = "docker"
+)
+
 // Runtime is the interface every container backend must satisfy.
 type Runtime interface {
 	// Pull downloads the container image for the given distribution tag.
@@ -73,7 +79,7 @@ func Detect(override string) (Runtime, error) {
 		return newCLIRuntime()
 	case RuntimeRootless:
 		return NewRootlessRuntime()
-	case "podman", "docker":
+	case binPodman, binDocker:
 		return newCLIRuntimeFor(override)
 	case "":
 		// auto-detect
@@ -106,7 +112,7 @@ func Detect(override string) (Runtime, error) {
 func newCLIRuntime() (Runtime, error) {
 	var found []string
 
-	for _, bin := range []string{"podman", "docker"} {
+	for _, bin := range []string{binPodman, binDocker} {
 		path, err := exec.LookPath(bin)
 		if err != nil {
 			continue

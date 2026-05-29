@@ -1,3 +1,4 @@
+//nolint:testpackage // exercises unexported helpers (newCLIRuntime, cliRuntimeReady, cliRuntime)
 package container
 
 import (
