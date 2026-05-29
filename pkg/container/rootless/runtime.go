@@ -27,9 +27,17 @@ func (r *Runtime) Pull(distro string) error {
 	return PullImage(distro)
 }
 
+// entrypoint is the builder image ENTRYPOINT. The CLI runtime relies on the
+// OCI ENTRYPOINT (["yap"]) and therefore dispatches bare sub-commands like
+// ["prepare", ...]. The rootless backend has no ENTRYPOINT and execs args[0]
+// directly, so we must prepend the yap binary path ourselves.
+const entrypoint = "/usr/bin/yap"
+
 // Run executes args inside the distro rootfs with workDir bind-mounted as /workspace.
+// args are the bare sub-command + flags (no binary name), matching the CLI
+// runtime contract; the image ENTRYPOINT (yap) is prepended here.
 func (r *Runtime) Run(distro, workDir string, args []string) error {
-	return RunInRootless(distro, workDir, args)
+	return RunInRootless(distro, workDir, append([]string{entrypoint}, args...))
 }
 
 // RunShell executes a shell command string inside the distro rootfs.

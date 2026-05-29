@@ -122,9 +122,19 @@ var buildCmd = &cobra.Command{
 			// when the user explicitly requested -s (skip-sync) or -d (no-makedeps),
 			// which implies they have already prepared the environment.
 			skipPrepare := buildOpts.SkipSyncDeps || buildOpts.NoMakeDeps
-			buildArgs := []string{buildCommand, distroTag, "/project"}
 
-			if RunPipelineInContainer(distroTag, fullJSONPath, buildArgs, skipPrepare) {
+			// Forward the flags that affect dependency resolution into the
+			// container. Without this, extra repos (--repo), the unverified
+			// trust opt-in (-U) and the cross arch (--target-arch) are lost on
+			// dispatch, so vendor packages fail to resolve inside the builder.
+			buildArgs := append([]string{buildCommand, distroTag, "/project"},
+				forwardedBuildFlags()...)
+
+			// prepare also needs --repo/--target-arch so the makedeps step can
+			// see vendor repositories and the correct toolchain.
+			prepareArgs := forwardedPrepareFlags()
+
+			if RunPipelineInContainer(distroTag, fullJSONPath, buildArgs, prepareArgs, skipPrepare) {
 				return nil
 			}
 		}
@@ -197,6 +207,44 @@ var buildCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// forwardedBuildFlags returns the subset of build flags that must be replayed
+// inside the dispatched container so dependency resolution matches the host
+// invocation: extra repos, the unverified-trust opt-in, and the cross arch.
+func forwardedBuildFlags() []string {
+	var out []string
+
+	for _, r := range buildOpts.ExtraRepos {
+		out = append(out, "--repo", r)
+	}
+
+	if buildOpts.AllowUnverifiedRepos {
+		out = append(out, "--allow-unverified-repos")
+	}
+
+	if buildOpts.TargetArch != "" {
+		out = append(out, "--target-arch", buildOpts.TargetArch)
+	}
+
+	return out
+}
+
+// forwardedPrepareFlags returns the flags the chained `yap prepare` step needs
+// so makedeps resolution sees the same vendor repositories and toolchain as
+// the build step.
+func forwardedPrepareFlags() []string {
+	var out []string
+
+	for _, r := range buildOpts.ExtraRepos {
+		out = append(out, "--repo", r)
+	}
+
+	if buildOpts.TargetArch != "" {
+		out = append(out, "--target-arch", buildOpts.TargetArch)
+	}
+
+	return out
 }
 
 // validateCompression validates that the compression algorithm is supported,

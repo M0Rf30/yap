@@ -106,11 +106,16 @@ func RunCommandInContainer(distro, workDir string, subArgs []string) bool {
 //
 //   - distro: distribution tag, e.g. "ubuntu-noble"
 //   - workDir: host directory to mount as /project
-//   - buildArgs: arguments for the inner yap build command (distroTag + path)
+//   - buildArgs: arguments for the inner yap build command (distroTag + path
+//     plus any forwarded build flags such as --repo, -U, --target-arch)
+//   - prepareArgs: extra flags to forward to the chained `yap prepare` step
+//     (e.g. --repo, --target-arch) so the prepare environment matches the
+//     build — repos added on the build side are not visible to prepare unless
+//     forwarded here
 //   - skipPrepare: if true, skip the prepare step (user passed -s or -d)
 //
 // Returns true if dispatched, false if caller should proceed natively.
-func RunPipelineInContainer(distro, workDir string, buildArgs []string, skipPrepare bool) bool {
+func RunPipelineInContainer(distro, workDir string, buildArgs, prepareArgs []string, skipPrepare bool) bool {
 	if IsInsideContainer() {
 		return false
 	}
@@ -142,7 +147,12 @@ func RunPipelineInContainer(distro, workDir string, buildArgs []string, skipPrep
 	if skipPrepare {
 		shellCmd = buildCmd
 	} else {
-		shellCmd = "yap prepare " + distro + " && " + buildCmd
+		prepareCmd := "yap prepare " + distro
+		if len(prepareArgs) > 0 {
+			prepareCmd += " " + shellJoinArgs(prepareArgs)
+		}
+
+		shellCmd = prepareCmd + " && " + buildCmd
 	}
 
 	if err := rt.RunShell(distro, workDir, shellCmd); err != nil {

@@ -30,7 +30,7 @@ const (
 	envChildRootfs = "_YAP_ROOTLESSKIT_ROOTFS"
 	// envChildWorkDir is the workspace path passed to the child.
 	envChildWorkDir = "_YAP_ROOTLESSKIT_WORKDIR"
-	// envChildArgs is the serialised command args passed to the child (NUL-separated).
+	// envChildArgs is the serialised command args passed to the child (argSep-separated).
 	envChildArgs = "_YAP_ROOTLESSKIT_ARGS"
 )
 
@@ -184,13 +184,16 @@ func execInRootfs(rootfs, workDir string, args []string) error {
 
 	// Bind-mount workspace.
 	if workDir != "" && workDir != "." {
-		wsTarget := filepath.Join(rootfs, "workspace")
+		wsTarget := filepath.Join(rootfs, "project")
 
 		if err := bindMount(workDir, wsTarget); err != nil {
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to bind mount workspace").
 				WithOperation("execInRootfs")
 		}
 	}
+
+	// Provide working DNS inside the rootfs (best-effort).
+	setupResolvConf(rootfs)
 
 	if err := pivotOrChroot(rootfs); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to pivot root or chroot").
@@ -205,6 +208,17 @@ func execInRootfs(rootfs, workDir string, args []string) error {
 	bin, err := exec.LookPath(args[0])
 	if err != nil {
 		bin = args[0]
+	}
+
+	// Clear the rootless control env vars before handing off to the real
+	// target. Otherwise the exec'd binary re-enters MaybeRunAsChild (called
+	// early in main, before cobra), sees envExecMode still set, and re-runs
+	// execInRootfs a SECOND time — now inside the already-pivoted rootfs,
+	// where the host-absolute workDir no longer exists, producing a spurious
+	// ENOENT on the workspace bind. YAP_IN_CONTAINER is intentionally kept so
+	// the inner process does not re-dispatch into a container.
+	for _, k := range []string{envExecMode, envChildRootfs, envChildWorkDir, envChildArgs} {
+		_ = os.Unsetenv(k)
 	}
 
 	return syscall.Exec(bin, args, os.Environ()) //nolint:gosec
@@ -240,6 +254,39 @@ func pivotOrChroot(newRoot string) error {
 	return os.Chdir("/")
 }
 
+// setupResolvConf bind-mounts the host's /etc/resolv.conf into the rootfs so
+// name resolution works inside the pivoted environment. rootlesskit shares the
+// host network namespace, so the host resolver is reachable — but the builder
+// rootfs ships an empty /etc/resolv.conf, which makes glibc fall back to
+// localhost (::1:53) and every lookup fails. Best-effort: all failures are
+// logged and ignored so a missing resolv.conf never aborts the build.
+func setupResolvConf(rootfs string) {
+	hostResolv, err := filepath.EvalSymlinks("/etc/resolv.conf")
+	if err != nil {
+		return
+	}
+
+	if _, err := os.Stat(hostResolv); err != nil {
+		return
+	}
+
+	dst := filepath.Join(rootfs, "etc", "resolv.conf")
+
+	// Ensure a regular file exists at dst to bind onto.
+	if _, err := os.Stat(dst); os.IsNotExist(err) { //nolint:gosec // path from rootfsPath, not user input
+		_ = os.MkdirAll(filepath.Dir(dst), 0o755) //nolint:gosec // path from rootfsPath, not user input
+
+		f, cerr := os.OpenFile(dst, os.O_CREATE, 0o644) //nolint:gosec // path from rootfsPath, not user input
+		if cerr == nil {
+			_ = f.Close()
+		}
+	}
+
+	if err := syscall.Mount(hostResolv, dst, "", syscall.MS_BIND, ""); err != nil {
+		logger.Warn("failed to bind mount resolv.conf", "error", err)
+	}
+}
+
 // bindMount bind-mounts src to dest.
 func bindMount(src, dest string) error {
 	if err := os.MkdirAll(dest, 0o755); err != nil { //nolint:gosec // path from rootfsPath, not user input
@@ -251,13 +298,20 @@ func bindMount(src, dest string) error {
 	return syscall.Mount(src, dest, "", syscall.MS_BIND|syscall.MS_REC, "")
 }
 
-// joinNUL encodes a string slice as NUL-separated bytes.
+// argSep separates encoded child args. We use ASCII Unit Separator (0x1f)
+// rather than NUL: the encoded value is passed through os.Setenv, which
+// rejects any string containing a NUL byte ("setenv: invalid argument"), so a
+// NUL separator broke every command with 2+ args. 0x1f never appears in real
+// argv (paths, flags) yet is still a safe in-band delimiter.
+const argSep = '\x1f'
+
+// joinNUL encodes a string slice as argSep-separated bytes.
 func joinNUL(ss []string) string {
 	var b strings.Builder
 
 	for i, s := range ss {
 		if i > 0 {
-			b.WriteByte(0)
+			b.WriteByte(argSep)
 		}
 
 		b.WriteString(s)
@@ -266,14 +320,14 @@ func joinNUL(ss []string) string {
 	return b.String()
 }
 
-// splitNUL decodes a NUL-separated string into a slice.
+// splitNUL decodes an argSep-separated string into a slice.
 func splitNUL(s string) []string {
 	var result []string
 
 	cur := &strings.Builder{}
 
 	for _, c := range s {
-		if c == 0 {
+		if c == argSep {
 			result = append(result, cur.String())
 			cur.Reset()
 		} else {
