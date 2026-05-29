@@ -283,17 +283,28 @@ over the [Model Context Protocol](https://modelcontextprotocol.io), so any
 MCP-compatible LLM client (Claude Desktop, opencode, Cursor, Zed, Continue,
 Goose, …) can drive yap directly.
 
-Quickstart:
+Quickstart (release binary):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/M0Rf30/yap/main/scripts/install.sh | sh
 # then add { "mcpServers": { "yap": { "command": "yap-mcp" } } } to your client config
 ```
 
+Or pull the standalone OCI image (also listed on the
+[MCP registry](https://registry.modelcontextprotocol.io) as `io.github.M0Rf30/yap`):
+
+```sh
+docker pull ghcr.io/m0rf30/yap-mcp:latest
+# client config:
+# { "mcpServers": { "yap": { "command": "docker",
+#   "args": ["run","-i","--rm","ghcr.io/m0rf30/yap-mcp:latest"] } } }
+```
+
 The full tool surface, per-client config snippets, security model, and
 troubleshooting are in **[`MCP.md`](MCP.md)**. The shipped skill card at
 [`skills/yap/SKILL.md`](skills/yap/SKILL.md) follows the Anthropic Agent
-Skills layout and gives agents a workflow cheatsheet for free.
+Skills layout and gives agents a workflow cheatsheet for free. Distribution
+channels and release steps are documented in **[`PUBLISHING.md`](PUBLISHING.md)**.
 
 ## CLI reference
 

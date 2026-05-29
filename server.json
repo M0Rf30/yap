@@ -1,0 +1,42 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.M0Rf30/yap",
+  "title": "YAP — Yet Another Packager",
+  "description": "Build native Linux packages (.deb/.rpm/.apk/.pkg.tar.zst) from a single PKGBUILD via MCP.",
+  "version": "0.0.0",
+  "websiteUrl": "https://github.com/M0Rf30/yap",
+  "repository": {
+    "url": "https://github.com/M0Rf30/yap",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/m0rf30/yap-mcp:0.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "YAP_VERBOSE",
+          "description": "Set to 1 for debug-level JSON-RPC frame logging on stderr.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "tool": "yap-mcp",
+      "tools": [
+        "validate", "parse_pkgbuild", "graph", "build", "build_status",
+        "build_wait", "build_logs", "build_cancel", "list_artifacts",
+        "inspect", "install", "prepare", "pull", "zap", "list_distros",
+        "list_images", "resolve_distro", "status"
+      ],
+      "prompts": ["build_single_pkg", "cross_compile", "sign_and_release"],
+      "resources": ["yap://distros", "yap://pkgbuild/{path}"]
+    }
+  }
+}
