@@ -1,0 +1,28 @@
+# Smithery configuration for the yap-mcp server.
+# https://smithery.ai/docs/build/project-config
+#
+# yap-mcp speaks stdio. We launch the published multi-arch OCI image so users
+# don't need a local Go toolchain.
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      verbose:
+        type: boolean
+        title: Verbose logging
+        description: Emit debug-level JSON-RPC frame logging on stderr.
+        default: false
+    additionalProperties: false
+  commandFunction: |-
+    (config) => ({
+      command: "docker",
+      args: ["run", "-i", "--rm",
+             ...(config.verbose ? ["-e", "YAP_VERBOSE=1"] : []),
+             "ghcr.io/m0rf30/yap-mcp:latest"]
+    })
+
+build:
+  dockerfile: build/mcp/Dockerfile
+  dockerBuildPath: .

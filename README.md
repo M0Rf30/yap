@@ -300,6 +300,19 @@ docker pull ghcr.io/m0rf30/yap-mcp:latest
 #   "args": ["run","-i","--rm","ghcr.io/m0rf30/yap-mcp:latest"] } } }
 ```
 
+### Claude Code plugin (server + skill in one)
+
+```text
+/plugin marketplace add M0Rf30/claude-plugins
+/plugin install yap@M0Rf30
+```
+
+### Smithery
+
+```sh
+npx @smithery/cli install io.github.M0Rf30/yap --client claude
+```
+
 The full tool surface, per-client config snippets, security model, and
 troubleshooting are in **[`MCP.md`](MCP.md)**. The shipped skill card at
 [`skills/yap/SKILL.md`](skills/yap/SKILL.md) follows the Anthropic Agent

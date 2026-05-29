@@ -1,0 +1,19 @@
+{
+  "name": "yap",
+  "version": "0.0.0",
+  "description": "Build native Linux packages (.deb/.rpm/.apk/.pkg.tar.zst) from a single PKGBUILD. Bundles the yap-mcp server and the yap agent skill.",
+  "author": {
+    "name": "M0Rf30",
+    "url": "https://github.com/M0Rf30"
+  },
+  "homepage": "https://github.com/M0Rf30/yap",
+  "repository": "https://github.com/M0Rf30/yap",
+  "license": "GPL-3.0-only",
+  "keywords": ["packaging", "deb", "rpm", "apk", "pacman", "pkgbuild", "linux"],
+  "mcpServers": {
+    "yap": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "ghcr.io/m0rf30/yap-mcp:latest"]
+    }
+  }
+}

@@ -70,23 +70,52 @@ Submit once; they index from GitHub thereafter. Each wants the repo URL +
 | mcp.so | submission form |
 | Smithery (`smithery.ai`) | add `smithery.yaml` (optional, for hosted deploy) |
 
-## 4. Agent Skill channels
+## 4. Claude Code plugin (server + skill bundle)
 
-`skills/yap/SKILL.md` already follows the Anthropic Agent Skills layout.
+`.claude-plugin/plugin.json` in this repo bundles the `yap-mcp` MCP server and
+auto-discovers the `skills/yap/` skill. It is listed from a dedicated
+**org-level marketplace repo** (`M0Rf30/claude-plugins`) so all M0Rf30 tools
+share one namespace.
+
+```text
+/plugin marketplace add M0Rf30/claude-plugins
+/plugin install yap@M0Rf30
+```
+
+- `M0Rf30/claude-plugins/.claude-plugin/marketplace.json` lists the `yap` plugin
+  with `source: { github, repo: M0Rf30/yap }` (optionally pin `ref` to a tag).
+- This repo ships only `plugin.json` (no `marketplace.json`).
+- `plugin.json` version is `0.0.0` in-repo; the `mcp-publish.yml`
+  `plugin-version` job bumps it to the tag and commits it back on release
+  (plugin.json is read from the repo at install time, so it must be persisted).
+
+## 5. Smithery
+
+`smithery.yaml` defines a stdio start command launching
+`ghcr.io/m0rf30/yap-mcp:latest` plus a hosted-build block. Users:
+
+```sh
+npx @smithery/cli install io.github.M0Rf30/yap --client claude
+```
+
+## 6. Agent Skill channels
+
+`skills/yap/SKILL.md` follows the Anthropic Agent Skills layout.
 
 | Channel | How |
 | --- | --- |
 | This repo | canonical source (`skills/yap/`) |
+| Claude Code plugin | bundled via `M0Rf30/claude-plugins` (above) |
 | `anthropics/skills` | PR to contribute as a community skill |
-| Claude Code plugin marketplaces | bundle skill in a plugin repo with `plugin.json` |
 | awesome-claude-skills lists | PR adding an entry |
 
 ## Release checklist
 
 1. Tag `vX.Y.Z` → `release.yml` builds binaries, `mcp-publish.yml` builds the
-   OCI image and publishes to the MCP registry.
+   OCI image, publishes to the MCP registry, and bumps `plugin.json`.
 2. Verify the image: `docker run -i --rm ghcr.io/m0rf30/yap-mcp:latest` (should
    block on stdio).
 3. Verify the registry entry at
    `https://registry.modelcontextprotocol.io/v0/servers?search=yap`.
-4. (First release only) open the aggregator + skill PRs above.
+4. (First release only) create the `M0Rf30/claude-plugins` repo and open the
+   aggregator + skill PRs above.

@@ -112,3 +112,46 @@ jobs:
 
       - name: 📡 Publish
         run: mcp-publisher publish
+
+  # Bump the Claude Code plugin manifest version to match the tag and commit it
+  # back to the default branch. plugin.json is read from the repo at install
+  # time, so unlike server.json it must be persisted (not just injected in CI).
+  plugin-version:
+    name: 🔖 Sync plugin.json version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: image
+    permissions:
+      contents: write
+    steps:
+      - name: 📂 Checkout default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: 🏷️ Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ github.event.inputs.version }}"
+          else
+            V="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=${V}" >> "$GITHUB_OUTPUT"
+
+      - name: 🔖 Update & commit plugin.json
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          jq --arg v "$V" '.version = $v' \
+            .claude-plugin/plugin.json > .claude-plugin/plugin.json.tmp
+          mv .claude-plugin/plugin.json.tmp .claude-plugin/plugin.json
+          if git diff --quiet; then
+            echo "plugin.json already at ${V}"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .claude-plugin/plugin.json
+          git commit -m "chore(plugin): sync plugin.json version to ${V} [skip ci]"
+          git push
