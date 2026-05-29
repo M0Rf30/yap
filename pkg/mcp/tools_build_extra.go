@@ -294,7 +294,10 @@ func registerBuildSummary(srv *mcpsdk.Server) {
 			out.DurationSec = int(time.Since(s.StartedAt).Seconds())
 		}
 
-		if s.Log != nil {
+		// Only surface failure diagnostics for non-successful builds. On a
+		// succeeded build the phase-marker regex would otherwise leak a
+		// bogus failedStep (e.g. "build") and mislead the caller.
+		if s.Log != nil && s.State != BuildStateSucceeded {
 			raw := s.Log.String()
 			out.LastErrorLine, out.FailedStep = lastErrorLine(raw)
 			out.Hints = inferHints(raw)

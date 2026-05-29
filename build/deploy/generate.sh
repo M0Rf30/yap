@@ -380,7 +380,7 @@ _gen "amazon-2" "amazonlinux:2" "yap-amazon-2" "YAP - Yet Another Packager for A
 
 # openSUSE (zypper)
 _gen "opensuse-leap"      "opensuse/leap:latest"       "yap-opensuse-leap"       "YAP - Yet Another Packager for openSUSE Leap with Go runtime 📦🐹"       block_zypper "$ZYPPER_SUDO"
-_gen "opensuse-tubleweed" "opensuse/tumbleweed:latest" "yap-opensuse-tumbleweed" "YAP - Yet Another Packager for openSUSE Tumbleweed with Go runtime 📦🐹" block_zypper "$ZYPPER_SUDO"
+_gen "opensuse-tumbleweed" "opensuse/tumbleweed:latest" "yap-opensuse-tumbleweed" "YAP - Yet Another Packager for openSUSE Tumbleweed with Go runtime 📦🐹" block_zypper "$ZYPPER_SUDO"
 
 # Arch (pacman)
 _gen "arch" "archlinux:latest" "yap-arch" "YAP - Yet Another Packager for Arch Linux with Go runtime 📦🐹" block_pacman "$PACMAN_SUDO"
