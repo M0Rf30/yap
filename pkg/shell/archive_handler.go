@@ -52,6 +52,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -137,7 +138,8 @@ func handleUnzip(ctx context.Context, args []string) error {
 		destDir = filepath.Join(hc.Dir, destDir)
 	}
 
-	logger.Info("archive handler: unzip", "archive", archivePath, "dest", destDir, "filters", filters)
+	logger.Info(i18n.T("logger.shell.info.archive_handler_unzip"),
+		"archive", archivePath, "dest", destDir, "filters", filters)
 
 	return archive.ExtractFiltered(ctx, archivePath, destDir, filters)
 }
@@ -210,7 +212,7 @@ func handleGunzip(ctx context.Context, args []string) error {
 	defer func() { _ = gr.Close() }()
 
 	if toStdout {
-		logger.Info("archive handler: gunzip → stdout", "input", inputPath)
+		logger.Info(i18n.T("logger.shell.info.archive_handler_gunzip_stdout"), "input", inputPath)
 
 		_, err = io.Copy(hc.Stdout, gr) //nolint:gosec
 
@@ -223,7 +225,7 @@ func handleGunzip(ctx context.Context, args []string) error {
 		outPath = inputPath + ".out"
 	}
 
-	logger.Info("archive handler: gunzip in-place", "input", inputPath, "output", outPath)
+	logger.Info(i18n.T("logger.shell.info.archive_handler_gunzip_place"), "input", inputPath, "output", outPath)
 
 	outFile, err := os.Create(filepath.Clean(outPath))
 	if err != nil {
@@ -287,7 +289,7 @@ func handleUnrar(ctx context.Context, args []string) error {
 		destDir = filepath.Join(hc.Dir, destDir)
 	}
 
-	logger.Info("archive handler: unrar", "archive", archivePath, "dest", destDir)
+	logger.Info(i18n.T("logger.shell.info.archive_handler_unrar"), "archive", archivePath, "dest", destDir)
 
 	return archive.Extract(ctx, archivePath, destDir)
 }
@@ -335,7 +337,7 @@ func handle7z(ctx context.Context, args []string) error {
 		destDir = filepath.Join(hc.Dir, destDir)
 	}
 
-	logger.Info("archive handler: 7z", "archive", archivePath, "dest", destDir)
+	logger.Info(i18n.T("logger.shell.info.archive_handler_7z"), "archive", archivePath, "dest", destDir)
 
 	return archive.Extract(ctx, archivePath, destDir)
 }
@@ -403,7 +405,7 @@ func handleJar(ctx context.Context, args []string) error {
 		destDir = filepath.Join(hc.Dir, destDir)
 	}
 
-	logger.Info("archive handler: jar", "archive", archivePath, "dest", destDir)
+	logger.Info(i18n.T("logger.shell.info.archive_handler_jar"), "archive", archivePath, "dest", destDir)
 
 	return archive.Extract(ctx, archivePath, destDir)
 }
@@ -451,7 +453,7 @@ func handleDpkgDeb(ctx context.Context, args []string, next interp.ExecHandlerFu
 		destDir = filepath.Join(hc.Dir, destDir)
 	}
 
-	logger.Info("archive handler: dpkg-deb -x", "archive", archivePath, "dest", destDir)
+	logger.Info(i18n.T("logger.shell.info.archive_handler_dpkg_deb"), "archive", archivePath, "dest", destDir)
 
 	return archive.ExtractDEB(archivePath, destDir)
 }
@@ -471,7 +473,7 @@ func handleRpm2Cpio(ctx context.Context, args []string) error {
 		archivePath = filepath.Join(hc.Dir, archivePath)
 	}
 
-	logger.Info("archive handler: rpm2cpio", "archive", archivePath)
+	logger.Info(i18n.T("logger.shell.info.archive_handler_rpm2cpio"), "archive", archivePath)
 
 	f, err := os.Open(filepath.Clean(archivePath))
 	if err != nil {

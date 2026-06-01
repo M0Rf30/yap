@@ -121,7 +121,7 @@ func writeFileFromEntry(path string, entry *archiveEntry) error {
 
 	defer func() {
 		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_new_1"),
+			logger.Warn(i18n.T("logger.archive.warn.failed_to_close_new"),
 				"path", path, "error", closeErr)
 		}
 	}()

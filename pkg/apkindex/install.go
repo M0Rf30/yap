@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -47,8 +48,7 @@ func (idx *Index) InstallPackagesWithOptions(
 			WithOperation("InstallPackagesWithOptions")
 	}
 
-	logger.Warn("installing APK packages without signature verification " +
-		"(set InstallOptions.AllowUnverifiedPackages=false to refuse)")
+	logger.Warn(i18n.T("logger.apkindex.warn.installing_without_verification"))
 
 	// 1. Resolve transitive deps.
 	resolved, err := idx.ResolveDeps(names)
@@ -73,8 +73,7 @@ func (idx *Index) InstallPackagesWithOptions(
 	}
 
 	if len(toInstall) == 0 {
-		logger.Info("apkindex: all packages already installed",
-			"requested", len(names),
+		logger.Info(i18n.T("logger.apkindex.info.all_packages_already_installed"), "requested", len(names),
 			"resolved", len(resolved))
 
 		return nil
@@ -85,8 +84,7 @@ func (idx *Index) InstallPackagesWithOptions(
 		totalBytes += p.Size
 	}
 
-	logger.Info("apkindex: installing APK packages",
-		"to_install", len(toInstall),
+	logger.Info(i18n.T("logger.apkindex.info.installing_apk_packages"), "to_install", len(toInstall),
 		"resolved", len(resolved),
 		"skipped_installed", len(resolved)-len(toInstall),
 		"total_bytes", totalBytes)
@@ -118,7 +116,7 @@ func (idx *Index) InstallPackagesWithOptions(
 				WithContext("package", p.Name)
 		}
 
-		logger.Debug("installed", "package", p.Name, "version", p.Version)
+		logger.Debug(i18n.T("logger.apkindex.debug.installed"), "package", p.Name, "version", p.Version)
 	}
 
 	return nil
@@ -332,7 +330,7 @@ func safeAPKSymlinkTarget(linkPath, target string) error {
 func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 	targetPath, ok := safeAPKPath(hdr.Name)
 	if !ok {
-		logger.Warn("skipping unsafe path in APK archive", "path", hdr.Name)
+		logger.Warn(i18n.T("logger.apkindex.warn.skipping_unsafe_path_apk"), "path", hdr.Name)
 
 		return nil
 	}
@@ -411,7 +409,7 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 
 	case tar.TypeSymlink:
 		if err := safeAPKSymlinkTarget(targetPath, hdr.Linkname); err != nil {
-			logger.Warn("skipping unsafe APK symlink",
+			logger.Warn(i18n.T("logger.apkindex.warn.skipping_unsafe_apk_symlink"),
 				"path", hdr.Name, "target", hdr.Linkname, "error", err)
 
 			return nil

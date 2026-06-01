@@ -12,6 +12,7 @@ import (
 	rpmutils "github.com/sassoftware/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -186,8 +187,7 @@ func extractRPMEntry(
 
 	target, err := SafeJoin(destDir, name)
 	if err != nil {
-		logger.Warn("path traversal rejected",
-			"entry", fi.Name(), "destination", destDir)
+		logger.Warn(i18n.T("logger.archive.warn.path_traversal_rejected"), "entry", fi.Name(), "destination", destDir)
 
 		return err
 	}
@@ -204,8 +204,7 @@ func extractRPMEntry(
 
 	case rpmFileTypeLink:
 		if err := SafeSymlinkTarget(fi.Name(), fi.Linkname()); err != nil {
-			logger.Warn("symlink rejected",
-				"entry", fi.Name(), "target", fi.Linkname())
+			logger.Warn(i18n.T("logger.archive.warn.symlink_rejected"), "entry", fi.Name(), "target", fi.Linkname())
 
 			return err
 		}

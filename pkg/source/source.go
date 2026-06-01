@@ -116,8 +116,7 @@ func (src *Source) Get() error {
 				return nil
 			}
 
-			logger.Warn("bare repo extraction failed, falling back to fresh clone",
-				"path", sourceFilePath)
+			logger.Warn(i18n.T("logger.source.warn.bare_repo_extraction_failed"), "path", sourceFilePath)
 
 			_ = os.RemoveAll(sourceFilePath)
 			// Also remove the failed working copy attempt
@@ -348,9 +347,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			logger.Warn(
-				"failed to close source file",
-				"path", sourceFilePath,
+			logger.Warn(i18n.T("logger.source.warn.failed_close_source_file"), "path", sourceFilePath,
 				"error", err)
 		}
 	}()

@@ -530,8 +530,6 @@
   translation: "Compilazione per distribuzione"
 - id: logger.build.building_packages
   translation: "Compilazione dei pacchetti"
-- id: logger.build.initializing_project
-  translation: "Inizializzazione del progetto"
 - id: logger.build.auto_detected_codename
   translation: "Codename rilevato automaticamente per la risoluzione delle dipendenze"
 - id: logger.build.no_distribution_specified
@@ -540,8 +538,6 @@
   translation: "Inizializzazione del progetto fallita"
 - id: logger.build.project_init_success
   translation: "Progetto inizializzato con successo"
-- id: logger.build.project_path
-  translation: "Percorso del progetto"
 - id: logger.build.starting_verbose
   translation: "Avvio della compilazione in modalità dettagliata"
 
@@ -560,69 +556,69 @@
   translation: "Symlink rifiutato"
 
 # Messaggi logger - Build package
-- id: logger.buildpackage.warn.failed_to_remove_temporary_1
+- id: logger.deb.warn.failed_to_remove_temporary
   translation: "Rimozione della directory temporanea fallita"
 
 # Messaggi logger - Calculate data hash
-- id: logger.calculatedatahash.warn.failed_to_close_file_1
+- id: logger.files.warn.failed_to_close_file
   translation: "Chiusura del file dopo il calcolo dell'hash fallita"
 
 # Messaggi logger - Calculate SHA256
-- id: logger.calculatesha256.warn.failed_to_close_file_5
+- id: logger.crypto.warn.failed_to_close_file
   translation: "Chiusura del file dopo il calcolo SHA256 fallita"
 
 # Messaggi logger - Check Go
-- id: logger.checkgo.info.go_is_already_installed_1
+- id: logger.platform.info.go_is_already_installed
   translation: "Go è già installato"
 
 # Messaggi logger - Chmod
-- id: logger.chmod.error.failed_to_chmod_1
+- id: logger.files.error.failed_to_chmod
   translation: "Modifica dei permessi del file fallita"
 
 # Messaggi logger - Chown
-- id: logger.chownrecursivetooriginaluser.warn.failed_to_chown_file_1
+- id: logger.platform.warn.failed_to_chown_file
   translation: "Modifica del proprietario del file fallita"
-- id: logger.chowntooriginaluser.debug.changed_ownership_to_original_1
+- id: logger.platform.debug.changed_ownership_to_original
   translation: "Proprietà cambiata all'utente originale"
 
 # Messaggi logger - Clone
-- id: logger.clone.error.failed_to_load_ssh_1
+- id: logger.git.error.failed_to_load_ssh
   translation: "Caricamento della chiave SSH fallito"
-- id: logger.clone.warn.try_to_use_an_1
+- id: logger.git.warn.try_to_use_an
   translation: "Prova a usare una chiave SSH o fornisci le credenziali"
 
 # Messaggi logger - Configure resume
-- id: logger.configureresumeifpossible.info.resuming_download_1
+- id: logger.download.info.resuming_download
   translation: "Ripresa del download dalla posizione precedente"
 
 # Messaggi logger - Create DEB
-- id: logger.createdeb.warn.failed_to_close_debian_1
+- id: logger.deb.warn.failed_to_close_debian
   translation: "Chiusura dell'archivio Debian fallita"
 
 # Messaggi logger - Create
-- id: logger.create.error.failed_to_create_path_1
+- id: logger.files.error.failed_to_create_path
   translation: "Creazione del percorso fallita"
 
 # Messaggi logger - Create mtree gzip
-- id: logger.createmtreegzip.warn.failed_to_close_gzip_1
+- id: logger.pacman.warn.failed_to_close_gzip
   translation: "Chiusura dello stream gzip fallita"
-- id: logger.createmtreegzip.warn.failed_to_close_output_1
+- id: logger.pacman.warn.failed_to_close_output
   translation: "Chiusura del file di output fallita"
 
 # Messaggi logger - Create spec
-- id: logger.createspec.warn.failed_to_close_pkgbuild_1
+- id: logger.pkgbuild.warn.failed_to_close_pkgbuild
   translation: "Chiusura del file PKGBUILD fallita"
 
 # Messaggi logger - Create tar.gz
-- id: logger.createtargz.warn.failed_to_close_output_1
+- id: logger.apk.warn.failed_to_close_output
   translation: "Chiusura dell'output tar.gz fallita"
 
 # Messaggi logger - Create tar.zst
-- id: logger.createtarzst.warn.failed_to_close_output_1
+- id: logger.archive.warn.failed_to_close_output
   translation: "Chiusura dell'output tar.zst fallita"
 
 # Messaggi logger - Create write
-- id: logger.createwrite.error.failed_to_write_to_1
+- id: logger.files.error.failed_to_write_to
   translation: "Scrittura nel file fallita"
 
 # Messaggi logger - Creating package
@@ -646,8 +642,6 @@
   translation: "Installazione dei pacchetti del cross-compiler"
 - id: logger.cross_compilation.rust_cross_compilation_configured
   translation: "Cross-compile Rust configurato"
-- id: logger.cross_compilation.setting_up_cross_compilation_environment
-  translation: "Configurazione dell'ambiente di cross-compile"
 - id: logger.cross_compilation.starting_cross_compilation_build
   translation: "Avvio della compilazione cross-compile"
 
@@ -700,23 +694,16 @@
   translation: "Estrazione del pacchetto nella directory sysroot"
 - id: logger.extract.package_extracted
   translation: "Pacchetto estratto con successo nella directory sysroot"
-- id: logger.extract.sysroot_cleaned
-  translation: "Directory sysroot pulita"
-- id: logger.extract.extraction_stats
-  translation: "Estrazione completata"
 - id: logger.extract.extracting_to_sysroot
   translation: "Estrazione pacchetto nel sysroot"
 
 # Messaggi logger - Exec with context
-- id: logger.execwithcontext.debug.command_execution_completed_1
+- id: logger.shell.debug.command_execution_completed
   translation: "Esecuzione del comando completata"
-- id: logger.execwithcontext.error.command_execution_failed_1
+- id: logger.shell.error.command_execution_failed
   translation: "Esecuzione del comando fallita"
 
 # Messaggi logger - Fatal error
-- id: logger.fatal_error
-  translation: "Errore fatale"
-
 # Messaggi logger - Files
 - id: logger.files.warn.close_write
   translation: "Chiusura del file writer fallita"
@@ -728,23 +715,23 @@
   translation: "Rimozione della directory del pacchetto fallita"
 
 # Messaggi logger - Finish
-- id: logger.finish.info.download_completed_1
+- id: logger.download.info.download_completed_2
   translation: "Download completato"
 
 # Messaggi logger - Generate PNG graph
-- id: logger.generatepnggraph.info.svg_graph_generated_for_1
+- id: logger.render.info.svg_graph_generated_for
   translation: "Grafico SVG generato per la conversione"
-- id: logger.generatepnggraph.warn.png_conversion_requires_external_1
+- id: logger.render.warn.png_conversion_requires_external
   translation: "La conversione PNG richiede uno strumento esterno (inkscape o imagemagick)"
 
 # Messaggi logger - Generate SVG graph
-- id: logger.generatesvggraph.error.failed_to_close_file_1
+- id: logger.render.error.failed_to_close_file
   translation: "Chiusura del file SVG fallita"
-- id: logger.generatesvggraph.info.svg_graph_generated_successfully_1
+- id: logger.render.info.svg_graph_generated_successfully
   translation: "Grafico SVG generato con successo"
 
 # Messaggi logger - Go setup
-- id: logger.gosetup.info.go_successfully_installed_1
+- id: logger.platform.info.go_successfully_installed
   translation: "Go installato con successo"
 
 # Messaggi logger - Installing
@@ -752,9 +739,9 @@
   translation: "Installazione delle dipendenze runtime esterne"
 - id: logger.installing_package
   translation: "Installazione del pacchetto"
-- id: logger.installpackage.info.installing_package_1
+- id: logger.command.info.installing_package
   translation: "Installazione del pacchetto"
-- id: logger.installpackage.info.package_installed_successfully_1
+- id: logger.command.info.package_installed_successfully
   translation: "Pacchetto installato con successo"
 
 # Messaggi logger - Integrity check
@@ -768,17 +755,17 @@
   translation: "Ordine pacchetti non valido"
 
 # Messaggi logger - Log download start
-- id: logger.logdownloadstart.info.response_status
+- id: logger.download.info.response_status_2
   translation: "Stato della risposta"
-- id: logger.logdownloadstart.info.server_supports_resume_1
+- id: logger.download.info.server_supports_resume
   translation: "Il server supporta la ripresa"
 
 # Messaggi logger - Log package created
-- id: logger.logpackagecreated.info.package_artifact_created_3
+- id: logger.common.info.package_artifact_created
   translation: "Artefatto del pacchetto creato"
 
 # Messaggi logger - Monitor download
-- id: logger.monitordownload.info.download_completed_1
+- id: logger.download.info.download_completed
   translation: "Download completato"
 
 # Messaggi logger - Multi project file
@@ -788,7 +775,7 @@
   translation: "Trovato file di progetto singolo"
 
 # Messaggi logger - Open
-- id: logger.open.error.failed_to_open_file_1
+- id: logger.files.error.failed_to_open_file
   translation: "Apertura del file fallita"
 
 # Messaggi logger - Package
@@ -798,15 +785,12 @@
   translation: "Installazione del pacchetto pianificata"
 - id: logger.package_installed
   translation: "Pacchetto installato"
-- id: logger.package_not_found
-  translation: "Pacchetto non trovato"
-
 # Messaggi logger - Parse file
-- id: logger.parsefile.error.failed_to_get_root_1
+- id: logger.parser.error.failed_to_get_root
   translation: "Recupero dell'elemento root fallito"
 
 # Messaggi logger - Parse OS release
-- id: logger.parseosrelease.warn.failed_to_close_osrelease_1
+- id: logger.platform.warn.failed_to_close_osrelease
   translation: "Chiusura di /etc/os-release fallita"
 
 # Messaggi logger - Performing topological sort
@@ -824,9 +808,9 @@
   translation: "Ricerca dell'utente sudo fallita"
 
 # Messaggi logger - Preserve ownership
-- id: logger.preserveownership.info.preserving_ownership_for_original_1
+- id: logger.platform.info.preserving_ownership_for_original
   translation: "Preservazione della proprietà per l'utente originale"
-- id: logger.preserveownership.warn.failed_to_get_original_1
+- id: logger.common.warn.failed_to_get_original
   translation: "Recupero della proprietà originale fallito"
 
 # Messaggi logger - Project
@@ -840,32 +824,20 @@
   translation: "Trovato pacchetto di partenza"
 - id: logger.project.found_to_package
   translation: "Trovato pacchetto di destinazione"
-- id: logger.project.installing_runtime_dependency
-  translation: "Installazione della dipendenza runtime"
 - id: logger.project.make_dependency_found
   translation: "Trovata dipendenza di make"
-- id: logger.project.package_installation_failed
-  translation: "Installazione del pacchetto fallita"
 - id: logger.project.runtime_dependencies_batching_complete
   translation: "Raggruppamento delle dipendenze runtime completato"
 - id: logger.project.runtime_dependencies_build_optimization
   translation: "Ottimizzazione dell'ordine di compilazione delle dipendenze runtime"
-- id: logger.project.runtime_dependency_batch_analysis
-  translation: "Analisi del batch di dipendenze runtime"
 - id: logger.project.runtime_dependency_detected
   translation: "Rilevata dipendenza runtime"
 - id: logger.project.runtime_dependency_found
   translation: "Trovata dipendenza runtime"
-- id: logger.project.runtime_dependency_installation_failed
-  translation: "Installazione della dipendenza runtime fallita"
-- id: logger.project.runtime_dependency_installed
-  translation: "Dipendenza runtime installata"
 - id: logger.project.runtime_dependency_map
   translation: "Mappa delle dipendenze runtime"
 - id: logger.project.filtering_projects
   translation: "Filtraggio dei progetti per la compilazione parallela"
-- id: logger.project.skipping_batch_filtered_out
-  translation: "Salto del batch (filtrato)"
 - id: logger.project.starting_dependencyaware_build_process
   translation: "Avvio del processo di compilazione con risoluzione delle dipendenze"
 
@@ -886,37 +858,30 @@
   translation: "Generazione del pacchetto"
 
 # Messaggi logger - Run graph command
-- id: logger.rungraphcommand.info.generating_dependency_graph_1
+- id: logger.command.info.generating_dependency_graph
   translation: "Generazione del grafico delle dipendenze"
 
 # Messaggi logger - Run install
-- id: logger.runinstall.info.detected_package_type_1
+- id: logger.command.info.detected_package_type
   translation: "Rilevato tipo di pacchetto"
 
 # Messaggi logger - Run script with package
-- id: logger.runscriptwithpackage.debug.starting_script_execution_1
+- id: logger.shell.debug.starting_script_execution
   translation: "Avvio dell'esecuzione dello script"
-- id: logger.runscriptwithpackage.error.script_execution_failed_1
+- id: logger.shell.error.script_execution_failed
   translation: "Esecuzione dello script fallita"
-- id: logger.runscriptwithpackage.error.script_execution_failed_3
+- id: logger.shell.error.script_execution_failed_2
   translation: "Esecuzione dello script fallita con errore"
-- id: logger.runscriptwithpackage.info.executing_shell_script_3
+- id: logger.shell.info.executing_shell_script
   translation: "Esecuzione dello script shell"
 
 # Messaggi logger - Setup ccache
-- id: logger.setupccache.info.ccache_enabled_for_build_1
+- id: logger.builder.info.ccache_enabled_for_build
   translation: "ccache abilitato per la compilazione"
-- id: logger.setupccache.info.ccache_not_found_skipping_1
-  translation: "ccache non trovato, salto"
-- id: logger.setupccache.warn.ccache_setup_failed_1
-  translation: "Configurazione di ccache fallita"
-- id: logger.setupccache.warn.failed_to_create_ccache_dir_1
-  translation: "Creazione della directory ccache fallita"
-
 # Messaggi logger - Setup environment dependencies
-- id: logger.setupenvironmentdependencies.info.go_detected_version_check_1
+- id: logger.common.info.go_detected_version_check
   translation: "Go rilevato, controllo della versione"
-- id: logger.setupenvironmentdependencies.warn.failed_to_setup_go_1
+- id: logger.common.warn.failed_to_setup_go
   translation: "Configurazione di Go fallita"
 
 # Messaggi logger - Shell
@@ -934,15 +899,12 @@
   translation: "Arresto della compilazione al pacchetto di destinazione"
 
 # Messaggi logger - Stringify array
-- id: logger.stringifyarray.error.unable_to_parse_array_1
+- id: logger.set.error.unable_to_parse_array
   translation: "Impossibile analizzare l'array"
 
 # Messaggi logger - Stringify func decl
-- id: logger.stringifyfuncdecl.error.unable_to_parse_function_1
-  translation: "Impossibile analizzare la funzione"
-
 # Messaggi logger - Strip
-- id: logger.strip.info.stripping_binaries_1
+- id: logger.options.info.stripping_binaries
   translation: "Rimozione dei simboli dai binari"
 
 # Messaggi logger - Tips
@@ -952,39 +914,37 @@
   translation: "Usa il flag --verbose per un output dettagliato"
 
 # Messaggi logger - Unknown/Generic
-- id: logger.unknown.debug.command_execution_completed_1
+- id: logger.shell.debug.command_execution_completed_2
   translation: "Esecuzione del comando completata"
-- id: logger.unknown.error.command_execution_failed_1
+- id: logger.shell.error.command_execution_failed_2
   translation: "Esecuzione del comando fallita"
-- id: logger.unknown.info.basic_build_environment_successfully_1
+- id: logger.command.info.basic_build_environment_successfully
   translation: "Configurazione dell'ambiente di compilazione completata con successo"
-- id: logger.unknown.info.go_successfully_installed_1
+- id: logger.command.info.go_successfully_installed
   translation: "Go installato con successo"
-- id: logger.unknown.info.shell_script_execution_completed_1
+- id: logger.shell.info.shell_script_execution_completed
   translation: "Esecuzione dello script shell completata"
-- id: logger.unknown.info.shell_script_execution_completed_3
+- id: logger.shell.info.shell_script_execution_completed_2
   translation: "Esecuzione dello script shell completata con successo"
-- id: logger.unknown.warn.failed_to_close_archive_1
-  translation: "Chiusura dell'archivio fallita"
-- id: logger.unknown.warn.failed_to_close_new_1
+- id: logger.archive.warn.failed_to_close_new
   translation: "Chiusura del nuovo file fallita"
-- id: logger.unknown.warn.failed_to_close_rpm_1
+- id: logger.rpm.warn.failed_to_close_rpm
   translation: "Chiusura del file RPM fallita"
 
 # Messaggi logger - Validate general
-- id: logger.validategeneral.error.invalid_spdx_license_identifier_1
+- id: logger.pkgbuild.error.invalid_spdx_license_identifier
   translation: "Identificatore di licenza SPDX non valido"
-- id: logger.validategeneral.error.missing_package_function_1
+- id: logger.pkgbuild.error.missing_package_function
   translation: "Funzione package() mancante nel PKGBUILD"
-- id: logger.validategeneral.error.number_of_sources_and_1
+- id: logger.pkgbuild.error.number_of_sources_and
   translation: "Il numero di sorgenti e checksum non corrisponde"
-- id: logger.validategeneral.info.you_can_find_valid_1
+- id: logger.pkgbuild.info.you_can_find_valid
   translation: "Puoi trovare identificatori di licenza SPDX validi su https://spdx.org/licenses/"
 
 # Messaggi logger - With resume
-- id: logger.withresumecontext.info.retrying_download_1
+- id: logger.download.info.retrying_download_2
   translation: "Nuovo tentativo di download con supporto per la ripresa"
-- id: logger.withresume.info.retrying_download_1
+- id: logger.download.info.retrying_download
   translation: "Nuovo tentativo di download"
 
 # Messaggi logger - Zap
@@ -1032,3 +992,519 @@
 # Messaggi di test
 - id: test.message
   translation: "Messaggio di test"
+
+# --- Migrated logger messages ---
+- id: logger.apkindex.debug.enqueue_install
+  translation: "Accodamento installazione"
+- id: logger.apkindex.debug.fetching_repo
+  translation: "Recupero repository"
+- id: logger.apkindex.debug.installed
+  translation: "Installato"
+- id: logger.apkindex.debug.resolved_virtual
+  translation: "Pacchetto virtuale risolto"
+- id: logger.apkindex.debug.unresolved
+  translation: "Non risolto"
+- id: logger.apkindex.info.all_packages_already_installed
+  translation: "Tutti i pacchetti sono già installati"
+- id: logger.apkindex.info.indexes_loaded
+  translation: "Indici caricati"
+- id: logger.apkindex.info.installing_apk_packages
+  translation: "Installazione pacchetti APK"
+- id: logger.apkindex.info.repo_fetched
+  translation: "Repository recuperato"
+- id: logger.apkindex.info.resolved_transitive_deps
+  translation: "Dipendenze transitive risolte"
+- id: logger.apkindex.info.updating_indexes
+  translation: "Aggiornamento indici"
+- id: logger.apkindex.warn.could_not_detect_apk
+  translation: "Impossibile rilevare l'architettura APK"
+- id: logger.apkindex.warn.fetch_failed
+  translation: "Recupero non riuscito"
+- id: logger.apkindex.warn.installing_without_verification
+  translation: "Installazione pacchetti APK senza verifica della firma (imposta InstallOptions.AllowUnverifiedPackages=false per rifiutare)"
+- id: logger.apkindex.warn.parse_failed
+  translation: "Analisi non riuscita"
+- id: logger.apkindex.warn.skipping_unsafe_apk_symlink
+  translation: "Collegamento simbolico APK non sicuro ignorato"
+- id: logger.apkindex.warn.skipping_unsafe_path_apk
+  translation: "Percorso non sicuro nell'archivio APK ignorato"
+- id: logger.aptinstall.debug.installing
+  translation: "Installazione in corso"
+- id: logger.aptinstall.debug.ldconfig_not_found_skipping
+  translation: "ldconfig non trovato, aggiornamento cache del linker ignorato"
+- id: logger.aptinstall.debug.running_maintainer_scriptlet
+  translation: "Esecuzione scriptlet del manutentore"
+- id: logger.aptinstall.debug.scriptlet_stdout
+  translation: "Output dello scriptlet"
+- id: logger.aptinstall.debug.skipping_foreign_arch_non
+  translation: "Pacchetto non-multiarch di architettura estranea ignorato"
+- id: logger.aptinstall.info.downloaded_packages
+  translation: "Pacchetti scaricati"
+- id: logger.aptinstall.info.installation_complete
+  translation: "Installazione completata"
+- id: logger.aptinstall.info.installed
+  translation: "Installato"
+- id: logger.aptinstall.info.installed_unconfigured
+  translation: "Installato (non configurato)"
+- id: logger.aptinstall.info.resolved_dependencies
+  translation: "Dipendenze risolte"
+- id: logger.aptinstall.info.skipping_existing_conffile
+  translation: "File di configurazione esistente ignorato"
+- id: logger.aptinstall.warn.ldconfig_failed
+  translation: "ldconfig non riuscito"
+- id: logger.aptinstall.warn.postinst_failed_leaving_package
+  translation: "Postinst non riuscito; pacchetto lasciato estratto ma non configurato"
+- id: logger.aptinstall.warn.skipping_path_traversal_attempt
+  translation: "Tentativo di path traversal ignorato"
+- id: logger.aptinstall.warn.skipping_unsafe_symlink
+  translation: "Collegamento simbolico non sicuro ignorato"
+- id: logger.aptrepo.debug.fetching_source
+  translation: "Recupero sorgente"
+- id: logger.aptrepo.info.cache_reloaded
+  translation: "Cache ricaricata"
+- id: logger.aptrepo.info.source_fetched
+  translation: "Sorgente recuperata"
+- id: logger.aptrepo.info.updating_indexes
+  translation: "Aggiornamento indici"
+- id: logger.aptrepo.info.verified_inrelease_signature
+  translation: "Firma InRelease verificata"
+- id: logger.aptrepo.info.verified_release_gpg_signature
+  translation: "Firma Release.gpg verificata"
+- id: logger.aptrepo.warn.accepting_unsigned_inrelease_opt
+  translation: "Accettazione InRelease non firmato (opt-in)"
+- id: logger.aptrepo.warn.accepting_unsigned_release_opt
+  translation: "Accettazione Release non firmato (opt-in)"
+- id: logger.aptrepo.warn.apt_component_fetch_failed
+  translation: "Recupero del componente apt non riuscito"
+- id: logger.aptrepo.warn.skipping_inrelease_signature_check
+  translation: "Verifica firma InRelease ignorata (nessuna ancora di fiducia)"
+- id: logger.aptrepo.warn.skipping_inrelease_signature_check_unknown
+  translation: "Verifica firma InRelease ignorata (firmatario sconosciuto, opt-in)"
+- id: logger.aptrepo.warn.skipping_release_gpg_signature
+  translation: "Verifica firma Release.gpg ignorata (nessuna ancora di fiducia)"
+- id: logger.aptrepo.warn.skipping_release_gpg_signature_check
+  translation: "Verifica firma Release.gpg ignorata (firmatario sconosciuto, opt-in)"
+- id: logger.aptrepo.warn.source_fetch_failed
+  translation: "Recupero sorgente non riuscito"
+- id: logger.binary.warn.cross_strip_not_found
+  translation: "cross-strip non trovato e il binario è di architettura estranea; strip ignorato"
+- id: logger.binary.warn.cross_strip_not_found_path
+  translation: "cross-strip non trovato nel PATH, ripiego sullo strip nativo"
+- id: logger.binary.warn.failed_add_debuglink
+  translation: "Aggiunta del debuglink non riuscita"
+- id: logger.binary.warn.skipping_strip_binary_foreign
+  translation: "Strip ignorato: il binario è di architettura estranea e nessun cross-strip è configurato"
+- id: logger.builder.warn.failed_parse_split_package
+  translation: "Analisi degli override dello split-package non riuscita, uso dei valori globali"
+- id: logger.builder.warn.no_package_function_found
+  translation: "Nessuna funzione package trovata per il sotto-pacchetto split, ignorato"
+- id: logger.command.debug.graph_options
+  translation: "Opzioni del grafico"
+- id: logger.command.error.container_pipeline_failed
+  translation: "Pipeline del container non riuscita"
+- id: logger.command.error.container_run_failed
+  translation: "Esecuzione del container non riuscita"
+- id: logger.command.error.failed_detect_container_runtime
+  translation: "Rilevamento del runtime del container non riuscito"
+- id: logger.command.info.dispatching_container
+  translation: "Inoltro al container"
+- id: logger.command.info.dispatching_pipeline_container
+  translation: "Inoltro della pipeline al container"
+- id: logger.command.info.using_container_runtime
+  translation: "Uso del runtime del container"
+- id: logger.common.debug.cross_compilation_toolchain_validation
+  translation: "Validazione del toolchain di cross-compilazione superata"
+- id: logger.common.debug.cross_strip_env_configured
+  translation: "Ambiente cross-strip configurato"
+- id: logger.common.debug.extracting_cross_build_dep
+  translation: "Estrazione dipendenza di cross-build"
+- id: logger.common.debug.skipping_host_transitive_arch
+  translation: "Dipendenza cross arch-all host/transitiva ignorata"
+- id: logger.common.debug.validating_cross_compilation_toolchain
+  translation: "Validazione della disponibilità del toolchain di cross-compilazione"
+- id: logger.common.info.ccache_active_cross_compilation
+  translation: "ccache attivo per la cross-compilazione"
+- id: logger.common.info.cross_build_deps_no
+  translation: "Dipendenze cross-build: nessuna dipendenza di runtime da recuperare"
+- id: logger.common.info.cross_build_deps_using
+  translation: "Dipendenze cross-build: uso dell'installazione nativa (nessuna estrazione della chiusura)"
+- id: logger.common.info.fetching_cross_build_runtime
+  translation: "Recupero delle dipendenze di runtime per il cross-build"
+- id: logger.common.info.installing_cross_compiler_toolchain
+  translation: "Installazione del toolchain del cross-compilatore"
+- id: logger.common.info.installing_environment_dependencies_via
+  translation: "Installazione delle dipendenze d'ambiente tramite il gestore di pacchetti"
+- id: logger.common.info.installing_rpm_dependencies_via
+  translation: "Installazione delle dipendenze RPM tramite dnfinstall"
+- id: logger.common.info.qualifying_makedepends_target_architecture
+  translation: "Qualificazione dei makedepends per l'architettura di destinazione"
+- id: logger.common.info.resolved_cross_deps_closure
+  translation: "Chiusura delle dipendenze cross risolta"
+- id: logger.common.info.skipped_host_transitive_arch
+  translation: "Dipendenze cross arch-all host/transitive ignorate"
+- id: logger.common.info.skipping_toolchain_validation
+  translation: "Validazione del toolchain ignorata"
+- id: logger.common.warn.cross_strip_env_failed
+  translation: "Ambiente cross-strip: risoluzione del toolchain non riuscita, strip userà gli strumenti nativi"
+- id: logger.common.warn.cross_strip_env_set_failed
+  translation: "Ambiente cross-strip: impostazione della variabile non riuscita"
+- id: logger.common.warn.failed_write_cmake_toolchain
+  translation: "Scrittura del file di toolchain CMake non riuscita"
+- id: logger.common.warn.unresolvable_transitive_cross_deps
+  translation: "Dipendenze cross transitive non risolvibili (proseguo)"
+- id: logger.common.warn.update_ccache_symlinks_failed
+  translation: "Update-ccache-symlinks non riuscito"
+- id: logger.container.debug.container_runtime_auto_detected
+  translation: "Runtime del container rilevato automaticamente"
+- id: logger.container.info.no_usable_podman_docker
+  translation: "Nessun podman/docker utilizzabile trovato, uso del runner rootless integrato"
+- id: logger.container.warn.container_cli_installed_but
+  translation: "CLI del container installata ma non raggiungibile, provo il backend successivo"
+- id: logger.deb.warn.failed_close_changelog_file
+  translation: "Chiusura del file changelog non riuscita"
+- id: logger.deb.warn.failed_close_file
+  translation: "Chiusura del file non riuscita"
+- id: logger.deb.warn.failed_close_gzip_writer
+  translation: "Chiusura del writer gzip non riuscita"
+- id: logger.dnfcache.debug.downloaded_rpm
+  translation: "RPM scaricato"
+- id: logger.dnfcache.debug.enqueue_install
+  translation: "Accodamento installazione"
+- id: logger.dnfcache.debug.legacy_bdb_rpmdb_falling
+  translation: "Rpmdb BDB legacy, ripiego su rpm -qa"
+- id: logger.dnfcache.debug.modules_index_path
+  translation: "Percorso indice moduli"
+- id: logger.dnfcache.debug.no_primary_xml_files
+  translation: "Nessun file primary.xml da caricare"
+- id: logger.dnfcache.debug.primary_index_path
+  translation: "Percorso indice primario"
+- id: logger.dnfcache.debug.resolved_virtual
+  translation: "Pacchetto virtuale risolto"
+- id: logger.dnfcache.debug.resolver_state_loaded
+  translation: "Stato del risolutore caricato"
+- id: logger.dnfcache.debug.skip_already_satisfied
+  translation: "Ignorato (già soddisfatto)"
+- id: logger.dnfcache.debug.skip_malformed_modules_yaml
+  translation: "Documento modules.yaml malformato ignorato"
+- id: logger.dnfcache.debug.unresolved
+  translation: "Non risolto"
+- id: logger.dnfcache.debug.unresolved_weak_ignored
+  translation: "Non risolto (debole, ignorato)"
+- id: logger.dnfcache.info.downloading_packages
+  translation: "Scaricamento pacchetti"
+- id: logger.dnfcache.info.fetched_repo
+  translation: "Repository recuperato"
+- id: logger.dnfcache.info.fetching_repos
+  translation: "Recupero repository"
+- id: logger.dnfcache.info.index_loaded
+  translation: "Indice caricato"
+- id: logger.dnfcache.info.installing_rpm_packages
+  translation: "Installazione pacchetti RPM"
+- id: logger.dnfcache.info.module_index_loaded
+  translation: "Indice dei moduli caricato"
+- id: logger.dnfcache.info.no_enabled_repos_found
+  translation: "Nessun repository abilitato trovato"
+- id: logger.dnfcache.info.resolved_transitive_deps
+  translation: "Dipendenze transitive risolte"
+- id: logger.dnfcache.warn.failed_fetch_modules_yaml
+  translation: "Recupero di modules.yaml non riuscito"
+- id: logger.dnfcache.warn.failed_fetch_repo
+  translation: "Recupero del repository non riuscito"
+- id: logger.dnfcache.warn.failed_parse_modules_yaml
+  translation: "Analisi di modules.yaml non riuscita"
+- id: logger.dnfcache.warn.failed_parse_primary_index
+  translation: "Analisi dell'indice primario non riuscita"
+- id: logger.dnfcache.warn.unresolvable_dependency
+  translation: "Dipendenza non risolvibile"
+- id: logger.dnfinstall.debug.downloaded_rpm
+  translation: "RPM scaricato"
+- id: logger.dnfinstall.debug.extracted_rpm
+  translation: "RPM estratto"
+- id: logger.dnfinstall.debug.ldconfig_not_found_skipping
+  translation: "ldconfig non trovato; aggiornamento di ld.so.cache ignorato"
+- id: logger.dnfinstall.debug.refreshed_ld_so_cache
+  translation: "ld.so.cache aggiornata"
+- id: logger.dnfinstall.debug.rpm_signature_verified
+  translation: "Firma RPM verificata"
+- id: logger.dnfinstall.debug.running_rpm_scriptlet
+  translation: "Esecuzione scriptlet RPM"
+- id: logger.dnfinstall.debug.scriptlet_stdout
+  translation: "Output dello scriptlet"
+- id: logger.dnfinstall.debug.skipped_unreadable_keyring_file
+  translation: "File keyring illeggibile ignorato"
+- id: logger.dnfinstall.debug.skipping_chroot_not_running
+  translation: "chroot ignorato, non in esecuzione come root"
+- id: logger.dnfinstall.debug.skipping_ldconfig_not_running
+  translation: "ldconfig ignorato, non in esecuzione come root"
+- id: logger.dnfinstall.debug.skipping_non_regular_rpm
+  translation: "Voce RPM non regolare ignorata"
+- id: logger.dnfinstall.debug.unresolved_package
+  translation: "Pacchetto non risolto"
+- id: logger.dnfinstall.info.installation_complete
+  translation: "Installazione completata"
+- id: logger.dnfinstall.info.installed_rpm_file
+  translation: "File RPM installato"
+- id: logger.dnfinstall.info.installed_rpm_package
+  translation: "Pacchetto RPM installato"
+- id: logger.dnfinstall.warn.failed_load_rpm_keyring
+  translation: "Caricamento del keyring RPM non riuscito, verifica ignorata"
+- id: logger.dnfinstall.warn.ldconfig_refresh_failed_continuing
+  translation: "Aggiornamento di ldconfig non riuscito (proseguo)"
+- id: logger.dnfinstall.warn.ldconfig_stderr
+  translation: "stderr di ldconfig"
+- id: logger.dnfinstall.warn.no_keys_rpm_keyring
+  translation: "Nessuna chiave nel keyring RPM, verifica ignorata"
+- id: logger.dnfinstall.warn.postin_scriptlet_failed_continuing
+  translation: "Scriptlet postin non riuscito (proseguo)"
+- id: logger.dnfinstall.warn.posttrans_scriptlet_failed_continuing
+  translation: "Scriptlet posttrans non riuscito (proseguo)"
+- id: logger.dnfinstall.warn.pretrans_scriptlet_failed_continuing
+  translation: "Scriptlet pretrans non riuscito (proseguo)"
+- id: logger.dnfinstall.warn.rpm_keyring_not_found
+  translation: "Keyring RPM non trovato, verifica ignorata"
+- id: logger.dnfinstall.warn.rpm_signature_verification_failed
+  translation: "Verifica della firma RPM non riuscita, ignorata"
+- id: logger.dnfinstall.warn.rpm_unsigned_skipping_verification
+  translation: "RPM non firmato, verifica ignorata"
+- id: logger.dnfinstall.warn.skipping_lua_scriptlet
+  translation: "Scriptlet Lua ignorato"
+- id: logger.dnfinstall.warn.skipping_unsafe_path_rpm
+  translation: "Percorso non sicuro nell'archivio RPM ignorato"
+- id: logger.dnfinstall.warn.skipping_unsafe_rpm_symlink
+  translation: "Collegamento simbolico RPM non sicuro ignorato"
+- id: logger.dnfinstall.warn.some_packages_could_not
+  translation: "Alcuni pacchetti non è stato possibile risolverli"
+- id: logger.download.info.downloading
+  translation: "Scaricamento in corso"
+- id: logger.gensum.info.hashed_source
+  translation: "Hash della sorgente calcolato"
+- id: logger.gensum.info.no_source_arrays_found
+  translation: "Nessun array source trovato, niente da fare"
+- id: logger.gensum.info.nothing_changed
+  translation: "Nulla è cambiato"
+- id: logger.gensum.info.skipping_vcs_source
+  translation: "Sorgente VCS ignorata"
+- id: logger.gensum.info.updated_checksums
+  translation: "Checksum aggiornati"
+- id: logger.git.info.cloning
+  translation: "Clonazione in corso"
+- id: logger.git.info.creating_working_copy_bare
+  translation: "Creazione della copia di lavoro dal repository bare"
+- id: logger.mcp.debug.mcp_request
+  translation: "Richiesta MCP"
+- id: logger.mcp.error.mcp_request_failed
+  translation: "Richiesta MCP non riuscita"
+- id: logger.mcp.info.mcp_request_done
+  translation: "Richiesta MCP completata"
+- id: logger.options.debug.about_strip_binary
+  translation: "In procinto di eseguire lo strip del binario"
+- id: logger.options.debug.compressing_man_page
+  translation: "Compressione della pagina di manuale"
+- id: logger.options.debug.ensuring_file_writable_before
+  translation: "Verifica che il file sia scrivibile prima dello strip"
+- id: logger.options.debug.purged_file
+  translation: "File eliminato"
+- id: logger.options.debug.purging_file
+  translation: "Eliminazione del file"
+- id: logger.options.debug.removing_doc_directory
+  translation: "Rimozione della directory della documentazione"
+- id: logger.options.debug.removing_empty_directory
+  translation: "Rimozione della directory vuota"
+- id: logger.options.error.strip_command_failed
+  translation: "Comando strip non riuscito"
+- id: logger.options.info.separated_debug_info
+  translation: "Informazioni di debug separate"
+- id: logger.options.warn.failed_get_file_info
+  translation: "Recupero delle informazioni sul file non riuscito"
+- id: logger.options.warn.failed_make_file_writable
+  translation: "Impossibile rendere scrivibile il file"
+- id: logger.options.warn.failed_separate_debug_info
+  translation: "Separazione delle informazioni di debug non riuscita"
+- id: logger.options.warn.file_still_not_writable
+  translation: "File ancora non scrivibile dopo chmod"
+- id: logger.pacmandb.debug.mirror_failed
+  translation: "Mirror non riuscito"
+- id: logger.pacmandb.debug.trying_mirror
+  translation: "Tentativo con il mirror"
+- id: logger.pacmandb.info.repo_synced
+  translation: "Repository sincronizzato"
+- id: logger.pacmandb.info.sync_complete
+  translation: "Sincronizzazione completata"
+- id: logger.pacmandb.info.syncing_repos
+  translation: "Sincronizzazione repository"
+- id: logger.pacmandb.warn.repo_sync_failed
+  translation: "Sincronizzazione del repository non riuscita"
+- id: logger.parser.warn.failed_close_pkgbuild_file
+  translation: "Chiusura del file PKGBUILD non riuscita"
+- id: logger.pkgbuild.debug.legacy_bdb_host_falling
+  translation: "Host BDB legacy, ripiego sul sottoprocesso"
+- id: logger.pkgbuild.info.delegating_package_install_subprocess
+  translation: "Delega dell'installazione del pacchetto al sottoprocesso"
+- id: logger.pkgbuild.info.delegating_package_manager_update
+  translation: "Delega dell'aggiornamento del gestore di pacchetti al sottoprocesso"
+- id: logger.pkgbuild.info.refreshed_apt_indexes
+  translation: "Indici apt aggiornati"
+- id: logger.pkgbuild.info.refreshed_pacman_sync_dbs
+  translation: "Database di sincronizzazione pacman aggiornati"
+- id: logger.pkgbuild.info.resolved_virtual_package
+  translation: "Pacchetto virtuale risolto"
+- id: logger.pkgbuild.info.resolved_virtual_packages_apt
+  translation: "Pacchetti virtuali risolti (apt)"
+- id: logger.pkgbuild.info.resolving_dependencies
+  translation: "Risoluzione delle dipendenze"
+- id: logger.pkgbuild.info.resolving_virtual_packages_apt
+  translation: "Risoluzione dei pacchetti virtuali (apt)"
+- id: logger.pkgbuild.warn.failed_parse_split_package
+  translation: "Analisi del corpo della funzione split-package per l'estrazione degli override non riuscita"
+- id: logger.pkgbuild.warn.open_failed_falling_back
+  translation: "Apertura non riuscita, ripiego sul sottoprocesso"
+- id: logger.platform.debug.skipping_recursive_ownership_preservation
+  translation: "Preservazione ricorsiva della proprietà ignorata nel container"
+- id: logger.project.debug.treating_filtered_package_as
+  translation: "Pacchetto filtrato trattato come interno (artefatto locale trovato)"
+- id: logger.project.debug.treating_filtered_package_as_external
+  translation: "Pacchetto filtrato trattato come esterno (nessun artefatto locale)"
+- id: logger.project.info.skipping_dependency
+  translation: "Dipendenza ignorata"
+- id: logger.project.warn.failed_parse_split_package
+  translation: "Analisi degli override dello split-package per il packaging non riuscita"
+- id: logger.repo.info.cross_apt_indexes_refreshed
+  translation: "Indici apt cross aggiornati tramite aptrepo"
+- id: logger.repo.info.cross_apt_setup_skipped
+  translation: "Configurazione apt cross ignorata (non è una distribuzione di tipo debian)"
+- id: logger.repo.info.dpkg_arch_already_registered
+  translation: "Architettura dpkg già registrata"
+- id: logger.repo.info.installed_apt_source
+  translation: "Sorgente apt installata"
+- id: logger.repo.info.installed_cross_arch_apt
+  translation: "Sorgente apt cross-arch installata"
+- id: logger.repo.info.installed_yum_repo
+  translation: "Repository yum installato"
+- id: logger.repo.info.registered_dpkg_architecture
+  translation: "Architettura dpkg registrata"
+- id: logger.repo.warn.close_failed
+  translation: "Chiusura non riuscita"
+- id: logger.repo.warn.cross_apt_update_some
+  translation: "Aggiornamento apt cross: alcune sorgenti non hanno superato la verifica della firma (non fatale)"
+- id: logger.repo.warn.rpm_import_failed_non
+  translation: "Rpm --import non riuscito (non fatale; dnf verificherà comunque tramite gpgkey= nel .repo)"
+- id: logger.repo.warn.unknown_distro_skipping_repo
+  translation: "Distribuzione sconosciuta, configurazione del repository ignorata"
+- id: logger.repo.warn.unsupported_format_skipping
+  translation: "Formato non supportato, ignorato"
+- id: logger.rootless.info.extracting_rootfs
+  translation: "Estrazione del rootfs"
+- id: logger.rootless.info.pulling_image
+  translation: "Download dell'immagine"
+- id: logger.rootless.info.rootfs_ready
+  translation: "rootfs pronto"
+- id: logger.rootless.info.saving_oci_image_layout
+  translation: "Salvataggio del layout dell'immagine OCI"
+- id: logger.rootless.info.starting_rootless_container
+  translation: "Avvio del container rootless"
+- id: logger.rootless.warn.bind_mount_failed
+  translation: "Bind mount non riuscito"
+- id: logger.rootless.warn.failed_bind_mount_resolv
+  translation: "Bind mount di resolv.conf non riuscito"
+- id: logger.rootless.warn.failed_remove_rootlesskit_state
+  translation: "Rimozione della directory di stato di rootlesskit non riuscita"
+- id: logger.rootless.warn.failed_unmount_old_root
+  translation: "Smontaggio della vecchia root non riuscito"
+- id: logger.rootless.warn.pipe_writer_close_error
+  translation: "Errore nella chiusura del writer della pipe"
+- id: logger.rootless.warn.restore_env_failed
+  translation: "Ripristino dell'ambiente non riuscito"
+- id: logger.rootless.warn.rootless_runtime_does_not
+  translation: "Il runtime rootless non supporta la cattura dell'output; l'output va allo stderr dell'host"
+- id: logger.rootless.warn.setenv_failed
+  translation: "Setenv non riuscito"
+- id: logger.rpm.warn.failed_read_changelog_rpm
+  translation: "Lettura del changelog per il pacchetto RPM non riuscita"
+- id: logger.rpmdb.debug.initialized_rpmdb_schema
+  translation: "Schema rpmdb inizializzato"
+- id: logger.rpmdb.info.installed_package_rpmdb
+  translation: "Pacchetto installato in rpmdb"
+- id: logger.sbom.debug.generated_sbom
+  translation: "SBOM generato"
+- id: logger.sbom.warn.failed_marshal_sbom_json
+  translation: "Serializzazione dell'SBOM in JSON non riuscita"
+- id: logger.sbom.warn.failed_write_sbom_file
+  translation: "Scrittura del file SBOM non riuscita"
+- id: logger.sbom.warn.unknown_sbom_format
+  translation: "Formato SBOM sconosciuto"
+- id: logger.shell.debug.execcapture
+  translation: "ExecCapture"
+- id: logger.shell.info.archive_handler_7z
+  translation: "Gestore archivio: 7z"
+- id: logger.shell.info.archive_handler_dpkg_deb
+  translation: "Gestore archivio: dpkg-deb -x"
+- id: logger.shell.info.archive_handler_gunzip_place
+  translation: "Gestore archivio: gunzip in loco"
+- id: logger.shell.info.archive_handler_gunzip_stdout
+  translation: "Gestore archivio: gunzip → stdout"
+- id: logger.shell.info.archive_handler_jar
+  translation: "Gestore archivio: jar"
+- id: logger.shell.info.archive_handler_rpm2cpio
+  translation: "Gestore archivio: rpm2cpio"
+- id: logger.shell.info.archive_handler_unrar
+  translation: "Gestore archivio: unrar"
+- id: logger.shell.info.archive_handler_unzip
+  translation: "Gestore archivio: unzip"
+- id: logger.signing.debug.computed_apk_signature
+  translation: "Firma APK calcolata"
+- id: logger.signing.debug.default_keys_directory_not
+  translation: "Directory delle chiavi predefinita non trovata"
+- id: logger.signing.debug.failed_get_home_directory
+  translation: "Recupero della directory home non riuscito"
+- id: logger.signing.debug.found_default_gpg_key
+  translation: "Trovato file della chiave GPG predefinita"
+- id: logger.signing.debug.found_default_key_file
+  translation: "Trovato file della chiave predefinita"
+- id: logger.signing.debug.found_default_rsa_key
+  translation: "Trovato file della chiave RSA predefinita"
+- id: logger.signing.debug.found_format_specific_key
+  translation: "Trovato file della chiave specifica del formato"
+- id: logger.signing.debug.loaded_gpg_private_key
+  translation: "Chiave privata GPG caricata per la firma"
+- id: logger.signing.debug.loaded_rsa_private_key
+  translation: "Chiave privata RSA caricata per la firma APK"
+- id: logger.signing.debug.no_default_key_found
+  translation: "Nessuna chiave predefinita trovata"
+- id: logger.signing.debug.no_default_key_found_format
+  translation: "Nessuna chiave predefinita trovata per il formato"
+- id: logger.signing.debug.resolved_passphrase_cli_flag
+  translation: "Passphrase risolta dal flag CLI"
+- id: logger.signing.debug.resolved_passphrase_format_specific
+  translation: "Passphrase risolta dalla variabile d'ambiente specifica del formato"
+- id: logger.signing.debug.resolved_passphrase_global_env
+  translation: "Passphrase risolta dalla variabile d'ambiente globale"
+- id: logger.signing.debug.resolved_passphrase_project_config
+  translation: "Passphrase risolta dalla configurazione del progetto"
+- id: logger.signing.debug.resolved_signing_key
+  translation: "Chiave di firma risolta"
+- id: logger.signing.debug.resolved_signing_key_default
+  translation: "Chiave di firma risolta dalla posizione predefinita"
+- id: logger.signing.debug.using_default_key_name
+  translation: "Uso del nome chiave predefinito per la firma APK"
+- id: logger.signing.info.apk_package_signed_successfully
+  translation: "Pacchetto APK firmato con successo"
+- id: logger.signing.info.deb_package_signed_successfully
+  translation: "Pacchetto DEB firmato con successo"
+- id: logger.signing.info.pacman_package_signed_successfully
+  translation: "Pacchetto Pacman firmato con successo"
+- id: logger.signing.info.rpm_package_signed_successfully
+  translation: "Pacchetto RPM firmato con successo"
+- id: logger.source.warn.bare_repo_extraction_failed
+  translation: "Estrazione del repository bare non riuscita, ripiego su una nuova clonazione"
+- id: logger.source.warn.failed_close_source_file
+  translation: "Chiusura del file sorgente non riuscita"
+- id: logger.yap-mcp.error.yap_mcp_server_failed
+  translation: "Server yap-mcp non riuscito"
+- id: logger.yap-mcp.info.parent_already_gone_exiting
+  translation: "Processo padre già terminato; uscita"
+- id: logger.yap-mcp.info.yap_mcp_starting
+  translation: "Avvio di yap-mcp"
+- id: logger.yap-mcp.info.yap_mcp_stopped
+  translation: "yap-mcp arrestato"
+- id: logger.yap-mcp.warn.prctl_pr_set_pdeathsig
+  translation: "prctl PR_SET_PDEATHSIG non riuscito"

@@ -95,7 +95,7 @@ func StringifyArray(node *syntax.Assign) []string {
 	for index := range node.Array.Elems {
 		err := printer.Print(out, node.Array.Elems[index].Value)
 		if err != nil {
-			logger.Error(i18n.T("logger.stringifyarray.error.unable_to_parse_array_1"),
+			logger.Error(i18n.T("logger.set.error.unable_to_parse_array"),
 				"path", out.String())
 		}
 

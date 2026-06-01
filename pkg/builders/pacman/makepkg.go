@@ -242,7 +242,7 @@ func createMTREEGzip(mtreeContent, outputFile string) error {
 	defer func() {
 		err := out.Close()
 		if err != nil {
-			logger.Warn(i18n.T("logger.createmtreegzip.warn.failed_to_close_output_1"), "error", err)
+			logger.Warn(i18n.T("logger.pacman.warn.failed_to_close_output"), "error", err)
 		}
 	}()
 
@@ -252,7 +252,7 @@ func createMTREEGzip(mtreeContent, outputFile string) error {
 	defer func() {
 		err := gzipWriter.Close()
 		if err != nil {
-			logger.Warn(i18n.T("logger.createmtreegzip.warn.failed_to_close_gzip_1"), "error", err)
+			logger.Warn(i18n.T("logger.pacman.warn.failed_to_close_gzip"), "error", err)
 		}
 	}()
 

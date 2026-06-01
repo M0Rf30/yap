@@ -11,6 +11,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/container/internal/runtimetype"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -92,13 +93,14 @@ func Detect(override string) (Runtime, error) {
 
 	// Try CLI runtimes first.
 	if rt, err := newCLIRuntime(); err == nil {
-		logger.Debug("container runtime auto-detected", "type", "cli", "backend", rt.(*cliRuntime).bin)
+		logger.Debug(i18n.T("logger.container.debug.container_runtime_auto_detected"),
+			"type", "cli", "backend", rt.(*cliRuntime).bin)
 
 		return rt, nil
 	}
 
 	// Fall back to built-in rootless runner.
-	logger.Info("no usable podman/docker found, using built-in rootless runner")
+	logger.Info(i18n.T("logger.container.info.no_usable_podman_docker"))
 
 	return NewRootlessRuntime()
 }
@@ -124,7 +126,7 @@ func newCLIRuntime() (Runtime, error) {
 			return &cliRuntime{bin: path}, nil
 		}
 
-		logger.Warn("container CLI installed but not reachable, trying next backend",
+		logger.Warn(i18n.T("logger.container.warn.container_cli_installed_but"),
 			"backend", bin, "hint", "daemon/machine not running")
 	}
 

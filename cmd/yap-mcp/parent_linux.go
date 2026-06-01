@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -19,7 +20,7 @@ import (
 // PR_SET_PDEATHSIG is Linux-specific; other platforms rely on stdin EOF.
 func armParentDeathSignal() {
 	if err := unix.Prctl(unix.PR_SET_PDEATHSIG, uintptr(syscall.SIGTERM), 0, 0, 0); err != nil {
-		logger.Warn("prctl PR_SET_PDEATHSIG failed", "error", err)
+		logger.Warn(i18n.T("logger.yap-mcp.warn.prctl_pr_set_pdeathsig"), "error", err)
 		return
 	}
 
@@ -27,7 +28,7 @@ func armParentDeathSignal() {
 	// the kernel reparented us to init. Detect that and self-terminate
 	// directly — relying on signal delivery ordering here is fragile.
 	if unix.Getppid() == 1 {
-		logger.Info("parent already gone; exiting")
+		logger.Info(i18n.T("logger.yap-mcp.info.parent_already_gone_exiting"))
 		os.Exit(1)
 	}
 }

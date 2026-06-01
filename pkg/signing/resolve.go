@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -29,7 +30,7 @@ func resolveAndValidateKeyPath(rawPath, source, sourceLabel string) (string, err
 			WithContext("key_path", absPath)
 	}
 
-	logger.Debug("Resolved signing key from "+sourceLabel,
+	logger.Debug(i18n.T("logger.signing.debug.resolved_signing_key"),
 		source, sourceLabel, "key_path", absPath)
 
 	return absPath, nil
@@ -140,8 +141,7 @@ func resolveGenericKeyPath(flagKey, configKey string) (string, error) {
 	// Try both default.rsa and default.gpg since we don't know the format yet
 	defaultPath, found := findGenericDefaultKey()
 	if found {
-		logger.Debug("Resolved signing key from default location",
-			"key_path", defaultPath)
+		logger.Debug(i18n.T("logger.signing.debug.resolved_signing_key_default"), "key_path", defaultPath)
 
 		return defaultPath, nil
 	}
@@ -155,21 +155,20 @@ func resolveGenericKeyPath(flagKey, configKey string) (string, error) {
 func resolveGenericPassphrase(flagPass, configPass string) string {
 	// Priority 1: CLI flag
 	if flagPass != "" {
-		logger.Debug("Resolved passphrase from CLI flag")
+		logger.Debug(i18n.T("logger.signing.debug.resolved_passphrase_cli_flag"))
 		return flagPass
 	}
 
 	// Priority 2: Global env var (YAP_SIGN_PASSPHRASE) - skip format-specific vars
 	if envVal := os.Getenv("YAP_SIGN_PASSPHRASE"); envVal != "" {
-		logger.Debug("Resolved passphrase from global env var",
-			"env_var", "YAP_SIGN_PASSPHRASE")
+		logger.Debug(i18n.T("logger.signing.debug.resolved_passphrase_global_env"), "env_var", "YAP_SIGN_PASSPHRASE")
 
 		return envVal
 	}
 
 	// Priority 3: Project config
 	if configPass != "" {
-		logger.Debug("Resolved passphrase from project config")
+		logger.Debug(i18n.T("logger.signing.debug.resolved_passphrase_project_config"))
 		return configPass
 	}
 
@@ -182,7 +181,7 @@ func resolveGenericPassphrase(flagPass, configPass string) string {
 func findGenericDefaultKey() (string, bool) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		logger.Debug("Failed to get home directory", "error", err)
+		logger.Debug(i18n.T("logger.signing.debug.failed_get_home_directory"), "error", err)
 		return "", false
 	}
 
@@ -190,8 +189,7 @@ func findGenericDefaultKey() (string, bool) {
 
 	// Check if keys directory exists
 	if _, err := os.Stat(keysDir); err != nil {
-		logger.Debug("Default keys directory not found",
-			"path", keysDir)
+		logger.Debug(i18n.T("logger.signing.debug.default_keys_directory_not"), "path", keysDir)
 
 		return "", false
 	}
@@ -199,8 +197,7 @@ func findGenericDefaultKey() (string, bool) {
 	// Try default.rsa first (APK uses RSA)
 	defaultRSA := filepath.Join(keysDir, "default.rsa")
 	if _, err := os.Stat(defaultRSA); err == nil {
-		logger.Debug("Found default RSA key file",
-			"path", defaultRSA)
+		logger.Debug(i18n.T("logger.signing.debug.found_default_rsa_key"), "path", defaultRSA)
 
 		return defaultRSA, true
 	}
@@ -208,14 +205,12 @@ func findGenericDefaultKey() (string, bool) {
 	// Fall back to default.gpg (DEB/RPM/Pacman use GPG)
 	defaultGPG := filepath.Join(keysDir, "default.gpg")
 	if _, err := os.Stat(defaultGPG); err == nil {
-		logger.Debug("Found default GPG key file",
-			"path", defaultGPG)
+		logger.Debug(i18n.T("logger.signing.debug.found_default_gpg_key"), "path", defaultGPG)
 
 		return defaultGPG, true
 	}
 
-	logger.Debug("No default key found",
-		"keys_dir", keysDir)
+	logger.Debug(i18n.T("logger.signing.debug.no_default_key_found"), "keys_dir", keysDir)
 
 	return "", false
 }
@@ -246,8 +241,7 @@ func resolveKeyPath(format Format, flagKey, configKey string) (string, error) {
 	// Priority 5: Default search in ~/.config/yap/keys/
 	defaultPath, found := findDefaultKey(format)
 	if found {
-		logger.Debug("Resolved signing key from default location",
-			"key_path", defaultPath)
+		logger.Debug(i18n.T("logger.signing.debug.resolved_signing_key_default"), "key_path", defaultPath)
 
 		return defaultPath, nil
 	}
@@ -260,30 +254,28 @@ func resolveKeyPath(format Format, flagKey, configKey string) (string, error) {
 func resolvePassphrase(format Format, flagPass, configPass string) string {
 	// Priority 1: CLI flag
 	if flagPass != "" {
-		logger.Debug("Resolved passphrase from CLI flag")
+		logger.Debug(i18n.T("logger.signing.debug.resolved_passphrase_cli_flag"))
 		return flagPass
 	}
 
 	// Priority 2: Format-specific env var (e.g., YAP_DEB_PASSPHRASE)
 	envKey := fmt.Sprintf("YAP_%s_PASSPHRASE", strings.ToUpper(string(format)))
 	if envVal := os.Getenv(envKey); envVal != "" {
-		logger.Debug("Resolved passphrase from format-specific env var",
-			"env_var", envKey)
+		logger.Debug(i18n.T("logger.signing.debug.resolved_passphrase_format_specific"), "env_var", envKey)
 
 		return envVal
 	}
 
 	// Priority 3: Global env var (YAP_SIGN_PASSPHRASE)
 	if envVal := os.Getenv("YAP_SIGN_PASSPHRASE"); envVal != "" {
-		logger.Debug("Resolved passphrase from global env var",
-			"env_var", "YAP_SIGN_PASSPHRASE")
+		logger.Debug(i18n.T("logger.signing.debug.resolved_passphrase_global_env"), "env_var", "YAP_SIGN_PASSPHRASE")
 
 		return envVal
 	}
 
 	// Priority 4: Project config
 	if configPass != "" {
-		logger.Debug("Resolved passphrase from project config")
+		logger.Debug(i18n.T("logger.signing.debug.resolved_passphrase_project_config"))
 		return configPass
 	}
 
@@ -297,7 +289,7 @@ func resolvePassphrase(format Format, flagPass, configPass string) string {
 func findDefaultKey(format Format) (string, bool) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		logger.Debug("Failed to get home directory", "error", err)
+		logger.Debug(i18n.T("logger.signing.debug.failed_get_home_directory"), "error", err)
 		return "", false
 	}
 
@@ -305,8 +297,7 @@ func findDefaultKey(format Format) (string, bool) {
 
 	// Check if keys directory exists
 	if _, err := os.Stat(keysDir); err != nil {
-		logger.Debug("Default keys directory not found",
-			"path", keysDir)
+		logger.Debug(i18n.T("logger.signing.debug.default_keys_directory_not"), "path", keysDir)
 
 		return "", false
 	}
@@ -318,8 +309,7 @@ func findDefaultKey(format Format) (string, bool) {
 	formatSpecificFile := filepath.Join(keysDir,
 		fmt.Sprintf("%s.%s", string(format), string(algo)))
 	if _, err := os.Stat(formatSpecificFile); err == nil {
-		logger.Debug("Found format-specific key file",
-			"path", formatSpecificFile)
+		logger.Debug(i18n.T("logger.signing.debug.found_format_specific_key"), "path", formatSpecificFile)
 
 		return formatSpecificFile, true
 	}
@@ -328,14 +318,12 @@ func findDefaultKey(format Format) (string, bool) {
 	defaultFile := filepath.Join(keysDir,
 		fmt.Sprintf("default.%s", string(algo)))
 	if _, err := os.Stat(defaultFile); err == nil {
-		logger.Debug("Found default key file",
-			"path", defaultFile)
+		logger.Debug(i18n.T("logger.signing.debug.found_default_key_file"), "path", defaultFile)
 
 		return defaultFile, true
 	}
 
-	logger.Debug("No default key found for format",
-		"format", string(format), "keys_dir", keysDir)
+	logger.Debug(i18n.T("logger.signing.debug.no_default_key_found_format"), "format", string(format), "keys_dir", keysDir)
 
 	return "", false
 }

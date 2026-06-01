@@ -13,6 +13,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/yapdb"
 )
@@ -61,7 +62,7 @@ func downloadAndInstall(
 		rpmPaths[pkg.Name] = path
 		mu.Unlock()
 
-		logger.Debug("downloaded RPM", "package", pkg.Name, "path", path)
+		logger.Debug(i18n.T("logger.dnfinstall.debug.downloaded_rpm"), "package", pkg.Name, "path", path)
 	}
 
 	// Install packages in dependency order.
@@ -151,7 +152,7 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 				WithContext("package", pkgName)
 		}
 
-		logger.Warn("pretrans scriptlet failed (continuing)",
+		logger.Warn(i18n.T("logger.dnfinstall.warn.pretrans_scriptlet_failed_continuing"),
 			"package", pkgName, "error", err.Error())
 	}
 
@@ -179,11 +180,12 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 				WithContext("package", pkgName)
 		}
 
-		logger.Warn("postin scriptlet failed (continuing)",
+		logger.Warn(i18n.T("logger.dnfinstall.warn.postin_scriptlet_failed_continuing"),
 			"package", pkgName, "error", err.Error())
 	}
 
-	logger.Info("installed RPM package", "path", filepath.Base(rpmPath), "files", len(entry.Files))
+	logger.Info(i18n.T("logger.dnfinstall.info.installed_rpm_package"),
+		"path", filepath.Base(rpmPath), "files", len(entry.Files))
 
 	// Write YAP state database (mandatory).
 	if err := writeYapdb(ctx, rpm, entry, rootDir); err != nil {
@@ -213,7 +215,7 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 				WithContext("package", pkgName)
 		}
 
-		logger.Warn("posttrans scriptlet failed (continuing)",
+		logger.Warn(i18n.T("logger.dnfinstall.warn.posttrans_scriptlet_failed_continuing"),
 			"package", pkgName, "error", err.Error())
 	}
 

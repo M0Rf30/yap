@@ -136,7 +136,7 @@ func isI18nTCall(callExpr *ast.CallExpr) bool {
 
 // readExistingMessages reads the existing English locale file.
 func readExistingMessages() ([]Message, error) {
-	data, err := os.ReadFile("en.yaml")
+	data, err := os.ReadFile("pkg/i18n/locales/en.yaml")
 	if err != nil {
 		// If the file doesn't exist, return empty slice
 		if os.IsNotExist(err) {

@@ -14,6 +14,7 @@ import (
 	"github.com/rootless-containers/rootlesskit/v2/pkg/parent"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -129,11 +130,11 @@ func RunInRootless(distro, workDir string, args []string) error {
 
 	defer func() {
 		if err := os.RemoveAll(stateDir); err != nil {
-			logger.Warn("failed to remove rootlesskit state dir", "error", err)
+			logger.Warn(i18n.T("logger.rootless.warn.failed_remove_rootlesskit_state"), "error", err)
 		}
 	}()
 
-	logger.Info("starting rootless container", "distro", distro, "rootfs", rootfs)
+	logger.Info(i18n.T("logger.rootless.info.starting_rootless_container"), "distro", distro, "rootfs", rootfs)
 
 	// Set env vars that the re-executed child will read.
 	for k, v := range map[string]string{
@@ -178,7 +179,7 @@ func execInRootfs(rootfs, workDir string, args []string) error {
 		dest := filepath.Join(rootfs, dir)
 
 		if err := bindMount("/"+dir, dest); err != nil {
-			logger.Warn("bind mount failed", "dir", dir, "error", err)
+			logger.Warn(i18n.T("logger.rootless.warn.bind_mount_failed"), "dir", dir, "error", err)
 		}
 	}
 
@@ -236,7 +237,7 @@ func pivotOrChroot(newRoot string) error {
 
 	if err := syscall.PivotRoot(newRoot, putOld); err == nil {
 		if err := syscall.Unmount("/.put_old", syscall.MNT_DETACH); err != nil {
-			logger.Warn("failed to unmount old root", "error", err)
+			logger.Warn(i18n.T("logger.rootless.warn.failed_unmount_old_root"), "error", err)
 		}
 
 		_ = os.Remove("/.put_old")
@@ -283,7 +284,7 @@ func setupResolvConf(rootfs string) {
 	}
 
 	if err := syscall.Mount(hostResolv, dst, "", syscall.MS_BIND, ""); err != nil {
-		logger.Warn("failed to bind mount resolv.conf", "error", err)
+		logger.Warn(i18n.T("logger.rootless.warn.failed_bind_mount_resolv"), "error", err)
 	}
 }
 

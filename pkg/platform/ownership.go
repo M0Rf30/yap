@@ -91,7 +91,7 @@ func (ou *OriginalUser) ChownToOriginalUser(path string) error {
 			WithContext("user", ou.Name)
 	}
 
-	logger.Debug(i18n.T("logger.chowntooriginaluser.debug.changed_ownership_to_original_1"),
+	logger.Debug(i18n.T("logger.platform.debug.changed_ownership_to_original"),
 		"path", path,
 		"user", ou.Name,
 		"uid", ou.UID,
@@ -122,7 +122,7 @@ func (ou *OriginalUser) ChownRecursiveToOriginalUser(path string) error {
 
 		err = syscall.Chown(walkPath, ou.UID, ou.GID)
 		if err != nil {
-			logger.Warn(i18n.T("logger.chownrecursivetooriginaluser.warn.failed_to_chown_file_1"),
+			logger.Warn(i18n.T("logger.platform.warn.failed_to_chown_file"),
 				"path", walkPath,
 				"user", ou.Name,
 				"error", err)
@@ -138,12 +138,12 @@ func (ou *OriginalUser) ChownRecursiveToOriginalUser(path string) error {
 func PreserveOwnership(path string) error {
 	originalUser, err := GetOriginalUser()
 	if err != nil {
-		logger.Warn(i18n.T("logger.preserveownership.warn.failed_to_get_original_1"), "error", err)
+		logger.Warn(i18n.T("logger.common.warn.failed_to_get_original"), "error", err)
 		return nil // Don't fail the operation
 	}
 
 	if originalUser != nil {
-		logger.Info(i18n.T("logger.preserveownership.info.preserving_ownership_for_original_1"),
+		logger.Info(i18n.T("logger.platform.info.preserving_ownership_for_original"),
 			"path", path,
 
 			"user", originalUser.Name)
@@ -164,8 +164,7 @@ func PreserveOwnership(path string) error {
 // k3s/Fedora CoreOS Jenkins pods).
 func PreserveOwnershipRecursive(path string) error {
 	if os.Getenv("YAP_IN_CONTAINER") == "1" {
-		logger.Debug("skipping recursive ownership preservation in container",
-			"path", path)
+		logger.Debug(i18n.T("logger.platform.debug.skipping_recursive_ownership_preservation"), "path", path)
 
 		return nil
 	}

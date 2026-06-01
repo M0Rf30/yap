@@ -58,7 +58,7 @@ func ZipMan(packageDir string) error {
 
 // gzipFile compresses a single file in-place, replacing it with a .gz version.
 func gzipFile(path string) error {
-	logger.Debug("compressing man page", "path", path)
+	logger.Debug(i18n.T("logger.options.debug.compressing_man_page"), "path", path)
 
 	in, err := os.Open(path) //nolint:gosec
 	if err != nil {

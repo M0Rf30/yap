@@ -29,6 +29,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
@@ -133,7 +134,7 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 		RefreshLDCache()
 	}
 
-	logger.Info("installation complete", "count", len(pkgs))
+	logger.Info(i18n.T("logger.aptinstall.info.installation_complete"), "count", len(pkgs))
 
 	return nil
 }
@@ -197,8 +198,7 @@ func resolveAndPrepare(
 		totalBytes += p.Size
 	}
 
-	logger.Info("aptinstall: resolved dependencies",
-		"seeds", len(names),
+	logger.Info(i18n.T("logger.aptinstall.info.resolved_dependencies"), "seeds", len(names),
 		"to_install", len(pkgs),
 		"total_bytes", totalBytes)
 
@@ -224,7 +224,7 @@ func resolveAndPrepare(
 			WithOperation("Install")
 	}
 
-	logger.Info("downloaded packages", "count", len(pkgs))
+	logger.Info(i18n.T("logger.aptinstall.info.downloaded_packages"), "count", len(pkgs))
 
 	debMetadata = make(map[string]*debContents, len(pkgs))
 
@@ -296,7 +296,7 @@ func installPackage(
 	pkgName := pkg.Name
 	arch := pkg.Architecture
 
-	logger.Debug("installing", "package", pkgName, "arch", arch)
+	logger.Debug(i18n.T("logger.aptinstall.debug.installing"), "package", pkgName, "arch", arch)
 
 	oldVersion := currentInstalledVersion(pkg)
 
@@ -363,8 +363,7 @@ func installPackage(
 	finalState := "install ok installed"
 
 	if postinstErr != nil {
-		logger.Warn("postinst failed; leaving package unpacked but not configured",
-			"package", pkgName,
+		logger.Warn(i18n.T("logger.aptinstall.warn.postinst_failed_leaving_package"), "package", pkgName,
 			"arch", arch,
 			"error", postinstErr,
 			"hint", "run `dpkg --configure -a` after install to retry")
@@ -379,9 +378,9 @@ func installPackage(
 	}
 
 	if postinstErr == nil {
-		logger.Info("installed", "package", pkgName, "arch", arch)
+		logger.Info(i18n.T("logger.aptinstall.info.installed"), "package", pkgName, "arch", arch)
 	} else {
-		logger.Info("installed (unconfigured)", "package", pkgName, "arch", arch)
+		logger.Info(i18n.T("logger.aptinstall.info.installed_unconfigured"), "package", pkgName, "arch", arch)
 	}
 
 	return nil
@@ -460,8 +459,7 @@ func filterForeignArchPackages(pkgs []*aptcache.PackageInfo) []*aptcache.Package
 			continue
 		}
 
-		logger.Debug("aptinstall: skipping foreign-arch non-multiarch package",
-			"package", p.Name,
+		logger.Debug(i18n.T("logger.aptinstall.debug.skipping_foreign_arch_non"), "package", p.Name,
 			"arch", arch,
 			"multi_arch", p.MultiArch,
 			"host_arch", hostArch)
@@ -475,7 +473,7 @@ func filterForeignArchPackages(pkgs []*aptcache.PackageInfo) []*aptcache.Package
 func RefreshLDCache() {
 	bin, err := exec.LookPath("ldconfig")
 	if err != nil {
-		logger.Debug("ldconfig not found, skipping linker cache refresh")
+		logger.Debug(i18n.T("logger.aptinstall.debug.ldconfig_not_found_skipping"))
 
 		return
 	}
@@ -484,6 +482,6 @@ func RefreshLDCache() {
 	cmd := exec.Command(bin)
 
 	if err := cmd.Run(); err != nil {
-		logger.Warn("ldconfig failed", "error", err)
+		logger.Warn(i18n.T("logger.aptinstall.warn.ldconfig_failed"), "error", err)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -53,8 +54,7 @@ func Generate(pkg *pkgbuild.PKGBUILD, artifactPath string,
 			sbomPath = artifactPath + ".spdx.json"
 			sbomData = generateSPDX(pkg)
 		default:
-			logger.Warn("Unknown SBOM format",
-				"format", format)
+			logger.Warn(i18n.T("logger.sbom.warn.unknown_sbom_format"), "format", format)
 
 			continue
 		}
@@ -62,8 +62,7 @@ func Generate(pkg *pkgbuild.PKGBUILD, artifactPath string,
 		// Marshal to JSON
 		jsonData, err := json.MarshalIndent(sbomData, "", "  ")
 		if err != nil {
-			logger.Warn("Failed to marshal SBOM to JSON",
-				"format", format,
+			logger.Warn(i18n.T("logger.sbom.warn.failed_marshal_sbom_json"), "format", format,
 				"artifact", filepath.Base(artifactPath),
 				"error", err)
 
@@ -72,15 +71,13 @@ func Generate(pkg *pkgbuild.PKGBUILD, artifactPath string,
 
 		// Write to file
 		if err := os.WriteFile(sbomPath, jsonData, 0o644); err != nil { //nolint:gosec
-			logger.Warn("Failed to write SBOM file",
-				"path", sbomPath,
+			logger.Warn(i18n.T("logger.sbom.warn.failed_write_sbom_file"), "path", sbomPath,
 				"error", err)
 
 			continue
 		}
 
-		logger.Debug("Generated SBOM",
-			"format", format,
+		logger.Debug(i18n.T("logger.sbom.debug.generated_sbom"), "format", format,
 			"path", sbomPath)
 
 		generatedFiles = append(generatedFiles, sbomPath)

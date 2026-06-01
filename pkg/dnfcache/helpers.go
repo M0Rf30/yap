@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/rpmdb"
 )
@@ -131,7 +132,7 @@ func loadInstalledSet(ctx context.Context) map[string]bool {
 		return map[string]bool{}
 	}
 
-	logger.Debug("dnfcache: legacy BDB rpmdb, falling back to rpm -qa")
+	logger.Debug(i18n.T("logger.dnfcache.debug.legacy_bdb_rpmdb_falling"))
 
 	return loadInstalledSetSubprocess(ctx)
 }
@@ -189,7 +190,7 @@ func loadInstalledProvides(ctx context.Context) map[string]bool {
 		return map[string]bool{}
 	}
 
-	logger.Debug("dnfcache: legacy BDB rpmdb, falling back to rpm -qa")
+	logger.Debug(i18n.T("logger.dnfcache.debug.legacy_bdb_rpmdb_falling"))
 
 	return loadInstalledProvidesSubprocess(ctx)
 }

@@ -14,6 +14,7 @@ import (
 
 	apperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -54,8 +55,7 @@ func Update(ctx context.Context) (*Index, error) {
 			WithOperation("Update")
 	}
 
-	logger.Info("apkindex: updating indexes",
-		"repos", len(repos),
+	logger.Info(i18n.T("logger.apkindex.info.updating_indexes"), "repos", len(repos),
 		"arch", arch)
 
 	idx := NewIndex()
@@ -65,12 +65,11 @@ func Update(ctx context.Context) (*Index, error) {
 		indexURL := repo.URL + "/" + arch + "/APKINDEX.tar.gz"
 		cachePath := filepath.Join(apkCacheDir, "APKINDEX."+sha1Hex(indexURL)+".tar.gz")
 
-		logger.Debug("apkindex: fetching repo", "url", repo.URL, "arch", arch)
+		logger.Debug(i18n.T("logger.apkindex.debug.fetching_repo"), "url", repo.URL, "arch", arch)
 
 		if err := downloadFile(ctx, indexURL, cachePath, maxAPKIndexBytes); err != nil {
 			// Log warning and continue with other repos.
-			logger.Warn("apkindex: fetch failed",
-				"url", indexURL, "error", err)
+			logger.Warn(i18n.T("logger.apkindex.warn.fetch_failed"), "url", indexURL, "error", err)
 
 			continue
 		}
@@ -81,21 +80,18 @@ func Update(ctx context.Context) (*Index, error) {
 		}
 
 		if err := loadIndexTarball(idx, cachePath, repo.URL); err != nil {
-			logger.Warn("apkindex: parse failed",
-				"path", cachePath, "error", err)
+			logger.Warn(i18n.T("logger.apkindex.warn.parse_failed"), "path", cachePath, "error", err)
 
 			continue
 		}
 
-		logger.Info("apkindex: repo fetched",
-			"url", repo.URL, "bytes", sizeBytes)
+		logger.Info(i18n.T("logger.apkindex.info.repo_fetched"), "url", repo.URL, "bytes", sizeBytes)
 
 		succeeded++
 	}
 
 	pkgs, caps := idx.Stats()
-	logger.Info("apkindex: indexes loaded",
-		"repos_succeeded", succeeded,
+	logger.Info(i18n.T("logger.apkindex.info.indexes_loaded"), "repos_succeeded", succeeded,
 		"repos_total", len(repos),
 		"packages", pkgs,
 		"capabilities", caps)

@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"github.com/M0Rf30/yap/v2/pkg/files"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
@@ -166,8 +167,7 @@ func SeparateDebugInfoWithEnv(binary, debugDir string, env map[string]string) (s
 
 	err = shell.Exec(ctx, false, "", objcopyCmd, "--add-gnu-debuglink="+debugFile, binary)
 	if err != nil {
-		logger.Warn("failed to add debuglink",
-			"binary", binary, "error", err)
+		logger.Warn(i18n.T("logger.binary.warn.failed_add_debuglink"), "binary", binary, "error", err)
 	}
 
 	return debugFile, nil
@@ -212,9 +212,7 @@ func stripWithEnv(path string, env map[string]string, args ...string) error {
 		// Strip is an optional optimization, not a correctness requirement,
 		// so we skip with a warning rather than break the build.
 		if isForeignArchELF(path) {
-			logger.Warn(
-				"skipping strip: binary is foreign-arch and no cross-strip configured",
-				"binary", path)
+			logger.Warn(i18n.T("logger.binary.warn.skipping_strip_binary_foreign"), "binary", path)
 
 			return nil
 		}
@@ -225,16 +223,13 @@ func stripWithEnv(path string, env map[string]string, args ...string) error {
 		if _, err := exec.LookPath(stripCmd); err != nil {
 			// Cross-strip configured but not installed. Same two cases as above.
 			if isForeignArchELF(path) {
-				logger.Warn(
-					"cross-strip not found and binary is foreign-arch; skipping strip",
-					"cross_strip", stripCmd,
+				logger.Warn(i18n.T("logger.binary.warn.cross_strip_not_found"), "cross_strip", stripCmd,
 					"binary", path)
 
 				return nil
 			}
 
-			logger.Warn("cross-strip not found in PATH, falling back to native strip",
-				"cross_strip", stripCmd)
+			logger.Warn(i18n.T("logger.binary.warn.cross_strip_not_found_path"), "cross_strip", stripCmd)
 
 			stripCmd = "strip"
 		}

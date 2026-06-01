@@ -48,7 +48,7 @@ func GenerateSVGGraph(graphData *graph.Data, outputPath string, showExternal boo
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Error(i18n.T("logger.generatesvggraph.error.failed_to_close_file_1"), "error", closeErr)
+			logger.Error(i18n.T("logger.render.error.failed_to_close_file"), "error", closeErr)
 		}
 	}()
 
@@ -73,7 +73,7 @@ func GenerateSVGGraph(graphData *graph.Data, outputPath string, showExternal boo
 			WithContext("path", outputPath)
 	}
 
-	logger.Info(i18n.T("logger.generatesvggraph.info.svg_graph_generated_successfully_1"),
+	logger.Info(i18n.T("logger.render.info.svg_graph_generated_successfully"),
 		"output", outputPath,
 		"nodes", len(graphData.Nodes),
 		"edges", len(graphData.Edges))
@@ -93,10 +93,10 @@ func GeneratePNGGraph(graphData *graph.Data, outputPath string, showExternal boo
 		return err
 	}
 
-	logger.Info(i18n.T("logger.generatepnggraph.info.svg_graph_generated_for_1"),
+	logger.Info(i18n.T("logger.render.info.svg_graph_generated_for"),
 		"svg_path", svgPath)
 
-	logger.Warn(i18n.T("logger.generatepnggraph.warn.png_conversion_requires_external_1"),
+	logger.Warn(i18n.T("logger.render.warn.png_conversion_requires_external"),
 		"suggestion", "Install Inkscape or ImageMagick to convert SVG to PNG",
 		"inkscape_command", "inkscape --export-type=png --export-filename="+outputPath+" "+svgPath,
 		"imagemagick_command", "convert "+svgPath+" "+outputPath,

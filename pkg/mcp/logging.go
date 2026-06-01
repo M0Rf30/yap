@@ -16,6 +16,7 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -28,8 +29,7 @@ func loggingMiddleware(direction string) mcpsdk.Middleware {
 		) (mcpsdk.Result, error) {
 			start := time.Now()
 
-			logger.Debug("mcp request",
-				"direction", direction,
+			logger.Debug(i18n.T("logger.mcp.debug.mcp_request"), "direction", direction,
 				"method", method,
 			)
 
@@ -37,8 +37,7 @@ func loggingMiddleware(direction string) mcpsdk.Middleware {
 
 			elapsed := time.Since(start)
 			if err != nil {
-				logger.Error("mcp request failed",
-					"direction", direction,
+				logger.Error(i18n.T("logger.mcp.error.mcp_request_failed"), "direction", direction,
 					"method", method,
 					"duration", elapsed,
 					"error", err,
@@ -47,8 +46,7 @@ func loggingMiddleware(direction string) mcpsdk.Middleware {
 				return res, err
 			}
 
-			logger.Info("mcp request done",
-				"direction", direction,
+			logger.Info(i18n.T("logger.mcp.info.mcp_request_done"), "direction", direction,
 				"method", method,
 				"duration", elapsed,
 			)

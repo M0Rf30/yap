@@ -368,7 +368,7 @@ func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFil
 
 	defer func() {
 		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.createtargz.warn.failed_to_close_output_1"),
+			logger.Warn(i18n.T("logger.apk.warn.failed_to_close_output"),
 				"path", cleanFilePath,
 				"error", closeErr)
 		}

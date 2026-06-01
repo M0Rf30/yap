@@ -6,6 +6,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
@@ -100,10 +101,10 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 
 	if len(unresolved) > 0 {
 		// Non-fatal: log and continue — installation will surface hard errors.
-		logger.Warn("some packages could not be resolved", "count", len(unresolved))
+		logger.Warn(i18n.T("logger.dnfinstall.warn.some_packages_could_not"), "count", len(unresolved))
 
 		for _, name := range unresolved {
-			logger.Debug("unresolved package", "name", name)
+			logger.Debug(i18n.T("logger.dnfinstall.debug.unresolved_package"), "name", name)
 		}
 	}
 
@@ -123,11 +124,11 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 			// A failed cache refresh should not abort an otherwise-successful
 			// install: log and continue, mirroring rpm's tolerance of a
 			// missing or non-fatal ldconfig.
-			logger.Warn("ldconfig refresh failed (continuing)", "error", err.Error())
+			logger.Warn(i18n.T("logger.dnfinstall.warn.ldconfig_refresh_failed_continuing"), "error", err.Error())
 		}
 	}
 
-	logger.Info("installation complete", "count", len(resolved))
+	logger.Info(i18n.T("logger.dnfinstall.info.installation_complete"), "count", len(resolved))
 
 	return nil
 }
@@ -153,7 +154,7 @@ func InstallFile(ctx context.Context, rpmPath string, opts Options) error {
 			WithContext("path", rpmPath)
 	}
 
-	logger.Info("installed RPM file", "path", rpmPath)
+	logger.Info(i18n.T("logger.dnfinstall.info.installed_rpm_file"), "path", rpmPath)
 
 	return nil
 }

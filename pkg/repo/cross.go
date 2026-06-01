@@ -13,6 +13,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -58,8 +59,7 @@ func SetupCrossAPT(opts CrossAptOptions) error {
 
 	portsURI := portsURIFor(distro)
 	if portsURI == "" {
-		logger.Info("repo: cross apt setup skipped (not a debian-like distro)",
-			"distro", distro)
+		logger.Info(i18n.T("logger.repo.info.cross_apt_setup_skipped"), "distro", distro)
 
 		return nil
 	}
@@ -167,8 +167,7 @@ func refreshCrossAptIndexes() error {
 		if n > 0 && aptrepo.IsVerificationError(err) {
 			// Some indexes succeeded (ports fetched) and the only failures
 			// are signature/trust issues on other repos — non-fatal.
-			logger.Warn("repo: cross apt update: some sources failed signature check (non-fatal)",
-				"indexes_ok", n, "error", err)
+			logger.Warn(i18n.T("logger.repo.warn.cross_apt_update_some"), "indexes_ok", n, "error", err)
 		} else {
 			return errors.Wrap(err, errors.ErrTypeBuild,
 				"repo: cross apt update via aptrepo").
@@ -176,7 +175,7 @@ func refreshCrossAptIndexes() error {
 		}
 	}
 
-	logger.Info("repo: cross apt indexes refreshed via aptrepo", "indexes", n)
+	logger.Info(i18n.T("logger.repo.info.cross_apt_indexes_refreshed"), "indexes", n)
 
 	return nil
 }
@@ -246,8 +245,7 @@ func writeCrossSource(r *Repo, targetDebArch, codename, distro, keyring string) 
 			WithContext("path", dst)
 	}
 
-	logger.Info("repo: installed cross-arch apt source",
-		"name", r.Name,
+	logger.Info(i18n.T("logger.repo.info.installed_cross_arch_apt"), "name", r.Name,
 		"arch", targetDebArch,
 		"suites", suites,
 		"path", dst)
@@ -363,7 +361,7 @@ func addDpkgArchitecture(arch string) error {
 	// Check if the arch is already registered.
 	for line := range strings.SplitSeq(string(data), "\n") {
 		if strings.TrimSpace(line) == arch {
-			logger.Info("repo: dpkg arch already registered", "arch", arch)
+			logger.Info(i18n.T("logger.repo.info.dpkg_arch_already_registered"), "arch", arch)
 
 			return nil
 		}
@@ -386,7 +384,7 @@ func addDpkgArchitecture(arch string) error {
 		return err
 	}
 
-	logger.Info("repo: registered dpkg architecture", "arch", arch)
+	logger.Info(i18n.T("logger.repo.info.registered_dpkg_architecture"), "arch", arch)
 
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -78,8 +79,7 @@ func DetectArch() string {
 	apkArch := constants.GetArchMapping().TranslateArch(constants.FormatAPK, normalized)
 
 	if apkArch == "" {
-		logger.Warn("could not detect APK architecture",
-			"goarch", runtime.GOARCH, "normalized", normalized)
+		logger.Warn(i18n.T("logger.apkindex.warn.could_not_detect_apk"), "goarch", runtime.GOARCH, "normalized", normalized)
 
 		return ""
 	}

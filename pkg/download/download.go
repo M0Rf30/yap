@@ -45,7 +45,7 @@ func Download(destination, uri string, writer io.Writer) error {
 	}
 
 	// start download
-	logger.Info("downloading", "url", req.URL())
+	logger.Info(i18n.T("logger.download.info.downloading"), "url", req.URL())
 	logger.Info(i18n.T("logger.download.info.response_status"), "status", resp.HTTPResponse.Status)
 
 	// Create enhanced progress bar using the progress helper
@@ -72,7 +72,7 @@ func WithResume(ctx context.Context, destination, uri string, maxRetries int, wr
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			logger.Info(i18n.T("logger.withresume.info.retrying_download_1"),
+			logger.Info(i18n.T("logger.download.info.retrying_download"),
 				"attempt", attempt+1,
 				"max_retries", maxRetries+1,
 				"url", uri)
@@ -126,7 +126,7 @@ func WithResumeContext(
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			logger.Info(i18n.T("logger.withresumecontext.info.retrying_download_1"),
+			logger.Info(i18n.T("logger.download.info.retrying_download_2"),
 				"attempt", attempt+1,
 				"max_retries", maxRetries+1,
 				"url", uri)
@@ -207,7 +207,7 @@ func configureResumeIfPossible(req *grab.Request, destination, uri string) {
 	if err == nil && info.Size() > 0 {
 		req.NoResume = false // Enable resume
 
-		logger.Info(i18n.T("logger.configureresumeifpossible.info.resuming_download_1"),
+		logger.Info(i18n.T("logger.download.info.resuming_download"),
 			"url", uri,
 			"existing_size", formatBytes(info.Size()))
 	}
@@ -216,11 +216,11 @@ func configureResumeIfPossible(req *grab.Request, destination, uri string) {
 // logDownloadStart logs the initial download information.
 func logDownloadStart(uri string, resp *grab.Response) {
 	if resp.CanResume {
-		logger.Info(i18n.T("logger.logdownloadstart.info.server_supports_resume_1"), "url", uri)
+		logger.Info(i18n.T("logger.download.info.server_supports_resume"), "url", uri)
 	}
 
-	logger.Info("downloading", "url", resp.Request.URL())
-	logger.Info(i18n.T("logger.logdownloadstart.info.response_status"), "status", resp.HTTPResponse.Status)
+	logger.Info(i18n.T("logger.download.info.downloading"), "url", resp.Request.URL())
+	logger.Info(i18n.T("logger.download.info.response_status_2"), "status", resp.HTTPResponse.Status)
 }
 
 // createProgressBar creates an enhanced progress bar if the response size is known.
@@ -286,7 +286,7 @@ func monitorDownload(
 				return resp.Err()
 			}
 
-			logger.Info(i18n.T("logger.monitordownload.info.download_completed_1"), "path", destination)
+			logger.Info(i18n.T("logger.download.info.download_completed"), "path", destination)
 
 			return nil
 

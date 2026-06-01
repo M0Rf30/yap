@@ -21,9 +21,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/M0Rf30/yap/v2/pkg/logger"
-
 	rpmutils "github.com/sassoftware/go-rpmutils"
+
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // evrString builds an "epoch:version-release" string for rpmutils.Vercmp.
@@ -213,8 +214,7 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	logger.Debug("dnfcache: resolver state loaded",
-		"installed_packages", len(installed),
+	logger.Debug(i18n.T("logger.dnfcache.debug.resolver_state_loaded"), "installed_packages", len(installed),
 		"installed_capabilities", len(provides),
 		"index_packages", len(c.packages),
 		"index_capabilities", len(c.providers))
@@ -254,7 +254,7 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 		// any alternative provider. Prevents conflicts like coreutils vs
 		// coreutils-single where both own /usr/bin/ls.
 		if installed[name] || provides[name] {
-			logger.Debug("dnfcache: skip (already satisfied)", "package", name)
+			logger.Debug(i18n.T("logger.dnfcache.debug.skip_already_satisfied"), "package", name)
 
 			skippedInstalled++
 
@@ -266,8 +266,7 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 			// Try virtual/capability resolution.
 			if providers, ok2 := c.providers[name]; ok2 && len(providers) > 0 {
 				chosen := pickProvider(providers)
-				logger.Debug("dnfcache: resolved virtual",
-					"capability", name,
+				logger.Debug(i18n.T("logger.dnfcache.debug.resolved_virtual"), "capability", name,
 					"provider", chosen.Name,
 					"arch", chosen.Arch)
 
@@ -279,11 +278,11 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 			}
 
 			if soft {
-				logger.Debug("dnfcache: unresolved (weak, ignored)", "package", name)
+				logger.Debug(i18n.T("logger.dnfcache.debug.unresolved_weak_ignored"), "package", name)
 				return
 			}
 
-			logger.Debug("dnfcache: unresolved", "package", name)
+			logger.Debug(i18n.T("logger.dnfcache.debug.unresolved"), "package", name)
 			unres = append(unres, name)
 
 			return
@@ -299,8 +298,7 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 			visit(rec, true)
 		}
 
-		logger.Debug("dnfcache: enqueue install",
-			"package", info.Name,
+		logger.Debug(i18n.T("logger.dnfcache.debug.enqueue_install"), "package", info.Name,
 			"version", info.Version,
 			"size", info.Size)
 		order = append(order, info)
@@ -310,8 +308,7 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 		visit(StripRPMConstraint(seed), false)
 	}
 
-	logger.Info("dnfcache: resolved transitive deps",
-		"seeds", len(seeds),
+	logger.Info(i18n.T("logger.dnfcache.info.resolved_transitive_deps"), "seeds", len(seeds),
 		"to_install", len(order),
 		"skipped_installed", skippedInstalled,
 		"via_virtual", resolvedViaVirtual,

@@ -26,6 +26,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/download"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
@@ -117,7 +118,7 @@ func UpdateChecksums(pkgbuildDir string) error {
 	// Extract all source blocks keyed by arch suffix ("" for base, "_x86_64", …).
 	sourceBlocks := extractArrayBlocks(content, sourceArrayRe)
 	if len(sourceBlocks) == 0 {
-		logger.Info("gensum: no source arrays found, nothing to do")
+		logger.Info(i18n.T("logger.gensum.info.no_source_arrays_found"))
 
 		return nil
 	}
@@ -156,13 +157,12 @@ func UpdateChecksums(pkgbuildDir string) error {
 
 		changed = true
 
-		logger.Info("gensum: updated checksums",
-			"field", checksumKey,
+		logger.Info(i18n.T("logger.gensum.info.updated_checksums"), "field", checksumKey,
 			"count", len(newHashes))
 	}
 
 	if !changed {
-		logger.Info("gensum: nothing changed")
+		logger.Info(i18n.T("logger.gensum.info.nothing_changed"))
 
 		return nil
 	}
@@ -275,7 +275,7 @@ func computeHashes(uris []string, tmpDir, pkgbuildDir string, expandVar func(str
 			strings.HasPrefix(uri, "bzr+") {
 			hashes[i] = "SKIP"
 
-			logger.Info("gensum: skipping VCS source", "uri", rawURI)
+			logger.Info(i18n.T("logger.gensum.info.skipping_vcs_source"), "uri", rawURI)
 
 			continue
 		}
@@ -285,8 +285,7 @@ func computeHashes(uris []string, tmpDir, pkgbuildDir string, expandVar func(str
 			return nil, err
 		}
 
-		logger.Info("gensum: hashed source",
-			"file", filepath.Base(uri),
+		logger.Info(i18n.T("logger.gensum.info.hashed_source"), "file", filepath.Base(uri),
 			"sha256", h[:16]+"…")
 
 		hashes[i] = h

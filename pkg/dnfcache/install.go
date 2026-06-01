@@ -13,6 +13,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -32,8 +33,7 @@ func (c *Cache) downloadAndInstall(ctx context.Context, pkgs []*PackageInfo) err
 		totalBytes += p.Size
 	}
 
-	logger.Info("dnfcache: downloading packages",
-		"count", len(pkgs),
+	logger.Info(i18n.T("logger.dnfcache.info.downloading_packages"), "count", len(pkgs),
 		"total_bytes", totalBytes)
 
 	paths, err := c.downloadAll(ctx, pkgs, tmpDir)
@@ -174,7 +174,7 @@ func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string,
 		}
 	}
 
-	logger.Debug("dnfcache: downloaded RPM", "package", pkg.Name, "dest", dest)
+	logger.Debug(i18n.T("logger.dnfcache.debug.downloaded_rpm"), "package", pkg.Name, "dest", dest)
 
 	return dest, nil
 }
@@ -192,7 +192,7 @@ func rpmInstall(ctx context.Context, paths []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	logger.Info("dnfcache: installing RPM packages", "count", len(paths))
+	logger.Info(i18n.T("logger.dnfcache.info.installing_rpm_packages"), "count", len(paths))
 
 	if err := cmd.Run(); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "failed to install RPM packages").
@@ -206,6 +206,6 @@ func rpmInstall(ctx context.Context, paths []string) error {
 // resolved in the index.
 func logUnresolved(names []string) {
 	for _, name := range names {
-		logger.Warn("dnfcache: unresolvable dependency", "package", name)
+		logger.Warn(i18n.T("logger.dnfcache.warn.unresolvable_dependency"), "package", name)
 	}
 }

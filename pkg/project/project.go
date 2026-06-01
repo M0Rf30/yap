@@ -268,7 +268,7 @@ func (mpc *MultipleProject) filterSkipDeps(deps []string) []string {
 
 	for _, d := range deps {
 		if _, excluded := skip[d]; excluded {
-			logger.Info("skipping dependency", "package", d)
+			logger.Info(i18n.T("logger.project.info.skipping_dependency"), "package", d)
 		} else {
 			filtered = append(filtered, d)
 		}
@@ -452,7 +452,7 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 	// Preserve ownership of the output directory so consumers running as the
 	// invoking user (e.g. CI agents) can traverse it after a sudo build.
 	if err := platform.PreserveOwnership(mpc.Output); err != nil {
-		logger.Warn(i18n.T("logger.preserveownership.warn.failed_to_get_original_1"),
+		logger.Warn(i18n.T("logger.common.warn.failed_to_get_original"),
 			"path", mpc.Output,
 			"error", err)
 	}
@@ -469,7 +469,7 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 		}
 
 		if err := platform.PreserveOwnership(absDebugDir); err != nil {
-			logger.Warn(i18n.T("logger.preserveownership.warn.failed_to_get_original_1"),
+			logger.Warn(i18n.T("logger.common.warn.failed_to_get_original"),
 				"path", absDebugDir,
 				"error", err)
 		}
@@ -536,8 +536,7 @@ func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
 
 		if funcBody, ok := proj.Builder.PKGBUILD.SplitPackageFuncs[subName]; ok {
 			if err := proj.Builder.PKGBUILD.ParseSplitOverrides(funcBody); err != nil {
-				logger.Warn("failed to parse split-package overrides for packaging",
-					"subpackage", subName, "error", err)
+				logger.Warn(i18n.T("logger.project.warn.failed_parse_split_package"), "subpackage", subName, "error", err)
 			}
 		}
 
@@ -650,10 +649,9 @@ func (mpc *MultipleProject) getRuntimeDeps() []string {
 				internalPackages[name] = true
 			case mpc.localArtifactExists(name):
 				internalPackages[name] = true
-				logger.Debug("treating filtered package as internal (local artifact found)",
-					"package", name, "output", mpc.Output)
+				logger.Debug(i18n.T("logger.project.debug.treating_filtered_package_as"), "package", name, "output", mpc.Output)
 			default:
-				logger.Debug("treating filtered package as external (no local artifact)",
+				logger.Debug(i18n.T("logger.project.debug.treating_filtered_package_as_external"),
 					"package", name, "output", mpc.Output)
 			}
 		}

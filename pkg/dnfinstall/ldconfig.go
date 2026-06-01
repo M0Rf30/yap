@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -35,7 +36,7 @@ var ldconfigCandidates = []string{
 func runLDConfig(ctx context.Context, rootDir string) error {
 	bin := findLDConfig(rootDir)
 	if bin == "" {
-		logger.Debug("ldconfig not found; skipping ld.so.cache refresh", "rootDir", rootDir)
+		logger.Debug(i18n.T("logger.dnfinstall.debug.ldconfig_not_found_skipping"), "rootDir", rootDir)
 
 		return nil
 	}
@@ -50,7 +51,7 @@ func runLDConfig(ctx context.Context, rootDir string) error {
 		if os.Getuid() != 0 {
 			// Non-root inside a build container: a chroot is not possible and
 			// running host ldconfig against a sandbox root is meaningless.
-			logger.Debug("skipping ldconfig, not running as root", "rootDir", rootDir)
+			logger.Debug(i18n.T("logger.dnfinstall.debug.skipping_ldconfig_not_running"), "rootDir", rootDir)
 
 			return nil
 		}
@@ -66,8 +67,7 @@ func runLDConfig(ctx context.Context, rootDir string) error {
 
 	if err := cmd.Run(); err != nil {
 		if stderr.Len() > 0 {
-			logger.Warn("ldconfig stderr",
-				"output", strings.TrimRight(stderr.String(), "\n"))
+			logger.Warn(i18n.T("logger.dnfinstall.warn.ldconfig_stderr"), "output", strings.TrimRight(stderr.String(), "\n"))
 		}
 
 		return errors.Wrap(err, errors.ErrTypeBuild, "ldconfig failed").
@@ -76,7 +76,7 @@ func runLDConfig(ctx context.Context, rootDir string) error {
 			WithContext("rootDir", rootDir)
 	}
 
-	logger.Debug("refreshed ld.so.cache", "binary", bin, "rootDir", rootDir)
+	logger.Debug(i18n.T("logger.dnfinstall.debug.refreshed_ld_so_cache"), "binary", bin, "rootDir", rootDir)
 
 	return nil
 }

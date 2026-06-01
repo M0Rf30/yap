@@ -12,6 +12,7 @@ import (
 	rpmutils "github.com/sassoftware/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -216,16 +217,14 @@ func runScriptlet(
 	// so also heuristically detect Lua syntax in the body when the
 	// declared interpreter is the default /bin/sh fallback.
 	if interpreter == "<lua>" || strings.HasPrefix(interpreter, "<lua>") || looksLikeLua(body) {
-		logger.Warn("skipping Lua scriptlet",
-			"kind", tags.kindName,
+		logger.Warn(i18n.T("logger.dnfinstall.warn.skipping_lua_scriptlet"), "kind", tags.kindName,
 			"package", pkgName,
 			"interpreter", interpreter)
 
 		return nil
 	}
 
-	logger.Debug("running RPM scriptlet",
-		"package", pkgName,
+	logger.Debug(i18n.T("logger.dnfinstall.debug.running_rpm_scriptlet"), "package", pkgName,
 		"kind", tags.kindName,
 		"interpreter", interpreter)
 
@@ -271,8 +270,7 @@ func runScriptlet(
 			cmd.Dir = "/"
 		} else {
 			// Not root: log debug and run anyway (container build scenario).
-			logger.Debug("skipping chroot, not running as root",
-				"kind", tags.kindName,
+			logger.Debug(i18n.T("logger.dnfinstall.debug.skipping_chroot_not_running"), "kind", tags.kindName,
 				"package", pkgName,
 				"rootDir", rootDir)
 			cmd.Dir = rootDir
@@ -290,8 +288,7 @@ func runScriptlet(
 
 	// Log output.
 	if stdout.Len() > 0 {
-		logger.Debug("scriptlet stdout",
-			"kind", tags.kindName,
+		logger.Debug(i18n.T("logger.dnfinstall.debug.scriptlet_stdout"), "kind", tags.kindName,
 			"package", pkgName,
 			"output", strings.TrimRight(stdout.String(), "\n"))
 	}

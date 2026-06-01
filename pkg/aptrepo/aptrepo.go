@@ -22,6 +22,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -95,8 +96,7 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		return 0, err
 	}
 
-	logger.Info("aptrepo: updating indexes",
-		"sources", len(sources),
+	logger.Info(i18n.T("logger.aptrepo.info.updating_indexes"), "sources", len(sources),
 		"allow_unverified", opts.AllowUnverifiedRepos)
 
 	// Flatten (source, arch) into a single job list so all combinations run
@@ -159,8 +159,7 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 			defer wg.Done()
 
 			for j := range jobCh {
-				logger.Debug("aptrepo: fetching source",
-					"url", j.src.URL,
+				logger.Debug(i18n.T("logger.aptrepo.debug.fetching_source"), "url", j.src.URL,
 					"suite", j.src.Suite,
 					"components", j.src.Components,
 					"arch", j.arch)
@@ -183,14 +182,14 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		succeeded64 += int64(res.n)
 
 		if res.err != nil {
-			logger.Warn("aptrepo: source fetch failed",
+			logger.Warn(i18n.T("logger.aptrepo.warn.source_fetch_failed"),
 				"url", res.src.URL, "suite", res.src.Suite, "arch", res.arch, "error", res.err)
 
 			if firstErr == nil {
 				firstErr = res.err
 			}
 		} else {
-			logger.Info("aptrepo: source fetched",
+			logger.Info(i18n.T("logger.aptrepo.info.source_fetched"),
 				"url", res.src.URL, "suite", res.src.Suite, "arch", res.arch, "components", res.n)
 		}
 	}
@@ -205,8 +204,7 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		aptcache.Reload()
 
 		c := aptcache.Load()
-		logger.Info("aptrepo: cache reloaded",
-			"packages", c.PackageCount(),
+		logger.Info(i18n.T("logger.aptrepo.info.cache_reloaded"), "packages", c.PackageCount(),
 			"capabilities", c.CapabilityCount())
 	}
 
@@ -278,7 +276,7 @@ func updateSource(ctx context.Context, src *aptcache.SourceEntry, arch string, o
 
 	for res := range resCh {
 		if res.err != nil {
-			logger.Warn("apt component fetch failed",
+			logger.Warn(i18n.T("logger.aptrepo.warn.apt_component_fetch_failed"),
 				"url", src.URL, "component", res.comp, "arch", arch, "error", res.err)
 
 			continue

@@ -81,9 +81,10 @@ func runGraphCommand(cmd *cobra.Command, args []string) error {
 			WithContext("projectPath", projectPath)
 	}
 
-	logger.Info(i18n.T("logger.rungraphcommand.info.generating_dependency_graph_1"),
+	logger.Info(i18n.T("logger.command.info.generating_dependency_graph"),
 		"project", absPath)
-	logger.Debug("graph options", "output", graphOutput, "format", graphFormat, "theme", graphTheme)
+	logger.Debug(i18n.T("logger.command.debug.graph_options"),
+		"output", graphOutput, "format", graphFormat, "theme", graphTheme)
 
 	// Load project configuration only
 	graphData, err := loader.LoadProjectForGraph(absPath, graphTheme)

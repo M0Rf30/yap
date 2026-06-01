@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/M0Rf30/yap/v2/pkg/container/internal/runtimetype"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -63,7 +64,7 @@ func (r *Runtime) RunShell(distro, workDir, shellCmd string) error {
 func (r *Runtime) RunShellCapture(_ context.Context, distro, workDir, shellCmd string,
 	env map[string]string, _ io.Writer,
 ) error {
-	logger.Warn("rootless runtime does not support output capture; output goes to host stderr")
+	logger.Warn(i18n.T("logger.rootless.warn.rootless_runtime_does_not"))
 
 	restore := setEnvOnce(env)
 	defer restore()
@@ -98,7 +99,7 @@ func setEnvOnce(env map[string]string) func() {
 		prevs[k] = prev{val: v, isSet: ok}
 
 		if err := os.Setenv(k, env[k]); err != nil {
-			logger.Warn("rootless: setenv failed", "key", k, "error", err)
+			logger.Warn(i18n.T("logger.rootless.warn.setenv_failed"), "key", k, "error", err)
 		}
 	}
 
@@ -112,7 +113,7 @@ func setEnvOnce(env map[string]string) func() {
 			}
 
 			if err != nil {
-				logger.Warn("rootless: restore env failed", "key", k, "error", err)
+				logger.Warn(i18n.T("logger.rootless.warn.restore_env_failed"), "key", k, "error", err)
 			}
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -45,8 +46,7 @@ func setupRPM(r *Repo) error {
 		// when the key is not in the RPM DB. Log a warning on failure rather
 		// than aborting the build.
 		if err := exec.CommandContext(ctx, "rpm", "--import", gpgKey).Run(); err != nil {
-			logger.Warn("repo: rpm --import failed (non-fatal; dnf will still verify via gpgkey= in .repo)",
-				"repo", r.Name,
+			logger.Warn(i18n.T("logger.repo.warn.rpm_import_failed_non"), "repo", r.Name,
 				"key", gpgKey,
 				"error", err)
 		}
@@ -76,8 +76,7 @@ func setupRPM(r *Repo) error {
 			WithContext("path", dst)
 	}
 
-	logger.Info("repo: installed yum repo",
-		"name", r.Name,
+	logger.Info(i18n.T("logger.repo.info.installed_yum_repo"), "name", r.Name,
 		"path", dst,
 		"gpgcheck", r.GPGCheck)
 

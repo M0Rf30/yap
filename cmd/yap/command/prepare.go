@@ -106,10 +106,10 @@ var (
 				return
 			}
 
-			logger.Info(i18n.T("logger.unknown.info.basic_build_environment_successfully_1"))
+			logger.Info(i18n.T("logger.command.info.basic_build_environment_successfully"))
 
 			if GoLang {
-				logger.Info(i18n.T("logger.unknown.info.go_successfully_installed_1"))
+				logger.Info(i18n.T("logger.command.info.go_successfully_installed"))
 			}
 		},
 	}

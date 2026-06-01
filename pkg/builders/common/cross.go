@@ -414,8 +414,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 		// RPM/APK/Pacman don't have a multiarch install story like dpkg, so we
 		// don't do the download+extract dance — we just let the native package
 		// manager install the deps as if it were a host build.
-		logger.Info("cross-build deps: using native install (no closure extract)",
-			"format", bb.Format,
+		logger.Info(i18n.T("logger.common.info.cross_build_deps_using"), "format", bb.Format,
 			"target_arch", targetArch,
 			"deps", len(deps))
 
@@ -444,14 +443,12 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 	seeds = append(seeds, qualified...)
 
 	if len(seeds) == 0 {
-		logger.Info("cross-build deps: no runtime deps to fetch",
-			"target_arch", targetArch)
+		logger.Info(i18n.T("logger.common.info.cross_build_deps_no"), "target_arch", targetArch)
 
 		return nil
 	}
 
-	logger.Info("fetching cross-build runtime deps",
-		"target_arch", targetArch,
+	logger.Info(i18n.T("logger.common.info.fetching_cross_build_runtime"), "target_arch", targetArch,
 		"arch_specific_count", len(qualified),
 		"arch_all_count", len(archAll),
 		"arch_specific", strings.Join(qualified, ", "),
@@ -483,7 +480,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 		// resolved from a generic apt index but the link will still succeed
 		// because they live elsewhere on the system. Surface so a CI run can
 		// grep for them.
-		logger.Warn("unresolvable transitive cross-deps (continuing)",
+		logger.Warn(i18n.T("logger.common.warn.unresolvable_transitive_cross_deps"),
 			"packages", strings.Join(unresolved, ", "))
 	}
 
@@ -496,8 +493,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 		seedSet[strings.TrimSpace(name)] = true
 	}
 
-	logger.Info("resolved cross-deps closure",
-		"declared", len(seeds),
+	logger.Info(i18n.T("logger.common.info.resolved_cross_deps_closure"), "declared", len(seeds),
 		"closure", len(resolved),
 		"transitive", len(resolved)-countDirect(resolved, seedSet))
 
@@ -507,8 +503,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 	}
 
 	if skipped > 0 {
-		logger.Info("skipped host/transitive arch-all cross-deps",
-			"count", skipped,
+		logger.Info(i18n.T("logger.common.info.skipped_host_transitive_arch"), "count", skipped,
 			"target_arch", targetArch)
 	}
 
@@ -547,8 +542,7 @@ func extractCrossDepsToRoot(
 
 		isSeed := seedSet[info.Name]
 		if shouldSkipCrossDep(info, hostArch, isSeed, installedNames) {
-			logger.Debug("skipping host/transitive arch-all cross-dep",
-				"package", info.Name,
+			logger.Debug(i18n.T("logger.common.debug.skipping_host_transitive_arch"), "package", info.Name,
 				"arch", info.Architecture,
 				"seed", isSeed)
 
@@ -562,8 +556,7 @@ func extractCrossDepsToRoot(
 			origin = "transitive"
 		}
 
-		logger.Debug("extracting cross-build dep",
-			"package", info.Name,
+		logger.Debug(i18n.T("logger.common.debug.extracting_cross_build_dep"), "package", info.Name,
 			"arch", info.Architecture,
 			"origin", origin)
 
@@ -649,8 +642,7 @@ func (bb *BaseBuilder) installCrossDeps(
 	archSpecific, archAll := partitionArchAllDeps(makeDepends)
 	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
 
-	logger.Info("Qualifying makedepends for target architecture",
-		"target_arch", targetArch,
+	logger.Info(i18n.T("logger.common.info.qualifying_makedepends_target_architecture"), "target_arch", targetArch,
 		"format", bb.Format,
 		"arch_specific_count", len(qualified),
 		"arch_all_count", len(archAll),
@@ -741,7 +733,7 @@ func (bb *BaseBuilder) handleCrossCompilation(
 			return err
 		}
 	} else {
-		logger.Info("Skipping toolchain validation", "target_arch", targetArch)
+		logger.Info(i18n.T("logger.common.info.skipping_toolchain_validation"), "target_arch", targetArch)
 	}
 
 	// Add cross-compilation dependencies
@@ -761,8 +753,7 @@ func (bb *BaseBuilder) handleCrossCompilation(
 
 // validateCrossToolchain validates that the cross-compilation toolchain is available.
 func (bb *BaseBuilder) validateCrossToolchain(targetArch string) error {
-	logger.Debug("Validating cross-compilation toolchain availability",
-		"target_arch", targetArch,
+	logger.Debug(i18n.T("logger.common.debug.validating_cross_compilation_toolchain"), "target_arch", targetArch,
 		"format", bb.Format)
 
 	if err := ValidateToolchain(targetArch, bb.Format); err != nil {
@@ -770,8 +761,7 @@ func (bb *BaseBuilder) validateCrossToolchain(targetArch string) error {
 		return err
 	}
 
-	logger.Debug("Cross-compilation toolchain validation passed",
-		"target_arch", targetArch,
+	logger.Debug(i18n.T("logger.common.debug.cross_compilation_toolchain_validation"), "target_arch", targetArch,
 		"format", bb.Format)
 
 	return nil
@@ -790,8 +780,7 @@ func (bb *BaseBuilder) crossCCEnv(params *crossCompileParams) []string {
 		// ccache wraps the cross-compiler transparently via the
 		// /usr/lib/ccache/<cross-compiler> symlinks that are ahead of the
 		// real compiler on PATH. No extra env var is needed.
-		logger.Info("ccache active for cross-compilation",
-			"cc", params.gccExecutable,
+		logger.Info(i18n.T("logger.common.info.ccache_active_cross_compilation"), "cc", params.gccExecutable,
 			"via", "/usr/lib/ccache/"+params.gccExecutable)
 	}
 
@@ -812,7 +801,7 @@ func (bb *BaseBuilder) crossCCEnv(params *crossCompileParams) []string {
 	cmakeToolchain, err := writeCMakeToolchainFile(
 		"", params.gccExecutable, params.gppExecutable, params.ccPrefix)
 	if err != nil {
-		logger.Warn("failed to write CMake toolchain file", "error", err)
+		logger.Warn(i18n.T("logger.common.warn.failed_write_cmake_toolchain"), "error", err)
 	} else {
 		env = append(env, "CMAKE_TOOLCHAIN_FILE="+cmakeToolchain)
 	}

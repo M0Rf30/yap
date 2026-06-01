@@ -276,7 +276,7 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			logger.Warn(i18n.T("logger.createspec.warn.failed_to_close_pkgbuild_1"),
+			logger.Warn(i18n.T("logger.pkgbuild.warn.failed_to_close_pkgbuild"),
 				"path", cleanFilePath,
 				"error", err)
 		}
@@ -464,9 +464,9 @@ func filterInstalledRPM(packages []string) []string {
 	db, err := rpmdb.Open()
 	if err != nil {
 		if stderrors.Is(err, rpmdb.ErrLegacyDB) {
-			logger.Debug("rpmdb: legacy BDB host, falling back to subprocess")
+			logger.Debug(i18n.T("logger.pkgbuild.debug.legacy_bdb_host_falling"))
 		} else {
-			logger.Warn("rpmdb: open failed, falling back to subprocess", "error", err)
+			logger.Warn(i18n.T("logger.pkgbuild.warn.open_failed_falling_back"), "error", err)
 		}
 
 		return filterInstalledRPMSubprocess(packages)
@@ -502,8 +502,7 @@ func (pkgBuild *PKGBUILD) GetDepends(
 		return nil
 	}
 
-	logger.Info("GetDepends: resolving dependencies",
-		"pm", packageManager,
+	logger.Info(i18n.T("logger.pkgbuild.info.resolving_dependencies"), "pm", packageManager,
 		"requested", len(makeDepends))
 
 	// Filter out already-installed packages to avoid sudo prompts
@@ -565,8 +564,7 @@ func (pkgBuild *PKGBUILD) GetDepends(
 	flags := args
 	args = append(args, missingPackages...)
 
-	logger.Info("delegating package install to subprocess",
-		"pm", packageManager,
+	logger.Info(i18n.T("logger.pkgbuild.info.delegating_package_install_subprocess"), "pm", packageManager,
 		"packages", len(missingPackages),
 		"flags", flags)
 
@@ -582,7 +580,7 @@ func resolveVirtualPackages(deps []string) []string {
 		return deps
 	}
 
-	logger.Info("resolving virtual packages (apt)", "input", len(deps))
+	logger.Info(i18n.T("logger.pkgbuild.info.resolving_virtual_packages_apt"), "input", len(deps))
 
 	resolved := make([]string, 0, len(deps))
 	rewritten := 0
@@ -596,8 +594,7 @@ func resolveVirtualPackages(deps []string) []string {
 		}
 	}
 
-	logger.Info("resolved virtual packages (apt)",
-		"input", len(deps),
+	logger.Info(i18n.T("logger.pkgbuild.info.resolved_virtual_packages_apt"), "input", len(deps),
 		"rewritten", rewritten)
 
 	return resolved
@@ -611,8 +608,7 @@ func resolveVirtualPackage(pkg string) string {
 
 	resolved := cache.ResolveVirtual(pkg)
 	if resolved != pkg {
-		logger.Info("resolved virtual package",
-			"virtual", pkg, "provider", resolved)
+		logger.Info(i18n.T("logger.pkgbuild.info.resolved_virtual_package"), "virtual", pkg, "provider", resolved)
 	}
 
 	return resolved
@@ -665,7 +661,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 				WithOperation("GetUpdates")
 		}
 
-		logger.Info("refreshed apt indexes", "count", n)
+		logger.Info(i18n.T("logger.pkgbuild.info.refreshed_apt_indexes"), "count", n)
 		aptcache.Reload()
 
 		return nil
@@ -690,7 +686,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 				WithOperation("GetUpdates")
 		}
 
-		logger.Info("refreshed pacman sync DBs", "count", n)
+		logger.Info(i18n.T("logger.pkgbuild.info.refreshed_pacman_sync_dbs"), "count", n)
 
 		return nil
 
@@ -705,8 +701,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 
 	// zypper and any other unhandled PMs fall through to the distro's
 	// subprocess. Log it so the user can see which command yap is delegating.
-	logger.Info("delegating package-manager update to subprocess",
-		"pm", packageManager, "args", args)
+	logger.Info(i18n.T("logger.pkgbuild.info.delegating_package_manager_update"), "pm", packageManager, "args", args)
 
 	return shell.ExecWithSudo(ctx, false, "", packageManager, args...)
 }
@@ -828,8 +823,7 @@ func (pkgBuild *PKGBUILD) ParseSplitOverrides(funcBody string) error {
 	if err != nil {
 		// Parse errors are non-fatal for override extraction — the body will still
 		// be executed by the shell interpreter; we just won't have static overrides.
-		logger.Warn("failed to parse split-package function body for override extraction",
-			"error", err)
+		logger.Warn(i18n.T("logger.pkgbuild.warn.failed_parse_split_package"), "error", err)
 
 		return nil
 	}
@@ -1123,9 +1117,9 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() error {
 	if !pkgBuild.checkLicense() {
 		checkErrors = append(checkErrors, "license")
 
-		logger.Error(i18n.T("logger.validategeneral.error.invalid_spdx_license_identifier_1"),
+		logger.Error(i18n.T("logger.pkgbuild.error.invalid_spdx_license_identifier"),
 			"pkgname", pkgBuild.PkgName)
-		logger.Info(i18n.T("logger.validategeneral.info.you_can_find_valid_1"),
+		logger.Info(i18n.T("logger.pkgbuild.info.you_can_find_valid"),
 			"🌐", "https://spdx.org/licenses/")
 	}
 
@@ -1133,7 +1127,7 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() error {
 	if len(pkgBuild.SourceURI) != len(pkgBuild.HashSums) {
 		checkErrors = append(checkErrors, "source-hash mismatch")
 
-		logger.Error(i18n.T("logger.validategeneral.error.number_of_sources_and_1"),
+		logger.Error(i18n.T("logger.pkgbuild.error.number_of_sources_and"),
 			"pkgname", pkgBuild.PkgName)
 	}
 
@@ -1142,7 +1136,7 @@ func (pkgBuild *PKGBUILD) ValidateGeneral() error {
 	if pkgBuild.Package == "" && !pkgBuild.IsSplitPackage() {
 		checkErrors = append(checkErrors, "package function")
 
-		logger.Error(i18n.T("logger.validategeneral.error.missing_package_function_1"),
+		logger.Error(i18n.T("logger.pkgbuild.error.missing_package_function"),
 			"pkgname", pkgBuild.PkgName)
 	}
 

@@ -218,7 +218,7 @@ func CalculateDataHash(baseDir string, skipPatterns []string) (string, error) {
 
 			defer func() {
 				if closeErr := file.Close(); closeErr != nil {
-					logger.Warn(i18n.T("logger.calculatedatahash.warn.failed_to_close_file_1"),
+					logger.Warn(i18n.T("logger.files.warn.failed_to_close_file"),
 						"path", path,
 						"error", closeErr)
 				}

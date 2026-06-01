@@ -11,6 +11,7 @@ import (
 	rpmutils "github.com/sassoftware/go-rpmutils"
 
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	rpmdbgen "github.com/M0Rf30/yap/v2/pkg/rpmdb/db"
 )
@@ -337,7 +338,7 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 			WithOperation("Install")
 	}
 
-	logger.Info("Installed package in rpmdb", "package", name, "hnum", hnum, "files", len(files))
+	logger.Info(i18n.T("logger.rpmdb.info.installed_package_rpmdb"), "package", name, "hnum", hnum, "files", len(files))
 
 	return nil
 }
@@ -474,7 +475,7 @@ CREATE INDEX sigmd5index ON Sigmd5 (key ASC);`
 			WithOperation("initSchema")
 	}
 
-	logger.Debug("Initialized rpmdb schema", "path", w.path)
+	logger.Debug(i18n.T("logger.rpmdb.debug.initialized_rpmdb_schema"), "path", w.path)
 
 	return nil
 }

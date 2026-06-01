@@ -10,6 +10,7 @@ import (
 	"github.com/sassoftware/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -179,7 +180,7 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 
 		targetPath, err := safeRPMPath(rootDir, name)
 		if err != nil {
-			logger.Warn("skipping unsafe path in RPM archive", "path", name, "error", err)
+			logger.Warn(i18n.T("logger.dnfinstall.warn.skipping_unsafe_path_rpm"), "path", name, "error", err)
 			continue
 		}
 
@@ -205,7 +206,7 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 
 		case rpmTypeLink:
 			if err := safeRPMSymlinkTarget(rootDir, targetPath, fi.Linkname()); err != nil {
-				logger.Warn("skipping unsafe RPM symlink",
+				logger.Warn(i18n.T("logger.dnfinstall.warn.skipping_unsafe_rpm_symlink"),
 					"path", name, "target", fi.Linkname(), "error", err)
 
 				continue
@@ -226,7 +227,7 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 			}
 
 		default:
-			logger.Debug("skipping non-regular RPM entry", "path", name, "mode", mode)
+			logger.Debug(i18n.T("logger.dnfinstall.debug.skipping_non_regular_rpm"), "path", name, "mode", mode)
 			continue
 		}
 
@@ -240,7 +241,7 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 		})
 	}
 
-	logger.Debug("extracted RPM", "path", path, "files", len(files))
+	logger.Debug(i18n.T("logger.dnfinstall.debug.extracted_rpm"), "path", path, "files", len(files))
 
 	return &rpmEntry{
 		Path:  path,

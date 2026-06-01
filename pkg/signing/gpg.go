@@ -11,6 +11,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -74,8 +75,7 @@ func NewGPGSigner(cfg Config, format Format) (*GPGSigner, error) {
 			WithContext("key_path", cfg.KeyPath)
 	}
 
-	logger.Debug("Loaded GPG private key for signing",
-		"key_path", cfg.KeyPath, "format", string(format),
+	logger.Debug(i18n.T("logger.signing.debug.loaded_gpg_private_key"), "key_path", cfg.KeyPath, "format", string(format),
 		"key_id", fmt.Sprintf("%X", entity.PrimaryKey.KeyId))
 
 	return &GPGSigner{
@@ -140,8 +140,7 @@ func (s *GPGSigner) Sign(ctx context.Context, artifactPath string) error {
 			return err
 		}
 
-		logger.Info("DEB package signed successfully",
-			"artifact_path", artifactPath,
+		logger.Info(i18n.T("logger.signing.info.deb_package_signed_successfully"), "artifact_path", artifactPath,
 			"signature_path", artifactPath+".asc")
 
 	case FormatPacman:
@@ -158,8 +157,7 @@ func (s *GPGSigner) Sign(ctx context.Context, artifactPath string) error {
 			return err
 		}
 
-		logger.Info("Pacman package signed successfully",
-			"artifact_path", artifactPath,
+		logger.Info(i18n.T("logger.signing.info.pacman_package_signed_successfully"), "artifact_path", artifactPath,
 			"signature_path", artifactPath+".sig")
 
 	case FormatRPM:
@@ -176,8 +174,7 @@ func (s *GPGSigner) Sign(ctx context.Context, artifactPath string) error {
 			return err
 		}
 
-		logger.Info("RPM package signed successfully",
-			"artifact_path", artifactPath,
+		logger.Info(i18n.T("logger.signing.info.rpm_package_signed_successfully"), "artifact_path", artifactPath,
 			"signature_path", artifactPath+".asc")
 
 	default:

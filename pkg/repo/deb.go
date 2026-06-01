@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -70,8 +71,7 @@ func setupDeb(r *Repo) error {
 			WithContext("path", dst)
 	}
 
-	logger.Info("repo: installed apt source",
-		"name", r.Name,
+	logger.Info(i18n.T("logger.repo.info.installed_apt_source"), "name", r.Name,
 		"path", dst,
 		"signed", signedBy != "")
 

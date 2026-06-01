@@ -41,7 +41,7 @@ func Strip(packageDir string) error {
 // safe: each goroutine can pass its own toolchain env without process-env
 // mutation.
 func StripWithEnv(packageDir string, env map[string]string) error {
-	logger.Info(i18n.T("logger.strip.info.stripping_binaries_1"))
+	logger.Info(i18n.T("logger.options.info.stripping_binaries"))
 
 	return filepath.WalkDir(packageDir, func(p string, d fs.DirEntry, err error) error {
 		return processFileWithEnv(p, d, err, env)
@@ -65,33 +65,25 @@ func processFileWithEnv(binary string, dirEntry fs.DirEntry, err error, env map[
 	}
 
 	// Always try to ensure the file is writable before stripping
-	logger.Debug(
-		"ensuring file is writable before stripping",
-		"file", binary)
+	logger.Debug(i18n.T("logger.options.debug.ensuring_file_writable_before"), "file", binary)
 
 	info, err := os.Stat(binary)
 	if err != nil {
-		logger.Warn(
-			"failed to get file info",
-			"file", binary, "error", err)
+		logger.Warn(i18n.T("logger.options.warn.failed_get_file_info"), "file", binary, "error", err)
 
 		return nil
 	}
 
 	chmodErr := files.Chmod(binary, info.Mode().Perm()|0o200)
 	if chmodErr != nil {
-		logger.Warn(
-			"failed to make file writable",
-			"file", binary, "error", chmodErr)
+		logger.Warn(i18n.T("logger.options.warn.failed_make_file_writable"), "file", binary, "error", chmodErr)
 
 		return nil // Skip if we can't change permissions
 	}
 
 	err = files.CheckWritable(binary)
 	if err != nil {
-		logger.Warn(
-			"file still not writable after chmod",
-			"file", binary, "error", err)
+		logger.Warn(i18n.T("logger.options.warn.file_still_not_writable"), "file", binary, "error", err)
 
 		return nil // Skip if not writable
 	}
@@ -112,25 +104,19 @@ func processFileWithEnv(binary string, dirEntry fs.DirEntry, err error, env map[
 	if localDebugDir != "" {
 		debugFile, sepErr := binutil.SeparateDebugInfoWithEnv(binary, localDebugDir, env)
 		if sepErr != nil {
-			logger.Warn("failed to separate debug info",
-				"binary", binary, "error", sepErr)
+			logger.Warn(i18n.T("logger.options.warn.failed_separate_debug_info"), "binary", binary, "error", sepErr)
 		} else if debugFile != "" {
-			logger.Info("separated debug info",
-				"binary", binary, "debug", debugFile)
+			logger.Info(i18n.T("logger.options.info.separated_debug_info"), "binary", binary, "debug", debugFile)
 		}
 	}
 
 	stripFlags, stripLTO := determineStripFlags(fileType, binary)
 
-	logger.Debug(
-		"about to strip binary",
-		"file", binary, "flags", stripFlags)
+	logger.Debug(i18n.T("logger.options.debug.about_strip_binary"), "file", binary, "flags", stripFlags)
 
 	err = binutil.StripFileWithEnv(binary, env, stripFlags)
 	if err != nil {
-		logger.Error(
-			"strip command failed",
-			"file", binary, "flags", stripFlags, "error", err)
+		logger.Error(i18n.T("logger.options.error.strip_command_failed"), "file", binary, "flags", stripFlags, "error", err)
 
 		return err
 	}

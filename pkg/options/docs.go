@@ -44,7 +44,7 @@ func RemoveDocs(packageDir string) error {
 			continue
 		}
 
-		logger.Debug("removing doc directory", "path", target)
+		logger.Debug(i18n.T("logger.options.debug.removing_doc_directory"), "path", target)
 
 		if err := os.RemoveAll(target); err != nil {
 			return err

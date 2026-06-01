@@ -34,7 +34,7 @@ func Purge(packageDir string) error {
 			return err
 		}
 
-		logger.Debug("purged file", "path", path)
+		logger.Debug(i18n.T("logger.options.debug.purged_file"), "path", path)
 	}
 
 	// Remove glob-matched files anywhere in the tree.
@@ -56,7 +56,7 @@ func Purge(packageDir string) error {
 			}
 
 			if matched {
-				logger.Debug("purging file", "path", path)
+				logger.Debug(i18n.T("logger.options.debug.purging_file"), "path", path)
 
 				//nolint:gosec
 				if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {

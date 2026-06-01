@@ -15,6 +15,7 @@ import (
 	"github.com/sassoftware/go-rpmutils"
 
 	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -62,8 +63,7 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 	_, err := os.Stat(trustPath)
 	if err != nil {
 		if opts.AllowUnverifiedRPMs {
-			logger.Warn("RPM keyring not found, skipping verification",
-				"path", path, "keyring", trustPath)
+			logger.Warn(i18n.T("logger.dnfinstall.warn.rpm_keyring_not_found"), "path", path, "keyring", trustPath)
 
 			return nil
 		}
@@ -75,7 +75,7 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 	keyring, err := loadRPMKeyring(ctx, trustPath)
 	if err != nil {
 		if opts.AllowUnverifiedRPMs {
-			logger.Warn("failed to load RPM keyring, skipping verification",
+			logger.Warn(i18n.T("logger.dnfinstall.warn.failed_load_rpm_keyring"),
 				"path", path, "keyring", trustPath, "error", err)
 
 			return nil
@@ -86,8 +86,7 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 
 	if len(keyring) == 0 {
 		if opts.AllowUnverifiedRPMs {
-			logger.Warn("no keys in RPM keyring, skipping verification",
-				"path", path, "keyring", trustPath)
+			logger.Warn(i18n.T("logger.dnfinstall.warn.no_keys_rpm_keyring"), "path", path, "keyring", trustPath)
 
 			return nil
 		}
@@ -112,8 +111,7 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 		verifyErr := wrapRPMSignatureError(err)
 
 		if opts.AllowUnverifiedRPMs {
-			logger.Warn("RPM signature verification failed, skipping",
-				"path", path, "error", verifyErr)
+			logger.Warn(i18n.T("logger.dnfinstall.warn.rpm_signature_verification_failed"), "path", path, "error", verifyErr)
 
 			return nil
 		}
@@ -126,7 +124,7 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 	// Verify that we got a signature.
 	if len(sigs) == 0 {
 		if opts.AllowUnverifiedRPMs {
-			logger.Warn("RPM is unsigned, skipping verification", "path", path)
+			logger.Warn(i18n.T("logger.dnfinstall.warn.rpm_unsigned_skipping_verification"), "path", path)
 			return nil
 		}
 
@@ -146,7 +144,9 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 		}
 	}
 
-	logger.Debug("RPM signature verified"+signerInfo, "path", filepath.Base(path))
+	logger.Debug(i18n.T("logger.dnfinstall.debug.rpm_signature_verified"),
+		"signer", strings.TrimSpace(strings.TrimPrefix(signerInfo, " by ")),
+		"path", filepath.Base(path))
 
 	return nil
 }
@@ -209,7 +209,7 @@ func loadRPMKeyringDir(dir string) (openpgp.EntityList, error) {
 		if err != nil {
 			// Skip unreadable entries — match Fedora's lenient behaviour
 			// for the default trust dir.
-			logger.Debug("skipped unreadable keyring file",
+			logger.Debug(i18n.T("logger.dnfinstall.debug.skipped_unreadable_keyring_file"),
 				"path", filepath.Join(dir, name), "error", err)
 
 			continue

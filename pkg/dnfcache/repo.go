@@ -22,6 +22,7 @@ import (
 
 	apperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -212,7 +213,7 @@ func fetchAllRepos(ctx context.Context) error {
 	// single mirror — sharedTransport already caps per-host connections.
 	concurrency := min(min(runtime.GOMAXPROCS(0)*2, 8), len(repos))
 	if concurrency == 0 {
-		logger.Info("dnfcache: no enabled repos found")
+		logger.Info(i18n.T("logger.dnfcache.info.no_enabled_repos_found"))
 
 		return nil
 	}
@@ -230,8 +231,7 @@ func fetchAllRepos(ctx context.Context) error {
 
 	close(jobCh)
 
-	logger.Info("dnfcache: fetching repos",
-		"total", len(repos),
+	logger.Info(i18n.T("logger.dnfcache.info.fetching_repos"), "total", len(repos),
 		"enabled", enabledCount,
 		"workers", concurrency)
 
@@ -259,8 +259,7 @@ func fetchAllRepos(ctx context.Context) error {
 
 	for res := range resCh {
 		if res.err != nil {
-			logger.Warn("dnfcache: failed to fetch repo",
-				"repo", res.id,
+			logger.Warn(i18n.T("logger.dnfcache.warn.failed_fetch_repo"), "repo", res.id,
 				"error", res.err)
 
 			// HTTP 4xx errors (auth-gated, not-found) are non-fatal: the
@@ -288,14 +287,13 @@ func fetchModules(ctx context.Context, repo RepoEntry, baseURL, repoCache, href,
 	modulesDest := filepath.Join(repoCache, filepath.Base(href))
 
 	if err := downloadVerified(ctx, modulesURL, modulesDest, checksum); err != nil {
-		logger.Warn("dnfcache: failed to fetch modules.yaml",
-			"repo", repo.ID,
+		logger.Warn(i18n.T("logger.dnfcache.warn.failed_fetch_modules_yaml"), "repo", repo.ID,
 			"error", err)
 
 		return
 	}
 
-	logger.Debug("dnfcache: modules index path", "repo", repo.ID, "file", modulesDest)
+	logger.Debug(i18n.T("logger.dnfcache.debug.modules_index_path"), "repo", repo.ID, "file", modulesDest)
 }
 
 // resolveRepoBaseURL returns the concrete base URL for a repo, resolving
@@ -444,15 +442,14 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 	}
 
 	if fi, statErr := os.Stat(destFile); statErr == nil {
-		logger.Info("dnfcache: fetched repo",
-			"repo", repo.ID,
+		logger.Info(i18n.T("logger.dnfcache.info.fetched_repo"), "repo", repo.ID,
 			"url", baseURL,
 			"bytes", fi.Size())
 	} else {
-		logger.Info("dnfcache: fetched repo", "repo", repo.ID, "url", baseURL)
+		logger.Info(i18n.T("logger.dnfcache.info.fetched_repo"), "repo", repo.ID, "url", baseURL)
 	}
 
-	logger.Debug("dnfcache: primary index path", "repo", repo.ID, "file", destFile)
+	logger.Debug(i18n.T("logger.dnfcache.debug.primary_index_path"), "repo", repo.ID, "file", destFile)
 
 	fetchModules(ctx, repo, baseURL, repoCache, refs.modulesHref, refs.modulesSHA256)
 
@@ -662,7 +659,7 @@ func (c *Cache) loadFromDisk() {
 	jobs := collectPrimaryFiles()
 
 	if len(jobs) == 0 {
-		logger.Debug("dnfcache: no primary.xml files to load")
+		logger.Debug(i18n.T("logger.dnfcache.debug.no_primary_xml_files"))
 
 		return
 	}
@@ -688,8 +685,7 @@ func (c *Cache) loadFromDisk() {
 
 			for j := range jobCh {
 				if err := c.parsePrimaryFile(j.path, j.burl); err != nil {
-					logger.Warn("dnfcache: failed to parse primary index",
-						"file", j.path,
+					logger.Warn(i18n.T("logger.dnfcache.warn.failed_parse_primary_index"), "file", j.path,
 						"error", err)
 				}
 			}
@@ -699,8 +695,7 @@ func (c *Cache) loadFromDisk() {
 	wg.Wait()
 
 	c.mu.RLock()
-	logger.Info("dnfcache: index loaded",
-		"primary_files", len(jobs),
+	logger.Info(i18n.T("logger.dnfcache.info.index_loaded"), "primary_files", len(jobs),
 		"packages", len(c.packages),
 		"capabilities", len(c.providers))
 	c.mu.RUnlock()

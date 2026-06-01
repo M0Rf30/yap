@@ -25,7 +25,7 @@ func CalculateSHA256(path string) ([]byte, error) {
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.calculatesha256.warn.failed_to_close_file_5"),
+			logger.Warn(i18n.T("logger.crypto.warn.failed_to_close_file"),
 				"path", cleanFilePath, "error", closeErr)
 		}
 	}()

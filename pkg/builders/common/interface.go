@@ -178,13 +178,13 @@ func (bb *BaseBuilder) SetupEnvironmentDeps(golang bool) []string {
 			platform.CheckGO()
 		} else {
 			logger.Info(i18n.T(
-				"logger.setupenvironmentdependencies.info.go_detected_version_check_1"))
+				"logger.common.info.go_detected_version_check"))
 
 			err := platform.GOSetup()
 			if err != nil {
 				logger.Warn(
 					i18n.T(
-						"logger.setupenvironmentdependencies.warn.failed_to_setup_go_1"),
+						"logger.common.warn.failed_to_setup_go"),
 					"error", err)
 			}
 		}
@@ -230,14 +230,14 @@ func (bb *BaseBuilder) CreateFileWalker() *files.Walker {
 // original invoking user so downstream consumers (CI agents, etc.) can read it
 // without elevated privileges.
 func (bb *BaseBuilder) LogPackageCreated(artifactPath string) {
-	logger.Info(i18n.T("logger.logpackagecreated.info.package_artifact_created_3"),
+	logger.Info(i18n.T("logger.common.info.package_artifact_created"),
 		"format", bb.Format,
 		"pkgver", bb.PKGBUILD.PkgVer,
 		"pkgrel", bb.PKGBUILD.PkgRel,
 		"artifact", artifactPath)
 
 	if err := platform.PreserveOwnership(artifactPath); err != nil {
-		logger.Warn(i18n.T("logger.preserveownership.warn.failed_to_get_original_1"),
+		logger.Warn(i18n.T("logger.common.warn.failed_to_get_original"),
 			"path", artifactPath,
 			"error", err)
 	}
@@ -377,8 +377,7 @@ func (bb *BaseBuilder) Prepare(ctx context.Context, makeDepends []string, target
 	// qualified makedepends below) but no compiler to link them with.
 	crossDeps := bb.getCrossCompilerDependencies(targetArch)
 	if len(crossDeps) > 0 {
-		logger.Info("installing cross-compiler toolchain",
-			"target_arch", targetArch,
+		logger.Info(i18n.T("logger.common.info.installing_cross_compiler_toolchain"), "target_arch", targetArch,
 			"packages", strings.Join(crossDeps, ", "))
 
 		installArgs := constants.GetInstallArgs(bb.Format)
@@ -456,8 +455,7 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 	installArgs := constants.GetInstallArgs(bb.Format)
 	pm := getPackageManager(bb.Format)
 
-	logger.Info("installing environment dependencies via package manager",
-		"pm", pm,
+	logger.Info(i18n.T("logger.common.info.installing_environment_dependencies_via"), "pm", pm,
 		"packages", len(deps),
 		"flags", len(installArgs))
 
@@ -499,7 +497,7 @@ func (bb *BaseBuilder) refreshCcacheSymlinks() {
 	// bin is the absolute path returned by exec.LookPath — it cannot be
 	// influenced by user input and yap is expected to run as root.
 	if err := exec.CommandContext(ctx, bin).Run(); err != nil {
-		logger.Warn("ccache: update-ccache-symlinks failed", "error", err)
+		logger.Warn(i18n.T("logger.common.warn.update_ccache_symlinks_failed"), "error", err)
 	}
 }
 
@@ -525,8 +523,7 @@ func (bb *BaseBuilder) installRPMDeps(ctx context.Context, deps []string) error 
 		return nil
 	}
 
-	logger.Info("installing RPM dependencies via dnfinstall",
-		"packages", len(deps),
+	logger.Info(i18n.T("logger.common.info.installing_rpm_dependencies_via"), "packages", len(deps),
 		"packages_list", strings.Join(deps, ", "))
 
 	if err := dnfinstall.Install(ctx, deps); err != nil {
@@ -611,8 +608,7 @@ func (bb *BaseBuilder) BuildCrossStripEnvSlice(targetArch string) []string {
 
 	toolchain, err := bb.resolveToolchainPackages(targetArch)
 	if err != nil {
-		logger.Warn("cross-strip env: failed to resolve toolchain, strip will use native tools",
-			"target_arch", targetArch, "error", err)
+		logger.Warn(i18n.T("logger.common.warn.cross_strip_env_failed"), "target_arch", targetArch, "error", err)
 
 		return nil
 	}
@@ -622,8 +618,7 @@ func (bb *BaseBuilder) BuildCrossStripEnvSlice(targetArch string) []string {
 		return nil
 	}
 
-	logger.Debug("cross-strip env configured",
-		"STRIP", prefix+"-strip",
+	logger.Debug(i18n.T("logger.common.debug.cross_strip_env_configured"), "STRIP", prefix+"-strip",
 		"OBJCOPY", prefix+"-objcopy")
 
 	return []string{
@@ -650,7 +645,7 @@ func (bb *BaseBuilder) SetupCrossStripEnv(targetArch string) {
 	for _, kv := range env {
 		if k, v, ok := strings.Cut(kv, "="); ok {
 			if err := os.Setenv(k, v); err != nil {
-				logger.Warn("cross-strip env: failed to set "+k, "error", err)
+				logger.Warn(i18n.T("logger.common.warn.cross_strip_env_set_failed"), "var", k, "error", err)
 			}
 		}
 	}

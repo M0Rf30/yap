@@ -36,7 +36,7 @@ func CheckWritable(path string) error {
 // Chmod changes file permissions.
 func Chmod(path string, perm os.FileMode) error {
 	if err := os.Chmod(path, perm); err != nil {
-		logger.Error(i18n.T("logger.chmod.error.failed_to_chmod_1"), "path", path, "error", err)
+		logger.Error(i18n.T("logger.files.error.failed_to_chmod"), "path", path, "error", err)
 
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			i18n.T("errors.files.failed_to_change_permissions")).
@@ -53,7 +53,7 @@ func Create(path string) (*os.File, error) {
 
 	file, err := os.Create(cleanFilePath)
 	if err != nil {
-		logger.Error(i18n.T("logger.create.error.failed_to_create_path_1"), "path", path, "error", err)
+		logger.Error(i18n.T("logger.files.error.failed_to_create_path"), "path", path, "error", err)
 		return nil, err
 	}
 
@@ -74,7 +74,7 @@ func CreateWrite(path, data string) error {
 	}()
 
 	if _, err = file.WriteString(data); err != nil {
-		logger.Error(i18n.T("logger.createwrite.error.failed_to_write_to_1"), "path", path, "error", err)
+		logger.Error(i18n.T("logger.files.error.failed_to_write_to"), "path", path, "error", err)
 		return err
 	}
 
@@ -196,7 +196,7 @@ func Open(path string) (*os.File, error) {
 
 	file, err := os.Open(cleanFilePath)
 	if err != nil {
-		logger.Error(i18n.T("logger.open.error.failed_to_open_file_1"), "path", path, "error", err)
+		logger.Error(i18n.T("logger.files.error.failed_to_open_file"), "path", path, "error", err)
 		return nil, err
 	}
 

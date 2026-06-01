@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -36,8 +37,7 @@ func Sync(ctx context.Context) (succeeded int, err error) {
 		arch = detectArch()
 	}
 
-	logger.Info("pacmandb: syncing repos",
-		"repos", len(cfg.Repos),
+	logger.Info(i18n.T("logger.pacmandb.info.syncing_repos"), "repos", len(cfg.Repos),
 		"arch", arch)
 
 	var firstErr error
@@ -48,8 +48,7 @@ func Sync(ctx context.Context) (succeeded int, err error) {
 				firstErr = err
 			}
 
-			logger.Warn("pacmandb: repo sync failed",
-				"repo", repo.Name, "error", err)
+			logger.Warn(i18n.T("logger.pacmandb.warn.repo_sync_failed"), "repo", repo.Name, "error", err)
 
 			continue
 		}
@@ -57,8 +56,7 @@ func Sync(ctx context.Context) (succeeded int, err error) {
 		succeeded++
 	}
 
-	logger.Info("pacmandb: sync complete",
-		"succeeded", succeeded,
+	logger.Info(i18n.T("logger.pacmandb.info.sync_complete"), "succeeded", succeeded,
 		"total", len(cfg.Repos))
 
 	return succeeded, firstErr
@@ -69,13 +67,11 @@ func syncRepo(ctx context.Context, repo Repo, arch string) error {
 		url := substituteVars(server, repo.Name, arch) + "/" + repo.Name + ".db"
 		dest := filepath.Join(pacmanSyncDir, repo.Name+".db")
 
-		logger.Debug("pacmandb: trying mirror",
-			"repo", repo.Name, "url", url)
+		logger.Debug(i18n.T("logger.pacmandb.debug.trying_mirror"), "repo", repo.Name, "url", url)
 
 		err := downloadFile(ctx, url, dest)
 		if err != nil {
-			logger.Debug("pacmandb: mirror failed",
-				"repo", repo.Name, "url", url, "error", err)
+			logger.Debug(i18n.T("logger.pacmandb.debug.mirror_failed"), "repo", repo.Name, "url", url, "error", err)
 
 			continue
 		}
@@ -89,8 +85,7 @@ func syncRepo(ctx context.Context, repo Repo, arch string) error {
 			sizeBytes = fi.Size()
 		}
 
-		logger.Info("pacmandb: repo synced",
-			"repo", repo.Name, "url", url, "bytes", sizeBytes)
+		logger.Info(i18n.T("logger.pacmandb.info.repo_synced"), "repo", repo.Name, "url", url, "bytes", sizeBytes)
 
 		return nil
 	}

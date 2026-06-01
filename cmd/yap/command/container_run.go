@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/container"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -79,12 +80,11 @@ func RunCommandInContainer(distro, workDir string, subArgs []string) bool {
 
 	rt, err := container.Detect(ContainerRuntimeOverride())
 	if err != nil {
-		logger.Error("failed to detect container runtime", "error", err)
+		logger.Error(i18n.T("logger.command.error.failed_detect_container_runtime"), "error", err)
 		os.Exit(1)
 	}
 
-	logger.Info("dispatching to container",
-		"runtime", string(rt.Type()),
+	logger.Info(i18n.T("logger.command.info.dispatching_container"), "runtime", string(rt.Type()),
 		"distro", distro,
 		"workdir", workDir)
 
@@ -92,7 +92,7 @@ func RunCommandInContainer(distro, workDir string, subArgs []string) bool {
 	// Note: the container ENTRYPOINT is already "yap", so subArgs must NOT
 	// include the binary name — pass the sub-command and its arguments directly.
 	if err := rt.Run(distro, workDir, subArgs); err != nil {
-		logger.Error("container run failed", "error", err)
+		logger.Error(i18n.T("logger.command.error.container_run_failed"), "error", err)
 		os.Exit(1)
 	}
 
@@ -126,12 +126,11 @@ func RunPipelineInContainer(distro, workDir string, buildArgs, prepareArgs []str
 
 	rt, err := container.Detect(ContainerRuntimeOverride())
 	if err != nil {
-		logger.Error("failed to detect container runtime", "error", err)
+		logger.Error(i18n.T("logger.command.error.failed_detect_container_runtime"), "error", err)
 		os.Exit(1)
 	}
 
-	logger.Info("dispatching pipeline to container",
-		"runtime", string(rt.Type()),
+	logger.Info(i18n.T("logger.command.info.dispatching_pipeline_container"), "runtime", string(rt.Type()),
 		"distro", distro,
 		"workdir", workDir,
 		"skip_prepare", skipPrepare)
@@ -154,7 +153,7 @@ func RunPipelineInContainer(distro, workDir string, buildArgs, prepareArgs []str
 	}
 
 	if err := rt.RunShell(distro, workDir, shellCmd); err != nil {
-		logger.Error("container pipeline failed", "error", err)
+		logger.Error(i18n.T("logger.command.error.container_pipeline_failed"), "error", err)
 		os.Exit(1)
 	}
 

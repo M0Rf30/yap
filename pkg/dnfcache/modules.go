@@ -30,6 +30,7 @@ import (
 	"github.com/ulikunitz/xz"
 	"gopkg.in/yaml.v3"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -95,7 +96,7 @@ func parseModulesYAML(r io.Reader, idx *moduleIndex) {
 				break
 			}
 			// Skip malformed documents but keep going.
-			logger.Debug("dnfcache: skip malformed modules.yaml doc", "error", err)
+			logger.Debug(i18n.T("logger.dnfcache.debug.skip_malformed_modules_yaml"), "error", err)
 
 			continue
 		}
@@ -258,15 +259,13 @@ func loadModuleIndex() *moduleIndex {
 	files := collectModuleFiles()
 	for _, f := range files {
 		if err := parseModulesFile(f, idx); err != nil {
-			logger.Warn("dnfcache: failed to parse modules.yaml",
-				"file", f,
+			logger.Warn(i18n.T("logger.dnfcache.warn.failed_parse_modules_yaml"), "file", f,
 				"error", err)
 		}
 	}
 
 	if len(idx.defaultStream) > 0 {
-		logger.Info("dnfcache: module index loaded",
-			"files", len(files),
+		logger.Info(i18n.T("logger.dnfcache.info.module_index_loaded"), "files", len(files),
 			"defaults", len(idx.defaultStream),
 			"blocked_nvra", len(idx.blockedNVRA))
 	}

@@ -39,7 +39,7 @@ var OverridePkgVer string
 func ParseFile(distro, release, startDir, home, targetArch string) (*pkgbuild.PKGBUILD, error) {
 	home, err := filepath.Abs(home)
 	if err != nil {
-		logger.Error(i18n.T("logger.parsefile.error.failed_to_get_root_1"),
+		logger.Error(i18n.T("logger.parser.error.failed_to_get_root"),
 			"path", home)
 
 		return nil, err
@@ -94,9 +94,7 @@ func getSyntaxFile(path string) (*syntax.File, error) {
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			logger.Warn(
-				"failed to close PKGBUILD file",
-				"path", filePath, "error", err)
+			logger.Warn(i18n.T("logger.parser.warn.failed_close_pkgbuild_file"), "path", filePath, "error", err)
 		}
 	}()
 

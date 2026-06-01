@@ -66,7 +66,7 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 		EnableDotGitCommonDir: true,
 	}
 
-	logger.Info("cloning", "repo", sourceItemURI)
+	logger.Info(i18n.T("logger.git.info.cloning"), "repo", sourceItemURI)
 
 	if files.Exists(dloadFilePath) {
 		return handleExistingRepo(dloadFilePath, referenceName, plainOpenOptions)
@@ -79,8 +79,8 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 
 		publicKey, err := ssh.NewPublicKeysFromFile("git", sshKeyPath, sshPassword)
 		if err != nil {
-			logger.Error(i18n.T("logger.clone.error.failed_to_load_ssh_1"))
-			logger.Warn(i18n.T("logger.clone.warn.try_to_use_an_1"))
+			logger.Error(i18n.T("logger.git.error.failed_to_load_ssh"))
+			logger.Warn(i18n.T("logger.git.warn.try_to_use_an"))
 
 			return err
 		}
@@ -118,8 +118,7 @@ func ExtractFromBare(barePath, srcDir, refKey, refValue string) error {
 	repoName := filepath.Base(barePath)
 	workDir := filepath.Join(srcDir, repoName)
 
-	logger.Info("creating working copy from bare repository",
-		"bare", barePath, "workdir", workDir)
+	logger.Info(i18n.T("logger.git.info.creating_working_copy_bare"), "bare", barePath, "workdir", workDir)
 
 	// Remove any existing symlink or stale directory at the target path
 	// (e.g. a symlink from a previous symlinkSources call pointing back

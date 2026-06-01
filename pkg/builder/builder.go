@@ -107,7 +107,7 @@ func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, m
 		if ccacheEnv := tempBuilder.BuildCcacheEnvSlice(); len(ccacheEnv) > 0 {
 			pkgEnv = append(pkgEnv, ccacheEnv...)
 
-			logger.Info(i18n.T("logger.setupccache.info.ccache_enabled_for_build_1"),
+			logger.Info(i18n.T("logger.builder.info.ccache_enabled_for_build"),
 				"package", pkgName)
 		}
 
@@ -179,8 +179,7 @@ func (builder *Builder) compileSplitPackages(ctx context.Context) error {
 		if !ok {
 			// Fall back to the shared package() if no per-package function exists.
 			if builder.PKGBUILD.Package == "" {
-				logger.Warn("no package function found for split sub-package, skipping",
-					"subpackage", subName)
+				logger.Warn(i18n.T("logger.builder.warn.no_package_function_found"), "subpackage", subName)
 
 				continue
 			}
@@ -216,8 +215,7 @@ func (builder *Builder) compileSplitPackages(ctx context.Context) error {
 		// This uses the same AddItem/parseDirective path as top-level PKGBUILD parsing,
 		// giving full __distro and _arch suffix support for free.
 		if err := builder.PKGBUILD.ParseSplitOverrides(funcBody); err != nil {
-			logger.Warn("failed to parse split-package overrides, using global values",
-				"subpackage", subName, "error", err)
+			logger.Warn(i18n.T("logger.builder.warn.failed_parse_split_package"), "subpackage", subName, "error", err)
 		}
 
 		if err := shell.RunScriptInFakeroot(

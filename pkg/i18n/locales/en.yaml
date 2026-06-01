@@ -528,8 +528,6 @@
   translation: "Building for distribution"
 - id: logger.build.building_packages
   translation: "Building packages"
-- id: logger.build.initializing_project
-  translation: "Initializing project"
 - id: logger.build.auto_detected_codename
   translation: "Auto-detected codename for dependency resolution"
 - id: logger.build.no_distribution_specified
@@ -538,8 +536,6 @@
   translation: "Project initialization failed"
 - id: logger.build.project_init_success
   translation: "Project initialized successfully"
-- id: logger.build.project_path
-  translation: "Project path"
 - id: logger.build.starting_verbose
   translation: "Starting build in verbose mode"
 
@@ -558,69 +554,69 @@
   translation: "Symlink rejected"
 
 # Logger messages - Build package
-- id: logger.buildpackage.warn.failed_to_remove_temporary_1
+- id: logger.deb.warn.failed_to_remove_temporary
   translation: "Failed to remove temporary directory"
 
 # Logger messages - Calculate data hash
-- id: logger.calculatedatahash.warn.failed_to_close_file_1
+- id: logger.files.warn.failed_to_close_file
   translation: "Failed to close file after hash calculation"
 
 # Logger messages - Calculate SHA256
-- id: logger.calculatesha256.warn.failed_to_close_file_5
+- id: logger.crypto.warn.failed_to_close_file
   translation: "Failed to close file after SHA256 calculation"
 
 # Logger messages - Check Go
-- id: logger.checkgo.info.go_is_already_installed_1
+- id: logger.platform.info.go_is_already_installed
   translation: "Go is already installed"
 
 # Logger messages - Chmod
-- id: logger.chmod.error.failed_to_chmod_1
+- id: logger.files.error.failed_to_chmod
   translation: "Failed to change file permissions"
 
 # Logger messages - Chown
-- id: logger.chownrecursivetooriginaluser.warn.failed_to_chown_file_1
+- id: logger.platform.warn.failed_to_chown_file
   translation: "Failed to change ownership of file"
-- id: logger.chowntooriginaluser.debug.changed_ownership_to_original_1
+- id: logger.platform.debug.changed_ownership_to_original
   translation: "Changed ownership to original user"
 
 # Logger messages - Clone
-- id: logger.clone.error.failed_to_load_ssh_1
+- id: logger.git.error.failed_to_load_ssh
   translation: "Failed to load SSH key"
-- id: logger.clone.warn.try_to_use_an_1
+- id: logger.git.warn.try_to_use_an
   translation: "Try to use an SSH key or provide credentials"
 
 # Logger messages - Configure resume
-- id: logger.configureresumeifpossible.info.resuming_download_1
+- id: logger.download.info.resuming_download
   translation: "Resuming download from previous position"
 
 # Logger messages - Create DEB
-- id: logger.createdeb.warn.failed_to_close_debian_1
+- id: logger.deb.warn.failed_to_close_debian
   translation: "Failed to close Debian archive"
 
 # Logger messages - Create
-- id: logger.create.error.failed_to_create_path_1
+- id: logger.files.error.failed_to_create_path
   translation: "Failed to create path"
 
 # Logger messages - Create mtree gzip
-- id: logger.createmtreegzip.warn.failed_to_close_gzip_1
+- id: logger.pacman.warn.failed_to_close_gzip
   translation: "Failed to close gzip stream"
-- id: logger.createmtreegzip.warn.failed_to_close_output_1
+- id: logger.pacman.warn.failed_to_close_output
   translation: "Failed to close output file"
 
 # Logger messages - Create spec
-- id: logger.createspec.warn.failed_to_close_pkgbuild_1
+- id: logger.pkgbuild.warn.failed_to_close_pkgbuild
   translation: "Failed to close PKGBUILD file"
 
 # Logger messages - Create tar.gz
-- id: logger.createtargz.warn.failed_to_close_output_1
+- id: logger.apk.warn.failed_to_close_output
   translation: "Failed to close tar.gz output"
 
 # Logger messages - Create tar.zst
-- id: logger.createtarzst.warn.failed_to_close_output_1
+- id: logger.archive.warn.failed_to_close_output
   translation: "Failed to close tar.zst output"
 
 # Logger messages - Create write
-- id: logger.createwrite.error.failed_to_write_to_1
+- id: logger.files.error.failed_to_write_to
   translation: "Failed to write to file"
 
 # Logger messages - Creating package
@@ -644,8 +640,6 @@
   translation: "Installing cross-compiler packages"
 - id: logger.cross_compilation.rust_cross_compilation_configured
   translation: "Rust cross-compilation configured"
-- id: logger.cross_compilation.setting_up_cross_compilation_environment
-  translation: "Setting up cross-compilation environment"
 - id: logger.cross_compilation.starting_cross_compilation_build
   translation: "Starting cross-compilation build"
 
@@ -694,15 +688,12 @@
   translation: "Response status"
 
 # Logger messages - Exec with context
-- id: logger.execwithcontext.debug.command_execution_completed_1
+- id: logger.shell.debug.command_execution_completed
   translation: "Command execution completed"
-- id: logger.execwithcontext.error.command_execution_failed_1
+- id: logger.shell.error.command_execution_failed
   translation: "Command execution failed"
 
 # Logger messages - Fatal error
-- id: logger.fatal_error
-  translation: "Fatal error"
-
 # Logger messages - Files
 - id: logger.files.warn.close_write
   translation: "Failed to close file writer"
@@ -714,23 +705,23 @@
   translation: "Failed to remove package directory"
 
 # Logger messages - Finish
-- id: logger.finish.info.download_completed_1
+- id: logger.download.info.download_completed_2
   translation: "Download completed"
 
 # Logger messages - Generate PNG graph
-- id: logger.generatepnggraph.info.svg_graph_generated_for_1
+- id: logger.render.info.svg_graph_generated_for
   translation: "SVG graph generated for conversion"
-- id: logger.generatepnggraph.warn.png_conversion_requires_external_1
+- id: logger.render.warn.png_conversion_requires_external
   translation: "PNG conversion requires external tool (inkscape or imagemagick)"
 
 # Logger messages - Generate SVG graph
-- id: logger.generatesvggraph.error.failed_to_close_file_1
+- id: logger.render.error.failed_to_close_file
   translation: "Failed to close SVG file"
-- id: logger.generatesvggraph.info.svg_graph_generated_successfully_1
+- id: logger.render.info.svg_graph_generated_successfully
   translation: "SVG graph generated successfully"
 
 # Logger messages - Go setup
-- id: logger.gosetup.info.go_successfully_installed_1
+- id: logger.platform.info.go_successfully_installed
   translation: "Go successfully installed"
 
 # Logger messages - Installing
@@ -738,9 +729,9 @@
   translation: "Installing external runtime dependencies"
 - id: logger.installing_package
   translation: "Installing package"
-- id: logger.installpackage.info.installing_package_1
+- id: logger.command.info.installing_package
   translation: "Installing package"
-- id: logger.installpackage.info.package_installed_successfully_1
+- id: logger.command.info.package_installed_successfully
   translation: "Package installed successfully"
 
 # Logger messages - Integrity check
@@ -754,17 +745,17 @@
   translation: "Invalid package order"
 
 # Logger messages - Log download start
-- id: logger.logdownloadstart.info.response_status
+- id: logger.download.info.response_status_2
   translation: "Response status"
-- id: logger.logdownloadstart.info.server_supports_resume_1
+- id: logger.download.info.server_supports_resume
   translation: "Server supports resume capability"
 
 # Logger messages - Log package created
-- id: logger.logpackagecreated.info.package_artifact_created_3
+- id: logger.common.info.package_artifact_created
   translation: "Package artifact created"
 
 # Logger messages - Monitor download
-- id: logger.monitordownload.info.download_completed_1
+- id: logger.download.info.download_completed
   translation: "Download completed"
 
 # Logger messages - Multi project file
@@ -774,7 +765,7 @@
   translation: "Single project file found"
 
 # Logger messages - Open
-- id: logger.open.error.failed_to_open_file_1
+- id: logger.files.error.failed_to_open_file
   translation: "Failed to open file"
 
 # Logger messages - Package
@@ -784,15 +775,12 @@
   translation: "Package installation planned"
 - id: logger.package_installed
   translation: "Package installed"
-- id: logger.package_not_found
-  translation: "Package not found"
-
 # Logger messages - Parse file
-- id: logger.parsefile.error.failed_to_get_root_1
+- id: logger.parser.error.failed_to_get_root
   translation: "Failed to get root element"
 
 # Logger messages - Parse OS release
-- id: logger.parseosrelease.warn.failed_to_close_osrelease_1
+- id: logger.platform.warn.failed_to_close_osrelease
   translation: "Failed to close /etc/os-release"
 
 # Logger messages - Performing topological sort
@@ -810,9 +798,9 @@
   translation: "Failed to lookup sudo user"
 
 # Logger messages - Preserve ownership
-- id: logger.preserveownership.info.preserving_ownership_for_original_1
+- id: logger.platform.info.preserving_ownership_for_original
   translation: "Preserving ownership for original user"
-- id: logger.preserveownership.warn.failed_to_get_original_1
+- id: logger.common.warn.failed_to_get_original
   translation: "Failed to get original ownership"
 
 # Logger messages - Project
@@ -826,32 +814,20 @@
   translation: "Found starting package"
 - id: logger.project.found_to_package
   translation: "Found target package"
-- id: logger.project.installing_runtime_dependency
-  translation: "Installing runtime dependency"
 - id: logger.project.make_dependency_found
   translation: "Make dependency found"
-- id: logger.project.package_installation_failed
-  translation: "Package installation failed"
 - id: logger.project.runtime_dependencies_batching_complete
   translation: "Runtime dependencies batching complete"
 - id: logger.project.runtime_dependencies_build_optimization
   translation: "Optimizing runtime dependencies build order"
-- id: logger.project.runtime_dependency_batch_analysis
-  translation: "Analyzing runtime dependency batch"
 - id: logger.project.runtime_dependency_detected
   translation: "Runtime dependency detected"
 - id: logger.project.runtime_dependency_found
   translation: "Runtime dependency found"
-- id: logger.project.runtime_dependency_installation_failed
-  translation: "Runtime dependency installation failed"
-- id: logger.project.runtime_dependency_installed
-  translation: "Runtime dependency installed"
 - id: logger.project.runtime_dependency_map
   translation: "Runtime dependency map"
 - id: logger.project.filtering_projects
   translation: "Filtering projects for parallel build"
-- id: logger.project.skipping_batch_filtered_out
-  translation: "Skipping batch (filtered out)"
 - id: logger.project.starting_dependencyaware_build_process
   translation: "Starting dependency-aware build process"
 
@@ -872,37 +848,30 @@
   translation: "Generating package"
 
 # Logger messages - Run graph command
-- id: logger.rungraphcommand.info.generating_dependency_graph_1
+- id: logger.command.info.generating_dependency_graph
   translation: "Generating dependency graph"
 
 # Logger messages - Run install
-- id: logger.runinstall.info.detected_package_type_1
+- id: logger.command.info.detected_package_type
   translation: "Detected package type"
 
 # Logger messages - Run script with package
-- id: logger.runscriptwithpackage.debug.starting_script_execution_1
+- id: logger.shell.debug.starting_script_execution
   translation: "Starting script execution"
-- id: logger.runscriptwithpackage.error.script_execution_failed_1
+- id: logger.shell.error.script_execution_failed
   translation: "Script execution failed"
-- id: logger.runscriptwithpackage.error.script_execution_failed_3
+- id: logger.shell.error.script_execution_failed_2
   translation: "Script execution failed with error"
-- id: logger.runscriptwithpackage.info.executing_shell_script_3
+- id: logger.shell.info.executing_shell_script
   translation: "Executing shell script"
 
 # Logger messages - Setup ccache
-- id: logger.setupccache.info.ccache_enabled_for_build_1
+- id: logger.builder.info.ccache_enabled_for_build
   translation: "ccache enabled for build"
-- id: logger.setupccache.info.ccache_not_found_skipping_1
-  translation: "ccache not found, skipping"
-- id: logger.setupccache.warn.ccache_setup_failed_1
-  translation: "ccache setup failed"
-- id: logger.setupccache.warn.failed_to_create_ccache_dir_1
-  translation: "Failed to create ccache directory"
-
 # Logger messages - Setup environment dependencies
-- id: logger.setupenvironmentdependencies.info.go_detected_version_check_1
+- id: logger.common.info.go_detected_version_check
   translation: "Go detected, checking version"
-- id: logger.setupenvironmentdependencies.warn.failed_to_setup_go_1
+- id: logger.common.warn.failed_to_setup_go
   translation: "Failed to setup Go"
 
 # Logger messages - Shell
@@ -920,15 +889,12 @@
   translation: "Stopping build at target package"
 
 # Logger messages - Stringify array
-- id: logger.stringifyarray.error.unable_to_parse_array_1
+- id: logger.set.error.unable_to_parse_array
   translation: "Unable to parse array"
 
 # Logger messages - Stringify func decl
-- id: logger.stringifyfuncdecl.error.unable_to_parse_function_1
-  translation: "Unable to parse function"
-
 # Logger messages - Strip
-- id: logger.strip.info.stripping_binaries_1
+- id: logger.options.info.stripping_binaries
   translation: "Stripping binaries"
 
 # Logger messages - Tips
@@ -938,39 +904,37 @@
   translation: "Use --verbose flag for detailed output"
 
 # Logger messages - Unknown/Generic
-- id: logger.unknown.debug.command_execution_completed_1
+- id: logger.shell.debug.command_execution_completed_2
   translation: "Command execution completed"
-- id: logger.unknown.error.command_execution_failed_1
+- id: logger.shell.error.command_execution_failed_2
   translation: "Command execution failed"
-- id: logger.unknown.info.basic_build_environment_successfully_1
+- id: logger.command.info.basic_build_environment_successfully
   translation: "Build environment setup completed successfully"
-- id: logger.unknown.info.go_successfully_installed_1
+- id: logger.command.info.go_successfully_installed
   translation: "Go successfully installed"
-- id: logger.unknown.info.shell_script_execution_completed_1
+- id: logger.shell.info.shell_script_execution_completed
   translation: "Shell script execution completed"
-- id: logger.unknown.info.shell_script_execution_completed_3
+- id: logger.shell.info.shell_script_execution_completed_2
   translation: "Shell script execution completed successfully"
-- id: logger.unknown.warn.failed_to_close_archive_1
-  translation: "Failed to close archive"
-- id: logger.unknown.warn.failed_to_close_new_1
+- id: logger.archive.warn.failed_to_close_new
   translation: "Failed to close new file"
-- id: logger.unknown.warn.failed_to_close_rpm_1
+- id: logger.rpm.warn.failed_to_close_rpm
   translation: "Failed to close RPM file"
 
 # Logger messages - Validate general
-- id: logger.validategeneral.error.invalid_spdx_license_identifier_1
+- id: logger.pkgbuild.error.invalid_spdx_license_identifier
   translation: "Invalid SPDX license identifier"
-- id: logger.validategeneral.error.missing_package_function_1
+- id: logger.pkgbuild.error.missing_package_function
   translation: "Missing package() function in PKGBUILD"
-- id: logger.validategeneral.error.number_of_sources_and_1
+- id: logger.pkgbuild.error.number_of_sources_and
   translation: "Number of sources and checksums do not match"
-- id: logger.validategeneral.info.you_can_find_valid_1
+- id: logger.pkgbuild.info.you_can_find_valid
   translation: "You can find valid SPDX license identifiers at https://spdx.org/licenses/"
 
 # Logger messages - With resume
-- id: logger.withresumecontext.info.retrying_download_1
+- id: logger.download.info.retrying_download_2
   translation: "Retrying download with resume support"
-- id: logger.withresume.info.retrying_download_1
+- id: logger.download.info.retrying_download
   translation: "Retrying download"
 
 # Logger messages - Zap
@@ -996,10 +960,6 @@
   translation: "Extracting package to sysroot directory"
 - id: logger.extract.package_extracted
   translation: "Package extracted successfully to sysroot"
-- id: logger.extract.sysroot_cleaned
-  translation: "Sysroot directory cleaned up"
-- id: logger.extract.extraction_stats
-  translation: "Extraction complete"
 - id: logger.extract.extracting_to_sysroot
   translation: "Extracting package to sysroot"
 
@@ -1030,3 +990,519 @@
 # Test messages
 - id: test.message
   translation: "Test message"
+
+# --- Migrated logger messages ---
+- id: logger.apkindex.debug.enqueue_install
+  translation: "Enqueue install"
+- id: logger.apkindex.debug.fetching_repo
+  translation: "Fetching repo"
+- id: logger.apkindex.debug.installed
+  translation: "Installed"
+- id: logger.apkindex.debug.resolved_virtual
+  translation: "Resolved virtual"
+- id: logger.apkindex.debug.unresolved
+  translation: "Unresolved"
+- id: logger.apkindex.info.all_packages_already_installed
+  translation: "All packages already installed"
+- id: logger.apkindex.info.indexes_loaded
+  translation: "Indexes loaded"
+- id: logger.apkindex.info.installing_apk_packages
+  translation: "Installing APK packages"
+- id: logger.apkindex.info.repo_fetched
+  translation: "Repo fetched"
+- id: logger.apkindex.info.resolved_transitive_deps
+  translation: "Resolved transitive deps"
+- id: logger.apkindex.info.updating_indexes
+  translation: "Updating indexes"
+- id: logger.apkindex.warn.could_not_detect_apk
+  translation: "Could not detect APK architecture"
+- id: logger.apkindex.warn.fetch_failed
+  translation: "Fetch failed"
+- id: logger.apkindex.warn.parse_failed
+  translation: "Parse failed"
+- id: logger.apkindex.warn.skipping_unsafe_apk_symlink
+  translation: "Skipping unsafe APK symlink"
+- id: logger.apkindex.warn.skipping_unsafe_path_apk
+  translation: "Skipping unsafe path in APK archive"
+- id: logger.aptinstall.debug.installing
+  translation: "Installing"
+- id: logger.aptinstall.debug.ldconfig_not_found_skipping
+  translation: "Ldconfig not found, skipping linker cache refresh"
+- id: logger.aptinstall.debug.running_maintainer_scriptlet
+  translation: "Running maintainer scriptlet"
+- id: logger.aptinstall.debug.scriptlet_stdout
+  translation: "Scriptlet stdout"
+- id: logger.aptinstall.debug.skipping_foreign_arch_non
+  translation: "Skipping foreign-arch non-multiarch package"
+- id: logger.aptinstall.info.downloaded_packages
+  translation: "Downloaded packages"
+- id: logger.aptinstall.info.installation_complete
+  translation: "Installation complete"
+- id: logger.aptinstall.info.installed
+  translation: "Installed"
+- id: logger.aptinstall.info.installed_unconfigured
+  translation: "Installed (unconfigured)"
+- id: logger.aptinstall.info.resolved_dependencies
+  translation: "Resolved dependencies"
+- id: logger.aptinstall.info.skipping_existing_conffile
+  translation: "Skipping existing conffile"
+- id: logger.aptinstall.warn.ldconfig_failed
+  translation: "Ldconfig failed"
+- id: logger.aptinstall.warn.postinst_failed_leaving_package
+  translation: "Postinst failed; leaving package unpacked but not configured"
+- id: logger.aptinstall.warn.skipping_path_traversal_attempt
+  translation: "Skipping path traversal attempt"
+- id: logger.aptinstall.warn.skipping_unsafe_symlink
+  translation: "Skipping unsafe symlink"
+- id: logger.aptrepo.debug.fetching_source
+  translation: "Fetching source"
+- id: logger.aptrepo.info.cache_reloaded
+  translation: "Cache reloaded"
+- id: logger.aptrepo.info.source_fetched
+  translation: "Source fetched"
+- id: logger.aptrepo.info.updating_indexes
+  translation: "Updating indexes"
+- id: logger.aptrepo.info.verified_inrelease_signature
+  translation: "Verified InRelease signature"
+- id: logger.aptrepo.info.verified_release_gpg_signature
+  translation: "Verified Release.gpg signature"
+- id: logger.aptrepo.warn.accepting_unsigned_inrelease_opt
+  translation: "Accepting unsigned InRelease (opt-in)"
+- id: logger.aptrepo.warn.accepting_unsigned_release_opt
+  translation: "Accepting unsigned Release (opt-in)"
+- id: logger.aptrepo.warn.apt_component_fetch_failed
+  translation: "Apt component fetch failed"
+- id: logger.aptrepo.warn.skipping_inrelease_signature_check
+  translation: "Skipping InRelease signature check (no trust anchor)"
+- id: logger.aptrepo.warn.skipping_inrelease_signature_check_unknown
+  translation: "Skipping InRelease signature check (unknown signer, opt-in)"
+- id: logger.aptrepo.warn.skipping_release_gpg_signature
+  translation: "Skipping Release.gpg signature check (no trust anchor)"
+- id: logger.aptrepo.warn.skipping_release_gpg_signature_check
+  translation: "Skipping Release.gpg signature check (unknown signer, opt-in)"
+- id: logger.aptrepo.warn.source_fetch_failed
+  translation: "Source fetch failed"
+- id: logger.binary.warn.cross_strip_not_found
+  translation: "Cross-strip not found and binary is foreign-arch; skipping strip"
+- id: logger.binary.warn.cross_strip_not_found_path
+  translation: "Cross-strip not found in PATH, falling back to native strip"
+- id: logger.binary.warn.failed_add_debuglink
+  translation: "Failed to add debuglink"
+- id: logger.binary.warn.skipping_strip_binary_foreign
+  translation: "Skipping strip: binary is foreign-arch and no cross-strip configured"
+- id: logger.builder.warn.failed_parse_split_package
+  translation: "Failed to parse split-package overrides, using global values"
+- id: logger.builder.warn.no_package_function_found
+  translation: "No package function found for split sub-package, skipping"
+- id: logger.command.debug.graph_options
+  translation: "Graph options"
+- id: logger.command.error.container_pipeline_failed
+  translation: "Container pipeline failed"
+- id: logger.command.error.container_run_failed
+  translation: "Container run failed"
+- id: logger.command.error.failed_detect_container_runtime
+  translation: "Failed to detect container runtime"
+- id: logger.command.info.dispatching_container
+  translation: "Dispatching to container"
+- id: logger.command.info.dispatching_pipeline_container
+  translation: "Dispatching pipeline to container"
+- id: logger.command.info.using_container_runtime
+  translation: "Using container runtime"
+- id: logger.common.debug.cross_compilation_toolchain_validation
+  translation: "Cross-compilation toolchain validation passed"
+- id: logger.common.debug.cross_strip_env_configured
+  translation: "Cross-strip env configured"
+- id: logger.common.debug.extracting_cross_build_dep
+  translation: "Extracting cross-build dep"
+- id: logger.common.debug.skipping_host_transitive_arch
+  translation: "Skipping host/transitive arch-all cross-dep"
+- id: logger.common.debug.validating_cross_compilation_toolchain
+  translation: "Validating cross-compilation toolchain availability"
+- id: logger.common.info.ccache_active_cross_compilation
+  translation: "Ccache active for cross-compilation"
+- id: logger.common.info.cross_build_deps_no
+  translation: "Cross-build deps: no runtime deps to fetch"
+- id: logger.common.info.cross_build_deps_using
+  translation: "Cross-build deps: using native install (no closure extract)"
+- id: logger.common.info.fetching_cross_build_runtime
+  translation: "Fetching cross-build runtime deps"
+- id: logger.common.info.installing_cross_compiler_toolchain
+  translation: "Installing cross-compiler toolchain"
+- id: logger.common.info.installing_environment_dependencies_via
+  translation: "Installing environment dependencies via package manager"
+- id: logger.common.info.installing_rpm_dependencies_via
+  translation: "Installing RPM dependencies via dnfinstall"
+- id: logger.common.info.qualifying_makedepends_target_architecture
+  translation: "Qualifying makedepends for target architecture"
+- id: logger.common.info.resolved_cross_deps_closure
+  translation: "Resolved cross-deps closure"
+- id: logger.common.info.skipped_host_transitive_arch
+  translation: "Skipped host/transitive arch-all cross-deps"
+- id: logger.common.info.skipping_toolchain_validation
+  translation: "Skipping toolchain validation"
+- id: logger.common.warn.cross_strip_env_failed
+  translation: "Cross-strip env: failed to resolve toolchain, strip will use native tools"
+- id: logger.common.warn.failed_write_cmake_toolchain
+  translation: "Failed to write CMake toolchain file"
+- id: logger.common.warn.unresolvable_transitive_cross_deps
+  translation: "Unresolvable transitive cross-deps (continuing)"
+- id: logger.common.warn.update_ccache_symlinks_failed
+  translation: "Update-ccache-symlinks failed"
+- id: logger.container.debug.container_runtime_auto_detected
+  translation: "Container runtime auto-detected"
+- id: logger.container.info.no_usable_podman_docker
+  translation: "No usable podman/docker found, using built-in rootless runner"
+- id: logger.container.warn.container_cli_installed_but
+  translation: "Container CLI installed but not reachable, trying next backend"
+- id: logger.deb.warn.failed_close_changelog_file
+  translation: "Failed to close changelog file"
+- id: logger.deb.warn.failed_close_file
+  translation: "Failed to close file"
+- id: logger.deb.warn.failed_close_gzip_writer
+  translation: "Failed to close gzip writer"
+- id: logger.dnfcache.debug.downloaded_rpm
+  translation: "Downloaded RPM"
+- id: logger.dnfcache.debug.enqueue_install
+  translation: "Enqueue install"
+- id: logger.dnfcache.debug.legacy_bdb_rpmdb_falling
+  translation: "Legacy BDB rpmdb, falling back to rpm -qa"
+- id: logger.dnfcache.debug.modules_index_path
+  translation: "Modules index path"
+- id: logger.dnfcache.debug.no_primary_xml_files
+  translation: "No primary.xml files to load"
+- id: logger.dnfcache.debug.primary_index_path
+  translation: "Primary index path"
+- id: logger.dnfcache.debug.resolved_virtual
+  translation: "Resolved virtual"
+- id: logger.dnfcache.debug.resolver_state_loaded
+  translation: "Resolver state loaded"
+- id: logger.dnfcache.debug.skip_already_satisfied
+  translation: "Skip (already satisfied)"
+- id: logger.dnfcache.debug.skip_malformed_modules_yaml
+  translation: "Skip malformed modules.yaml doc"
+- id: logger.dnfcache.debug.unresolved
+  translation: "Unresolved"
+- id: logger.dnfcache.debug.unresolved_weak_ignored
+  translation: "Unresolved (weak, ignored)"
+- id: logger.dnfcache.info.downloading_packages
+  translation: "Downloading packages"
+- id: logger.dnfcache.info.fetched_repo
+  translation: "Fetched repo"
+- id: logger.dnfcache.info.fetching_repos
+  translation: "Fetching repos"
+- id: logger.dnfcache.info.index_loaded
+  translation: "Index loaded"
+- id: logger.dnfcache.info.installing_rpm_packages
+  translation: "Installing RPM packages"
+- id: logger.dnfcache.info.module_index_loaded
+  translation: "Module index loaded"
+- id: logger.dnfcache.info.no_enabled_repos_found
+  translation: "No enabled repos found"
+- id: logger.dnfcache.info.resolved_transitive_deps
+  translation: "Resolved transitive deps"
+- id: logger.dnfcache.warn.failed_fetch_modules_yaml
+  translation: "Failed to fetch modules.yaml"
+- id: logger.dnfcache.warn.failed_fetch_repo
+  translation: "Failed to fetch repo"
+- id: logger.dnfcache.warn.failed_parse_modules_yaml
+  translation: "Failed to parse modules.yaml"
+- id: logger.dnfcache.warn.failed_parse_primary_index
+  translation: "Failed to parse primary index"
+- id: logger.dnfcache.warn.unresolvable_dependency
+  translation: "Unresolvable dependency"
+- id: logger.dnfinstall.debug.downloaded_rpm
+  translation: "Downloaded RPM"
+- id: logger.dnfinstall.debug.extracted_rpm
+  translation: "Extracted RPM"
+- id: logger.dnfinstall.debug.ldconfig_not_found_skipping
+  translation: "Ldconfig not found; skipping ld.so.cache refresh"
+- id: logger.dnfinstall.debug.refreshed_ld_so_cache
+  translation: "Refreshed ld.so.cache"
+- id: logger.dnfinstall.debug.running_rpm_scriptlet
+  translation: "Running RPM scriptlet"
+- id: logger.dnfinstall.debug.scriptlet_stdout
+  translation: "Scriptlet stdout"
+- id: logger.dnfinstall.debug.skipped_unreadable_keyring_file
+  translation: "Skipped unreadable keyring file"
+- id: logger.dnfinstall.debug.skipping_chroot_not_running
+  translation: "Skipping chroot, not running as root"
+- id: logger.dnfinstall.debug.skipping_ldconfig_not_running
+  translation: "Skipping ldconfig, not running as root"
+- id: logger.dnfinstall.debug.skipping_non_regular_rpm
+  translation: "Skipping non-regular RPM entry"
+- id: logger.dnfinstall.debug.unresolved_package
+  translation: "Unresolved package"
+- id: logger.dnfinstall.info.installation_complete
+  translation: "Installation complete"
+- id: logger.dnfinstall.info.installed_rpm_file
+  translation: "Installed RPM file"
+- id: logger.dnfinstall.info.installed_rpm_package
+  translation: "Installed RPM package"
+- id: logger.dnfinstall.warn.failed_load_rpm_keyring
+  translation: "Failed to load RPM keyring, skipping verification"
+- id: logger.dnfinstall.warn.ldconfig_refresh_failed_continuing
+  translation: "Ldconfig refresh failed (continuing)"
+- id: logger.dnfinstall.warn.ldconfig_stderr
+  translation: "Ldconfig stderr"
+- id: logger.dnfinstall.warn.no_keys_rpm_keyring
+  translation: "No keys in RPM keyring, skipping verification"
+- id: logger.dnfinstall.warn.postin_scriptlet_failed_continuing
+  translation: "Postin scriptlet failed (continuing)"
+- id: logger.dnfinstall.warn.posttrans_scriptlet_failed_continuing
+  translation: "Posttrans scriptlet failed (continuing)"
+- id: logger.dnfinstall.warn.pretrans_scriptlet_failed_continuing
+  translation: "Pretrans scriptlet failed (continuing)"
+- id: logger.dnfinstall.warn.rpm_keyring_not_found
+  translation: "RPM keyring not found, skipping verification"
+- id: logger.dnfinstall.warn.rpm_signature_verification_failed
+  translation: "RPM signature verification failed, skipping"
+- id: logger.dnfinstall.warn.rpm_unsigned_skipping_verification
+  translation: "RPM is unsigned, skipping verification"
+- id: logger.dnfinstall.warn.skipping_lua_scriptlet
+  translation: "Skipping Lua scriptlet"
+- id: logger.dnfinstall.warn.skipping_unsafe_path_rpm
+  translation: "Skipping unsafe path in RPM archive"
+- id: logger.dnfinstall.warn.skipping_unsafe_rpm_symlink
+  translation: "Skipping unsafe RPM symlink"
+- id: logger.dnfinstall.warn.some_packages_could_not
+  translation: "Some packages could not be resolved"
+- id: logger.download.info.downloading
+  translation: "Downloading"
+- id: logger.gensum.info.hashed_source
+  translation: "Hashed source"
+- id: logger.gensum.info.no_source_arrays_found
+  translation: "No source arrays found, nothing to do"
+- id: logger.gensum.info.nothing_changed
+  translation: "Nothing changed"
+- id: logger.gensum.info.skipping_vcs_source
+  translation: "Skipping VCS source"
+- id: logger.gensum.info.updated_checksums
+  translation: "Updated checksums"
+- id: logger.git.info.cloning
+  translation: "Cloning"
+- id: logger.git.info.creating_working_copy_bare
+  translation: "Creating working copy from bare repository"
+- id: logger.mcp.debug.mcp_request
+  translation: "Mcp request"
+- id: logger.mcp.error.mcp_request_failed
+  translation: "Mcp request failed"
+- id: logger.mcp.info.mcp_request_done
+  translation: "Mcp request done"
+- id: logger.options.debug.about_strip_binary
+  translation: "About to strip binary"
+- id: logger.options.debug.compressing_man_page
+  translation: "Compressing man page"
+- id: logger.options.debug.ensuring_file_writable_before
+  translation: "Ensuring file is writable before stripping"
+- id: logger.options.debug.purged_file
+  translation: "Purged file"
+- id: logger.options.debug.purging_file
+  translation: "Purging file"
+- id: logger.options.debug.removing_doc_directory
+  translation: "Removing doc directory"
+- id: logger.options.debug.removing_empty_directory
+  translation: "Removing empty directory"
+- id: logger.options.error.strip_command_failed
+  translation: "Strip command failed"
+- id: logger.options.info.separated_debug_info
+  translation: "Separated debug info"
+- id: logger.options.warn.failed_get_file_info
+  translation: "Failed to get file info"
+- id: logger.options.warn.failed_make_file_writable
+  translation: "Failed to make file writable"
+- id: logger.options.warn.failed_separate_debug_info
+  translation: "Failed to separate debug info"
+- id: logger.options.warn.file_still_not_writable
+  translation: "File still not writable after chmod"
+- id: logger.pacmandb.debug.mirror_failed
+  translation: "Mirror failed"
+- id: logger.pacmandb.debug.trying_mirror
+  translation: "Trying mirror"
+- id: logger.pacmandb.info.repo_synced
+  translation: "Repo synced"
+- id: logger.pacmandb.info.sync_complete
+  translation: "Sync complete"
+- id: logger.pacmandb.info.syncing_repos
+  translation: "Syncing repos"
+- id: logger.pacmandb.warn.repo_sync_failed
+  translation: "Repo sync failed"
+- id: logger.parser.warn.failed_close_pkgbuild_file
+  translation: "Failed to close PKGBUILD file"
+- id: logger.pkgbuild.debug.legacy_bdb_host_falling
+  translation: "Legacy BDB host, falling back to subprocess"
+- id: logger.pkgbuild.info.delegating_package_install_subprocess
+  translation: "Delegating package install to subprocess"
+- id: logger.pkgbuild.info.delegating_package_manager_update
+  translation: "Delegating package-manager update to subprocess"
+- id: logger.pkgbuild.info.refreshed_apt_indexes
+  translation: "Refreshed apt indexes"
+- id: logger.pkgbuild.info.refreshed_pacman_sync_dbs
+  translation: "Refreshed pacman sync DBs"
+- id: logger.pkgbuild.info.resolved_virtual_package
+  translation: "Resolved virtual package"
+- id: logger.pkgbuild.info.resolved_virtual_packages_apt
+  translation: "Resolved virtual packages (apt)"
+- id: logger.pkgbuild.info.resolving_dependencies
+  translation: "Resolving dependencies"
+- id: logger.pkgbuild.info.resolving_virtual_packages_apt
+  translation: "Resolving virtual packages (apt)"
+- id: logger.pkgbuild.warn.failed_parse_split_package
+  translation: "Failed to parse split-package function body for override extraction"
+- id: logger.pkgbuild.warn.open_failed_falling_back
+  translation: "Open failed, falling back to subprocess"
+- id: logger.platform.debug.skipping_recursive_ownership_preservation
+  translation: "Skipping recursive ownership preservation in container"
+- id: logger.project.debug.treating_filtered_package_as
+  translation: "Treating filtered package as internal (local artifact found)"
+- id: logger.project.debug.treating_filtered_package_as_external
+  translation: "Treating filtered package as external (no local artifact)"
+- id: logger.project.info.skipping_dependency
+  translation: "Skipping dependency"
+- id: logger.project.warn.failed_parse_split_package
+  translation: "Failed to parse split-package overrides for packaging"
+- id: logger.repo.info.cross_apt_indexes_refreshed
+  translation: "Cross apt indexes refreshed via aptrepo"
+- id: logger.repo.info.cross_apt_setup_skipped
+  translation: "Cross apt setup skipped (not a debian-like distro)"
+- id: logger.repo.info.dpkg_arch_already_registered
+  translation: "Dpkg arch already registered"
+- id: logger.repo.info.installed_apt_source
+  translation: "Installed apt source"
+- id: logger.repo.info.installed_cross_arch_apt
+  translation: "Installed cross-arch apt source"
+- id: logger.repo.info.installed_yum_repo
+  translation: "Installed yum repo"
+- id: logger.repo.info.registered_dpkg_architecture
+  translation: "Registered dpkg architecture"
+- id: logger.repo.warn.close_failed
+  translation: "Close failed"
+- id: logger.repo.warn.cross_apt_update_some
+  translation: "Cross apt update: some sources failed signature check (non-fatal)"
+- id: logger.repo.warn.rpm_import_failed_non
+  translation: "Rpm --import failed (non-fatal; dnf will still verify via gpgkey= in .repo)"
+- id: logger.repo.warn.unknown_distro_skipping_repo
+  translation: "Unknown distro, skipping repo setup"
+- id: logger.repo.warn.unsupported_format_skipping
+  translation: "Unsupported format, skipping"
+- id: logger.rootless.info.extracting_rootfs
+  translation: "Extracting rootfs"
+- id: logger.rootless.info.pulling_image
+  translation: "Pulling image"
+- id: logger.rootless.info.rootfs_ready
+  translation: "Rootfs ready"
+- id: logger.rootless.info.saving_oci_image_layout
+  translation: "Saving OCI image layout"
+- id: logger.rootless.info.starting_rootless_container
+  translation: "Starting rootless container"
+- id: logger.rootless.warn.bind_mount_failed
+  translation: "Bind mount failed"
+- id: logger.rootless.warn.failed_bind_mount_resolv
+  translation: "Failed to bind mount resolv.conf"
+- id: logger.rootless.warn.failed_remove_rootlesskit_state
+  translation: "Failed to remove rootlesskit state dir"
+- id: logger.rootless.warn.failed_unmount_old_root
+  translation: "Failed to unmount old root"
+- id: logger.rootless.warn.pipe_writer_close_error
+  translation: "Pipe writer close error"
+- id: logger.rootless.warn.restore_env_failed
+  translation: "Restore env failed"
+- id: logger.rootless.warn.rootless_runtime_does_not
+  translation: "Rootless runtime does not support output capture; output goes to host stderr"
+- id: logger.rootless.warn.setenv_failed
+  translation: "Setenv failed"
+- id: logger.rpm.warn.failed_read_changelog_rpm
+  translation: "Failed to read changelog for RPM package"
+- id: logger.rpmdb.debug.initialized_rpmdb_schema
+  translation: "Initialized rpmdb schema"
+- id: logger.rpmdb.info.installed_package_rpmdb
+  translation: "Installed package in rpmdb"
+- id: logger.sbom.debug.generated_sbom
+  translation: "Generated SBOM"
+- id: logger.sbom.warn.failed_marshal_sbom_json
+  translation: "Failed to marshal SBOM to JSON"
+- id: logger.sbom.warn.failed_write_sbom_file
+  translation: "Failed to write SBOM file"
+- id: logger.sbom.warn.unknown_sbom_format
+  translation: "Unknown SBOM format"
+- id: logger.shell.debug.execcapture
+  translation: "ExecCapture"
+- id: logger.shell.info.archive_handler_7z
+  translation: "Archive handler: 7z"
+- id: logger.shell.info.archive_handler_dpkg_deb
+  translation: "Archive handler: dpkg-deb -x"
+- id: logger.shell.info.archive_handler_gunzip_place
+  translation: "Archive handler: gunzip in-place"
+- id: logger.shell.info.archive_handler_gunzip_stdout
+  translation: "Archive handler: gunzip → stdout"
+- id: logger.shell.info.archive_handler_jar
+  translation: "Archive handler: jar"
+- id: logger.shell.info.archive_handler_rpm2cpio
+  translation: "Archive handler: rpm2cpio"
+- id: logger.shell.info.archive_handler_unrar
+  translation: "Archive handler: unrar"
+- id: logger.shell.info.archive_handler_unzip
+  translation: "Archive handler: unzip"
+- id: logger.signing.debug.computed_apk_signature
+  translation: "Computed APK signature"
+- id: logger.signing.debug.default_keys_directory_not
+  translation: "Default keys directory not found"
+- id: logger.signing.debug.failed_get_home_directory
+  translation: "Failed to get home directory"
+- id: logger.signing.debug.found_default_gpg_key
+  translation: "Found default GPG key file"
+- id: logger.signing.debug.found_default_key_file
+  translation: "Found default key file"
+- id: logger.signing.debug.found_default_rsa_key
+  translation: "Found default RSA key file"
+- id: logger.signing.debug.found_format_specific_key
+  translation: "Found format-specific key file"
+- id: logger.signing.debug.loaded_gpg_private_key
+  translation: "Loaded GPG private key for signing"
+- id: logger.signing.debug.loaded_rsa_private_key
+  translation: "Loaded RSA private key for APK signing"
+- id: logger.signing.debug.no_default_key_found
+  translation: "No default key found"
+- id: logger.signing.debug.no_default_key_found_format
+  translation: "No default key found for format"
+- id: logger.signing.debug.resolved_passphrase_cli_flag
+  translation: "Resolved passphrase from CLI flag"
+- id: logger.signing.debug.resolved_passphrase_format_specific
+  translation: "Resolved passphrase from format-specific env var"
+- id: logger.signing.debug.resolved_passphrase_global_env
+  translation: "Resolved passphrase from global env var"
+- id: logger.signing.debug.resolved_passphrase_project_config
+  translation: "Resolved passphrase from project config"
+- id: logger.signing.debug.resolved_signing_key_default
+  translation: "Resolved signing key from default location"
+- id: logger.signing.debug.using_default_key_name
+  translation: "Using default key name for APK signature"
+- id: logger.signing.info.apk_package_signed_successfully
+  translation: "APK package signed successfully"
+- id: logger.signing.info.deb_package_signed_successfully
+  translation: "DEB package signed successfully"
+- id: logger.signing.info.pacman_package_signed_successfully
+  translation: "Pacman package signed successfully"
+- id: logger.signing.info.rpm_package_signed_successfully
+  translation: "RPM package signed successfully"
+- id: logger.source.warn.bare_repo_extraction_failed
+  translation: "Bare repo extraction failed, falling back to fresh clone"
+- id: logger.source.warn.failed_close_source_file
+  translation: "Failed to close source file"
+- id: logger.yap-mcp.error.yap_mcp_server_failed
+  translation: "Yap-mcp server failed"
+- id: logger.yap-mcp.info.parent_already_gone_exiting
+  translation: "Parent already gone; exiting"
+- id: logger.yap-mcp.info.yap_mcp_starting
+  translation: "Yap-mcp starting"
+- id: logger.yap-mcp.info.yap_mcp_stopped
+  translation: "Yap-mcp stopped"
+- id: logger.yap-mcp.warn.prctl_pr_set_pdeathsig
+  translation: "Prctl PR_SET_PDEATHSIG failed"
+- id: logger.apkindex.warn.installing_without_verification
+  translation: "Installing APK packages without signature verification (set InstallOptions.AllowUnverifiedPackages=false to refuse)"
+- id: logger.dnfinstall.debug.rpm_signature_verified
+  translation: "RPM signature verified"
+- id: logger.signing.debug.resolved_signing_key
+  translation: "Resolved signing key"
+- id: logger.common.warn.cross_strip_env_set_failed
+  translation: "Cross-strip env: failed to set variable"

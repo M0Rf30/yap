@@ -76,7 +76,7 @@ func (pb *ProgressBar) Finish() {
 
 	duration := time.Since(pb.startTime)
 
-	logger.Info(i18n.T("logger.finish.info.download_completed_1"),
+	logger.Info(i18n.T("logger.download.info.download_completed_2"),
 		"title", pb.title,
 		"duration", duration)
 }

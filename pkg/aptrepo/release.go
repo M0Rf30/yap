@@ -15,6 +15,7 @@ import (
 
 	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -102,16 +103,14 @@ func verifyInReleaseOrFallback(
 			return nil, keyringErr
 		}
 
-		logger.Warn("skipping InRelease signature check (no trust anchor)",
-			"url", baseURL, "reason", keyringErr)
+		logger.Warn(i18n.T("logger.aptrepo.warn.skipping_inrelease_signature_check"), "url", baseURL, "reason", keyringErr)
 
 		return stripClearsignArmor(data), nil
 	}
 
 	res, err := verifyInRelease(data, keyring)
 	if err == nil {
-		logger.Info("verified InRelease signature",
-			"url", baseURL, "signer", res.signer)
+		logger.Info(i18n.T("logger.aptrepo.info.verified_inrelease_signature"), "url", baseURL, "signer", res.signer)
 
 		return res.body, nil
 	}
@@ -125,8 +124,7 @@ func verifyInReleaseOrFallback(
 				WithContext("url", baseURL)
 		}
 
-		logger.Warn("skipping InRelease signature check (unknown signer, opt-in)",
-			"url", baseURL, "reason", err)
+		logger.Warn(i18n.T("logger.aptrepo.warn.skipping_inrelease_signature_check_unknown"), "url", baseURL, "reason", err)
 
 		return stripClearsignArmor(data), nil
 	}
@@ -145,7 +143,7 @@ func verifyInReleaseOrFallback(
 			WithContext("url", baseURL)
 	}
 
-	logger.Warn("accepting unsigned InRelease (opt-in)", "url", baseURL)
+	logger.Warn(i18n.T("logger.aptrepo.warn.accepting_unsigned_inrelease_opt"), "url", baseURL)
 
 	return stripClearsignArmor(data), nil
 }
@@ -169,8 +167,7 @@ func verifyDetachedOrFallback(
 				WithContext("url", baseURL)
 		}
 
-		logger.Warn("accepting unsigned Release (opt-in)",
-			"url", baseURL, "reason", sigErr)
+		logger.Warn(i18n.T("logger.aptrepo.warn.accepting_unsigned_release_opt"), "url", baseURL, "reason", sigErr)
 
 		return body, nil
 	}
@@ -180,16 +177,14 @@ func verifyDetachedOrFallback(
 			return nil, keyringErr
 		}
 
-		logger.Warn("skipping Release.gpg signature check (no trust anchor)",
-			"url", baseURL, "reason", keyringErr)
+		logger.Warn(i18n.T("logger.aptrepo.warn.skipping_release_gpg_signature"), "url", baseURL, "reason", keyringErr)
 
 		return body, nil
 	}
 
 	res, err := verifyDetachedRelease(body, sig, keyring)
 	if err == nil {
-		logger.Info("verified Release.gpg signature",
-			"url", baseURL, "signer", res.signer)
+		logger.Info(i18n.T("logger.aptrepo.info.verified_release_gpg_signature"), "url", baseURL, "signer", res.signer)
 
 		return res.body, nil
 	}
@@ -202,8 +197,7 @@ func verifyDetachedOrFallback(
 				WithContext("url", baseURL)
 		}
 
-		logger.Warn("skipping Release.gpg signature check (unknown signer, opt-in)",
-			"url", baseURL, "reason", err)
+		logger.Warn(i18n.T("logger.aptrepo.warn.skipping_release_gpg_signature_check"), "url", baseURL, "reason", err)
 
 		return body, nil
 	}

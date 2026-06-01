@@ -16,6 +16,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -48,7 +49,7 @@ func rootfsPath(distro string) (string, error) {
 // (no CLI required) and extracts it to a local rootfs directory.
 func PullImage(distro string) error {
 	ref := constants.DockerOrg + distro
-	logger.Info("pulling image", "ref", ref)
+	logger.Info(i18n.T("logger.rootless.info.pulling_image"), "ref", ref)
 
 	img, err := crane.Pull(ref)
 	if err != nil {
@@ -70,7 +71,7 @@ func PullImage(distro string) error {
 			WithContext("path", storePath)
 	}
 
-	logger.Info("saving OCI image layout", "path", storePath)
+	logger.Info(i18n.T("logger.rootless.info.saving_oci_image_layout"), "path", storePath)
 
 	if err := crane.SaveOCI(img, storePath); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
@@ -79,7 +80,7 @@ func PullImage(distro string) error {
 			WithContext("path", storePath)
 	}
 
-	logger.Info("extracting rootfs", "distro", distro)
+	logger.Info(i18n.T("logger.rootless.info.extracting_rootfs"), "distro", distro)
 
 	return extractRootfs(img, distro)
 }
@@ -116,7 +117,7 @@ func extractRootfs(img v1.Image, distro string) error {
 		exportErr <- crane.Export(img, pw)
 
 		if err := pw.Close(); err != nil {
-			logger.Warn("pipe writer close error", "error", err)
+			logger.Warn(i18n.T("logger.rootless.warn.pipe_writer_close_error"), "error", err)
 		}
 	}()
 
@@ -134,7 +135,7 @@ func extractRootfs(img v1.Image, distro string) error {
 			WithContext("distro", distro)
 	}
 
-	logger.Info("rootfs ready", "path", rootfs)
+	logger.Info(i18n.T("logger.rootless.info.rootfs_ready"), "path", rootfs)
 
 	return nil
 }

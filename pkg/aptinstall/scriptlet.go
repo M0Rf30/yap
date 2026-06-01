@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -104,8 +105,7 @@ func runScriptlet(
 			WithOperation("runScriptlet").WithContext("scriptlet", scriptName).WithContext("path", scriptPath)
 	}
 
-	logger.Debug("running maintainer scriptlet",
-		"package", pkgName,
+	logger.Debug(i18n.T("logger.aptinstall.debug.running_maintainer_scriptlet"), "package", pkgName,
 		"scriptlet", scriptName,
 		"action", action)
 
@@ -128,7 +128,7 @@ func runScriptlet(
 	err := cmd.Run()
 
 	if stdout.Len() > 0 {
-		logger.Debug("scriptlet stdout",
+		logger.Debug(i18n.T("logger.aptinstall.debug.scriptlet_stdout"),
 			"scriptlet", scriptName, "output", strings.TrimRight(stdout.String(), "\n"))
 	}
 

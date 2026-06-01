@@ -66,7 +66,7 @@ func parseOSReleaseFile(path string) (OSRelease, error) {
 
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.parseosrelease.warn.failed_to_close_osrelease_1"), "error", closeErr)
+			logger.Warn(i18n.T("logger.platform.warn.failed_to_close_osrelease"), "error", closeErr)
 		}
 	}()
 
@@ -147,7 +147,7 @@ func GetArchitecture() string {
 func CheckGO() bool {
 	_, err := os.Stat(goExecutable)
 	if err == nil {
-		logger.Info(i18n.T("logger.checkgo.info.go_is_already_installed_1"))
+		logger.Info(i18n.T("logger.platform.info.go_is_already_installed"))
 		return true
 	}
 
@@ -202,7 +202,7 @@ func GOSetup() error {
 			WithOperation("GOSetup")
 	}
 
-	logger.Info(i18n.T("logger.gosetup.info.go_successfully_installed_1"))
+	logger.Info(i18n.T("logger.platform.info.go_successfully_installed"))
 
 	return nil
 }

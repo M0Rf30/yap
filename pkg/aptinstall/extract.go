@@ -10,6 +10,7 @@ import (
 	"github.com/m0rf30/ar"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -209,7 +210,7 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 		// Compute the destination path while rejecting traversal attempts.
 		fullPath, err := safeJoin(destDir, path)
 		if err != nil {
-			logger.Warn("Skipping path traversal attempt", "path", path, "error", err)
+			logger.Warn(i18n.T("logger.aptinstall.warn.skipping_path_traversal_attempt"), "path", path, "error", err)
 
 			continue
 		}
@@ -259,7 +260,7 @@ func extractTarDir(hdr *tar.Header, fullPath string, dirMap map[string]bool) err
 // link target cannot escape destDir.
 func extractTarSymlink(hdr *tar.Header, destDir, fullPath string, dirMap map[string]bool) error {
 	if err := safeSymlinkTarget(destDir, fullPath, hdr.Linkname); err != nil {
-		logger.Warn("Skipping unsafe symlink",
+		logger.Warn(i18n.T("logger.aptinstall.warn.skipping_unsafe_symlink"),
 			"path", hdr.Name, "target", hdr.Linkname, "error", err)
 
 		return nil
@@ -298,7 +299,7 @@ func extractTarFile(
 	dirMap, conffileSet map[string]bool,
 ) error {
 	if conffileSet[fullPath] && fileExists(fullPath) {
-		logger.Info("Skipping existing conffile", "path", fullPath)
+		logger.Info(i18n.T("logger.aptinstall.info.skipping_existing_conffile"), "path", fullPath)
 
 		return nil
 	}

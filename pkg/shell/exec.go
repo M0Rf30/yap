@@ -236,7 +236,7 @@ func ExecCapture(ctx context.Context, out io.Writer, dir, name string, args ...s
 		cmd.Dir = dir
 	}
 
-	logger.Debug("ExecCapture", "command", name, "args", args, "dir", dir)
+	logger.Debug(i18n.T("logger.shell.debug.execcapture"), "command", name, "args", args, "dir", dir)
 
 	if err := cmd.Run(); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "failed to execute command").
@@ -281,7 +281,7 @@ func ExecWithContext(
 	duration := time.Since(start)
 
 	if err != nil {
-		logger.Debug(i18n.T("logger.execwithcontext.error.command_execution_failed_1"),
+		logger.Debug(i18n.T("logger.shell.error.command_execution_failed"),
 			"command", name,
 			"args", args,
 			"dir", dir,
@@ -293,7 +293,7 @@ func ExecWithContext(
 			WithContext("command", name)
 	}
 
-	logger.Debug(i18n.T("logger.execwithcontext.debug.command_execution_completed_1"),
+	logger.Debug(i18n.T("logger.shell.debug.command_execution_completed"),
 		"command", name,
 		"duration", duration)
 
@@ -411,7 +411,7 @@ func RunScriptWithPackage(ctx context.Context, cmds, packageName string, extraEn
 	if packageName != "" {
 		logger.Info(i18n.T("logger.shell.info.exec_script"), "package", packageName)
 	} else {
-		logger.Info(i18n.T("logger.runscriptwithpackage.info.executing_shell_script_3"))
+		logger.Info(i18n.T("logger.shell.info.executing_shell_script"))
 	}
 
 	if cmds != "" {
@@ -490,7 +490,7 @@ func RunScriptWithPackage(ctx context.Context, cmds, packageName string, extraEn
 			WithOperation("RunScriptWithPackage")
 	}
 
-	logger.Debug(i18n.T("logger.runscriptwithpackage.debug.starting_script_execution_1"))
+	logger.Debug(i18n.T("logger.shell.debug.starting_script_execution"))
 
 	err = runner.Run(ctx, script)
 	duration := time.Since(start)
@@ -629,7 +629,7 @@ func RunScriptInFakeroot(ctx context.Context, cmds, packageName string, extraEnv
 	if packageName != "" {
 		logger.Info(i18n.T("logger.shell.info.exec_script"), "package", packageName)
 	} else {
-		logger.Info(i18n.T("logger.runscriptwithpackage.info.executing_shell_script_3"))
+		logger.Info(i18n.T("logger.shell.info.executing_shell_script"))
 	}
 
 	if cmds != "" {
@@ -697,7 +697,7 @@ func RunScriptInFakeroot(ctx context.Context, cmds, packageName string, extraEnv
 			WithOperation("RunScriptInFakeroot")
 	}
 
-	logger.Debug(i18n.T("logger.runscriptwithpackage.debug.starting_script_execution_1"))
+	logger.Debug(i18n.T("logger.shell.debug.starting_script_execution"))
 
 	err = runner.Run(ctx, script)
 	duration := time.Since(start)
@@ -771,12 +771,12 @@ func logScriptResult(err error, packageName string, duration time.Duration, outp
 		scriptErr := extractErrorLines(outputBuf.String(), err.Error())
 
 		if packageName != "" {
-			logger.Error(i18n.T("logger.runscriptwithpackage.error.script_execution_failed_1"),
+			logger.Error(i18n.T("logger.shell.error.script_execution_failed"),
 				"error", scriptErr,
 				"duration", duration,
 				"package", packageName)
 		} else {
-			logger.Error(i18n.T("logger.runscriptwithpackage.error.script_execution_failed_3"),
+			logger.Error(i18n.T("logger.shell.error.script_execution_failed_2"),
 				"error", scriptErr,
 				"duration", duration)
 		}
@@ -786,11 +786,11 @@ func logScriptResult(err error, packageName string, duration time.Duration, outp
 	}
 
 	if packageName != "" {
-		logger.Info(i18n.T("logger.unknown.info.shell_script_execution_completed_1"),
+		logger.Info(i18n.T("logger.shell.info.shell_script_execution_completed"),
 			"duration", duration,
 			"package", packageName)
 	} else {
-		logger.Info(i18n.T("logger.unknown.info.shell_script_execution_completed_3"),
+		logger.Info(i18n.T("logger.shell.info.shell_script_execution_completed_2"),
 			"duration", duration)
 	}
 
@@ -857,7 +857,7 @@ func ExecWithSudoContext(
 	duration := time.Since(start)
 
 	if err != nil {
-		logger.Debug(i18n.T("logger.unknown.error.command_execution_failed_1"),
+		logger.Debug(i18n.T("logger.shell.error.command_execution_failed_2"),
 			"command", name,
 			"args", args,
 			"dir", dir,
@@ -870,7 +870,7 @@ func ExecWithSudoContext(
 			WithContext("command", name)
 	}
 
-	logger.Debug(i18n.T("logger.unknown.debug.command_execution_completed_1"),
+	logger.Debug(i18n.T("logger.shell.debug.command_execution_completed_2"),
 		"command", name,
 		"duration", duration,
 		"sudo", needsSudo)

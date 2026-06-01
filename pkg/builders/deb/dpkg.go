@@ -63,7 +63,7 @@ func (d *Package) BuildPackage(ctx context.Context, artifactsPath string, target
 	defer func() {
 		err := os.RemoveAll(debTemp)
 		if err != nil {
-			logger.Warn(i18n.T("logger.buildpackage.warn.failed_to_remove_temporary_1"),
+			logger.Warn(i18n.T("logger.deb.warn.failed_to_remove_temporary"),
 				"path", debTemp, "error", err)
 		}
 	}()
@@ -173,7 +173,7 @@ func addArFileFromPath(writer *ar.Writer, name string, filePath string, modtime 
 
 	defer func() {
 		if cerr := f.Close(); cerr != nil {
-			logger.Warn("failed to close file", "path", filePath, "error", cerr)
+			logger.Warn(i18n.T("logger.deb.warn.failed_close_file"), "path", filePath, "error", cerr)
 		}
 	}()
 
@@ -332,7 +332,7 @@ func (d *Package) createChangelogFile() error {
 
 	defer func() {
 		if cerr := changelogFile.Close(); cerr != nil {
-			logger.Warn("failed to close changelog file", "path", changelogPath,
+			logger.Warn(i18n.T("logger.deb.warn.failed_close_changelog_file"), "path", changelogPath,
 				"error", cerr)
 		}
 	}()
@@ -340,7 +340,7 @@ func (d *Package) createChangelogFile() error {
 	gzWriter := gzip.NewWriter(changelogFile)
 	defer func() {
 		if cerr := gzWriter.Close(); cerr != nil {
-			logger.Warn("failed to close gzip writer", "path", changelogPath,
+			logger.Warn(i18n.T("logger.deb.warn.failed_close_gzip_writer"), "path", changelogPath,
 				"error", cerr)
 		}
 	}()
@@ -375,7 +375,7 @@ func (d *Package) createDeb(artifactPath, control, data string) (string, error) 
 	defer func() {
 		err := debPackage.Close()
 		if err != nil {
-			logger.Warn(i18n.T("logger.createdeb.warn.failed_to_close_debian_1"), "error", err)
+			logger.Warn(i18n.T("logger.deb.warn.failed_to_close_debian"), "error", err)
 		}
 	}()
 
@@ -573,7 +573,7 @@ func md5File(path string) (string, error) {
 
 	defer func() {
 		if cerr := f.Close(); cerr != nil {
-			logger.Warn("failed to close file", "path", path, "error", cerr)
+			logger.Warn(i18n.T("logger.deb.warn.failed_close_file"), "path", path, "error", cerr)
 		}
 	}()
 

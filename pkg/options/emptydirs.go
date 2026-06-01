@@ -38,7 +38,7 @@ func RemoveEmptyDirs(packageDir string) error {
 			}
 
 			if len(entries) == 0 {
-				logger.Debug("removing empty directory", "path", path)
+				logger.Debug(i18n.T("logger.options.debug.removing_empty_directory"), "path", path)
 
 				if err := os.Remove(path); err != nil { //nolint:gosec
 					return err

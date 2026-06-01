@@ -19,6 +19,7 @@ import (
 	"github.com/klauspost/compress/gzip"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -53,7 +54,7 @@ func NewRSASigner(cfg Config) (*RSASigner, error) {
 		return nil, err
 	}
 
-	logger.Debug("Loaded RSA private key for APK signing",
+	logger.Debug(i18n.T("logger.signing.debug.loaded_rsa_private_key"),
 		"key_path", cfg.KeyPath, "key_size", key.N.BitLen())
 
 	return &RSASigner{
@@ -143,8 +144,7 @@ func (s *RSASigner) Sign(ctx context.Context, artifactPath string) error {
 			WithContext("artifact_path", artifactPath)
 	}
 
-	logger.Debug("Computed APK signature",
-		"artifact_path", artifactPath,
+	logger.Debug(i18n.T("logger.signing.debug.computed_apk_signature"), "artifact_path", artifactPath,
 		"signature_size", len(signature),
 		"key_name", s.cfg.KeyName)
 
@@ -200,8 +200,7 @@ func (s *RSASigner) Sign(ctx context.Context, artifactPath string) error {
 			WithContext("artifact_path", artifactPath)
 	}
 
-	logger.Info("APK package signed successfully",
-		"artifact_path", artifactPath,
+	logger.Info(i18n.T("logger.signing.info.apk_package_signed_successfully"), "artifact_path", artifactPath,
 		"key_name", s.cfg.KeyName)
 
 	return nil
@@ -224,8 +223,7 @@ func (s *RSASigner) createSignatureTar(signature []byte) ([]byte, error) {
 			keyName = "yap"
 		}
 
-		logger.Debug("Using default key name for APK signature",
-			"key_name", keyName)
+		logger.Debug(i18n.T("logger.signing.debug.using_default_key_name"), "key_name", keyName)
 	}
 
 	// Create tar entry name

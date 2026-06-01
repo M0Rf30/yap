@@ -17,6 +17,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
@@ -57,7 +58,7 @@ func Setup(distro string, repos []Repo) error {
 
 	pm := constants.DistroToPackageManager[distro]
 	if pm == "" {
-		logger.Warn("repo: unknown distro, skipping repo setup", "distro", distro)
+		logger.Warn(i18n.T("logger.repo.warn.unknown_distro_skipping_repo"), "distro", distro)
 
 		return nil
 	}
@@ -103,8 +104,7 @@ func setupOne(pm string, r *Repo, distro string, idx int) error {
 
 		return setupRPM(r)
 	default:
-		logger.Warn("repo: unsupported format, skipping",
-			"name", r.Name,
+		logger.Warn(i18n.T("logger.repo.warn.unsupported_format_skipping"), "name", r.Name,
 			"format", format)
 
 		return nil
@@ -261,6 +261,6 @@ func fetchKey(url, dst string) error {
 // closeQuiet closes c and logs a warning instead of swallowing the error.
 func closeQuiet(c io.Closer, what string) {
 	if err := c.Close(); err != nil {
-		logger.Warn("repo: close failed", "target", what, "error", err)
+		logger.Warn(i18n.T("logger.repo.warn.close_failed"), "target", what, "error", err)
 	}
 }

@@ -37,7 +37,7 @@ var pullCmd = &cobra.Command{
 			logger.Fatal(i18n.T("logger.pull.failed_to_pull"), "error", err)
 		}
 
-		logger.Info("using container runtime", "type", string(rt.Type()))
+		logger.Info(i18n.T("logger.command.info.using_container_runtime"), "type", string(rt.Type()))
 
 		if err := rt.Pull(args[0]); err != nil {
 			logger.Fatal(i18n.T("logger.pull.failed_to_pull"), "error", err)

@@ -23,6 +23,7 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/M0Rf30/yap/v2/pkg/buildinfo"
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	yapmcp "github.com/M0Rf30/yap/v2/pkg/mcp"
 )
@@ -40,8 +41,7 @@ func main() {
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	logger.Info("yap-mcp starting",
-		"version", buildinfo.Version,
+	logger.Info(i18n.T("logger.yap-mcp.info.yap_mcp_starting"), "version", buildinfo.Version,
 		"commit", buildinfo.Commit,
 		"transport", "stdio",
 	)
@@ -55,10 +55,10 @@ func main() {
 	stop()
 
 	if err != nil && !isContextError(err) {
-		logger.Fatal("yap-mcp server failed", "error", err)
+		logger.Fatal(i18n.T("logger.yap-mcp.error.yap_mcp_server_failed"), "error", err)
 	}
 
-	logger.Info("yap-mcp stopped")
+	logger.Info(i18n.T("logger.yap-mcp.info.yap_mcp_stopped"))
 }
 
 // isContextError reports whether err is a benign context cancellation,

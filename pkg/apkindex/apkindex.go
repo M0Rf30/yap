@@ -17,6 +17,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
@@ -119,8 +120,7 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 		if !ok {
 			// Try virtual package resolution.
 			if vp, ok := idx.ResolveVirtual(n); ok {
-				logger.Debug("apkindex: resolved virtual",
-					"capability", n,
+				logger.Debug(i18n.T("logger.apkindex.debug.resolved_virtual"), "capability", n,
 					"provider", vp.Name)
 
 				viaVirtual++
@@ -128,7 +128,7 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 				pkg = vp
 			} else {
 				// Package not found — skip it; apk will reject it later if needed.
-				logger.Debug("apkindex: unresolved", "package", n)
+				logger.Debug(i18n.T("logger.apkindex.debug.unresolved"), "package", n)
 
 				unresolved++
 
@@ -153,8 +153,7 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 			}
 		}
 
-		logger.Debug("apkindex: enqueue install",
-			"package", pkg.Name,
+		logger.Debug(i18n.T("logger.apkindex.debug.enqueue_install"), "package", pkg.Name,
 			"version", pkg.Version,
 			"size", pkg.Size)
 
@@ -169,8 +168,7 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 		}
 	}
 
-	logger.Info("apkindex: resolved transitive deps",
-		"seeds", len(names),
+	logger.Info(i18n.T("logger.apkindex.info.resolved_transitive_deps"), "seeds", len(names),
 		"to_install", len(out),
 		"via_virtual", viaVirtual,
 		"unresolved", unresolved)

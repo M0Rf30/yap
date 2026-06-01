@@ -62,7 +62,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	logger.Info(i18n.T("logger.runinstall.info.detected_package_type_1"),
+	logger.Info(i18n.T("logger.command.info.detected_package_type"),
 		"artifact", absPath,
 		"type", packageType)
 
@@ -97,7 +97,7 @@ func detectPackageType(filePath string) (string, error) {
 func installPackage(packageType, artifactPath string) error {
 	// RPM: use dnfinstall
 	if packageType == packageTypeRPM {
-		logger.Info(i18n.T("logger.installpackage.info.installing_package_1"),
+		logger.Info(i18n.T("logger.command.info.installing_package"),
 			"command", "dnfinstall",
 			"artifact", artifactPath)
 
@@ -116,7 +116,7 @@ func installPackage(packageType, artifactPath string) error {
 				WithContext("packageType", packageType)
 		}
 
-		logger.Info(i18n.T("logger.installpackage.info.package_installed_successfully_1"),
+		logger.Info(i18n.T("logger.command.info.package_installed_successfully"),
 			"artifact", artifactPath,
 			"type", packageType)
 
@@ -149,7 +149,7 @@ func installPackage(packageType, artifactPath string) error {
 			WithContext("packageType", packageType)
 	}
 
-	logger.Info(i18n.T("logger.installpackage.info.installing_package_1"),
+	logger.Info(i18n.T("logger.command.info.installing_package"),
 		"command", cmd,
 		"args", strings.Join(args, " "),
 		"artifact", artifactPath)
@@ -164,7 +164,7 @@ func installPackage(packageType, artifactPath string) error {
 			WithContext("packageType", packageType)
 	}
 
-	logger.Info(i18n.T("logger.installpackage.info.package_installed_successfully_1"),
+	logger.Info(i18n.T("logger.command.info.package_installed_successfully"),
 		"artifact", artifactPath,
 		"type", packageType)
 

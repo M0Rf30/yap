@@ -179,7 +179,7 @@ func CreateTarCompressed(
 
 	defer func() {
 		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.createtarzst.warn.failed_to_close_output_1"),
+			logger.Warn(i18n.T("logger.archive.warn.failed_to_close_output"),
 				"path", cleanOut,
 				"error", closeErr)
 		}

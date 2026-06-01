@@ -130,7 +130,7 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 	defer func() {
 		err := rpmFile.Close()
 		if err != nil {
-			logger.Warn(i18n.T("logger.unknown.warn.failed_to_close_rpm_1"), "path", cleanFilePath,
+			logger.Warn(i18n.T("logger.rpm.warn.failed_to_close_rpm"), "path", cleanFilePath,
 				"error", err)
 		}
 	}()
@@ -268,8 +268,7 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 func (r *RPM) addChangelog(rpm *rpmpack.RPM) {
 	changelogData, err := r.PKGBUILD.ReadChangelog()
 	if err != nil {
-		logger.Warn("failed to read changelog for RPM package",
-			"error", err)
+		logger.Warn(i18n.T("logger.rpm.warn.failed_read_changelog_rpm"), "error", err)
 
 		return
 	}
