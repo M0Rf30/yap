@@ -13,7 +13,7 @@ description: |
 # Driving yap-mcp
 
 > The authoritative, generated tool/prompt/resource inventory (with
-> annotations) lives in [`docs/mcp-surface.md`](../../docs/mcp-surface.md),
+> annotations) lives in `docs/mcp-surface.md` (in the yap repo root),
 > produced by `go generate ./pkg/mcp/...`. This card is the curated guide;
 > that file is the source of truth.
 
