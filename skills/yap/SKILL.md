@@ -12,6 +12,11 @@ description: |
 
 # Driving yap-mcp
 
+> The authoritative, generated tool/prompt/resource inventory (with
+> annotations) lives in [`docs/mcp-surface.md`](../../docs/mcp-surface.md),
+> produced by `go generate ./pkg/mcp/...`. This card is the curated guide;
+> that file is the source of truth.
+
 ## Picking the right tool
 
 | Want to                                  | Use                          |
@@ -20,6 +25,8 @@ description: |
 | Parse a PKGBUILD into structured JSON    | `parse_pkgbuild(path)`       |
 | See the project's dependency graph       | `graph(path)`                |
 | List supported distros + pkg managers    | `list_distros()`             |
+| Normalize/auto-detect distro + release   | `resolve_distro(distro?, release?)` |
+| yap version + runtime/container info     | `status()`                   |
 | Find prebuilt container image tags       | `list_images()`              |
 | Pre-fetch one image for offline use      | `pull(distro)`               |
 | Prepare the host (toolchain + makedeps)  | `prepare(distro?)`           |

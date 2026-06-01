@@ -274,13 +274,15 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 
 ### MCP surface (`pkg/mcp/`, `cmd/yap-mcp/`)
 
-- Tools: `validate`, `parse_pkgbuild`, `graph`, `build` (async + buildID), `build_status`, `build_wait`, `build_logs` (tail/since/grep), `build_cancel`, `list_artifacts`, `inspect`, `install`, `prepare`, `pull`, `zap`, `list_distros`, `list_images`, `resolve_distro`, `status`.
-- Prompts: `build_single_pkg`, `cross_compile`, `sign_and_release`.
-- Resources: `yap://distros`, `yap://pkgbuild/{path}`.
+- Tools (19): `validate`, `parse_pkgbuild`, `graph`, `build` (async + buildID), `build_status`, `build_wait`, `build_summary`, `build_logs` (tail/since/grep), `build_cancel`, `list_artifacts`, `inspect`, `install`, `prepare`, `pull`, `zap`, `list_distros`, `list_images`, `resolve_distro`, `status`.
+- Prompts (2): `build_single_pkg`, `cross_compile`.
+- Resources (1): `yap://distros`.
+- The exact tool/prompt/resource sets are enforced by `pkg/mcp/surface_test.go` (Test{Tool,Prompt,Resource}SurfaceExact). Adding or removing one fails CI until this list, `skills/yap/SKILL.md`, and the test's expected set are all updated together.
+- `docs/mcp-surface.md` is the generated source-of-truth inventory (names + annotations + descriptions); regenerate with `go generate ./pkg/mcp/...` (runs `cmd/mcp-surface`) after any surface change.
 - Handlers are intentionally thin wrappers over the existing `pkg/project`, `pkg/parser`, `pkg/packer`, `pkg/container`, `pkg/signing`, `pkg/dnfinstall` packages — do not duplicate build logic in `pkg/mcp`.
 - `BuildSession.Done()` channel is closed by `Finish`; use it instead of polling for new wait-style tools.
 - Tool annotations: `ReadOnlyHint` + `IdempotentHint` for inspectors; `DestructiveHint` for `build`, `install`, `prepare`, `zap`.
-- Skill card lives at `.opencode/skills/yap/SKILL.md`; keep it in sync when adding tools/prompts.
+- Skill card lives at `skills/yap/SKILL.md`; keep it in sync when adding tools/prompts (enforced by `pkg/mcp/surface_test.go`).
 - Install script: `scripts/install.sh` (curl|sh; Linux/Darwin × amd64/arm64).
 
 ### Development priorities

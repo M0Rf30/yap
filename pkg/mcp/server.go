@@ -12,6 +12,8 @@
 // translate results into MCP tool/resource payloads.
 package mcp
 
+//go:generate go run ../../cmd/mcp-surface
+
 import (
 	"context"
 	"runtime"
