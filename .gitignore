@@ -10,7 +10,9 @@
 /dist/
 /releases/
 artifacts/
-docs/
+docs/*
+# Generated MCP surface inventory is tracked (source of truth for SKILL/AGENTS)
+!docs/mcp-surface.md
 
 # Go build cache
 *.test
