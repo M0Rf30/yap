@@ -2,7 +2,7 @@
 
 ## Project overview
 
-**YAP (Yet Another Packager)** builds native packages for multiple GNU/Linux distributions from a single PKGBUILD specification. Written in Go; uses OCI containers (Docker/Podman) for isolated, reproducible builds across 15 supported distributions.
+**YAP (Yet Another Packager)** builds native packages for multiple GNU/Linux distributions from a single PKGBUILD specification. Written in Go; uses OCI containers (Docker/Podman) for isolated, reproducible builds across 15 supported distributions and 5 package managers (apk, apt, pacman, yum, zypper).
 
 ### Key packages
 
@@ -13,9 +13,9 @@
 | `pkg/mcp/` | MCP tool/resource/prompt registrations; thin wrappers over yap pkgs |
 | `pkg/project/` | `MultipleProject`, `BuildAll`, multi-package orchestration |
 | `pkg/core/` | Project config struct (`yap.json`) |
-| `pkg/builders/{apk,deb,rpm,pacman}` | Format-specific builders |
+| `pkg/builders/{apk,deb,rpm,pacman}` | Format-specific builders (openSUSE/zypper uses the `rpm` builder) |
 | `pkg/builders/common` | `BaseBuilder`, shared helpers, cross-compilation |
-| `pkg/packer/` | Selects the right builder per distro/package manager |
+| `pkg/packer/` | Selects the right builder per distro/package manager (`yum`+`zypper` → RPM) |
 | `pkg/graph/` | Build order / dependency resolution |
 | `pkg/source/` | Source download and validation |
 | `pkg/pkgbuild/`, `pkg/parser/` | Extended PKGBUILD format |

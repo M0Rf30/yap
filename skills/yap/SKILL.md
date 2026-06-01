@@ -107,6 +107,12 @@ worrying about argv leakage.
   Provide a distro tag (e.g. `ubuntu-jammy`) to dispatch the build into a
   matching container image. Cross-arch builds usually need a distro arg so
   the right cross-toolchain is available.
+- **Formats & package managers**: 15 distros across 5 package managers —
+  `apt` (Debian/Ubuntu/Mint/Pop → `.deb`), `yum` and `zypper`
+  (Fedora/RHEL/Rocky/Alma/Amazon/Oracle/CentOS **and** openSUSE Leap/Tumbleweed
+  → `.rpm`), `apk` (Alpine → `.apk`), `pacman` (Arch → `.pkg.tar.zst`).
+  openSUSE/`zypper` is RPM-format and uses the `rpm` builder — there is no
+  separate zypper builder. Call `list_distros` for the authoritative set.
 - **Async builds**: `build` returns a `buildID` instantly. The actual work
   runs in a goroutine. Always pair `build` with `build_wait` or
   `build_status` polling.
