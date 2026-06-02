@@ -11,7 +11,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.7.0
 	github.com/go-git/go-git/v5 v5.19.1
-	github.com/go-playground/validator/v10 v10.30.2
+	github.com/go-playground/validator/v10 v10.30.3
 	github.com/google/go-containerregistry v0.21.6
 	github.com/klauspost/compress v1.18.6
 	github.com/klauspost/pgzip v1.2.6
@@ -20,7 +20,7 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
 	github.com/nwaples/rardecode/v2 v2.2.3
 	github.com/otiai10/copy v1.14.1
-	github.com/pierrec/lz4/v4 v4.1.26
+	github.com/pierrec/lz4/v4 v4.1.27
 	github.com/rootless-containers/rootlesskit/v2 v2.3.6
 	github.com/sassoftware/go-rpmutils v0.4.0
 	github.com/spf13/cobra v1.10.2
