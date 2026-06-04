@@ -161,6 +161,25 @@ artifacts/
 | `projects` | — | Array of packages to build |
 | `depends` | — | Build-time ordering dependencies |
 
+### Editor validation (JSON Schema)
+
+A JSON Schema for `yap.json` ships at the repo root: [`yap.schema.json`](./yap.schema.json).
+It documents every supported field (compression, signing, repos, SBOM,
+cross-compilation, etc.). Reference it from your `yap.json` for autocomplete and
+inline validation in editors that support JSON Schema:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/M0Rf30/yap/main/yap.schema.json",
+  "name": "My Multi-Package Project",
+  "...": "..."
+}
+```
+
+The schema is also being submitted to [SchemaStore](https://www.schemastore.org)
+so editors validate any `yap.json` by filename automatically — no `$schema`
+line required.
+
 ## PKGBUILD extensions
 
 ### Distribution-specific variables
