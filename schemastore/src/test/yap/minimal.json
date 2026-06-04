@@ -1,0 +1,7 @@
+{
+  "name": "hello-world",
+  "description": "Minimal valid yap project",
+  "buildDir": "/tmp/yap-build",
+  "output": "artifacts",
+  "projects": [{ "name": "hello-world" }]
+}

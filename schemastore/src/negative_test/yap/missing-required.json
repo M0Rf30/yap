@@ -1,0 +1,5 @@
+{
+  "name": "broken",
+  "description": "missing buildDir, output and projects",
+  "compressionDeb": "lzma"
+}
