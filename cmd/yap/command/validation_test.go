@@ -645,3 +645,28 @@ func TestValidatePathForCommand(t *testing.T) {
 		})
 	}
 }
+
+// TestResolveDistroReleaseBareDistroStaysGeneric ensures that an explicitly
+// passed bare distro family (e.g. "ubuntu") is treated as generic: the
+// codename is NOT back-filled from the host /etc/os-release. This locks in the
+// fix for #202 where `yap build ubuntu .` on an Ubuntu host produced a
+// `1jammy` deb suffix instead of the generic `1ubuntu`.
+func TestResolveDistroReleaseBareDistroStaysGeneric(t *testing.T) {
+	distro, release := ResolveDistroRelease("ubuntu", "", "")
+	if distro != "ubuntu" {
+		t.Errorf("expected distro %q, got %q", "ubuntu", distro)
+	}
+
+	if release != "" {
+		t.Errorf("expected empty release for bare distro family, got %q", release)
+	}
+}
+
+// TestResolveDistroReleaseExplicitReleasePreserved ensures an explicitly
+// provided distro+release pair is returned unchanged.
+func TestResolveDistroReleaseExplicitReleasePreserved(t *testing.T) {
+	distro, release := ResolveDistroRelease("ubuntu", "jammy", "")
+	if distro != "ubuntu" || release != "jammy" {
+		t.Errorf("expected (ubuntu, jammy), got (%q, %q)", distro, release)
+	}
+}

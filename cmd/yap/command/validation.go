@@ -310,11 +310,13 @@ func isPathArgument(arg string) bool {
 // Behavior:
 //   - If distro is empty: the host distro and codename are used; a warning
 //     is logged using noDistroKey (an i18n key for "no distribution specified").
-//   - If distro is set but release is empty: the codename is auto-detected
-//     only when the host distro matches; a debug log is emitted on success.
+//   - If distro is set but release is empty: the value is treated as an
+//     explicitly-requested bare distro family (generic). The codename is NOT
+//     back-filled from the host, so format-specific suffixes fall back to the
+//     distro name (e.g. a deb release stays `1ubuntu` instead of `1jammy`).
 //
-// This keeps `build`, `zap`, and `prepare` consistent so distro+codename
-// PKGBUILD directives (e.g. depends__ubuntu_jammy) resolve correctly.
+// This keeps `build`, `zap`, and `prepare` consistent: host-codename
+// auto-detection only kicks in when no distro argument was provided.
 func ResolveDistroRelease(distro, release, noDistroKey string) (
 	resolvedDistro, resolvedRelease string,
 ) {
@@ -331,14 +333,8 @@ func ResolveDistroRelease(distro, release, noDistroKey string) (
 		return distro, release
 	}
 
-	if release == "" {
-		osRelease, err := platform.ParseOSRelease()
-		if err == nil && osRelease.ID == distro && osRelease.Codename != "" {
-			release = osRelease.Codename
-			logger.Debug(i18n.T("logger.build.auto_detected_codename"),
-				"distro", distro, "codename", release)
-		}
-	}
-
+	// An explicitly-passed bare distro family (e.g. "ubuntu") stays generic:
+	// the codename is intentionally left empty so the package suffix falls
+	// back to the distro name. Do not back-fill from the host /etc/os-release.
 	return distro, release
 }
