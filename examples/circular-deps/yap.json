@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/M0Rf30/yap/main/yap.schema.json",
   "name": "circular-dependency-test",
   "description": "Example demonstrating YAP's circular dependency detection and error handling",
   "buildDir": "/tmp/yap-circular-deps",
