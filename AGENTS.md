@@ -269,7 +269,7 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - `pacman -S` (install): still subprocess due to alpm hook complexity
 - `pkg/dnfinstall` does NOT update `/var/lib/rpm/` by default (state lives in yapdb); set `Options.WriteSystemRpmdb=true` to also write to SQLite rpmdb (Fedora 33+/RHEL 9+/Rocky 9+ only — BDB hosts skip with warn)
 - `pkg/aptinstall` does NOT update `/var/lib/dpkg/status` by default (state lives in yapdb); set `Options.WriteDpkgStatus=true` for legacy behavior
-- `pkg/dnfinstall` coverage at ~41% (rpmpack→rpmutils interop blocks happy-path integration tests); pure-unit coverage of helpers is strong, full pipeline validated via `make test-e2e-rpm` on Rocky 8
+- `pkg/dnfinstall` coverage at ~40% (rpmpack→rpmutils interop blocks happy-path integration tests); pure-unit coverage of helpers is strong, full pipeline validated via `make test-e2e-rpm` on Rocky 8
 
 ### MCP surface (`pkg/mcp/`, `cmd/yap-mcp/`)
 

@@ -2,12 +2,13 @@
 
 # YAP — Yet Another Packager
 
-![yap-logo](assets/images/logo.png)
+<img src="assets/images/logo.png" alt="yap-logo" width="240">
+
+<br><br>
 
 [![report card](https://img.shields.io/badge/report%20card-a%2B-ff3333.svg?style=flat-square)](http://goreportcard.com/report/M0Rf30/yap)
 [![View examples](https://img.shields.io/badge/learn%20by-examples-0077b3.svg?style=flat-square)](examples)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0)
-[![Go Report Card](https://goreportcard.com/badge/github.com/M0Rf30/yap?style=flat-square)](https://goreportcard.com/report/github.com/M0Rf30/yap)
 [![GitHub release](https://img.shields.io/github/release/M0Rf30/yap.svg?style=flat-square)](https://github.com/M0Rf30/yap/releases/latest)
 
 </div>
