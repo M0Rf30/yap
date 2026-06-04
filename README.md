@@ -1,3 +1,5 @@
+<div align="center">
+
 # YAP — Yet Another Packager
 
 ![yap-logo](assets/images/logo.png)
@@ -7,6 +9,8 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/M0Rf30/yap?style=flat-square)](https://goreportcard.com/report/github.com/M0Rf30/yap)
 [![GitHub release](https://img.shields.io/github/release/M0Rf30/yap.svg?style=flat-square)](https://github.com/M0Rf30/yap/releases/latest)
+
+</div>
 
 YAP builds native packages for multiple GNU/Linux distributions from a single PKGBUILD specification. Write your package once; get `.deb`, `.rpm`, `.apk`, and `.pkg.tar.zst` out. All builds run in isolated OCI containers (Docker or Podman).
 
@@ -122,7 +126,7 @@ yap build .
 # Specific distribution
 yap build ubuntu-jammy .
 yap build fedora-38 /path/to/project
-yap build --cleanbuild --nomakedeps ubuntu-jammy .
+yap build --cleanbuild --no-makedeps ubuntu-jammy .
 ```
 
 ### 4. Output
@@ -143,23 +147,34 @@ artifacts/
   "description": "Project description",
   "buildDir": "/tmp/yap-builds",
   "output": "dist",
-  "cleanPrevious": true,
   "projects": [
-    { "name": "package-one", "depends": [] },
-    { "name": "package-two", "depends": ["package-one"] }
+    { "name": "package-one", "install": true },
+    { "name": "package-two" }
   ]
 }
 ```
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `name` | — | Project display name |
-| `description` | — | Project description |
-| `buildDir` | `/tmp` | Temporary build directory |
-| `output` | `artifacts` | Output directory for built packages |
-| `cleanPrevious` | `false` | Clean previous builds before starting |
-| `projects` | — | Array of packages to build |
-| `depends` | — | Build-time ordering dependencies |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Project collection name |
+| `description` | yes | — | Project collection description |
+| `buildDir` | yes | — | Build/working directory |
+| `output` | yes | — | Output directory for built packages |
+| `projects` | yes | — | Ordered array of packages to build |
+| `projects[].name` | yes | — | Sub-directory containing the package's PKGBUILD |
+| `projects[].install` | no | `false` | Install immediately after build so later packages can depend on it |
+| `compressionDeb` / `compressionRpm` | no | `zstd` | Per-format compression: `zstd`/`gzip`/`xz` |
+| `signing` | no | — | Signing config (see [Package signing](#package-signing)) |
+| `repos` | no | — | Extra package repositories to configure before resolving deps |
+| `skipDeps` | no | — | Package names to omit from makedepends |
+| `targetArch` | no | host | Cross-compilation target architecture |
+| `parallel` | no | `false` | Build independent packages in parallel (topo-sort) |
+| `sbom` | no | `false` | Generate SBOM sidecars |
+| `sbomFormat` | no | `both` | `cyclonedx`/`spdx`/`both` |
+
+Build ordering between packages comes from the `install` flag and each
+PKGBUILD's `depends`/`makedepends` — there is no `yap.json`-level `depends`
+field. See [`yap.schema.json`](./yap.schema.json) for the complete spec.
 
 ### Editor validation (JSON Schema)
 
@@ -285,7 +300,7 @@ maintainer="John Doe <john@example.com>"
 | `arch` | `.pkg.tar.zst` | pacman |
 | `centos` | `.rpm` | yum |
 | `debian` | `.deb` | apt |
-| `fedora` | `.rpm` | dnf |
+| `fedora` | `.rpm` | yum |
 | `linuxmint` | `.deb` | apt |
 | `opensuse-leap` | `.rpm` | zypper |
 | `opensuse-tumbleweed` | `.rpm` | zypper |
@@ -359,48 +374,59 @@ yap completion <shell>                # Generate shell completion (bash/zsh/fish
 
 ```bash
 # Build behavior
---cleanbuild              # Clean srcdir before build
---nobuild                 # Download sources only
---zap                     # Deep clean staging directory
+--cleanbuild, -c            # Clean srcdir before build
+--no-build, -o              # Download sources only
+--zap, -z                   # Deep clean staging directory
+--skip-hash-check, -H       # Skip source checksum verification
+--no-container              # Build natively on the host (skip container dispatch)
 
 # Dependencies
---nomakedeps              # Skip makedeps installation
---skip-sync               # Skip package manager sync
---parallel                # Enable parallel topo-sort (opt-in)
+--no-makedeps, -d           # Skip makedeps installation
+--skip-sync, -s             # Skip package manager sync
+--skip-deps pkg1,pkg2       # Omit specific packages from makedeps
+--parallel, -P              # Enable parallel topo-sort (opt-in)
 
 # Version
---pkgver 1.2.3            # Override package version
---pkgrel 2                # Override release number
+--pkgver 1.2.3, -w          # Override package version
+--pkgrel 2, -r              # Override release number
 
-# Range
---from package1           # Start from specific package
---to package5             # Stop at specific package
---only pkg1,pkg2          # Build only listed packages
+# Range / filter
+--from package1             # Start from specific package
+--to package5               # Stop at specific package
+--only pkg1,pkg2            # Build only listed packages
+--skip pkg1,pkg2            # Skip listed packages
+
+# Source access
+--ssh-password pass, -p     # Password for SSH source access
 
 # Cross-compilation
---target-arch arm64       # Cross-compile for target architecture
---skip-toolchain-validation
+--target-arch arm64, -t     # Cross-compile for target architecture
+--skip-toolchain-validation, -T
+
+# Repositories / trust
+--repo "<spec>"             # Add an extra package repository (repeatable)
+--allow-unverified-repos, -U  # Allow apt sources without a verifiable Signed-By key
 
 # Signing
---sign                    # Enable artifact signing
---sign-key /path/to/key   # Private key path
---sign-passphrase pass    # Passphrase (prefer env: YAP_SIGN_PASSPHRASE)
---sign-key-name mykey     # APK key name
+--sign, -K                  # Enable artifact signing
+--sign-key /path/to/key     # Private key path
+--sign-passphrase pass      # Passphrase (prefer env: YAP_SIGN_PASSPHRASE)
+--sign-key-name mykey       # APK key name
 
 # SBOM
---sbom                    # Generate SBOM sidecars
---sbom-format cyclonedx   # CycloneDX 1.5 only
---sbom-format spdx        # SPDX 2.3 only
---sbom-format both        # Both (default)
+--sbom, -S                  # Generate SBOM sidecars
+--sbom-format cyclonedx     # CycloneDX 1.5 only
+--sbom-format spdx          # SPDX 2.3 only
+--sbom-format both          # Both (default)
 
 # Compression
---compression-deb gzip    # DEB: zstd|gzip|xz (default: zstd)
---compression-rpm xz      # RPM: zstd|gzip|xz (default: zstd)
+--compression-deb gzip      # DEB: zstd|gzip|xz (default: zstd)
+--compression-rpm xz        # RPM: zstd|gzip|xz (default: zstd)
 
-# Debug
---debug-dir /path         # Emit split debug info
---verbose                 # Verbose logging
---no-color                # Disable colored output
+# Debug / output
+--debug-dir /path, -D       # Emit split debug info
+--verbose                   # Verbose logging
+--no-color                  # Disable colored output
 ```
 
 ### Shell completion
