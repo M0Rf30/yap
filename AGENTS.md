@@ -258,7 +258,7 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - SBOM — CycloneDX 1.5 + SPDX 2.3
 - Per-format compression — DEB/RPM
 - Pacman `.INSTALL` scriptlets — 6-hook parity
-- Changelog support — DEB (Lintian-compliant), Pacman; RPM deferred
+- Changelog support — DEB (Lintian-compliant), RPM (native %changelog), Pacman
 - Builder interface unification — `BuildPackage` returns `(string, error)`
 - Sequential build default; `--parallel` / `-P` opt-in
 - `pkg/color` + `pkg/logger` — zero external UI deps (pterm removed)
@@ -266,7 +266,6 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - `/etc/os-release` auto-detection — `ResolveDistroRelease` helper
 
 ### Known limitations
-- RPM changelog: no-op pending rpmpack API support
 - `pacman -S` (install): still subprocess due to alpm hook complexity
 - `pkg/dnfinstall` does NOT update `/var/lib/rpm/` by default (state lives in yapdb); set `Options.WriteSystemRpmdb=true` to also write to SQLite rpmdb (Fedora 33+/RHEL 9+/Rocky 9+ only — BDB hosts skip with warn)
 - `pkg/aptinstall` does NOT update `/var/lib/dpkg/status` by default (state lives in yapdb); set `Options.WriteDpkgStatus=true` for legacy behavior
@@ -286,11 +285,10 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - Install script: `scripts/install.sh` (curl|sh; Linux/Darwin × amd64/arm64).
 
 ### Development priorities
-1. Wire RPM changelog when rpmpack adds the API
-2. Expand test coverage: `pkg/signing` and `pkg/sbom` targets 85%
-3. `yap keygen` CLI subcommand for signing key generation
-4. `yap pubkey` for public-key extraction
-5. Repository signing (Release.gpg, repodata) — separate from package signing
+1. Expand test coverage: `pkg/signing` and `pkg/sbom` targets 85%
+2. `yap keygen` CLI subcommand for signing key generation
+3. `yap pubkey` for public-key extraction
+4. Repository signing (Release.gpg, repodata) — separate from package signing
 
 ## Agent-specific rules
 

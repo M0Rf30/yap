@@ -258,9 +258,9 @@ changelog=CHANGELOG.md
 ```
 
 - **DEB**: `usr/share/doc/<pkgname>/changelog.Debian.gz` (Lintian-compliant)
+- **RPM**: native `%changelog` entries embedded in package metadata
 - **Pacman**: `.CHANGELOG` in the archive
 - **APK**: ignored (no Alpine convention)
-- **RPM**: deferred (rpmpack API gap)
 
 ### Pacman scriptlets
 
