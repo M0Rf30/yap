@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/M0Rf30/yap/main/yap.schema.json",
+  "$schema": "https://www.schemastore.org/yap.json",
   "name": "dependency-orchestration-example",
   "description": "Comprehensive example demonstrating YAP's automatic dependency resolution and installation orchestration",
   "buildDir": "/tmp/yap-dependency-example",

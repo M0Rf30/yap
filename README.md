@@ -186,15 +186,15 @@ inline validation in editors that support JSON Schema:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/M0Rf30/yap/main/yap.schema.json",
+  "$schema": "https://www.schemastore.org/yap.json",
   "name": "My Multi-Package Project",
   "...": "..."
 }
 ```
 
-The schema is also being submitted to [SchemaStore](https://www.schemastore.org)
-so editors validate any `yap.json` by filename automatically — no `$schema`
-line required.
+The schema is published on [SchemaStore](https://www.schemastore.org/json/),
+so editors (VS Code, JetBrains, Neovim, …) validate any `yap.json` by filename
+automatically — no `$schema` line required.
 
 ## PKGBUILD extensions
 

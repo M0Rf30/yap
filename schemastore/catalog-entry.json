@@ -1,6 +1,0 @@
-{
-  "name": "yap.json",
-  "description": "YAP (Yet Another Packager) multi-package project file",
-  "fileMatch": ["yap.json"],
-  "url": "https://www.schemastore.org/yap.json"
-}
