@@ -279,14 +279,14 @@ func (c *Cache) Lookup(name string) (PackageInfo, bool) {
 		return *p, true
 	}
 
-	// Last resort: scan for any entry matching name:*.
-	// This handles edge cases where a package only exists for a foreign
-	// architecture (e.g. a test or cross-build situation with arm64-only
-	// packages on an amd64 host).
-	for key, candidate := range c.entries {
-		if bare, _, has := strings.Cut(key, ":"); has && bare == name {
-			return *candidate, true
-		}
+	// Last resort: any entry matching name:* via the byBareName secondary
+	// index — O(1) instead of a full-map scan. This handles edge cases
+	// where a package only exists for a foreign architecture (e.g. a test
+	// or cross-build situation with arm64-only packages on an amd64 host).
+	// Misses are the common case during dependency resolution (virtual
+	// packages), so this path must stay cheap.
+	if candidate, ok := c.scanEntryByName(name); ok {
+		return *candidate, true
 	}
 
 	return PackageInfo{}, false

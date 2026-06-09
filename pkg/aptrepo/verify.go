@@ -28,7 +28,6 @@ package aptrepo
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -39,6 +38,7 @@ import (
 	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
 
 	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/signing"
 )
 
 // defaultAptKeyringPaths is the set of files/directories apt itself trusts
@@ -259,15 +259,7 @@ func loadKeyringFile(path string) (openpgp.EntityList, error) {
 // Automatic Signing Key (2018) <[email protected]>") from a
 // verified entity, or returns the hex key ID when no UID is present.
 func signerName(e *openpgp.Entity) string {
-	if e == nil {
-		return ""
-	}
-
-	for name := range e.Identities {
-		return name
-	}
-
-	return fmt.Sprintf("%X", e.PrimaryKey.KeyId)
+	return signing.SignerName(e)
 }
 
 // wrapPGPError translates ProtonMail's sentinel + typed errors into a

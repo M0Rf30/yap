@@ -11,6 +11,7 @@ import (
 
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/klauspost/compress/gzip"
+	"golang.org/x/sync/errgroup"
 
 	apperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
@@ -61,26 +62,55 @@ func Update(ctx context.Context) (*Index, error) {
 	idx := NewIndex()
 	succeeded := 0
 
-	for _, repo := range repos {
-		indexURL := repo.URL + "/" + arch + "/APKINDEX.tar.gz"
-		cachePath := filepath.Join(apkCacheDir, "APKINDEX."+sha1Hex(indexURL)+".tar.gz")
+	// Phase 1: download all APKINDEX tarballs in parallel (network-bound;
+	// destinations are distinct cache files keyed by URL hash).
+	type fetchResult struct {
+		indexURL  string
+		cachePath string
+		err       error
+	}
 
-		logger.Debug(i18n.T("logger.apkindex.debug.fetching_repo"), "url", repo.URL, "arch", arch)
+	results := make([]fetchResult, len(repos))
 
-		if err := downloadFile(ctx, indexURL, cachePath, maxAPKIndexBytes); err != nil {
+	g := new(errgroup.Group)
+	g.SetLimit(4)
+
+	for i, repo := range repos {
+		g.Go(func() error {
+			indexURL := repo.URL + "/" + arch + "/APKINDEX.tar.gz"
+			cachePath := filepath.Join(apkCacheDir, "APKINDEX."+sha1Hex(indexURL)+".tar.gz")
+
+			logger.Debug(i18n.T("logger.apkindex.debug.fetching_repo"), "url", repo.URL, "arch", arch)
+
+			results[i] = fetchResult{
+				indexURL:  indexURL,
+				cachePath: cachePath,
+				err:       downloadFile(ctx, indexURL, cachePath, maxAPKIndexBytes),
+			}
+
+			return nil
+		})
+	}
+
+	_ = g.Wait()
+
+	// Phase 2: parse sequentially — Index mutation is not concurrency-safe
+	// and parsing is cheap compared to the network fetch.
+	for i, repo := range repos {
+		res := results[i]
+		if res.err != nil {
 			// Log warning and continue with other repos.
-			logger.Warn(i18n.T("logger.apkindex.warn.fetch_failed"), "url", indexURL, "error", err)
-
+			logger.Warn(i18n.T("logger.apkindex.warn.fetch_failed"), "url", res.indexURL, "error", res.err)
 			continue
 		}
 
 		var sizeBytes int64
-		if fi, statErr := os.Stat(cachePath); statErr == nil {
+		if fi, statErr := os.Stat(res.cachePath); statErr == nil {
 			sizeBytes = fi.Size()
 		}
 
-		if err := loadIndexTarball(idx, cachePath, repo.URL); err != nil {
-			logger.Warn(i18n.T("logger.apkindex.warn.parse_failed"), "path", cachePath, "error", err)
+		if err := loadIndexTarball(idx, res.cachePath, repo.URL); err != nil {
+			logger.Warn(i18n.T("logger.apkindex.warn.parse_failed"), "path", res.cachePath, "error", err)
 
 			continue
 		}

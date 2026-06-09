@@ -17,6 +17,7 @@ import (
 	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/signing"
 )
 
 // ErrUnsignedRPM is returned when an RPM has no signature header.
@@ -285,13 +286,5 @@ func wrapRPMSignatureError(err error) error {
 // <[email protected]>") from a verified entity, or returns the hex key ID
 // when no UID is present.
 func signerName(e *openpgp.Entity) string {
-	if e == nil {
-		return ""
-	}
-
-	for name := range e.Identities {
-		return name
-	}
-
-	return fmt.Sprintf("%X", e.PrimaryKey.KeyId)
+	return signing.SignerName(e)
 }

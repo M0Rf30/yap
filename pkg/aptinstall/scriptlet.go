@@ -11,6 +11,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // scriptletEnvAllowList enumerates the environment variables we forward to
@@ -37,40 +38,18 @@ var scriptletEnvAllowList = map[string]bool{
 }
 
 // filterScriptletEnv returns the subset of os.Environ() that's safe to
-// forward to a maintainer script.
+// forward to a maintainer script. A sane PATH is always provided so
+// /usr/bin lookups (debconf, dpkg-trigger, update-alternatives, ldconfig)
+// work even if the parent env stripped it.
 func filterScriptletEnv() []string {
-	parent := os.Environ()
-	filtered := make([]string, 0, len(parent))
-
-	for _, kv := range parent {
-		k, _, ok := strings.Cut(kv, "=")
-		if !ok {
-			continue
-		}
-
-		if scriptletEnvAllowList[k] {
-			filtered = append(filtered, kv)
-		}
-	}
-
-	// Always provide a sane PATH so /usr/bin lookups (debconf, dpkg-trigger,
-	// update-alternatives, ldconfig) work even if the parent env stripped it.
-	if !hasEnvKey(filtered, "PATH") {
-		filtered = append(filtered, "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
-	}
-
-	return filtered
+	return shell.FilterEnv(scriptletEnvAllowList, map[string]string{
+		"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	})
 }
 
+// hasEnvKey reports whether key is present in env ("key=value" entries).
 func hasEnvKey(env []string, key string) bool {
-	prefix := key + "="
-	for _, kv := range env {
-		if strings.HasPrefix(kv, prefix) {
-			return true
-		}
-	}
-
-	return false
+	return shell.HasEnvKey(env, key)
 }
 
 // runScriptlet executes a maintainer scriptlet via /bin/sh as a child

@@ -706,14 +706,7 @@ func (mpc *MultipleProject) localArtifactExists(pkgName string) bool {
 		}
 
 		for _, m := range matches {
-			low := strings.ToLower(m)
-			switch {
-			case strings.HasSuffix(low, ".deb"),
-				strings.HasSuffix(low, ".rpm"),
-				strings.HasSuffix(low, ".apk"),
-				strings.HasSuffix(low, ".pkg.tar.zst"),
-				strings.HasSuffix(low, ".pkg.tar.xz"),
-				strings.HasSuffix(low, ".pkg.tar.gz"):
+			if _, ok := signingFormatForArtifact(m); ok {
 				return true
 			}
 		}

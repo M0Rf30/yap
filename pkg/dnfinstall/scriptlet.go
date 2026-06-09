@@ -14,6 +14,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
 // scriptletKind identifies which scriptlet to run.
@@ -94,33 +95,14 @@ var scriptletEnvAllowList = map[string]bool{
 }
 
 // filterScriptletEnv returns a filtered environment suitable for scriptlet
-// execution. Mirrors the deb/apt approach but for RPM.
+// execution. Mirrors the deb/apt approach but for RPM: a sane PATH is
+// always provided so lookups (ldconfig, systemctl, etc.) work, and HOME
+// defaults to / as rpm does.
 func filterScriptletEnv() []string {
-	parent := os.Environ()
-	filtered := make([]string, 0, len(parent))
-
-	for _, kv := range parent {
-		k, _, ok := strings.Cut(kv, "=")
-		if !ok {
-			continue
-		}
-
-		if scriptletEnvAllowList[k] {
-			filtered = append(filtered, kv)
-		}
-	}
-
-	// Always provide a sane PATH so lookups (ldconfig, systemctl, etc.) work.
-	if !hasEnvKey(filtered, "PATH") {
-		filtered = append(filtered, "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
-	}
-
-	// Always provide HOME.
-	if !hasEnvKey(filtered, "HOME") {
-		filtered = append(filtered, "HOME=/")
-	}
-
-	return filtered
+	return shell.FilterEnv(scriptletEnvAllowList, map[string]string{
+		"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"HOME": "/",
+	})
 }
 
 // looksLikeLua returns true when the body appears to be an RPM Lua scriptlet
@@ -155,16 +137,9 @@ func looksLikeLua(body string) bool {
 	return false
 }
 
-// hasEnvKey checks if an environment variable key exists in the list.
+// hasEnvKey reports whether key is present in env ("key=value" entries).
 func hasEnvKey(env []string, key string) bool {
-	prefix := key + "="
-	for _, kv := range env {
-		if strings.HasPrefix(kv, prefix) {
-			return true
-		}
-	}
-
-	return false
+	return shell.HasEnvKey(env, key)
 }
 
 // runScriptlet executes a single scriptlet from the RPM header.

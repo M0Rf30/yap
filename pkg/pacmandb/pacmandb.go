@@ -12,6 +12,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -40,21 +43,40 @@ func Sync(ctx context.Context) (succeeded int, err error) {
 	logger.Info(i18n.T("logger.pacmandb.info.syncing_repos"), "repos", len(cfg.Repos),
 		"arch", arch)
 
-	var firstErr error
+	// Repos are independent (separate .db destinations) — sync them in
+	// parallel, bounded like the other repo fetchers. Failures are
+	// per-repo warnings; the first error is reported to the caller.
+	var (
+		mu       sync.Mutex
+		firstErr error
+	)
+
+	g := new(errgroup.Group)
+	g.SetLimit(4)
 
 	for _, repo := range cfg.Repos {
-		if err := syncRepo(ctx, repo, arch); err != nil {
-			if firstErr == nil {
-				firstErr = err
+		g.Go(func() error {
+			if err := syncRepo(ctx, repo, arch); err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				mu.Unlock()
+
+				logger.Warn(i18n.T("logger.pacmandb.warn.repo_sync_failed"), "repo", repo.Name, "error", err)
+
+				return nil // best-effort: don't abort sibling repos
 			}
 
-			logger.Warn(i18n.T("logger.pacmandb.warn.repo_sync_failed"), "repo", repo.Name, "error", err)
+			mu.Lock()
+			succeeded++
+			mu.Unlock()
 
-			continue
-		}
-
-		succeeded++
+			return nil
+		})
 	}
+
+	_ = g.Wait()
 
 	logger.Info(i18n.T("logger.pacmandb.info.sync_complete"), "succeeded", succeeded,
 		"total", len(cfg.Repos))
