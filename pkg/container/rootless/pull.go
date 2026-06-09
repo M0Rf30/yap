@@ -6,6 +6,7 @@ package rootless
 
 import (
 	"archive/tar"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // imageStorePath returns the local OCI store path for a given distro image.
@@ -150,7 +152,7 @@ func extractTar(r io.Reader, destDir string) error {
 
 	for {
 		hdr, err := tr.Next()
-		if err == io.EOF {
+		if stderrors.Is(err, io.EOF) {
 			break
 		}
 
@@ -165,8 +167,13 @@ func extractTar(r io.Reader, destDir string) error {
 			continue
 		}
 
-		// Sanitize path to prevent traversal.
-		target := filepath.Join(destDir, filepath.Clean("/"+hdr.Name)) //nolint:gosec
+		// Sanitize path to prevent traversal (zip-slip).
+		target, err := safepath.Join(destDir, hdr.Name)
+		if err != nil {
+			return errors.Wrap(err, errors.ErrTypeValidation, "unsafe tar entry path").
+				WithOperation("extractTar").
+				WithContext("entry", hdr.Name)
+		}
 
 		if err := extractTarEntry(tr, hdr, target, destDir); err != nil {
 			return err
@@ -186,7 +193,7 @@ func extractTarEntry(tr *tar.Reader, hdr *tar.Header, target, destDir string) er
 		return extractRegularFile(tr, hdr, target)
 
 	case tar.TypeSymlink:
-		return extractSymlink(hdr, target)
+		return extractSymlink(hdr, target, destDir)
 
 	case tar.TypeLink:
 		return extractHardLink(hdr, target, destDir)
@@ -220,7 +227,17 @@ func extractRegularFile(tr *tar.Reader, hdr *tar.Header, target string) error {
 	return f.Close()
 }
 
-func extractSymlink(hdr *tar.Header, target string) error {
+// extractSymlink creates a symlink after validating that a relative target
+// cannot escape destDir (a malicious layer could otherwise plant a link
+// pointing outside the rootfs and write through it with a later entry).
+func extractSymlink(hdr *tar.Header, target, destDir string) error {
+	if err := safepath.SymlinkTarget(destDir, target, hdr.Linkname); err != nil {
+		return errors.Wrap(err, errors.ErrTypeValidation, "unsafe symlink in layer").
+			WithOperation("extractSymlink").
+			WithContext("path", target).
+			WithContext("link_target", hdr.Linkname)
+	}
+
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create parent directory").
 			WithOperation("extractSymlink").

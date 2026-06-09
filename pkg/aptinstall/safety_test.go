@@ -84,7 +84,9 @@ func TestSafeJoinRejectsTraversal(t *testing.T) {
 		{"dotdot_escape", "/tmp/sandbox", "../etc/passwd", true},
 		{"deep_escape", "/tmp/sandbox", "a/b/../../../etc/passwd", true},
 		{"prefix_alias", "/tmp/sandbox", "../sandboxX/evil", true},
-		{"root_with_dotdot", "/", "../etc/passwd", false}, // resolves to /etc/passwd, still under /
+		// Hardened: a member literally named "../etc/passwd" is hostile even
+		// when "/" clamping would keep it under root — dpkg/rpm reject it too.
+		{"root_with_dotdot", "/", "../etc/passwd", true},
 		{"root_plain", "/", "etc/hosts", false},
 	}
 

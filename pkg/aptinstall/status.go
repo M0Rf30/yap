@@ -401,15 +401,6 @@ func writeYapdb(
 		}
 	}
 
-	// Open yapdb and insert the package record.
-	db, err := yapdb.Open(ctx, yapdb.DefaultPath(rootDir))
-	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open yapdb").
-			WithOperation("writeYapdb").
-			WithContext("package", pkgName)
-	}
-	defer func() { _ = db.Close() }()
-
 	pkg := &yapdb.Package{
 		Name:        pkgName,
 		Epoch:       "",
@@ -423,13 +414,7 @@ func writeYapdb(
 		Caps:        caps,
 	}
 
-	if err := db.Insert(ctx, pkg); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to insert package into yapdb").
-			WithOperation("writeYapdb").
-			WithContext("package", pkgName)
-	}
-
-	return nil
+	return yapdb.RecordInstalled(ctx, rootDir, pkg)
 }
 
 // updateDpkgStatusForPackage updates or inserts a package entry in /var/lib/dpkg/status

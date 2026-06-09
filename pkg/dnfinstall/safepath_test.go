@@ -115,10 +115,12 @@ func TestSafeRPMPathWithRootSlash(t *testing.T) {
 			wantPath:  "/etc/passwd",
 		},
 		{
-			name:      "parent traversal resolves within root",
+			// Hardened: a CPIO member literally named "../etc/passwd" is
+			// hostile even when "/" clamping would keep it under root —
+			// rpm >= 4.18 rejects ".."-bearing payload paths too.
+			name:      "parent traversal rejected even under root slash",
 			entryName: "../etc/passwd",
-			wantOK:    true,
-			wantPath:  "/etc/passwd",
+			wantOK:    false,
 		},
 	}
 
@@ -169,14 +171,14 @@ func TestSafeRPMSymlinkTarget(t *testing.T) {
 			linkPath:   "/tmp/fakeroot/bin/sh",
 			target:     "../../../../../../etc/passwd",
 			wantErr:    true,
-			wantErrSub: "escapes rootDir",
+			wantErrSub: "escapes root",
 		},
 		{
 			name:       "relative target with .. at root",
 			linkPath:   "/tmp/fakeroot/sh",
 			target:     "../etc/passwd",
 			wantErr:    true,
-			wantErrSub: "escapes rootDir",
+			wantErrSub: "escapes root",
 		},
 	}
 

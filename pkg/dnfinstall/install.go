@@ -248,15 +248,6 @@ func writeYapdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir
 	// Extract capabilities from RPM header (Provides, Requires, Conflicts, Obsoletes).
 	caps := extractCapabilities(rpm)
 
-	// Open yapdb and insert the package record.
-	db, err := yapdb.Open(ctx, yapdb.DefaultPath(rootDir))
-	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open yapdb").
-			WithOperation("writeYapdb").
-			WithContext("package", name)
-	}
-	defer func() { _ = db.Close() }()
-
 	pkg := &yapdb.Package{
 		Name:        name,
 		Epoch:       epoch,
@@ -270,13 +261,7 @@ func writeYapdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir
 		Caps:        caps,
 	}
 
-	if err := db.Insert(ctx, pkg); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to insert package into yapdb").
-			WithOperation("writeYapdb").
-			WithContext("package", name)
-	}
-
-	return nil
+	return yapdb.RecordInstalled(ctx, rootDir, pkg)
 }
 
 // writeSystemRpmdb optionally writes to the system rpmdb.sqlite (SQLite only).

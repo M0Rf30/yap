@@ -39,6 +39,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // ErrUnrecognizedArchive is returned by Extract / ExtractFiltered when the
@@ -386,8 +387,9 @@ func SafeSymlinkTarget(entryName, target string) error {
 // archive entry name contains "../" or an absolute path that would escape the
 // extraction root.
 //
-// Returns the cleaned absolute-ish path on success, or an error if the entry
-// would escape destination.
+// Source archives are stricter than package payloads: any ".." segment is
+// rejected outright, even when the cleaned path would stay inside the
+// destination. The containment check itself lives in pkg/safepath.
 func safeJoin(destination, name string) (string, error) {
 	if strings.Contains(name, "..") {
 		segs := strings.Split(filepath.ToSlash(name), "/")
@@ -399,76 +401,27 @@ func safeJoin(destination, name string) (string, error) {
 		}
 	}
 
-	cleanDest := filepath.Clean(destination)
-	cleanJoined := filepath.Clean(filepath.Join(cleanDest, name))
-
-	prefix := cleanDest
-	if !strings.HasSuffix(prefix, string(os.PathSeparator)) {
-		prefix += string(os.PathSeparator)
-	}
-
-	if cleanJoined != cleanDest && !strings.HasPrefix(cleanJoined, prefix) {
-		return "", errors.New(errors.ErrTypePackaging,
-			"archive entry escapes destination").
+	joined, err := safepath.Join(destination, name)
+	if err != nil {
+		return "", errors.Wrap(err, errors.ErrTypePackaging, "archive entry escapes destination").
 			WithContext("entry", name).
-			WithContext("destination", cleanDest).
-			WithContext("resolved", cleanJoined).
+			WithContext("destination", destination).
 			WithOperation("safeJoin")
 	}
 
-	return cleanJoined, nil
+	return joined, nil
 }
 
 // safeSymlinkTarget validates a symlink target before it is created on disk.
-//
-// Absolute targets are accepted: real packages routinely ship absolute
-// symlinks (e.g. /usr/lib64/libfoo.so.1 -> /usr/lib/libfoo.so.1) and
-// dpkg/rpm/apk accept them.
-//
-// Relative targets containing ".." are accepted *if* the target resolves to
-// a path that stays inside the extraction root when interpreted relative to
-// the symlink's own location. For example, an entry
-//
-//	opt/foo/sbin/slapacl -> ../libexec/slapd
-//
-// resolves to "opt/foo/libexec/slapd" — well inside the root, and a perfectly
-// normal Debian/RPM symlink pattern. Conversely, an entry
-//
-//	a/b -> ../../../escape
-//
-// would resolve above the extraction root and is rejected.
-//
-// This is defense-in-depth against TOCTOU-style symlink+write attacks where
-// a malicious archive first creates a symlink pointing outside the root and
-// then writes a regular file through it. safeJoin handles the write-path
-// case lexically, but does not follow symlinks on disk; rejecting escaping
-// link targets closes that gap.
+// Targets are archive-relative: absolute targets are accepted (real packages
+// routinely ship them), relative targets must stay inside the archive root
+// when resolved against the symlink's own location. See
+// safepath.EntrySymlinkTarget for the full semantics.
 func safeSymlinkTarget(entryName, target string) error {
-	if target == "" {
-		return nil
-	}
-
-	// Absolute targets are accepted as-is; see function doc.
-	if filepath.IsAbs(target) || strings.HasPrefix(target, "/") {
-		return nil
-	}
-
-	// Resolve the target relative to the symlink's own parent directory
-	// within the archive, then verify it doesn't escape the archive root.
-	parent := filepath.ToSlash(filepath.Dir(filepath.ToSlash(entryName)))
-	if parent == "." || parent == "/" {
-		parent = ""
-	}
-
-	joined := filepath.ToSlash(filepath.Join(parent, filepath.ToSlash(target)))
-
-	// filepath.Join cleans the path; an escape manifests as a leading "..".
-	if joined == ".." || strings.HasPrefix(joined, "../") {
-		return errors.New(errors.ErrTypePackaging,
-			"symlink target escapes archive root").
+	if err := safepath.EntrySymlinkTarget(entryName, target); err != nil {
+		return errors.Wrap(err, errors.ErrTypePackaging, "symlink target escapes archive root").
 			WithContext("entry", entryName).
 			WithContext("target", target).
-			WithContext("resolved", joined).
 			WithOperation("safeSymlinkTarget")
 	}
 

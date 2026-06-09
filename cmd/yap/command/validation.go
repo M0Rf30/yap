@@ -338,3 +338,22 @@ func ResolveDistroRelease(distro, release, noDistroKey string) (
 	// back to the distro name. Do not back-fill from the host /etc/os-release.
 	return distro, release
 }
+
+// ResolveFlexibleDistro parses "distro[-release] [path]" style arguments
+// (via ParseFlexibleArgs) and auto-detects the distro/release from
+// /etc/os-release when missing (via ResolveDistroRelease). userProvided
+// reports whether the caller explicitly named a distro — used by `build`
+// and `zap` to decide on container dispatch and logging.
+func ResolveFlexibleDistro(args []string, noDistroKey string) (
+	distro, release, fullJSONPath string, userProvided bool, err error,
+) {
+	distro, release, fullJSONPath, err = ParseFlexibleArgs(args)
+	if err != nil {
+		return "", "", "", false, err
+	}
+
+	userProvided = distro != ""
+	distro, release = ResolveDistroRelease(distro, release, noDistroKey)
+
+	return distro, release, fullJSONPath, userProvided, nil
+}

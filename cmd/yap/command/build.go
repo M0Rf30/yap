@@ -88,16 +88,13 @@ var buildCmd = &cobra.Command{
 			logger.Debug(i18n.T("logger.build.starting_verbose"))
 		}
 
-		// Parse flexible arguments using shared function
-		distro, release, fullJSONPath, err := ParseFlexibleArgs(args)
+		// Parse flexible arguments and auto-detect distro/codename from
+		// /etc/os-release when missing.
+		distro, release, fullJSONPath, userProvidedDistro, err := ResolveFlexibleDistro(args,
+			"logger.build.no_distribution_specified")
 		if err != nil {
 			return err
 		}
-
-		// Auto-detect distro and codename from /etc/os-release when missing.
-		userProvidedDistro := distro != ""
-		distro, release = ResolveDistroRelease(distro, release,
-			"logger.build.no_distribution_specified")
 
 		if userProvidedDistro {
 			logArgs := []any{"distro", distro}

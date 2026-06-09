@@ -15,6 +15,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 const apkInstalledDB = "/lib/apk/db/installed"
@@ -290,40 +291,27 @@ func extractAPKData(r io.Reader) error {
 }
 
 // safeAPKPath joins "/" with a sanitised tar-entry name, rejecting
-// traversal attempts (".." or absolute paths). The legacy `cleanName`
-// + `filepath.Join("/", …)` pattern is correct only because `cleanName`
-// has already been verified to not start with "..".
+// traversal attempts and absolute entry names (APK tarballs always use
+// relative member names). Containment logic lives in pkg/safepath.
 func safeAPKPath(entryName string) (string, bool) {
-	cleanName := filepath.Clean(entryName)
-	if cleanName == "." || cleanName == "/" {
+	if filepath.IsAbs(entryName) {
 		return "", false
 	}
 
-	if strings.HasPrefix(cleanName, "..") || filepath.IsAbs(cleanName) {
+	p, err := safepath.JoinStrict("/", entryName)
+	if err != nil {
 		return "", false
 	}
 
-	// nolint:gocritic // We *do* want / as the join base — APK is system-wide.
-	return filepath.Join("/", cleanName), true
+	return p, true
 }
 
 // safeAPKSymlinkTarget rejects symlink targets that would escape the
 // filesystem root via "..". Absolute targets are permitted because APK
 // packages commonly ship absolute symlinks (/usr/bin/foo → /usr/bin/bar).
+// Containment logic lives in pkg/safepath.
 func safeAPKSymlinkTarget(linkPath, target string) error {
-	if filepath.IsAbs(target) {
-		return nil
-	}
-
-	resolved := filepath.Clean(filepath.Join(filepath.Dir(linkPath), target))
-	if strings.HasPrefix(resolved, "..") {
-		return errors.New(errors.ErrTypeValidation, "symlink target escapes root").
-			WithOperation("safeAPKSymlinkTarget").
-			WithContext("link_path", linkPath).
-			WithContext("target", target)
-	}
-
-	return nil
+	return safepath.SymlinkTarget("/", linkPath, target)
 }
 
 // extractAPKEntry extracts a single tar entry to the filesystem.

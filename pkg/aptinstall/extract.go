@@ -12,6 +12,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // extractDataTar extracts the data.tar member of a .deb to the destination directory.
@@ -91,61 +92,17 @@ func extractDataTar(debPath, destDir string, conffiles []string) error {
 // safeJoin joins destDir with a tar-entry path, rejecting anything that
 // escapes destDir via "..", absolute paths, or prefix-aliasing
 // (`destDir="/tmp/foo"`, entry resolves to "/tmp/foobar/evil").
-//
-// We deliberately avoid the legacy `strings.HasPrefix(fullPath, destDir)`
-// check: it is vulnerable to prefix aliasing, and degenerates to a no-op
-// when destDir is "/" (every absolute path starts with "/").
+// Containment logic lives in pkg/safepath.
 func safeJoin(destDir, entry string) (string, error) {
-	// Reject entries with absolute paths or NUL bytes outright.
-	if filepath.IsAbs(entry) {
-		entry = strings.TrimPrefix(entry, "/")
-	}
-
-	cleaned := filepath.Clean(filepath.Join(destDir, entry))
-
-	rel, err := filepath.Rel(filepath.Clean(destDir), cleaned)
-	if err != nil {
-		return "", errors.Wrap(err, errors.ErrTypeValidation, "path traversal").
-			WithOperation("safeJoin").WithContext("entry", entry).WithContext("destDir", destDir)
-	}
-
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", errors.New(errors.ErrTypeValidation, "path traversal: entry escapes destDir").
-			WithOperation("safeJoin").WithContext("entry", entry).WithContext("destDir", destDir)
-	}
-
-	return cleaned, nil
+	return safepath.Join(destDir, entry)
 }
 
 // safeSymlinkTarget validates that a symlink's target stays under destDir.
-// Absolute targets are rejected outright; relative targets are resolved
-// against the symlink's own location.
+// Absolute targets are permitted (common in Debian packages; they only
+// resolve at runtime); relative targets are resolved against the symlink's
+// own location. Containment logic lives in pkg/safepath.
 func safeSymlinkTarget(destDir, linkPath, target string) error {
-	if filepath.IsAbs(target) {
-		// Absolute symlink targets are common in Debian (e.g. /usr/share/...).
-		// They are safe at install time because the symlink itself is created
-		// under destDir; the target resolution only matters at runtime, when
-		// the package is actually installed at /. Permit them.
-		return nil
-	}
-
-	// Relative: resolve the target relative to the symlink's directory and
-	// confirm the result stays under destDir.
-	resolved := filepath.Clean(filepath.Join(filepath.Dir(linkPath), target))
-
-	rel, err := filepath.Rel(filepath.Clean(destDir), resolved)
-	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeValidation, "symlink target traversal").
-			WithOperation("safeSymlinkTarget").WithContext("link", linkPath).WithContext("target", target)
-	}
-
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return errors.New(errors.ErrTypeValidation, "symlink target traversal: escapes destDir").
-			WithOperation("safeSymlinkTarget").WithContext("link", linkPath).
-			WithContext("target", target).WithContext("destDir", destDir)
-	}
-
-	return nil
+	return safepath.SymlinkTarget(destDir, linkPath, target)
 }
 
 // extractDataTarWithConffiles extracts a data.tar file, skipping conffiles that already exist.

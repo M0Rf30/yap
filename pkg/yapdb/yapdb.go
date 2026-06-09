@@ -122,6 +122,28 @@ func DefaultPath(rootDir string) string {
 	return filepath.Join(rootDir, dbRelPath)
 }
 
+// RecordInstalled opens the state DB under rootDir, inserts pkg, and
+// closes the handle. This is the shared tail of every per-format
+// installer (deb, rpm); metadata assembly stays format-specific, the
+// open/insert/close transaction does not.
+func RecordInstalled(ctx context.Context, rootDir string, pkg *Package) error {
+	handle, err := Open(ctx, DefaultPath(rootDir))
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open yapdb").
+			WithOperation("RecordInstalled").
+			WithContext("package", pkg.Name)
+	}
+	defer func() { _ = handle.Close() }()
+
+	if err := handle.Insert(ctx, pkg); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to insert package into yapdb").
+			WithOperation("RecordInstalled").
+			WithContext("package", pkg.Name)
+	}
+
+	return nil
+}
+
 // initSchema initializes the database schema if it doesn't exist.
 func (d *DB) initSchema(ctx context.Context) error {
 	// Check if meta table exists.

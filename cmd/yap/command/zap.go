@@ -27,16 +27,13 @@ var zapCmd = &cobra.Command{
 	Args:    cobra.RangeArgs(1, 2),                            // Allow 1-2 arguments
 	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
-		// Parse flexible arguments using shared function
-		distro, release, fullJSONPath, err := ParseFlexibleArgs(args)
+		// Parse flexible arguments and auto-detect distro/codename from
+		// /etc/os-release when missing.
+		distro, release, fullJSONPath, userProvidedDistro, err := ResolveFlexibleDistro(args,
+			"logger.zap.no_distribution_specified")
 		if err != nil {
 			return err
 		}
-
-		// Auto-detect distro and codename from /etc/os-release when missing.
-		userProvidedDistro := distro != ""
-		distro, release = ResolveDistroRelease(distro, release,
-			"logger.zap.no_distribution_specified")
 
 		if userProvidedDistro {
 			logger.Info(i18n.T("logger.zap.cleaning_for_distribution"),
