@@ -4,8 +4,10 @@ package download
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,9 +16,14 @@ import (
 	"github.com/cavaliergopher/grab/v3"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
+
+// backoffBase is the first retry delay; it doubles on each subsequent
+// attempt (1s, 2s, 4s, …). Package-level var so tests can shrink it.
+var backoffBase = time.Second
 
 // Download downloads a file from the given URL and saves it to the specified destination.
 // Uses a simple writer for output.
@@ -64,42 +71,8 @@ func Download(destination, uri string, writer io.Writer) error {
 // - maxRetries: maximum number of retry attempts (0 = no retries, default: 3).
 // - writer: writer for progress output (can be nil)
 func WithResume(ctx context.Context, destination, uri string, maxRetries int, writer io.Writer) error {
-	if maxRetries <= 0 {
-		maxRetries = 3
-	}
-
-	var lastErr error
-
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			logger.Info(i18n.T("logger.download.info.retrying_download"),
-				"attempt", attempt+1,
-				"max_retries", maxRetries+1,
-				"url", uri)
-
-			// Exponential backoff: 1s, 2s, 4s, 8s
-			backoff := time.Duration(1<<(attempt-1)) * time.Second
-			time.Sleep(backoff)
-		}
-
-		err := downloadWithResumeInternal(ctx, destination, uri, "", "", writer)
-		if err == nil {
-			return nil
-		}
-
-		lastErr = err
-
-		// Check if it's a retryable error
-		if !isRetryableDownloadError(err) {
-			break
-		}
-	}
-
-	return errors.Wrap(lastErr, errors.ErrTypeNetwork,
-		fmt.Sprintf(i18n.T("errors.download.download_failed_after_attempts"), maxRetries+1)).
-		WithOperation("WithResume").
-		WithContext("uri", uri).
-		WithContext("max_retries", maxRetries)
+	return retryDownload(ctx, destination, uri, maxRetries, "", "", writer,
+		"WithResume", "logger.download.info.retrying_download")
 }
 
 // WithResumeContext downloads a file with context information for enhanced
@@ -118,6 +91,20 @@ func WithResumeContext(
 	packageName, sourceName string,
 	writer io.Writer,
 ) error {
+	return retryDownload(context.Background(), destination, uri, maxRetries,
+		packageName, sourceName, writer,
+		"WithResumeContext", "logger.download.info.retrying_download_2")
+}
+
+// retryDownload is the attempt loop shared by WithResume and
+// WithResumeContext: exponential backoff between attempts, retry only on
+// transient errors, and partial-file cleanup when the partial cannot be
+// resumed (length mismatch).
+func retryDownload(
+	ctx context.Context, destination, uri string, maxRetries int,
+	packageName, sourceName string, writer io.Writer,
+	op, retryMsgID string,
+) error {
 	if maxRetries <= 0 {
 		maxRetries = 3
 	}
@@ -126,19 +113,26 @@ func WithResumeContext(
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			logger.Info(i18n.T("logger.download.info.retrying_download_2"),
+			logger.Info(i18n.T(retryMsgID),
 				"attempt", attempt+1,
 				"max_retries", maxRetries+1,
 				"url", uri)
 
-			// Exponential backoff: 1s, 2s, 4s, 8s
-			backoff := time.Duration(1<<(attempt-1)) * time.Second
-			time.Sleep(backoff)
+			// Exponential backoff: 1s, 2s, 4s, 8s — abandoned early when
+			// the context is cancelled.
+			backoff := backoffBase << (attempt - 1)
+
+			select {
+			case <-ctx.Done():
+				return errors.Wrap(lastErr, errors.ErrTypeNetwork,
+					i18n.T("errors.download.download_failed")).
+					WithOperation(op).
+					WithContext("uri", uri)
+			case <-time.After(backoff):
+			}
 		}
 
-		err := downloadWithResumeInternal(
-			context.Background(),
-			destination, uri, packageName, sourceName, writer)
+		err := downloadWithResumeInternal(ctx, destination, uri, packageName, sourceName, writer)
 		if err == nil {
 			return nil
 		}
@@ -149,11 +143,18 @@ func WithResumeContext(
 		if !isRetryableDownloadError(err) {
 			break
 		}
+
+		// A length mismatch means the on-disk partial cannot be resumed
+		// (half-synced mirror or corrupt partial) — clear it so the next
+		// attempt starts from scratch instead of failing the same way.
+		if stderrors.Is(err, grab.ErrBadLength) {
+			_ = os.Remove(destination)
+		}
 	}
 
 	return errors.Wrap(lastErr, errors.ErrTypeNetwork,
 		fmt.Sprintf(i18n.T("errors.download.download_failed_after_attempts"), maxRetries+1)).
-		WithOperation("WithResumeContext").
+		WithOperation(op).
 		WithContext("uri", uri).
 		WithContext("max_retries", maxRetries)
 }
@@ -298,27 +299,54 @@ func monitorDownload(
 	}
 }
 
-// isRetryableDownloadError determines if a download error is retryable.
+// isRetryableDownloadError determines if a download error is transient and
+// worth retrying. Typed checks run first: context cancellation is never
+// retried; grab status codes retry on 408/429/5xx; transport-level errors
+// (timeouts, resets, truncated bodies) defer to httpclient.IsRetryable.
+// A conservative string fallback catches errors that lost their type
+// through fmt-style wrapping.
 func isRetryableDownloadError(err error) bool {
 	if err == nil {
 		return false
 	}
 
-	errStr := err.Error()
-	// Network-related errors that are typically retryable
-	retryableErrors := []string{
+	if stderrors.Is(err, context.Canceled) || stderrors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	var statusErr grab.StatusCodeError
+	if stderrors.As(err, &statusErr) {
+		code := int(statusErr)
+
+		return code == http.StatusRequestTimeout ||
+			code == http.StatusTooManyRequests ||
+			code >= http.StatusInternalServerError
+	}
+
+	// Length mismatch: half-synced mirror or corrupt partial; the retry
+	// loop clears the partial file and starts fresh.
+	if stderrors.Is(err, grab.ErrBadLength) {
+		return true
+	}
+
+	// Transport-level classification (net.Error, url.Error, unexpected
+	// EOF, ECONNRESET/ECONNREFUSED, …).
+	if httpclient.IsRetryable(err) {
+		return true
+	}
+
+	// Fallback for errors that lost their type through string wrapping.
+	errStr := strings.ToLower(err.Error())
+	for _, retryable := range []string{
 		"connection reset",
 		"connection refused",
 		"timeout",
-		"deadline exceeded",
 		"temporary failure",
 		"network is unreachable",
 		"no route to host",
-		"502", "503", "504", // HTTP server errors
-	}
-
-	for _, retryable := range retryableErrors {
-		if strings.Contains(strings.ToLower(errStr), retryable) {
+		"unexpected eof",
+	} {
+		if strings.Contains(errStr, retryable) {
 			return true
 		}
 	}

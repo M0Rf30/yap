@@ -9,11 +9,20 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
 )
+
+// TestMain shrinks the retry backoff so retry-path tests don't sleep
+// through the production backoff schedule.
+func TestMain(m *testing.M) {
+	backoffBase = time.Millisecond
+
+	os.Exit(m.Run())
+}
 
 func TestFilename(t *testing.T) {
 	testCases := []struct {
@@ -60,15 +69,29 @@ func TestFormatBytes(t *testing.T) {
 
 func TestIsRetryableDownloadError(t *testing.T) {
 	testCases := []struct {
+		name     string
 		err      error
 		expected bool
 	}{
-		{nil, false},
-		{io.EOF, false},
-		{context.DeadlineExceeded, true}, // Contains "timeout"
+		{"nil", nil, false},
+		// Truncated transfers are transient: retry resumes the partial.
+		{"EOF", io.EOF, true},
+		{"unexpected EOF", io.ErrUnexpectedEOF, true},
+		// Context cancellation is a deliberate stop, never retried.
+		{"context canceled", context.Canceled, false},
+		{"context deadline", context.DeadlineExceeded, false},
+		// grab typed status codes: 4xx definitive, 408/429/5xx transient.
+		{"grab 404", grab.StatusCodeError(http.StatusNotFound), false},
+		{"grab 403", grab.StatusCodeError(http.StatusForbidden), false},
+		{"grab 408", grab.StatusCodeError(http.StatusRequestTimeout), true},
+		{"grab 429", grab.StatusCodeError(http.StatusTooManyRequests), true},
+		{"grab 500", grab.StatusCodeError(http.StatusInternalServerError), true},
+		{"grab 503", grab.StatusCodeError(http.StatusServiceUnavailable), true},
+		// Unresumable partial: retried after the loop clears the file.
+		{"grab bad length", grab.ErrBadLength, true},
 	}
 
-	// Test with string-based errors
+	// String-wrapped errors that lost their type.
 	stringTestCases := []struct {
 		errStr   string
 		expected bool
@@ -76,21 +99,21 @@ func TestIsRetryableDownloadError(t *testing.T) {
 		{"connection reset by peer", true},
 		{"connection refused", true},
 		{"timeout exceeded", true},
-		{"502 bad gateway", true},
-		{"503 service unavailable", true},
-		{"504 gateway timeout", true},
 		{"network is unreachable", true},
 		{"no route to host", true},
 		{"temporary failure", true},
+		{"unexpected eof while reading body", true},
 		{"file not found", false},
 		{"permission denied", false},
 	}
 
 	for _, tc := range testCases {
-		result := isRetryableDownloadError(tc.err)
-		if result != tc.expected {
-			t.Errorf("isRetryableDownloadError(%v) = %v, expected %v", tc.err, result, tc.expected)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			result := isRetryableDownloadError(tc.err)
+			if result != tc.expected {
+				t.Errorf("isRetryableDownloadError(%v) = %v, expected %v", tc.err, result, tc.expected)
+			}
+		})
 	}
 
 	for _, tc := range stringTestCases {
@@ -398,5 +421,89 @@ func TestMonitorDownloadTimeout(t *testing.T) {
 	// Should get an error due to cancellation
 	if err == nil {
 		t.Log("Expected error due to cancellation, but got nil")
+	}
+}
+
+// TestWithResumeRecoversFromTransient5xx tests that the retry loop survives
+// a mirror that returns 5xx before recovering.
+func TestWithResumeRecoversFromTransient5xx(t *testing.T) {
+	var hits atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if hits.Add(1) <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		_, _ = w.Write([]byte("recovered content"))
+	}))
+	defer server.Close()
+
+	destination := filepath.Join(t.TempDir(), "out.txt")
+
+	if err := WithResume(context.Background(), destination, server.URL, 3, nil); err != nil {
+		t.Fatalf("WithResume failed: %v", err)
+	}
+
+	data, err := os.ReadFile(destination) //nolint:gosec
+	if err != nil {
+		t.Fatalf("read destination: %v", err)
+	}
+
+	if string(data) != "recovered content" {
+		t.Errorf("unexpected content: %q", data)
+	}
+
+	if got := hits.Load(); got != 3 {
+		t.Errorf("expected 3 attempts, got %d", got)
+	}
+}
+
+// TestWithResumeNoRetryOn404 tests that a definitive 404 fails immediately
+// without burning the retry budget.
+func TestWithResumeNoRetryOn404(t *testing.T) {
+	var hits atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	destination := filepath.Join(t.TempDir(), "out.txt")
+
+	if err := WithResume(context.Background(), destination, server.URL, 3, nil); err == nil {
+		t.Fatal("expected error for 404")
+	}
+
+	if got := hits.Load(); got != 1 {
+		t.Errorf("expected 1 attempt, got %d", got)
+	}
+}
+
+// TestWithResumeContextCancelledStopsRetrying tests that a cancelled
+// context aborts the backoff instead of sleeping through it.
+func TestWithResumeCancelledStopsRetrying(t *testing.T) {
+	var hits atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	destination := filepath.Join(t.TempDir(), "out.txt")
+
+	if err := WithResume(ctx, destination, server.URL, 3, nil); err == nil {
+		t.Fatal("expected error")
+	}
+
+	// First attempt may fire before the ctx check in the backoff select,
+	// but no further attempts must happen.
+	if got := hits.Load(); got > 1 {
+		t.Errorf("expected at most 1 attempt, got %d", got)
 	}
 }
