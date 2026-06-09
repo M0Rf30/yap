@@ -19,15 +19,12 @@
 package dnfcache
 
 import (
-	"bufio"
-	"compress/gzip"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/ulikunitz/xz"
 	"gopkg.in/yaml.v3"
 
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -149,37 +146,14 @@ func buildBlockedNVRA(idx *moduleIndex, streamRPMs map[string][]string) {
 	}
 }
 
-// parseModulesFile opens path (possibly .gz/.xz compressed) and merges its
-// modulemd content into idx.
+// parseModulesFile opens path (possibly .gz/.xz/.zst compressed) and merges
+// its modulemd content into idx.
 func parseModulesFile(path string, idx *moduleIndex) error {
-	f, err := os.Open(path) //nolint:gosec
+	r, closeFn, err := openCompressed(path)
 	if err != nil {
 		return err
 	}
-
-	defer func() { _ = f.Close() }()
-
-	var r io.Reader = f
-
-	switch {
-	case strings.HasSuffix(path, ".gz"):
-		gz, err := gzip.NewReader(f)
-		if err != nil {
-			return err
-		}
-
-		defer func() { _ = gz.Close() }()
-
-		r = gz
-
-	case strings.HasSuffix(path, ".xz"):
-		xzr, err := xz.NewReader(bufio.NewReader(f))
-		if err != nil {
-			return err
-		}
-
-		r = xzr
-	}
+	defer closeFn()
 
 	parseModulesYAML(r, idx)
 

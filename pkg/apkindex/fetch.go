@@ -2,7 +2,6 @@ package apkindex
 
 import (
 	"archive/tar"
-	"compress/gzip"
 	"context"
 	"crypto/sha1" //nolint:gosec
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/cavaliergopher/grab/v3"
+	"github.com/klauspost/compress/gzip"
 
 	apperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"

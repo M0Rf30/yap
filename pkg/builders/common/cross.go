@@ -191,12 +191,38 @@ func isPerlModule(name string) bool {
 	return strings.HasSuffix(name, "-perl")
 }
 
+// partitionMode selects how partitionArchAllDeps treats packages that are
+// already installed host-side without Multi-Arch: same.
+type partitionMode int
+
+const (
+	// partitionForInstall is dpkg-aware: a package installed for the host
+	// arch without Multi-Arch: same must NOT be qualified with the target
+	// arch (installing both arches would cause a dpkg conflict).
+	partitionForInstall partitionMode = iota
+	// partitionForExtract is used by DownloadAndExtractCrossDeps. Since
+	// extraction bypasses dpkg there are no multi-arch conflicts, so
+	// host-installed packages are still qualified with the target arch.
+	partitionForExtract
+)
+
 // partitionArchAllDeps splits deps according to apt Multi-Arch policy. The
 // caller is responsible for ensuring the aptcache singleton is up to date
 // (e.g. via aptcache.Reload after apt-get update or SetupCrossAPT). Tests
 // install a synthetic cache via StoreGlobal and must not be clobbered by an
 // implicit disk reload.
-func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
+//
+// Unqualified (archAll) in both modes:
+//   - Perl modules — host-side build tools despite Multi-Arch: same.
+//   - Architecture: all — no arch-specific variant exists.
+//   - Essential packages (e.g. bash) — a foreign-arch copy alongside the
+//     host one breaks the build environment.
+//   - Multi-Arch: foreign/allowed — host tools (cmake, git, systemd, perl…)
+//     where a single host-arch copy satisfies any-arch dependencies.
+//
+// partitionForInstall additionally leaves host-installed non-Multi-Arch:same
+// packages unqualified (see partitionMode).
+func partitionArchAllDeps(deps []string, mode partitionMode) (archSpecific, archAll []string) {
 	cache := aptcache.Load()
 
 	for _, dep := range deps {
@@ -239,7 +265,9 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 		}
 
 		// Essential packages (e.g. bash) conflict when installed for a foreign
-		// arch alongside the host-arch version.
+		// arch alongside the host-arch version — and with extraction,
+		// overwriting host binaries (e.g. /bin/bash) with target-arch
+		// binaries would break the build environment.
 		if info.Essential {
 			archAll = append(archAll, dep)
 			continue
@@ -253,70 +281,15 @@ func partitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
 		// Multi-Arch: same — dev libraries that must be installed separately
 		// per architecture. These DO get the :arm64 qualifier.
 		//
-		// Multi-Arch: absent / no — qualify only if not already installed
-		// (installing the same package for two arches without Multi-Arch: same
-		// causes dpkg conflicts).
+		// Multi-Arch: absent / no — for dpkg installs, qualify only if not
+		// already installed (installing the same package for two arches
+		// without Multi-Arch: same causes dpkg conflicts).
 		if info.MultiArchForeign() {
 			archAll = append(archAll, dep)
 			continue
 		}
 
-		if !info.MultiArchSame() && info.Installed {
-			archAll = append(archAll, dep)
-			continue
-		}
-
-		archSpecific = append(archSpecific, dep)
-	}
-
-	return archSpecific, archAll
-}
-
-// partitionArchAllDepsForExtract is a relaxed variant of partitionArchAllDeps
-// used by DownloadAndExtractCrossDeps. Since extraction bypasses dpkg, there
-// are no multi-arch conflicts. The only packages left unqualified are:
-//   - Architecture: all — no arch-specific variant exists.
-//   - Multi-Arch: foreign/allowed — host tools (cmake, git, systemd, perl…).
-//   - Essential packages — overwriting host binaries would break the env.
-//
-// Packages already installed for the host arch are still qualified with the
-// target arch because extraction overwrites files without dpkg conflict checks.
-func partitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []string) {
-	cache := aptcache.Load()
-
-	for _, dep := range deps {
-		name, _, _ := strings.Cut(dep, " (")
-		name, _, _ = strings.Cut(name, ":")
-
-		// Perl modules: same exception as partitionArchAllDeps.
-		if isPerlModule(name) {
-			archAll = append(archAll, dep)
-			continue
-		}
-
-		info, found := cache.Lookup(name)
-		if !found {
-			// Not in apt cache — assume arch-specific so apt can surface a clear error.
-			archSpecific = append(archSpecific, dep)
-			continue
-		}
-
-		if info.ArchitectureAll() {
-			archAll = append(archAll, dep)
-			continue
-		}
-
-		// Essential packages still conflict even with extraction because
-		// overwriting host binaries (e.g. /bin/bash) with target-arch
-		// binaries would break the build environment.
-		if info.Essential {
-			archAll = append(archAll, dep)
-			continue
-		}
-
-		// Multi-Arch: foreign/allowed — host tools that must not be
-		// qualified with the target arch (same reasoning as partitionArchAllDeps).
-		if info.MultiArchForeign() {
+		if mode == partitionForInstall && !info.MultiArchSame() && info.Installed {
 			archAll = append(archAll, dep)
 			continue
 		}
@@ -435,7 +408,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 	// Use the extract-safe partitioning: since we download+extract (not dpkg -i),
 	// there are no dpkg conflicts, so packages already installed for the host arch
 	// must still be downloaded as target-arch.
-	archSpecific, archAll := partitionArchAllDepsForExtract(deps)
+	archSpecific, archAll := partitionArchAllDeps(deps, partitionForExtract)
 	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
 
 	seeds := make([]string, 0, len(archAll)+len(qualified))
@@ -639,7 +612,7 @@ func (bb *BaseBuilder) installCrossDeps(
 	// with the target arch (e.g. perl:arm64), producing a broken build env.
 	aptcache.Reload()
 
-	archSpecific, archAll := partitionArchAllDeps(makeDepends)
+	archSpecific, archAll := partitionArchAllDeps(makeDepends, partitionForInstall)
 	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)
 
 	logger.Info(i18n.T("logger.common.info.qualifying_makedepends_target_architecture"), "target_arch", targetArch,

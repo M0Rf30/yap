@@ -2,7 +2,6 @@ package dnfcache
 
 import (
 	"bufio"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -16,9 +15,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/klauspost/compress/zstd"
-	"github.com/ulikunitz/xz"
 
 	apperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
@@ -953,47 +949,11 @@ func isPrimaryIndex(name string) bool {
 
 // parsePrimaryFile opens and parses a primary.xml file (possibly compressed).
 func (c *Cache) parsePrimaryFile(path, baseURL string) error {
-	f, err := os.Open(path) //nolint:gosec
+	r, closeFn, err := openCompressed(path)
 	if err != nil {
 		return err
 	}
-
-	defer func() { _ = f.Close() }()
-
-	var r io.Reader = f
-
-	switch {
-	case strings.HasSuffix(path, ".gz"):
-		gz, err := gzip.NewReader(f)
-		if err != nil {
-			return err
-		}
-
-		defer func() { _ = gz.Close() }()
-
-		r = gz
-
-	case strings.HasSuffix(path, ".xz"):
-		// bufio.NewReader wraps the file in a buffered reader; ulikunitz/xz
-		// reads in small chunks and without buffering this causes excessive
-		// syscall overhead — 5-8x slower than buffered I/O.
-		xzr, err := xz.NewReader(bufio.NewReader(f))
-		if err != nil {
-			return err
-		}
-
-		r = xzr
-
-	case strings.HasSuffix(path, ".zst"):
-		zr, err := zstd.NewReader(bufio.NewReader(f))
-		if err != nil {
-			return err
-		}
-
-		defer zr.Close()
-
-		r = zr
-	}
+	defer closeFn()
 
 	return c.parsePrimaryXML(r, baseURL)
 }

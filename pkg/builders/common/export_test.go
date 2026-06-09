@@ -7,11 +7,15 @@ import "github.com/M0Rf30/yap/v2/pkg/aptcache"
 // IsPerlModule exposes isPerlModule for unit tests.
 var IsPerlModule = isPerlModule
 
-// PartitionArchAllDeps exposes partitionArchAllDeps for unit tests.
-var PartitionArchAllDeps = partitionArchAllDeps
+// PartitionArchAllDeps exposes partitionArchAllDeps (install mode) for unit tests.
+func PartitionArchAllDeps(deps []string) (archSpecific, archAll []string) {
+	return partitionArchAllDeps(deps, partitionForInstall)
+}
 
-// PartitionArchAllDepsForExtract exposes partitionArchAllDepsForExtract for unit tests.
-var PartitionArchAllDepsForExtract = partitionArchAllDepsForExtract
+// PartitionArchAllDepsForExtract exposes partitionArchAllDeps (extract mode) for unit tests.
+func PartitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []string) {
+	return partitionArchAllDeps(deps, partitionForExtract)
+}
 
 // CountDirect exposes countDirect for unit tests.
 var CountDirect = countDirect

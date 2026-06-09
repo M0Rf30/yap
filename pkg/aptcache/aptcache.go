@@ -14,7 +14,6 @@ package aptcache
 import (
 	"bufio"
 	"compress/bzip2"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -30,6 +29,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cavaliergopher/grab/v3"
+	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 	lz4 "github.com/pierrec/lz4/v4"
 	"github.com/ulikunitz/xz"

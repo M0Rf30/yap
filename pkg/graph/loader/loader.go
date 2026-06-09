@@ -295,6 +295,11 @@ func parseDependenciesFromPKGBUILD(pkgbuildPath string) map[string][]string {
 	return dependencies
 }
 
+// dynDependsRe matches dynamic dependency declarations like
+// depends__{distro}=( — hoisted to package level so it is compiled once,
+// not per parsed PKGBUILD line.
+var dynDependsRe = regexp.MustCompile(`^(depends|makedepends|checkdepends|optdepends)__\w+=\(`)
+
 // processDependencyLine processes a single line for dependency parsing.
 func processDependencyLine(
 	line, currentArray string,
@@ -302,9 +307,6 @@ func processDependencyLine(
 	inArray bool,
 	dependencies map[string][]string,
 ) (newArray string, newDeps []string, newInArray bool) {
-	// Regex to match dynamic dependency declarations like depends__{distro}
-	re := regexp.MustCompile(`^(depends|makedepends|checkdepends|optdepends)__\w+=\(`)
-
 	switch {
 	case strings.HasPrefix(line, "depends=("):
 		return handleDependencyArrayStart(line, "depends=(", "runtime", dependencies)
@@ -314,8 +316,8 @@ func processDependencyLine(
 		return handleDependencyArrayStart(line, "checkdepends=(", "check", dependencies)
 	case strings.HasPrefix(line, "optdepends=("):
 		return handleDependencyArrayStart(line, "optdepends=(", "optional", dependencies)
-	case re.MatchString(line):
-		prefix := re.FindString(line)
+	case dynDependsRe.MatchString(line):
+		prefix := dynDependsRe.FindString(line)
 		arrayType := strings.Split(prefix, "__")[0]
 
 		return handleDependencyArrayStart(line, prefix, arrayType, dependencies)

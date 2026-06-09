@@ -3,13 +3,14 @@ package apkindex
 import (
 	"archive/tar"
 	"bufio"
-	"compress/gzip"
 	"context"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/klauspost/compress/gzip"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
