@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -996,8 +997,9 @@ baseurl=http://mirror.example.com/
 	}
 }
 
-// TestParseRepoFileContentMultipleBaseURLs tests that only the first baseurl is used.
-func TestParseRepoFileContentMultipleBaseURLs(t *testing.T) {
+// TestParseRepoFileContentFirstBaseURLKept tests that BaseURL still holds
+// the first URL while BaseURLs collects the full mirror candidate list.
+func TestParseRepoFileContentFirstBaseURLKept(t *testing.T) {
 	content := `
 [multi]
 baseurl=http://first.example.com/ http://second.example.com/
@@ -1010,7 +1012,11 @@ enabled=1
 	}
 
 	if repos[0].BaseURL != "http://first.example.com/" {
-		t.Errorf("expected first URL only, got %s", repos[0].BaseURL)
+		t.Errorf("expected first URL, got %s", repos[0].BaseURL)
+	}
+
+	if len(repos[0].BaseURLs) != 2 || repos[0].BaseURLs[1] != "http://second.example.com/" {
+		t.Errorf("expected both URLs collected, got %v", repos[0].BaseURLs)
 	}
 }
 
@@ -1374,10 +1380,10 @@ func TestReadReleaseverQuotedValue(t *testing.T) {
 	}
 }
 
-// ---- parseMedalinkURL ----
+// ---- parseMetalinkURLs ----
 
-// TestParseMedalinkURLBasic tests extraction of a base URL from metalink XML.
-func TestParseMedalinkURLBasic(t *testing.T) {
+// TestParseMetalinkURLsBasic tests extraction of base URLs from metalink XML.
+func TestParseMetalinkURLsBasic(t *testing.T) {
 	body := `<?xml version="1.0" encoding="utf-8"?>
 <metalink xmlns="urn:ietf:params:xml:ns:metalink">
   <file name="repomd.xml">
@@ -1386,18 +1392,27 @@ func TestParseMedalinkURLBasic(t *testing.T) {
   </file>
 </metalink>`
 
-	got, err := parseMedalinkURL(body, "https://metalink.example.com/")
+	got, err := parseMetalinkURLs(body, "https://metalink.example.com/")
 	if err != nil {
-		t.Fatalf("parseMedalinkURL failed: %v", err)
+		t.Fatalf("parseMetalinkURLs failed: %v", err)
 	}
 
-	if got != "https://mirror.example.com/rocky/8/BaseOS/x86_64/os/" {
-		t.Errorf("unexpected base URL: %q", got)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 mirrors, got %d: %v", len(got), got)
+	}
+
+	if got[0] != "https://mirror.example.com/rocky/8/BaseOS/x86_64/os/" {
+		t.Errorf("unexpected first base URL: %q", got[0])
+	}
+
+	if got[1] != "https://mirror2.example.com/rocky/8/BaseOS/x86_64/os/" {
+		t.Errorf("unexpected second base URL: %q", got[1])
 	}
 }
 
-// TestParseMedalinkURLNoHTTPS tests that a metalink with no https:// URLs returns an error.
-func TestParseMedalinkURLNoHTTPS(t *testing.T) {
+// TestParseMetalinkURLsHTTPFallback tests that http:// mirrors are accepted
+// as a fallback when no https:// mirror is present.
+func TestParseMetalinkURLsHTTPFallback(t *testing.T) {
 	body := `<?xml version="1.0" encoding="utf-8"?>
 <metalink>
   <file name="repomd.xml">
@@ -1405,23 +1420,71 @@ func TestParseMedalinkURLNoHTTPS(t *testing.T) {
   </file>
 </metalink>`
 
-	_, err := parseMedalinkURL(body, "https://metalink.example.com/")
-	if err == nil {
-		t.Error("expected error when no https:// URL found in metalink")
+	got, err := parseMetalinkURLs(body, "https://metalink.example.com/")
+	if err != nil {
+		t.Fatalf("parseMetalinkURLs failed: %v", err)
+	}
+
+	if len(got) != 1 || got[0] != "http://mirror.example.com/" {
+		t.Errorf("unexpected mirrors: %v", got)
 	}
 }
 
-// TestParseMedalinkURLPlainMirror tests a plain https:// URL without repomd.xml suffix.
-func TestParseMedalinkURLPlainMirror(t *testing.T) {
-	body := `<url>https://mirror.example.com/rocky/8/BaseOS/x86_64/os/</url>`
+// TestParseMetalinkURLsHTTPSPreferred tests that https:// mirrors are
+// ordered before http:// mirrors regardless of document order.
+func TestParseMetalinkURLsHTTPSPreferred(t *testing.T) {
+	body := `<url>http://plain.example.com/repodata/repomd.xml</url>
+<url>https://secure.example.com/repodata/repomd.xml</url>`
 
-	got, err := parseMedalinkURL(body, "https://metalink.example.com/")
+	got, err := parseMetalinkURLs(body, "https://metalink.example.com/")
 	if err != nil {
-		t.Fatalf("parseMedalinkURL failed: %v", err)
+		t.Fatalf("parseMetalinkURLs failed: %v", err)
 	}
 
-	if got == "" {
-		t.Error("expected non-empty URL")
+	if len(got) != 2 || got[0] != "https://secure.example.com/" || got[1] != "http://plain.example.com/" {
+		t.Errorf("unexpected mirror order: %v", got)
+	}
+}
+
+// TestParseMetalinkURLsNoMirrors tests that a metalink with no URLs returns an error.
+func TestParseMetalinkURLsNoMirrors(t *testing.T) {
+	body := `<?xml version="1.0" encoding="utf-8"?>
+<metalink><file name="repomd.xml"></file></metalink>`
+
+	_, err := parseMetalinkURLs(body, "https://metalink.example.com/")
+	if err == nil {
+		t.Error("expected error when no usable URL found in metalink")
+	}
+}
+
+// TestParseMetalinkURLsPlainMirror tests a plain https:// URL without repomd.xml suffix.
+func TestParseMetalinkURLsPlainMirror(t *testing.T) {
+	body := `<url>https://mirror.example.com/rocky/8/BaseOS/x86_64/os/</url>`
+
+	got, err := parseMetalinkURLs(body, "https://metalink.example.com/")
+	if err != nil {
+		t.Fatalf("parseMetalinkURLs failed: %v", err)
+	}
+
+	if len(got) != 1 || got[0] == "" {
+		t.Errorf("expected one non-empty URL, got %v", got)
+	}
+}
+
+// TestParseMetalinkURLsCapped tests that at most maxMirrors mirrors are returned.
+func TestParseMetalinkURLsCapped(t *testing.T) {
+	var sb strings.Builder
+	for i := range 12 {
+		fmt.Fprintf(&sb, "<url>https://m%d.example.com/repodata/repomd.xml</url>\n", i)
+	}
+
+	got, err := parseMetalinkURLs(sb.String(), "https://metalink.example.com/")
+	if err != nil {
+		t.Fatalf("parseMetalinkURLs failed: %v", err)
+	}
+
+	if len(got) != maxMirrors {
+		t.Errorf("expected %d mirrors, got %d", maxMirrors, len(got))
 	}
 }
 

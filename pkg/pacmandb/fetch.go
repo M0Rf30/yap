@@ -14,7 +14,17 @@ import (
 // Real Arch / extra / community DBs are well under 50 MB.
 const maxPacmanDBBytes = 256 << 20
 
+// downloadFile fetches url into dest (atomic tmp+rename write). Transient
+// network failures are retried per the httpclient retry policy; SyncRepo's
+// mirror loop handles definitive per-mirror failures.
 func downloadFile(ctx context.Context, url, dest string) error {
+	return httpclient.WithRetry(ctx, url, func() error {
+		return downloadFileOnce(ctx, url, dest)
+	})
+}
+
+// downloadFileOnce performs a single download attempt.
+func downloadFileOnce(ctx context.Context, url, dest string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return err

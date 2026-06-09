@@ -1208,6 +1208,8 @@
   translation: "Failed to parse modules.yaml"
 - id: logger.dnfcache.warn.failed_parse_primary_index
   translation: "Failed to parse primary index"
+- id: logger.dnfcache.warn.mirror_failed_trying_next
+  translation: "Mirror failed, trying next"
 - id: logger.dnfcache.warn.unresolvable_dependency
   translation: "Unresolvable dependency"
 - id: logger.dnfinstall.debug.downloaded_rpm
@@ -1282,6 +1284,8 @@
   translation: "Cloning"
 - id: logger.git.info.creating_working_copy_bare
   translation: "Creating working copy from bare repository"
+- id: logger.httpclient.warn.transient_fetch_retry
+  translation: "Transient fetch failure, retrying"
 - id: logger.mcp.debug.mcp_request
   translation: "Mcp request"
 - id: logger.mcp.error.mcp_request_failed

@@ -63,21 +63,21 @@ func TestIsNonFatalRepoErrorWrapped(t *testing.T) {
 	assert.True(t, isNonFatalRepoError(wrapped))
 }
 
-// ---- parseMedalinkURL missing branch ----
+// ---- parseMetalinkURLs missing branch ----
 
-// TestParseMedalinkURLNoTrailingSlash tests a plain https:// URL without trailing
-// slash and without /repodata/repomd.xml suffix — the third branch that appends "/".
-func TestParseMedalinkURLNoTrailingSlash(t *testing.T) {
+// TestParseMetalinkURLsNoTrailingSlash tests a plain https:// URL without trailing
+// slash and without /repodata/repomd.xml suffix — the branch that appends "/".
+func TestParseMetalinkURLsNoTrailingSlash(t *testing.T) {
 	// URL has no trailing slash and no /repodata/repomd.xml suffix.
 	body := `<url>https://mirror.example.com/rocky/8/BaseOS/x86_64/os</url>`
 
-	got, err := parseMedalinkURL(body, "https://metalink.example.com/")
+	got, err := parseMetalinkURLs(body, "https://metalink.example.com/")
 	require.NoError(t, err)
-	assert.NotEmpty(t, got)
+	require.Len(t, got, 1)
 	// The function should append "/" to make it a proper base URL.
-	assert.True(t, strings.HasSuffix(got, "/"),
-		"expected trailing slash, got %q", got)
-	assert.Contains(t, got, "https://mirror.example.com/rocky/8/BaseOS/x86_64/os")
+	assert.True(t, strings.HasSuffix(got[0], "/"),
+		"expected trailing slash, got %q", got[0])
+	assert.Contains(t, got[0], "https://mirror.example.com/rocky/8/BaseOS/x86_64/os")
 }
 
 // ---- parsePrimaryXML malformed XML ----

@@ -326,8 +326,24 @@ func stripClearsignArmor(data []byte) []byte {
 const maxReleaseBytes = 16 << 20
 
 // httpFetch downloads a URL and returns the raw bytes, capped at
-// maxReleaseBytes.
+// maxReleaseBytes. Transient network failures are retried per the
+// httpclient retry policy.
 func httpFetch(ctx context.Context, fetchURL string) ([]byte, error) {
+	var data []byte
+
+	err := httpclient.WithRetry(ctx, fetchURL, func() error {
+		var err error
+
+		data, err = httpFetchOnce(ctx, fetchURL)
+
+		return err
+	})
+
+	return data, err
+}
+
+// httpFetchOnce performs a single fetch attempt.
+func httpFetchOnce(ctx context.Context, fetchURL string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL, http.NoBody)
 	if err != nil {
 		return nil, err

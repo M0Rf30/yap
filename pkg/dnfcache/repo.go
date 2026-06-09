@@ -26,7 +26,9 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
-const (
+// dnfCacheDir and yumRepoDir are package-level vars (not consts) so tests
+// can redirect them to temp directories.
+var (
 	dnfCacheDir = "/var/cache/dnf"
 	yumRepoDir  = "/etc/yum.repos.d"
 )
@@ -34,9 +36,24 @@ const (
 // RepoEntry holds a single enabled repository parsed from a .repo file.
 type RepoEntry struct {
 	ID         string
-	BaseURL    string // first baseurl= line
-	MirrorList string // mirrorlist= URL (used when BaseURL is empty)
+	BaseURL    string   // first baseurl= value (kept for single-URL callers)
+	BaseURLs   []string // all baseurl= values in listed order
+	MirrorList string   // mirrorlist= / metalink= URL (used when no baseurl)
 	Enabled    bool
+}
+
+// baseURLs returns every configured baseurl for the repo, tolerating
+// entries constructed with only the legacy BaseURL field set.
+func (r *RepoEntry) baseURLs() []string {
+	if len(r.BaseURLs) > 0 {
+		return r.BaseURLs
+	}
+
+	if r.BaseURL != "" {
+		return []string{r.BaseURL}
+	}
+
+	return nil
 }
 
 // parseRepoFiles reads all *.repo files from /etc/yum.repos.d and returns
@@ -96,27 +113,7 @@ func ParseRepoFileContent(content string) []RepoEntry {
 			continue
 		}
 
-		key, val, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-
-		key = strings.TrimSpace(key)
-		val = strings.TrimSpace(val)
-
-		switch key {
-		case "baseurl":
-			if cur.BaseURL == "" {
-				// Take the first URL (may be space/newline separated list).
-				cur.BaseURL = strings.Fields(val)[0]
-			}
-		case "mirrorlist", "metalink":
-			if cur.MirrorList == "" {
-				cur.MirrorList = strings.Fields(val)[0]
-			}
-		case "enabled":
-			cur.Enabled = val != "0"
-		}
+		applyRepoLine(&cur, line)
 	}
 
 	if cur.ID != "" {
@@ -124,6 +121,53 @@ func ParseRepoFileContent(content string) []RepoEntry {
 	}
 
 	return repos
+}
+
+// applyRepoLine folds one non-section line of a .repo file into cur:
+// bare-URL baseurl continuation lines and key=value assignments.
+func applyRepoLine(cur *RepoEntry, line string) {
+	// Multi-line baseurl continuation: dnf's INI dialect allows extra
+	// URLs on indented lines following a "baseurl=" line.
+	if cur.ID != "" && isRepoURL(line) {
+		cur.BaseURLs = append(cur.BaseURLs, line)
+		if cur.BaseURL == "" {
+			cur.BaseURL = line
+		}
+
+		return
+	}
+
+	key, val, ok := strings.Cut(line, "=")
+	if !ok {
+		return
+	}
+
+	key = strings.TrimSpace(key)
+	val = strings.TrimSpace(val)
+
+	switch key {
+	case "baseurl":
+		// Collect every URL (may be a space/newline separated list).
+		urls := strings.Fields(val)
+
+		cur.BaseURLs = append(cur.BaseURLs, urls...)
+		if cur.BaseURL == "" && len(urls) > 0 {
+			cur.BaseURL = urls[0]
+		}
+	case "mirrorlist", "metalink":
+		if cur.MirrorList == "" {
+			cur.MirrorList = strings.Fields(val)[0]
+		}
+	case "enabled":
+		cur.Enabled = val != "0"
+	}
+}
+
+// isRepoURL reports whether line looks like a bare repository URL
+// (a baseurl continuation line in a .repo file).
+func isRepoURL(line string) bool {
+	return strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") ||
+		strings.HasPrefix(line, "ftp://") || strings.HasPrefix(line, "file://")
 }
 
 // ---- repomd.xml XML structs ----
@@ -222,7 +266,7 @@ func fetchAllRepos(ctx context.Context) error {
 	jobCh := make(chan RepoEntry, len(repos))
 
 	for _, r := range repos {
-		if r.Enabled && (r.BaseURL != "" || r.MirrorList != "") {
+		if r.Enabled && (len(r.baseURLs()) > 0 || r.MirrorList != "") {
 			jobCh <- r
 
 			enabledCount++
@@ -246,7 +290,7 @@ func fetchAllRepos(ctx context.Context) error {
 			defer wg.Done()
 
 			for repo := range jobCh {
-				err := fetchRepo(ctx, repo)
+				err := fetchRepo(ctx, &repo)
 				resCh <- result{id: repo.ID, err: err}
 			}
 		}()
@@ -278,7 +322,7 @@ func fetchAllRepos(ctx context.Context) error {
 // fetchModules downloads modules.yaml when present. Always non-fatal: a
 // missing or unfetchable modules index just disables module-stream
 // filtering for that repo.
-func fetchModules(ctx context.Context, repo RepoEntry, baseURL, repoCache, href, checksum string) {
+func fetchModules(ctx context.Context, repo *RepoEntry, baseURL, repoCache, href, checksum string) {
 	if href == "" {
 		return
 	}
@@ -296,29 +340,48 @@ func fetchModules(ctx context.Context, repo RepoEntry, baseURL, repoCache, href,
 	logger.Debug(i18n.T("logger.dnfcache.debug.modules_index_path"), "repo", repo.ID, "file", modulesDest)
 }
 
-// resolveRepoBaseURL returns the concrete base URL for a repo, resolving
-// mirrorlist/metalink if no baseurl was set.
-func resolveRepoBaseURL(ctx context.Context, repo RepoEntry) (string, error) {
-	baseURL := expandRepoVars(repo.BaseURL)
+// maxMirrors caps how many candidate mirrors are kept per repo. The first
+// healthy one wins; trying more than a handful only delays the failure
+// report when a repo is truly unreachable.
+const maxMirrors = 5
 
-	if baseURL == "" && repo.MirrorList != "" {
-		resolved, err := resolveMirrorList(ctx, expandRepoVars(repo.MirrorList))
+// resolveRepoCandidates returns the ordered list of candidate base URLs
+// for a repo: every baseurl= entry (vars expanded), or — when none is set
+// — up to maxMirrors mirrors resolved from the mirrorlist/metalink URL.
+func resolveRepoCandidates(ctx context.Context, repo *RepoEntry) ([]string, error) {
+	var candidates []string
+
+	for _, raw := range repo.baseURLs() {
+		u := normalizeURL(expandRepoVars(raw))
+		if u != "" {
+			candidates = append(candidates, strings.TrimSuffix(u, "/"))
+		}
+	}
+
+	if len(candidates) == 0 && repo.MirrorList != "" {
+		mirrors, err := resolveMirrors(ctx, expandRepoVars(repo.MirrorList))
 		if err != nil {
-			return "", apperrors.Wrap(err, apperrors.ErrTypeNetwork, "resolve mirrorlist").
+			return nil, apperrors.Wrap(err, apperrors.ErrTypeNetwork, "resolve mirrorlist").
 				WithOperation("fetchRepo").
 				WithContext("repo_id", repo.ID)
 		}
 
-		baseURL = resolved
+		for _, m := range mirrors {
+			candidates = append(candidates, strings.TrimSuffix(m, "/"))
+		}
 	}
 
-	if baseURL == "" {
-		return "", apperrors.New(apperrors.ErrTypeConfiguration, "no baseurl or mirrorlist for repo").
+	if len(candidates) == 0 {
+		return nil, apperrors.New(apperrors.ErrTypeConfiguration, "no baseurl or mirrorlist for repo").
 			WithOperation("fetchRepo").
 			WithContext("repo_id", repo.ID)
 	}
 
-	return strings.TrimSuffix(baseURL, "/"), nil
+	if len(candidates) > maxMirrors {
+		candidates = candidates[:maxMirrors]
+	}
+
+	return candidates, nil
 }
 
 // repomdRefs holds the href + sha256 pair for one repodata entry.
@@ -335,7 +398,7 @@ type repomdRefs struct {
 // If-Modified-Since. On HTTP 304 the cached file is parsed directly and
 // no body is downloaded — the typical case when the repo's repomd hasn't
 // moved. The cached file is refreshed (with the same content) on 200.
-func parseRepoMD(ctx context.Context, repo RepoEntry, baseURL string) (repomdRefs, error) {
+func parseRepoMD(ctx context.Context, repo *RepoEntry, baseURL string) (repomdRefs, error) {
 	var refs repomdRefs
 
 	repomdURL := baseURL + "/repodata/repomd.xml"
@@ -406,13 +469,46 @@ func parseRepoMD(ctx context.Context, repo RepoEntry, baseURL string) (repomdRef
 }
 
 // fetchRepo fetches repomd.xml, primary.xml.gz, and (when present)
-// modules.yaml for a single repo.
-func fetchRepo(ctx context.Context, repo RepoEntry) error {
-	baseURL, err := resolveRepoBaseURL(ctx, repo)
+// modules.yaml for a single repo, failing over across candidate mirrors:
+// when one mirror is unreachable, stale (checksum mismatch), or missing
+// the repo path (404), the next candidate is tried. repomd.xml and the
+// files it references are always fetched from the SAME mirror so a
+// mid-sync mirror cannot mix metadata generations.
+func fetchRepo(ctx context.Context, repo *RepoEntry) error {
+	candidates, err := resolveRepoCandidates(ctx, repo)
 	if err != nil {
 		return err
 	}
 
+	var lastErr error
+
+	for i, baseURL := range candidates {
+		err := fetchRepoFrom(ctx, repo, baseURL)
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+
+		// Don't burn the remaining mirrors when the caller is gone.
+		if ctx.Err() != nil {
+			break
+		}
+
+		if i < len(candidates)-1 {
+			logger.Warn(i18n.T("logger.dnfcache.warn.mirror_failed_trying_next"),
+				"repo", repo.ID,
+				"mirror", baseURL,
+				"remaining", len(candidates)-i-1,
+				"error", err)
+		}
+	}
+
+	return lastErr
+}
+
+// fetchRepoFrom fetches the full metadata set for repo from a single mirror.
+func fetchRepoFrom(ctx context.Context, repo *RepoEntry, baseURL string) error {
 	refs, err := parseRepoMD(ctx, repo, baseURL)
 	if err != nil {
 		return err
@@ -456,24 +552,25 @@ func fetchRepo(ctx context.Context, repo RepoEntry) error {
 	return nil
 }
 
-// resolveMirrorList fetches a mirrorlist or metalink URL and returns the
-// first usable base URL from the response.
+// resolveMirrors fetches a mirrorlist or metalink URL and returns the
+// usable base URLs from the response, in server-preferred order, capped
+// at maxMirrors.
 //
 // Plain mirrorlist: one URL per line, '#' lines are comments.
-// Metalink XML: extracts the first https:// URL from <url> elements,
-// strips the trailing /repodata/repomd.xml path to get the repo base URL.
+// Metalink XML: extracts http(s):// URLs from <url> elements, stripping
+// the trailing /repodata/repomd.xml path to get the repo base URL.
 //
 // If the request returns HTTP 404 and the URL contains a dotted version
 // (e.g. "8.10"), the fetch is retried with the major-only version ("8").
 // Some Rocky Linux repos (e.g. Devel) only register major-version entries
 // in the mirror manager.
-func resolveMirrorList(ctx context.Context, mirrorListURL string) (string, error) {
+func resolveMirrors(ctx context.Context, mirrorListURL string) ([]string, error) {
 	data, err := fetchBytes(ctx, mirrorListURL)
 	if err != nil {
 		// Retry with major-only releasever on 404 (e.g. Devel-8.10 → Devel-8).
 		data, err = retryMajorVersion(ctx, mirrorListURL, err)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -481,24 +578,32 @@ func resolveMirrorList(ctx context.Context, mirrorListURL string) (string, error
 
 	// Metalink XML response.
 	if strings.HasPrefix(body, "<") || strings.Contains(body[:min(len(body), 100)], "<?xml") {
-		u, err := parseMedalinkURL(body, mirrorListURL)
-
-		return normalizeURL(u), err
+		return parseMetalinkURLs(body, mirrorListURL)
 	}
 
-	// Plain mirrorlist: first non-comment, non-empty line.
+	// Plain mirrorlist: one URL per non-comment, non-empty line.
+	var mirrors []string
+
 	for line := range strings.SplitSeq(body, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		return normalizeURL(line), nil
+		mirrors = append(mirrors, normalizeURL(line))
+
+		if len(mirrors) == maxMirrors {
+			break
+		}
 	}
 
-	return "", apperrors.New(apperrors.ErrTypeNetwork, "no usable mirror in mirrorlist").
-		WithOperation("resolveMirrorList").
-		WithContext("url", mirrorListURL)
+	if len(mirrors) == 0 {
+		return nil, apperrors.New(apperrors.ErrTypeNetwork, "no usable mirror in mirrorlist").
+			WithOperation("resolveMirrors").
+			WithContext("url", mirrorListURL)
+	}
+
+	return mirrors, nil
 }
 
 // retryMajorVersion retries a mirrorlist fetch replacing "X.Y" releasever
@@ -524,43 +629,79 @@ func retryMajorVersion(ctx context.Context, mirrorListURL string, origErr error)
 	return data, nil
 }
 
-// parseMedalinkURL extracts the first https:// repo base URL from a
-// Fedora/EPEL metalink XML response. The <url> elements point to
-// repomd.xml files; we strip the trailing /repodata/repomd.xml.
-func parseMedalinkURL(body, sourceURL string) (string, error) {
+// parseMetalinkURLs extracts repo base URLs from a Fedora/EPEL metalink
+// XML response, preserving the server's preference order. The <url>
+// elements point to repomd.xml files; the trailing /repodata/repomd.xml
+// is stripped. https:// mirrors are preferred; plain http:// mirrors are
+// appended after them as a last resort. Returns at most maxMirrors URLs.
+func parseMetalinkURLs(body, sourceURL string) ([]string, error) {
+	var httpsMirrors, httpMirrors []string
+
 	// Simple scan — avoid a full XML decode for a hot path.
 	for line := range strings.SplitSeq(body, "\n") {
-		line = strings.TrimSpace(line)
-
-		// Match <url ...>https://...</url> or bare https:// inside any tag.
-		start := strings.Index(line, "https://")
-		if start < 0 {
+		u, secure := extractMirrorURL(strings.TrimSpace(line))
+		if u == "" {
 			continue
 		}
 
-		end := strings.IndexAny(line[start:], "<\" \t")
-		if end < 0 {
-			end = len(line[start:])
+		if secure {
+			httpsMirrors = append(httpsMirrors, u)
+		} else {
+			httpMirrors = append(httpMirrors, u)
 		}
-
-		u := line[start : start+end]
-
-		// Strip /repodata/repomd.xml suffix to get the base URL.
-		if before, found := strings.CutSuffix(u, "/repodata/repomd.xml"); found {
-			return before + "/", nil
-		}
-
-		// If no repomd.xml suffix, return as-is (plain mirror URL).
-		if strings.HasSuffix(u, "/") {
-			return u, nil
-		}
-
-		return u + "/", nil
 	}
 
-	return "", apperrors.New(apperrors.ErrTypeNetwork, "no usable mirror in metalink").
-		WithOperation("parseMedalinkURL").
-		WithContext("url", sourceURL)
+	mirrors := append(httpsMirrors, httpMirrors...) //nolint:gocritic
+	if len(mirrors) == 0 {
+		return nil, apperrors.New(apperrors.ErrTypeNetwork, "no usable mirror in metalink").
+			WithOperation("parseMetalinkURLs").
+			WithContext("url", sourceURL)
+	}
+
+	if len(mirrors) > maxMirrors {
+		mirrors = mirrors[:maxMirrors]
+	}
+
+	for i, m := range mirrors {
+		mirrors[i] = normalizeURL(m)
+	}
+
+	return mirrors, nil
+}
+
+// extractMirrorURL pulls an http(s) URL out of one metalink line and
+// normalizes it to a base URL (strips /repodata/repomd.xml, ensures a
+// trailing slash). Returns ("", false) when the line holds no usable URL.
+func extractMirrorURL(line string) (string, bool) {
+	secure := true
+
+	start := strings.Index(line, "https://")
+	if start < 0 {
+		secure = false
+
+		start = strings.Index(line, "http://")
+		if start < 0 {
+			return "", false
+		}
+	}
+
+	end := strings.IndexAny(line[start:], "<\" \t")
+	if end < 0 {
+		end = len(line[start:])
+	}
+
+	u := line[start : start+end]
+
+	// Strip /repodata/repomd.xml suffix to get the base URL.
+	if before, found := strings.CutSuffix(u, "/repodata/repomd.xml"); found {
+		return before + "/", secure
+	}
+
+	if strings.HasSuffix(u, "/") {
+		return u, secure
+	}
+
+	return u + "/", secure
 }
 
 // isNonFatalRepoError reports whether the error is an HTTP 4xx response,
@@ -582,6 +723,9 @@ func fetchBytes(ctx context.Context, url string) ([]byte, error) {
 
 // downloadVerified downloads url to destFile, verifying SHA256 if provided.
 // Skips download if destFile already exists with matching checksum.
+// Transient network failures are retried per the httpclient retry policy;
+// a checksum mismatch is NOT retried here — it usually means the mirror is
+// mid-sync, and the caller's mirror-failover loop moves to the next mirror.
 func downloadVerified(ctx context.Context, url, destFile, expectedSHA256 string) error {
 	// Skip if already cached with correct checksum.
 	if expectedSHA256 != "" {
@@ -590,6 +734,13 @@ func downloadVerified(ctx context.Context, url, destFile, expectedSHA256 string)
 		}
 	}
 
+	return httpclient.WithRetry(ctx, url, func() error {
+		return downloadVerifiedOnce(ctx, url, destFile, expectedSHA256)
+	})
+}
+
+// downloadVerifiedOnce performs a single download + verify attempt.
+func downloadVerifiedOnce(ctx context.Context, url, destFile, expectedSHA256 string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return err
@@ -719,17 +870,21 @@ func collectPrimaryFiles() []primaryFileJob {
 			continue
 		}
 
-		baseURL := strings.TrimSuffix(repo.BaseURL, "/")
-
 		cacheDir := findRepoCacheDir(repo.ID)
 		if cacheDir == "" {
 			continue
 		}
 
+		// Prefer the mirror actually used at fetch time (persisted by
+		// fetchRepoFrom) so package downloads hit a mirror known to carry
+		// this metadata generation; fall back to the configured baseurl.
+		baseURL := ""
+		if b, err := os.ReadFile(filepath.Join(cacheDir, ".baseurl")); err == nil { //nolint:gosec
+			baseURL = strings.TrimSpace(string(b))
+		}
+
 		if baseURL == "" {
-			if b, err := os.ReadFile(filepath.Join(cacheDir, ".baseurl")); err == nil { //nolint:gosec
-				baseURL = strings.TrimSpace(string(b))
-			}
+			baseURL = strings.TrimSuffix(expandRepoVars(repo.BaseURL), "/")
 		}
 
 		repoCache := filepath.Join(cacheDir, "repodata")

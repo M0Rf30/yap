@@ -2,8 +2,6 @@ package dnfcache
 
 import (
 	"context"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
-	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -108,75 +105,72 @@ func DownloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string,
 	return downloadRPM(ctx, pkg, destDir)
 }
 
-// downloadRPM downloads a single .rpm to destDir, verifying SHA256.
+// downloadRPM downloads a single .rpm to destDir, verifying SHA256. When
+// the package's repo was indexed via a mirrorlist, every resolved mirror
+// is tried in order before giving up; transient HTTP failures on a single
+// mirror are retried by the httpclient retry policy.
 func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string, error) {
-	baseURL := pkg.BaseURL
-
-	// Resolve mirrorlist placeholder set by loadFromDisk when no baseurl was
-	// available at index-load time.
-	if rest, ok := strings.CutPrefix(baseURL, "mirrorlist:"); ok {
-		resolved, err := resolveMirrorList(ctx, rest)
-		if err != nil {
-			return "", errors.Wrap(err, errors.ErrTypeNetwork, "failed to resolve mirrorlist").
-				WithOperation("downloadRPM").
-				WithContext("package", pkg.Name)
-		}
-
-		baseURL = strings.TrimSuffix(resolved, "/") + "/"
+	baseURLs, err := packageBaseURLs(ctx, pkg)
+	if err != nil {
+		return "", err
 	}
 
-	url := baseURL + pkg.LocationHref
 	dest := filepath.Join(destDir, filepath.Base(pkg.LocationHref))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
-	if err != nil {
-		return "", err
-	}
+	var lastErr error
 
-	resp, err := httpclient.Client().Do(req)
-	if err != nil {
-		return "", errors.Wrap(err, errors.ErrTypeNetwork, "failed to download package").
-			WithOperation("downloadRPM").
-			WithContext("package", pkg.Name)
-	}
+	for i, baseURL := range baseURLs {
+		err := downloadVerified(ctx, baseURL+pkg.LocationHref, dest, pkg.SHA256)
+		if err == nil {
+			logger.Debug(i18n.T("logger.dnfcache.debug.downloaded_rpm"), "package", pkg.Name,
+				"dest", dest)
 
-	defer func() { _ = resp.Body.Close() }()
+			return dest, nil
+		}
 
-	if err := httpclient.CheckStatus(resp, url); err != nil {
-		return "", err
-	}
+		lastErr = err
 
-	f, err := os.Create(dest) //nolint:gosec
-	if err != nil {
-		return "", err
-	}
+		if ctx.Err() != nil {
+			break
+		}
 
-	if _, err := io.Copy(f, io.LimitReader(resp.Body, 512<<20)); err != nil {
-		_ = f.Close()
-		_ = os.Remove(dest)
-
-		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write package file").
-			WithOperation("downloadRPM").
-			WithContext("package", pkg.Name)
-	}
-
-	if err := f.Close(); err != nil {
-		return "", err
-	}
-
-	if pkg.SHA256 != "" {
-		if ok, _ := fileMatchesSHA256(dest, pkg.SHA256); !ok {
-			_ = os.Remove(dest)
-
-			return "", errors.New(errors.ErrTypeValidation, "SHA256 mismatch").
-				WithOperation("downloadRPM").
-				WithContext("package", pkg.Name)
+		if i < len(baseURLs)-1 {
+			logger.Warn(i18n.T("logger.dnfcache.warn.mirror_failed_trying_next"),
+				"package", pkg.Name,
+				"mirror", baseURL,
+				"remaining", len(baseURLs)-i-1,
+				"error", lastErr)
 		}
 	}
 
-	logger.Debug(i18n.T("logger.dnfcache.debug.downloaded_rpm"), "package", pkg.Name, "dest", dest)
+	return "", errors.Wrap(lastErr, errors.ErrTypeNetwork, "failed to download package").
+		WithOperation("downloadRPM").
+		WithContext("package", pkg.Name)
+}
 
-	return dest, nil
+// packageBaseURLs returns the candidate base URLs (trailing slash
+// included) for downloading pkg. A "mirrorlist:" placeholder set by
+// loadFromDisk (no baseurl available at index-load time) is resolved to
+// the full mirror candidate list.
+func packageBaseURLs(ctx context.Context, pkg *PackageInfo) ([]string, error) {
+	rest, ok := strings.CutPrefix(pkg.BaseURL, "mirrorlist:")
+	if !ok {
+		return []string{pkg.BaseURL}, nil
+	}
+
+	mirrors, err := resolveMirrors(ctx, rest)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeNetwork, "failed to resolve mirrorlist").
+			WithOperation("downloadRPM").
+			WithContext("package", pkg.Name)
+	}
+
+	urls := make([]string, 0, len(mirrors))
+	for _, m := range mirrors {
+		urls = append(urls, strings.TrimSuffix(m, "/")+"/")
+	}
+
+	return urls, nil
 }
 
 // rpmInstall installs the given .rpm files via "rpm --install --nodeps".

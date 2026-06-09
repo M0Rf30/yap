@@ -1809,7 +1809,18 @@ const maxDebBytes int64 = 2 << 30
 // after every verification step succeeds. A failed verification leaves no
 // partial file at destFile — preventing callers from mistaking a corrupt
 // stub for a verified package.
+// Transient network failures (connection reset, mid-body EOF, HTTP 5xx)
+// are retried per the httpclient retry policy.
 func downloadAndVerify(ctx context.Context, pkgURL, destFile, expectedSHA256 string, expectedSize int64) error {
+	return httpclient.WithRetry(ctx, pkgURL, func() error {
+		return downloadAndVerifyOnce(ctx, pkgURL, destFile, expectedSHA256, expectedSize)
+	})
+}
+
+// downloadAndVerifyOnce performs a single download + verify attempt.
+func downloadAndVerifyOnce(
+	ctx context.Context, pkgURL, destFile, expectedSHA256 string, expectedSize int64,
+) error {
 	resp, err := startDownload(ctx, pkgURL)
 	if err != nil {
 		return err

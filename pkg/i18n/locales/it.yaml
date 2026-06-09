@@ -1214,6 +1214,8 @@
   translation: "Analisi di modules.yaml non riuscita"
 - id: logger.dnfcache.warn.failed_parse_primary_index
   translation: "Analisi dell'indice primario non riuscita"
+- id: logger.dnfcache.warn.mirror_failed_trying_next
+  translation: "Mirror non raggiungibile, provo il successivo"
 - id: logger.dnfcache.warn.unresolvable_dependency
   translation: "Dipendenza non risolvibile"
 - id: logger.dnfinstall.debug.downloaded_rpm
@@ -1290,6 +1292,8 @@
   translation: "Clonazione in corso"
 - id: logger.git.info.creating_working_copy_bare
   translation: "Creazione della copia di lavoro dal repository bare"
+- id: logger.httpclient.warn.transient_fetch_retry
+  translation: "Errore di rete transitorio, nuovo tentativo"
 - id: logger.mcp.debug.mcp_request
   translation: "Richiesta MCP"
 - id: logger.mcp.error.mcp_request_failed

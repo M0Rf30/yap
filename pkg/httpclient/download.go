@@ -17,6 +17,9 @@ import (
 //
 // This is the warm-cache primitive that lets dnfcache / aptrepo / aptcache
 // skip re-downloading metadata files whose upstream hasn't moved.
+//
+// Transient failures (network errors, HTTP 5xx) are retried per the
+// package retry policy.
 func FetchBytesConditional(
 	ctx context.Context,
 	url string,
@@ -27,6 +30,22 @@ func FetchBytesConditional(
 		maxBytes = DefaultMaxBytes
 	}
 
+	err = WithRetry(ctx, url, func() error {
+		body, notModified, err = fetchBytesConditionalOnce(ctx, url, maxBytes, ifModSince)
+
+		return err
+	})
+
+	return body, notModified, err
+}
+
+// fetchBytesConditionalOnce performs a single conditional GET attempt.
+func fetchBytesConditionalOnce(
+	ctx context.Context,
+	url string,
+	maxBytes int64,
+	ifModSince time.Time,
+) (body []byte, notModified bool, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, false, err
@@ -68,11 +87,27 @@ func FetchBytesConditional(
 
 // FetchBytes downloads url and returns the body, capped at maxBytes.
 // A non-positive maxBytes falls back to DefaultMaxBytes.
+// Transient failures are retried per the package retry policy.
 func FetchBytes(ctx context.Context, url string, maxBytes int64) ([]byte, error) {
 	if maxBytes <= 0 {
 		maxBytes = DefaultMaxBytes
 	}
 
+	var data []byte
+
+	err := WithRetry(ctx, url, func() error {
+		var err error
+
+		data, err = fetchBytesOnce(ctx, url, maxBytes)
+
+		return err
+	})
+
+	return data, err
+}
+
+// fetchBytesOnce performs a single GET attempt.
+func fetchBytesOnce(ctx context.Context, url string, maxBytes int64) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
@@ -106,11 +141,20 @@ func FetchBytes(ctx context.Context, url string, maxBytes int64) ([]byte, error)
 // FetchToFile downloads url and writes it atomically to destPath, capped at maxBytes.
 // Content-Length is checked as a cheap preflight when available.
 // A non-positive maxBytes falls back to DefaultMaxBytes.
+// Transient failures are retried per the package retry policy; the atomic
+// temp-file + rename write guarantees a failed attempt leaves no partial file.
 func FetchToFile(ctx context.Context, url, destPath string, maxBytes int64) error {
 	if maxBytes <= 0 {
 		maxBytes = DefaultMaxBytes
 	}
 
+	return WithRetry(ctx, url, func() error {
+		return fetchToFileOnce(ctx, url, destPath, maxBytes)
+	})
+}
+
+// fetchToFileOnce performs a single download attempt.
+func fetchToFileOnce(ctx context.Context, url, destPath string, maxBytes int64) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return err

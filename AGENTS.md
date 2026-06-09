@@ -25,8 +25,10 @@
 | `pkg/apkindex/` | `apk update` + `apk add` |
 | `pkg/pacmandb/` | `pacman -Sy` |
 | `pkg/rpmdb/` | RPM SQLite reader + optional writer (Fedora 33+, RHEL 9+) |
+| `pkg/dnfcache/` | `dnf makecache` + dep resolution + RPM downloads (repomd/primary, mirror failover) |
 | `pkg/dnfinstall/` | RPM install (GPG verify → CPIO extract → scriptlets → yapdb) |
 | `pkg/yapdb/` | YAP-internal SQLite state DB for installed packages (cross-format) |
+| `pkg/httpclient/` | Shared HTTP client: timeouts, size caps, transient-failure retry with backoff |
 | `pkg/signing/` | APK RSA + DEB/RPM/Pacman GPG signing |
 | `pkg/sbom/` | CycloneDX 1.5 + SPDX 2.3 generation |
 | `pkg/color/` | Zero-dependency ANSI color helpers |
@@ -253,6 +255,9 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - RPM SQLite reader — `pkg/rpmdb` (Fedora 33+, RHEL 9+; subprocess fallback for legacy BDB)
 - RPM install — `pkg/dnfinstall` (GPG verify → CPIO extract → scriptlets → yapdb); replaces `dnf install` for both `yap install <pkg.rpm>` and build-time makedepends on RPM distros
 - YAP-internal package state — `pkg/yapdb` (cross-format SQLite registry at `<rootDir>/var/lib/yap/installed.db`); decouples YAP from system dpkg/rpm DBs (ephemeral build container friendly)
+- DNF metadata + install resolution — `pkg/dnfcache` (`dnf makecache` replacement: repomd.xml/primary.xml parsing, module filtering, transitive dep resolution, SHA256-verified downloads)
+- Mirror failover (dnf) — `pkg/dnfcache` keeps every `baseurl=` entry (incl. dnf-style continuation lines) and up to 5 mirrorlist/metalink mirrors; repomd + primary always come from the SAME mirror (no mixed metadata generations); dead (4xx/network) or stale (checksum-mismatch) mirrors are skipped with a warn; the winning mirror is persisted in `.baseurl` and preferred for package downloads
+- Transient-failure retry — `pkg/httpclient` `WithRetry`/`IsRetryable` (3 attempts, exponential backoff + jitter; retries transport errors, mid-body EOF, HTTP 408/429/5xx; never other 4xx/size-cap/ctx-cancel); wired into all dnf/apt/apk/pacman metadata and package fetch paths; tests shrink backoff via `httpclient.SetRetryPolicy` in `TestMain`
 - Transitive cross-build dep extraction — `pkg/builders/common/cross.go` `DownloadClosure`
 - Package signing — APK RSA + DEB/RPM/Pacman GPG
 - SBOM — CycloneDX 1.5 + SPDX 2.3
