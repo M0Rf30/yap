@@ -3,6 +3,7 @@ package pkgbuild
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	stderrors "errors"
 	"fmt"
@@ -459,30 +460,57 @@ func pacmanDirToName(dir string) string {
 
 // filterInstalledRPM queries the SQLite rpmdb directly on modern hosts
 // (Fedora 33+, RHEL 9+, Rocky 9+, Alma 9+, openSUSE 15.5+). On legacy
-// BerkeleyDB hosts it falls back to `rpm -q`.
+// BerkeleyDB hosts it reads the BDB Packages database natively; a batched
+// `rpm -q` subprocess remains the last-resort fallback.
 func filterInstalledRPM(packages []string) []string {
 	db, err := rpmdb.Open()
-	if err != nil {
-		if stderrors.Is(err, rpmdb.ErrLegacyDB) {
-			logger.Debug(i18n.T("logger.pkgbuild.debug.legacy_bdb_host_falling"))
-		} else {
-			logger.Warn(i18n.T("logger.pkgbuild.warn.open_failed_falling_back"), "error", err)
-		}
-
-		return filterInstalledRPMSubprocess(packages)
+	if err == nil {
+		return db.FilterInstalled(context.Background(), packages)
 	}
 
-	return db.FilterInstalled(context.Background(), packages)
+	if stderrors.Is(err, rpmdb.ErrLegacyDB) {
+		logger.Debug(i18n.T("logger.pkgbuild.debug.legacy_bdb_host_falling"))
+
+		if legacy, err := rpmdb.OpenLegacy(); err == nil {
+			if missing, err := legacy.FilterInstalled(context.Background(), packages); err == nil {
+				return missing
+			}
+		}
+	} else {
+		logger.Warn(i18n.T("logger.pkgbuild.warn.open_failed_falling_back"), "error", err)
+	}
+
+	return filterInstalledRPMSubprocess(packages)
 }
 
-// filterInstalledRPMSubprocess is the legacy BerkeleyDB fallback.
+// filterInstalledRPMSubprocess is the legacy BerkeleyDB fallback. It runs a
+// single batched `rpm -q pkg1 pkg2 …` (one line of output per argument, in
+// order) instead of one subprocess per package.
 func filterInstalledRPMSubprocess(packages []string) []string {
+	var out bytes.Buffer
+
+	args := append([]string{"-q"}, packages...)
+
+	err := shell.ExecCapture(context.Background(), &out, "", "rpm", args...)
+	if err == nil {
+		return nil // every queried package is installed
+	}
+
+	// rpm exits non-zero when ANY queried package is missing; map the
+	// output lines back to the inputs positionally.
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != len(packages) {
+		// Unexpected output shape (rpm missing, usage error, stderr noise)
+		// — be conservative and report everything as missing, matching the
+		// old per-package loop when every `rpm -q` invocation failed.
+		return packages
+	}
+
 	missing := make([]string, 0, len(packages))
 
-	for _, pkg := range packages {
-		err := shell.Exec(context.Background(), true, "", "rpm", "-q", pkg)
-		if err != nil {
-			missing = append(missing, pkg)
+	for i, line := range lines {
+		if strings.Contains(line, "is not installed") {
+			missing = append(missing, packages[i])
 		}
 	}
 

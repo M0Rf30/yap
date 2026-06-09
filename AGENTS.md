@@ -24,7 +24,7 @@
 | `pkg/aptinstall/` | `apt-get install` (transitive dep resolution, scriptlets) |
 | `pkg/apkindex/` | `apk update` + `apk add` |
 | `pkg/pacmandb/` | `pacman -Sy` |
-| `pkg/rpmdb/` | RPM SQLite reader + optional writer (Fedora 33+, RHEL 9+) |
+| `pkg/rpmdb/` | RPM SQLite reader + optional writer (Fedora 33+, RHEL 9+) + native BDB reader (RHEL 8 and earlier) |
 | `pkg/dnfcache/` | `dnf makecache` + dep resolution + RPM downloads (repomd/primary, mirror failover) |
 | `pkg/dnfinstall/` | RPM install (GPG verify → CPIO extract → scriptlets → yapdb) |
 | `pkg/yapdb/` | YAP-internal SQLite state DB for installed packages (cross-format) |
@@ -252,7 +252,7 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - `apt-get install` — `pkg/aptinstall` (transitive deps, scriptlets, yapdb state by default)
 - `apk update` + `apk add` — `pkg/apkindex`
 - `pacman -Sy` — `pkg/pacmandb`
-- RPM SQLite reader — `pkg/rpmdb` (Fedora 33+, RHEL 9+; subprocess fallback for legacy BDB)
+- RPM database reader — `pkg/rpmdb`: SQLite natively (Fedora 33+, RHEL 9+) and legacy BerkeleyDB natively via `go-rpmdb/pkg/bdb` + in-house header-image parser (`LegacyDB`: ListInstalled / ListInstalledProvides / FilterInstalled); batched `rpm -q` / `rpm -qa` subprocess remains only as last-resort fallback
 - RPM install — `pkg/dnfinstall` (GPG verify → CPIO extract → scriptlets → yapdb); replaces `dnf install` for both `yap install <pkg.rpm>` and build-time makedepends on RPM distros
 - YAP-internal package state — `pkg/yapdb` (cross-format SQLite registry at `<rootDir>/var/lib/yap/installed.db`); decouples YAP from system dpkg/rpm DBs (ephemeral build container friendly)
 - DNF metadata + install resolution — `pkg/dnfcache` (`dnf makecache` replacement: repomd.xml/primary.xml parsing, module filtering, transitive dep resolution, SHA256-verified downloads)

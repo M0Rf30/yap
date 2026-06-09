@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -113,7 +114,8 @@ func ExpandBooleanDep(name string) []string {
 
 // loadInstalledSet returns the set of package names currently installed
 // according to the RPM database. On hosts where the SQLite rpmdb is not
-// available (Rocky 8 / BerkeleyDB), falls back to "rpm -qa".
+// available (Rocky 8 / BerkeleyDB), reads the BDB Packages database
+// natively; "rpm -qa" remains the last-resort fallback.
 func loadInstalledSet(ctx context.Context) map[string]bool {
 	db, err := rpmdb.Open()
 	if err == nil {
@@ -133,6 +135,17 @@ func loadInstalledSet(ctx context.Context) map[string]bool {
 	}
 
 	logger.Debug(i18n.T("logger.dnfcache.debug.legacy_bdb_rpmdb_falling"))
+
+	if legacy, err := rpmdb.OpenLegacy(); err == nil {
+		if names, err := legacy.ListInstalled(ctx); err == nil {
+			set := make(map[string]bool, len(names))
+			for _, name := range names {
+				set[name] = true
+			}
+
+			return set
+		}
+	}
 
 	return loadInstalledSetSubprocess(ctx)
 }
@@ -169,20 +182,15 @@ func loadInstalledSetSubprocess(ctx context.Context) map[string]bool {
 // "coreutils" which may be provided by "coreutils-single" on minimal images.
 // Used by ResolveDeps to avoid installing alternative packages that conflict
 // with what is already on the system.
+//
+// On legacy BerkeleyDB hosts the BDB Packages database is read natively;
+// "rpm -qa" remains the last-resort fallback.
 func loadInstalledProvides(ctx context.Context) map[string]bool {
 	db, err := rpmdb.Open()
 	if err == nil {
 		provides, err := db.ListInstalledProvides(ctx)
 		if err == nil {
-			set := make(map[string]bool, len(provides))
-			for _, prov := range provides {
-				capName := StripRPMConstraint(prov)
-				if capName != "" {
-					set[capName] = true
-				}
-			}
-
-			return set
+			return providesSet(provides)
 		}
 	}
 
@@ -192,7 +200,27 @@ func loadInstalledProvides(ctx context.Context) map[string]bool {
 
 	logger.Debug(i18n.T("logger.dnfcache.debug.legacy_bdb_rpmdb_falling"))
 
+	if legacy, err := rpmdb.OpenLegacy(); err == nil {
+		if provides, err := legacy.ListInstalledProvides(ctx); err == nil {
+			return providesSet(provides)
+		}
+	}
+
 	return loadInstalledProvidesSubprocess(ctx)
+}
+
+// providesSet normalizes a Provides list into a constraint-stripped set.
+func providesSet(provides []string) map[string]bool {
+	set := make(map[string]bool, len(provides))
+
+	for _, prov := range provides {
+		capName := StripRPMConstraint(prov)
+		if capName != "" {
+			set[capName] = true
+		}
+	}
+
+	return set
 }
 
 // loadInstalledProvidesSubprocess returns the set of capabilities (Provides)
@@ -256,18 +284,30 @@ func normalizeURL(rawURL string) string {
 	return u.String()
 }
 
+// dnfVarCache memoizes /etc/dnf/vars/<var> lookups (including misses) so
+// repeated URL expansion doesn't re-stat the filesystem per repo/package.
+var dnfVarCache sync.Map // varName → string (expanded value, or "$"+varName on miss)
+
 // expandDNFVars replaces any remaining $var tokens in rawURL by reading
-// /etc/dnf/vars/<var>. Unknown vars are left as-is.
+// /etc/dnf/vars/<var>. Unknown vars are left as-is. Values are cached for
+// the process lifetime — dnf vars are static host configuration.
 func expandDNFVars(rawURL string) string {
 	return dnfVarRe.ReplaceAllStringFunc(rawURL, func(m string) string {
-		varName := m[1:] // strip leading '$'
-
-		val, err := os.ReadFile("/etc/dnf/vars/" + varName) //nolint:gosec
-		if err != nil {
-			return m // leave unexpanded
+		if cached, ok := dnfVarCache.Load(m); ok {
+			return cached.(string)
 		}
 
-		return strings.TrimSpace(string(val))
+		varName := m[1:] // strip leading '$'
+
+		expanded := m // leave unexpanded on miss
+
+		if val, err := os.ReadFile("/etc/dnf/vars/" + varName); err == nil { //nolint:gosec
+			expanded = strings.TrimSpace(string(val))
+		}
+
+		dnfVarCache.Store(m, expanded)
+
+		return expanded
 	})
 }
 
@@ -300,9 +340,11 @@ func goArchToRPM() string {
 	}
 }
 
-// readReleasever reads VERSION_ID from /etc/os-release.
+// readReleasever returns VERSION_ID from /etc/os-release, cached for the
+// process lifetime (the file is static host configuration and this is
+// called for every URL expansion).
 // Returns an empty string if the file cannot be read or the field is absent.
-func readReleasever() string {
+var readReleasever = sync.OnceValue(func() string {
 	data, err := os.ReadFile("/etc/os-release")
 	if err != nil {
 		return ""
@@ -318,4 +360,4 @@ func readReleasever() string {
 	}
 
 	return ""
-}
+})

@@ -15,6 +15,7 @@ require (
 	github.com/google/go-containerregistry v0.21.6
 	github.com/klauspost/compress v1.18.6
 	github.com/klauspost/pgzip v1.2.6
+	github.com/knqyf263/go-rpmdb v0.1.1
 	github.com/m0rf30/ar v1.0.0
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
@@ -91,6 +92,7 @@ require (
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	modernc.org/libc v1.73.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
