@@ -16,7 +16,7 @@ const (
 	// Git defines the git command name.
 	Git = "git"
 	// goVersion defines the Go toolchain version to download.
-	goVersion = "1.26.1"
+	goVersion = "1.26.4"
 )
 
 // YAPVersion defines the current version of YAP. It mirrors the ldflags-injected
