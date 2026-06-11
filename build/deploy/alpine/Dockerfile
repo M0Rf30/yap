@@ -65,7 +65,7 @@ ENV YAP_IN_CONTAINER=1
 # Create non-root user
 RUN addgroup -g 1000 yap && \
     adduser -D -u 1000 -G yap -s /bin/bash yap && \
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /sbin/apk' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS CCACHE_DIR CCACHE_BASEDIR CCACHE_MAXSIZE CCACHE_SLOPPINESS CCACHE_NOHASHDIR XDG_CACHE_HOME"' >> /etc/sudoers && echo 'yap ALL=(ALL) NOPASSWD: /usr/bin/yap, /usr/bin/tee, /sbin/apk' >> /etc/sudoers
 
 # Copy binary and completion from builder
 COPY --from=builder /usr/bin/yap /usr/bin/yap

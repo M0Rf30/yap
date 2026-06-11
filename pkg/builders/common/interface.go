@@ -567,10 +567,15 @@ func (bb *BaseBuilder) BuildCcacheEnvSlice() []string {
 		// at that path are then shared across builds within the same user account.
 	}
 
-	// Prepend ccache symlink directory to PATH so compilers resolve through
-	// ccache transparently. Check both common locations used by RHEL/Fedora
-	// (/usr/lib64/ccache) and Debian/Ubuntu (/usr/lib/ccache).
-	for _, dir := range []string{"/usr/lib64/ccache", "/usr/lib/ccache"} {
+	// Prepend the ccache symlink directory to PATH so compilers resolve through
+	// ccache transparently. Layouts by distro family:
+	//   - RHEL/Fedora/openSUSE: /usr/lib64/ccache/<compiler>
+	//   - Alpine/Arch:          /usr/lib/ccache/bin/<compiler>
+	//   - Debian/Ubuntu:        /usr/lib/ccache/<compiler>
+	// /usr/lib/ccache/bin MUST be probed before /usr/lib/ccache: on Alpine and
+	// Arch the parent directory exists too, but contains only bin/ — prepending
+	// the parent would silently bypass ccache.
+	for _, dir := range []string{"/usr/lib64/ccache", "/usr/lib/ccache/bin", "/usr/lib/ccache"} {
 		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
 			currentPath := os.Getenv("PATH")
 			vars = append(vars, "PATH="+dir+":"+currentPath)

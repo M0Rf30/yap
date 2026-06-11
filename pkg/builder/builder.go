@@ -3,7 +3,11 @@ package builder
 
 import (
 	"context"
+	"os"
+	"os/exec"
 	"runtime"
+	"strings"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -103,6 +107,8 @@ func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, m
 	// Set up ccache and cross-compilation environment for the build stage.
 	// Use the new slice-based methods (BuildCcacheEnvSlice, BuildCrossEnvSlice)
 	// which do NOT call os.Setenv, making them safe for parallel builds.
+	ccacheActive := false
+
 	if stage == "build" { //nolint:nestif
 		// Create a temporary BaseBuilder to access the environment slice methods
 		format := constants.DistroFormat(builder.PKGBUILD.Distro)
@@ -114,6 +120,7 @@ func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, m
 		// Collect ccache env vars without mutating os.Setenv
 		if ccacheEnv := tempBuilder.BuildCcacheEnvSlice(); len(ccacheEnv) > 0 {
 			pkgEnv = append(pkgEnv, ccacheEnv...)
+			ccacheActive = true
 
 			logger.Info(i18n.T("logger.builder.info.ccache_enabled_for_build"),
 				"package", pkgName)
@@ -153,7 +160,52 @@ func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, m
 			WithOperation(stage)
 	}
 
+	if stage == "build" && ccacheActive {
+		logCcacheStats(ctx, pkgName, pkgEnv)
+	}
+
 	return nil
+}
+
+// logCcacheStats surfaces ccache effectiveness right after the build stage so
+// that cache regressions (e.g. an unmounted or sudo-reset cache directory in
+// CI) are visible in build logs instead of failing silently. The overall
+// hit-rate line is logged at info level when recognizable; the full `ccache -s`
+// output is available at debug level.
+func logCcacheStats(ctx context.Context, pkgName string, pkgEnv []string) {
+	bin, err := exec.LookPath("ccache")
+	if err != nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, bin, "-s")
+
+	cmd.Env = append(os.Environ(), pkgEnv...)
+
+	out, err := cmd.Output()
+	if err != nil {
+		logger.Debug(i18n.T("logger.builder.debug.ccache_stats_failed"),
+			"package", pkgName, "error", err)
+
+		return
+	}
+
+	stats := strings.TrimSpace(string(out))
+	logger.Debug(i18n.T("logger.builder.debug.ccache_stats"), "package", pkgName, "stats", stats)
+
+	for line := range strings.SplitSeq(stats, "\n") {
+		trimmed := strings.TrimSpace(line)
+		// ccache >= 4.x: "Hits:  309 / 525 (58.86 %)" — the first match is the
+		// overall rate. ccache 3.x: "cache hit rate  58.86 %".
+		if strings.HasPrefix(trimmed, "Hits:") || strings.HasPrefix(trimmed, "cache hit rate") {
+			logger.Info(i18n.T("logger.builder.info.ccache_hit_rate"), "package", pkgName, "rate", trimmed)
+
+			return
+		}
+	}
 }
 
 // runBuildStages executes prepare → build → check → package (or split-package) stages.

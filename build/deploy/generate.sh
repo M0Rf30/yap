@@ -131,7 +131,7 @@ ENV PATH="/usr/lib/ccache:\${PATH}"
 RUN userdel -r ubuntu 2>/dev/null || true && \\
     groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS CCACHE_DIR CCACHE_BASEDIR CCACHE_MAXSIZE CCACHE_SLOPPINESS CCACHE_NOHASHDIR XDG_CACHE_HOME"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 APT
 }
@@ -160,7 +160,7 @@ ENV YAP_IN_CONTAINER=1
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS CCACHE_DIR CCACHE_BASEDIR CCACHE_MAXSIZE CCACHE_SLOPPINESS CCACHE_NOHASHDIR XDG_CACHE_HOME"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 DEB
 }
@@ -182,7 +182,7 @@ ENV YAP_IN_CONTAINER=1
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS CCACHE_DIR CCACHE_BASEDIR CCACHE_MAXSIZE CCACHE_SLOPPINESS CCACHE_NOHASHDIR XDG_CACHE_HOME"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 DNF
 }
@@ -215,7 +215,7 @@ ENV YAP_IN_CONTAINER=1
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS CCACHE_DIR CCACHE_BASEDIR CCACHE_MAXSIZE CCACHE_SLOPPINESS CCACHE_NOHASHDIR XDG_CACHE_HOME"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 ROCKY
 }
@@ -236,7 +236,7 @@ ENV YAP_IN_CONTAINER=1
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS CCACHE_DIR CCACHE_BASEDIR CCACHE_MAXSIZE CCACHE_SLOPPINESS CCACHE_NOHASHDIR XDG_CACHE_HOME"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 YUM
 }
@@ -256,7 +256,7 @@ ENV YAP_IN_CONTAINER=1
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS CCACHE_DIR CCACHE_BASEDIR CCACHE_MAXSIZE CCACHE_SLOPPINESS CCACHE_NOHASHDIR XDG_CACHE_HOME"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 ZYPPER
 }
@@ -276,7 +276,7 @@ ENV YAP_IN_CONTAINER=1
 # Create non-root user
 RUN groupadd -g 1000 yap && \\
     useradd -m -u 1000 -g 1000 -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS CCACHE_DIR CCACHE_BASEDIR CCACHE_MAXSIZE CCACHE_SLOPPINESS CCACHE_NOHASHDIR XDG_CACHE_HOME"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 PACMAN
 }
@@ -296,7 +296,7 @@ ENV YAP_IN_CONTAINER=1
 # Create non-root user
 RUN addgroup -g 1000 yap && \\
     adduser -D -u 1000 -G yap -s /bin/bash yap && \\
-    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
+    echo 'Defaults env_keep += "KUBERNETES_SERVICE_HOST YAP_IN_CONTAINER YAP_ALLOW_UNVERIFIED_REPOS CCACHE_DIR CCACHE_BASEDIR CCACHE_MAXSIZE CCACHE_SLOPPINESS CCACHE_NOHASHDIR XDG_CACHE_HOME"' >> /etc/sudoers && echo '${sudoers}' >> /etc/sudoers
 
 APK
 }

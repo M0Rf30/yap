@@ -882,6 +882,12 @@
 # Messaggi logger - Setup ccache
 - id: logger.builder.info.ccache_enabled_for_build
   translation: "ccache abilitato per la compilazione"
+- id: logger.builder.info.ccache_hit_rate
+  translation: "Percentuale di hit ccache dopo la compilazione"
+- id: logger.builder.debug.ccache_stats
+  translation: "Statistiche ccache"
+- id: logger.builder.debug.ccache_stats_failed
+  translation: "Lettura delle statistiche ccache non riuscita"
 # Messaggi logger - Setup environment dependencies
 - id: logger.common.info.go_detected_version_check
   translation: "Go rilevato, controllo della versione"
