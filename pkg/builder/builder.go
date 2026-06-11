@@ -19,6 +19,12 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/source"
 )
 
+// scriptPrologue mirrors makepkg's run_function(): every PKGBUILD function
+// (prepare/build/check/package) is executed with errexit and xtrace enabled
+// and an implicit `cd "${srcdir}"`, so function bodies can assume they start
+// inside the source directory exactly like under makepkg.
+const scriptPrologue = "  set -e\n  set -x\n  cd \"${srcdir}\"\n"
+
 // Builder maps PKGBUILD to generic functions aimed at artifacts generation.
 type Builder struct {
 	PKGBUILD      *pkgbuild.PKGBUILD
@@ -135,7 +141,7 @@ func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, m
 	// produce no output on failure — only an exit status).
 	// Pass pkgEnv so the interpreter receives per-package dirs/names without
 	// relying on the (racy) global os environment.
-	err := shell.RunScriptWithPackage(ctx, "  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)
+	err := shell.RunScriptWithPackage(ctx, scriptPrologue+preamble+pkgbuildFunction, pkgName, pkgEnv)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).
@@ -219,7 +225,7 @@ func (builder *Builder) compileSplitPackages(ctx context.Context) error {
 		}
 
 		if err := shell.RunScriptInFakeroot(
-			ctx, "  set -e\n  set -x\n"+preamble+funcBody, subName, pkgEnv,
+			ctx, scriptPrologue+preamble+funcBody, subName, pkgEnv,
 		); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 				WithContext("package", subName).
@@ -271,7 +277,7 @@ func (builder *Builder) processFunctionInFakeroot(ctx context.Context, pkgbuildF
 
 	preamble := builder.PKGBUILD.BuildScriptPreamble()
 
-	err := shell.RunScriptInFakeroot(ctx, "  set -e\n  set -x\n"+preamble+pkgbuildFunction, pkgName, pkgEnv)
+	err := shell.RunScriptInFakeroot(ctx, scriptPrologue+preamble+pkgbuildFunction, pkgName, pkgEnv)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, i18n.T("errors.build.build_stage_failed")).
 			WithContext("package", pkgName).
