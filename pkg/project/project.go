@@ -70,6 +70,10 @@ type BuildOptions struct {
 	// SKIP in the PKGBUILD. Useful during development when iterating on
 	// sources before finalising checksums.
 	SkipHashCheck bool
+	// NoCheck skips the PKGBUILD check() function, mirroring makepkg's
+	// --nocheck. Useful when test suites are slow or require resources
+	// unavailable in the build environment.
+	NoCheck bool
 }
 
 // extractPackageName extracts the package name from a dependency string,

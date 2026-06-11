@@ -109,6 +109,7 @@ type PKGBUILD struct {
 	BuildArch       string // Build architecture for cross-compilation (where compilation happens)
 	BuildDate       int64
 	Changelog       string `json:"changelog,omitempty"`
+	Check           string
 	Checksum        string
 	Codename        string
 	Commit          string
@@ -1019,6 +1020,8 @@ func (pkgBuild *PKGBUILD) mapFunctions(key string, data any) {
 	switch key {
 	case "build":
 		pkgBuild.Build = body
+	case "check":
+		pkgBuild.Check = body
 	case "package":
 		pkgBuild.Package = body
 	case "preinst":

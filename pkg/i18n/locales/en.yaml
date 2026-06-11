@@ -262,6 +262,8 @@
   translation: "Key name for APK signing (e.g., 'mykey')"
 - id: flags.build.skip_hash_check
   translation: "Skip sha256/sha512 integrity verification of source files"
+- id: flags.build.nocheck
+  translation: "Skip the PKGBUILD check() function (like makepkg --nocheck)"
 - id: flags.build.allow_unverified_repos
   translation: "Permit apt repos with no usable OpenPGP trust anchor (still refuses repos whose signature is present but invalid). Also settable via YAP_ALLOW_UNVERIFIED_REPOS=1"
 - id: flags.build.compression_deb
@@ -844,6 +846,8 @@
   translation: "Preparing sources"
 - id: logger.building
   translation: "Building"
+- id: logger.running_checks
+  translation: "Running checks"
 - id: logger.generating_package
   translation: "Generating package"
 

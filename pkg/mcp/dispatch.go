@@ -109,6 +109,7 @@ func appendBoolFlags(c []string, a *buildArgs) []string {
 		{a.NoMakeDeps, "--no-make-deps"},
 		{a.NoBuild, "--no-build"},
 		{a.SkipHashCheck, "--skip-hash-check"},
+		{a.NoCheck, "--nocheck"},
 		{a.SkipToolchainValidation, "--skip-toolchain-validation"},
 		{a.Zap, "--zap"},
 		{a.Parallel, "--parallel"},

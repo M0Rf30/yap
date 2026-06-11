@@ -262,6 +262,8 @@
   translation: "Passphrase per la chiave privata (preferire la variabile d'ambiente YAP_SIGN_PASSPHRASE)"
 - id: flags.build.skip_hash_check
   translation: "Salta la verifica dell'integrità sha256/sha512 dei file sorgente"
+- id: flags.build.nocheck
+  translation: "Salta la funzione check() del PKGBUILD (come makepkg --nocheck)"
 - id: flags.build.allow_unverified_repos
   translation: "Permette repository apt senza trust anchor OpenPGP (rifiuta comunque repo con firma presente ma non valida). Impostabile anche con YAP_ALLOW_UNVERIFIED_REPOS=1"
 - id: flags.build.sign_key_name
@@ -854,6 +856,8 @@
   translation: "Preparazione dei sorgenti"
 - id: logger.building
   translation: "Compilazione"
+- id: logger.running_checks
+  translation: "Esecuzione dei test"
 - id: logger.generating_package
   translation: "Generazione del pacchetto"
 

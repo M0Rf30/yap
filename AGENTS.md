@@ -100,7 +100,7 @@ yap status
 yap graph <path>
 
 # Key build flags
---skip-sync --cleanbuild --parallel --sign --sbom
+--skip-sync --cleanbuild --parallel --sign --sbom --nocheck
 --compression-deb zstd|gzip|xz
 --compression-rpm zstd|gzip|xz
 --target-arch <arch>
@@ -268,6 +268,8 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - Pacman `.INSTALL` scriptlets — 6-hook parity
 - Changelog support — DEB (Lintian-compliant), RPM (native %changelog), Pacman
 - Builder interface unification — `BuildPackage` returns `(string, error)`
+- PKGBUILD `check()` function — runs between build and package (makepkg parity); skip with `--nocheck` (CLI), `noCheck` (MCP build tool)
+- Implicit `cd "${srcdir}"` before every PKGBUILD function (prepare/build/check/package) — makepkg `run_function` parity
 - Sequential build default; `--parallel` / `-P` opt-in
 - `pkg/color` + `pkg/logger` — zero external UI deps (pterm removed)
 - Structured log tree rendering

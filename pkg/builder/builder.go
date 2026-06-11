@@ -29,6 +29,8 @@ const scriptPrologue = "  set -e\n  set -x\n  cd \"${srcdir}\"\n"
 type Builder struct {
 	PKGBUILD      *pkgbuild.PKGBUILD
 	SkipHashCheck bool
+	// NoCheck skips the check() function, mirroring makepkg's --nocheck.
+	NoCheck bool
 }
 
 // Compile manages all the instructions that lead to a single project artifact.
@@ -154,7 +156,7 @@ func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, m
 	return nil
 }
 
-// runBuildStages executes prepare → build → package (or split-package) stages.
+// runBuildStages executes prepare → build → check → package (or split-package) stages.
 func (builder *Builder) runBuildStages(ctx context.Context) error {
 	if err := builder.processFunction(ctx, builder.PKGBUILD.Prepare, "logger.preparing_sources", "prepare"); err != nil {
 		return err
@@ -162,6 +164,12 @@ func (builder *Builder) runBuildStages(ctx context.Context) error {
 
 	if err := builder.processFunction(ctx, builder.PKGBUILD.Build, "logger.building", "build"); err != nil {
 		return err
+	}
+
+	if !builder.NoCheck {
+		if err := builder.processFunction(ctx, builder.PKGBUILD.Check, "logger.running_checks", "check"); err != nil {
+			return err
+		}
 	}
 
 	if builder.PKGBUILD.IsSplitPackage() {

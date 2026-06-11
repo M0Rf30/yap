@@ -433,6 +433,17 @@ func TestPKGBUILD_mapFunctions(t *testing.T) {
 		t.Errorf("Expected Prepare 'patch -p1 < fix.patch', got '%s'", pb.Prepare)
 	}
 
+	// Test mapping check function — must land in Check, not HelperFunctions
+	pb.mapFunctions("check", FuncBody("make test"))
+
+	if pb.Check != "make test" {
+		t.Errorf("Expected Check 'make test', got '%s'", pb.Check)
+	}
+
+	if _, isHelper := pb.HelperFunctions["check"]; isHelper {
+		t.Error("check() must not be stored as a helper function")
+	}
+
 	// Test mapping scriptlets
 	pb.mapFunctions("preinst", FuncBody("echo pre-install"))
 

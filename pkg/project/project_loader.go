@@ -155,8 +155,12 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 		}
 
 		proj := &Project{
-			Name:           child.Name,
-			Builder:        &builder.Builder{PKGBUILD: pkgbuildFile, SkipHashCheck: mpc.Opts.SkipHashCheck},
+			Name: child.Name,
+			Builder: &builder.Builder{
+				PKGBUILD:      pkgbuildFile,
+				SkipHashCheck: mpc.Opts.SkipHashCheck,
+				NoCheck:       mpc.Opts.NoCheck,
+			},
 			PackageManager: mpc.packageManager,
 			HasToInstall:   child.HasToInstall,
 		}

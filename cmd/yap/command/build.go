@@ -368,6 +368,7 @@ func InitializeBuildDescriptions() {
 		"sign-passphrase":           "flags.build.sign_passphrase",
 		"sign-key-name":             "flags.build.sign_key_name",
 		"skip-hash-check":           "flags.build.skip_hash_check",
+		"nocheck":                   "flags.build.nocheck",
 		"allow-unverified-repos":    "flags.build.allow_unverified_repos",
 	})
 }
@@ -408,6 +409,8 @@ func init() {
 		"zap", "z", false, "")
 	buildCmd.Flags().BoolVarP(&buildOpts.SkipHashCheck,
 		"skip-hash-check", "H", false, "")
+	buildCmd.Flags().BoolVarP(&buildOpts.NoCheck,
+		"nocheck", "", false, "")
 
 	// DEPENDENCY MANAGEMENT FLAGS
 	buildCmd.Flags().BoolVarP(&buildOpts.NoMakeDeps,

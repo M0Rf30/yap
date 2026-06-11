@@ -142,6 +142,7 @@ type buildArgs struct {
 	SkipSyncDeps            bool     `json:"skipSyncDeps,omitempty" jsonschema:"skip pkg-manager update before makedeps"`
 	NoMakeDeps              bool     `json:"noMakeDeps,omitempty" jsonschema:"skip makedeps installation entirely"`
 	SkipHashCheck           bool     `json:"skipHashCheck,omitempty" jsonschema:"disable sha verification of sources"`
+	NoCheck                 bool     `json:"noCheck,omitempty" jsonschema:"skip the PKGBUILD check() function"`
 	SkipToolchainValidation bool     `json:"skipToolchainValidation,omitempty" jsonschema:"skip cross toolchain checks"`
 	SkipDeps                []string `json:"skipDeps,omitempty" jsonschema:"pkgs to omit from makedeps"`
 	FromPkgName             string   `json:"fromPkgName,omitempty" jsonschema:"start build at this pkg"`
@@ -332,6 +333,7 @@ func buildOptionsFromArgs(args *buildArgs) project.BuildOptions {
 		SkipDeps:                args.SkipDeps,
 		SkipToolchainValidation: args.SkipToolchainValidation,
 		SkipHashCheck:           args.SkipHashCheck,
+		NoCheck:                 args.NoCheck,
 		Zap:                     args.Zap,
 		Parallel:                args.Parallel,
 		SBOM:                    args.SBOM,
