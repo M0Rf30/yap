@@ -12,7 +12,7 @@ require (
 	github.com/github/go-spdx/v2 v2.7.0
 	github.com/go-git/go-git/v5 v5.19.1
 	github.com/go-playground/validator/v10 v10.30.3
-	github.com/google/go-containerregistry v0.21.6
+	github.com/google/go-containerregistry v0.21.7
 	github.com/klauspost/compress v1.18.6
 	github.com/klauspost/pgzip v1.2.6
 	github.com/knqyf263/go-rpmdb v0.1.1
