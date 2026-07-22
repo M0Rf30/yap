@@ -132,13 +132,17 @@ func TestUpdateSourceDedupsInReleaseFetches(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Stock jammy layout: jammy ×3 deb lines, jammy-updates ×2.
+	// Stock jammy layout: jammy ×3 deb lines, jammy-updates ×2. SignedBy
+	// points at a nonexistent keyring so trust resolution deterministically
+	// yields no anchor (bypassed via AllowUnverifiedRepos) regardless of
+	// whether the host has real apt keyrings — CI runners do.
+	noKey := "/nonexistent/yap-test-keyring.gpg"
 	sources := []aptcache.SourceEntry{
-		{URL: srv.URL, Suite: "jammy", Components: []string{"main", "restricted"}},
-		{URL: srv.URL, Suite: "jammy", Components: []string{"universe"}},
-		{URL: srv.URL, Suite: "jammy", Components: []string{"multiverse"}},
-		{URL: srv.URL, Suite: "jammy-updates", Components: []string{"main"}},
-		{URL: srv.URL, Suite: "jammy-updates", Components: []string{"universe"}},
+		{URL: srv.URL, Suite: "jammy", Components: []string{"main", "restricted"}, SignedBy: noKey},
+		{URL: srv.URL, Suite: "jammy", Components: []string{"universe"}, SignedBy: noKey},
+		{URL: srv.URL, Suite: "jammy", Components: []string{"multiverse"}, SignedBy: noKey},
+		{URL: srv.URL, Suite: "jammy-updates", Components: []string{"main"}, SignedBy: noKey},
+		{URL: srv.URL, Suite: "jammy-updates", Components: []string{"universe"}, SignedBy: noKey},
 	}
 
 	rc := newReleaseCache()
