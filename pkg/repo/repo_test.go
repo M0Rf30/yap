@@ -225,25 +225,37 @@ func TestSplitPlusEmpty(t *testing.T) {
 	}
 }
 
-// TestAppliesTo verifies the appliesTo function correctly filters repos by distro.
+// TestAppliesTo verifies the appliesTo function correctly filters repos by
+// distro and optional release qualifier.
 func TestAppliesTo(t *testing.T) {
 	cases := []struct {
-		name   string
-		repo   Repo
-		distro string
-		want   bool
+		name    string
+		repo    Repo
+		distro  string
+		release string
+		want    bool
 	}{
-		{"no filter applies to all", Repo{}, "ubuntu", true},
-		{"matching entry passes", Repo{Distros: []string{"debian", "ubuntu"}}, "ubuntu", true},
-		{"non-matching entry blocked", Repo{Distros: []string{"debian"}}, "ubuntu", false},
-		{"single distro match", Repo{Distros: []string{"fedora"}}, "fedora", true},
-		{"single distro no match", Repo{Distros: []string{"fedora"}}, "ubuntu", false},
+		{"no filter applies to all", Repo{}, "ubuntu", "", true},
+		{"matching entry passes", Repo{Distros: []string{"debian", "ubuntu"}}, "ubuntu", "", true},
+		{"non-matching entry blocked", Repo{Distros: []string{"debian"}}, "ubuntu", "", false},
+		{"single distro match", Repo{Distros: []string{"fedora"}}, "fedora", "", true},
+		{"single distro no match", Repo{Distros: []string{"fedora"}}, "ubuntu", "", false},
+		// release-qualified matching
+		{"qualified match ubuntu-jammy", Repo{Distros: []string{"ubuntu-jammy"}}, "ubuntu", "jammy", true},
+		{"qualified no match ubuntu-noble", Repo{Distros: []string{"ubuntu-jammy"}}, "ubuntu", "noble", false},
+		{"bare match still works with release", Repo{Distros: []string{"ubuntu"}}, "ubuntu", "jammy", true},
+		{"qualified rocky-9", Repo{Distros: []string{"rocky-9"}}, "rocky", "9", true},
+		{"qualified rocky mismatch", Repo{Distros: []string{"rocky-8"}}, "rocky", "9", false},
+		{"mixed bare and qualified", Repo{Distros: []string{"debian", "ubuntu-jammy"}}, "ubuntu", "jammy", true},
+		{"mixed bare and qualified no match", Repo{Distros: []string{"debian", "ubuntu-jammy"}}, "ubuntu", "noble", false},
+		{"no release still matches bare", Repo{Distros: []string{"ubuntu"}}, "ubuntu", "", true},
+		{"qualified entry no release provided", Repo{Distros: []string{"ubuntu-jammy"}}, "ubuntu", "", false},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := appliesTo(&c.repo, c.distro); got != c.want {
-				t.Fatalf("appliesTo(%+v, %q) = %v, want %v", c.repo, c.distro, got, c.want)
+			if got := appliesTo(&c.repo, c.distro, c.release); got != c.want {
+				t.Fatalf("appliesTo(%+v, %q, %q) = %v, want %v", c.repo, c.distro, c.release, got, c.want)
 			}
 		})
 	}
@@ -273,7 +285,7 @@ func TestFormatForCoversKnownManagers(t *testing.T) {
 // TestSetupEmptyRepos verifies that Setup returns nil without error when given
 // an empty repo list.
 func TestSetupEmptyRepos(t *testing.T) {
-	err := Setup("ubuntu", []Repo{})
+	err := Setup("ubuntu", "", []Repo{})
 	if err != nil {
 		t.Fatalf("Setup returned error for empty repos: %v", err)
 	}
@@ -286,7 +298,7 @@ func TestSetupUnknownDistro(t *testing.T) {
 		{Name: "test", URL: "https://example.com"},
 	}
 
-	err := Setup("unknowndistro", repos)
+	err := Setup("unknowndistro", "", repos)
 	if err != nil {
 		t.Fatalf("Setup returned error for unknown distro: %v", err)
 	}
@@ -304,15 +316,15 @@ func TestSetupRepoAppliesToAllDistros(t *testing.T) {
 	}
 
 	// Verify appliesTo returns true for any distro
-	if !appliesTo(&repo, "ubuntu") {
+	if !appliesTo(&repo, "ubuntu", "") {
 		t.Fatalf("repo with empty Distros should apply to ubuntu")
 	}
 
-	if !appliesTo(&repo, "fedora") {
+	if !appliesTo(&repo, "fedora", "") {
 		t.Fatalf("repo with empty Distros should apply to fedora")
 	}
 
-	if !appliesTo(&repo, "alpine") {
+	if !appliesTo(&repo, "alpine", "") {
 		t.Fatalf("repo with empty Distros should apply to alpine")
 	}
 }
@@ -326,15 +338,15 @@ func TestSetupRepoAppliesToSpecificDistros(t *testing.T) {
 		Distros: []string{"debian", "ubuntu"},
 	}
 
-	if !appliesTo(&repo, "debian") {
+	if !appliesTo(&repo, "debian", "") {
 		t.Fatalf("repo should apply to debian")
 	}
 
-	if !appliesTo(&repo, "ubuntu") {
+	if !appliesTo(&repo, "ubuntu", "") {
 		t.Fatalf("repo should apply to ubuntu")
 	}
 
-	if appliesTo(&repo, "fedora") {
+	if appliesTo(&repo, "fedora", "") {
 		t.Fatalf("repo should not apply to fedora")
 	}
 }

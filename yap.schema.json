@@ -122,7 +122,7 @@
           },
           "distros": {
             "type": "array",
-            "description": "Restrict this repo to specific distro keys (e.g. [\"ubuntu\", \"rocky\"]). Empty means all.",
+            "description": "Restrict this repo to specific distros. Accepts bare distro keys (\"ubuntu\", \"rocky\") or release-qualified forms (\"ubuntu-jammy\", \"rocky-9\"). Empty means all distros.",
             "items": { "type": "string" }
           },
           "format": {

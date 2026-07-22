@@ -47,11 +47,12 @@ type Repo struct {
 }
 
 // Setup writes apt/dnf repository definitions for every Repo applicable to the
-// current distro. distro is the bare distro key (e.g. "ubuntu", "rocky"); only
-// repos with empty Distros, or whose Distros entry matches, are installed.
-// Repos that target a different package format than the active distro are
-// silently skipped.
-func Setup(distro string, repos []Repo) error {
+// current distro+release pair. distro is the bare os-release ID (e.g. "ubuntu",
+// "rocky"); release is the codename or version (e.g. "jammy", "9"). Repos whose
+// Distros list is empty match every distro. When Distros is non-empty, an entry
+// matches if it equals the bare distro ("ubuntu") OR the qualified form
+// ("ubuntu-jammy").
+func Setup(distro, release string, repos []Repo) error {
 	if len(repos) == 0 {
 		return nil
 	}
@@ -64,7 +65,7 @@ func Setup(distro string, repos []Repo) error {
 	}
 
 	for i := range repos {
-		if err := setupOne(pm, &repos[i], distro, i); err != nil {
+		if err := setupOne(pm, &repos[i], distro, release, i); err != nil {
 			return err
 		}
 	}
@@ -74,8 +75,8 @@ func Setup(distro string, repos []Repo) error {
 
 // setupOne installs a single repository definition if it targets the active
 // distro and matches the active package format.
-func setupOne(pm string, r *Repo, distro string, idx int) error {
-	if !appliesTo(r, distro) {
+func setupOne(pm string, r *Repo, distro, release string, idx int) error {
+	if !appliesTo(r, distro, release) {
 		return nil
 	}
 
@@ -112,12 +113,22 @@ func setupOne(pm string, r *Repo, distro string, idx int) error {
 }
 
 // appliesTo reports whether the repo declaration targets the given distro.
-func appliesTo(r *Repo, distro string) bool {
+// When release is non-empty, entries may use either the bare distro key
+// ("ubuntu") or the qualified "distro-release" form ("ubuntu-jammy").
+func appliesTo(r *Repo, distro, release string) bool {
 	if len(r.Distros) == 0 {
 		return true
 	}
 
-	return slices.Contains(r.Distros, distro)
+	if slices.Contains(r.Distros, distro) {
+		return true
+	}
+
+	if release != "" {
+		return slices.Contains(r.Distros, distro+"-"+release)
+	}
+
+	return false
 }
 
 // formatFor returns the canonical repo format ("deb" or "rpm") for the active

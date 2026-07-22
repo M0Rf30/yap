@@ -365,8 +365,9 @@ func (mpc *MultipleProject) applyJSONDefaults() error {
 // setupExtraRepos installs custom apt/dnf repositories declared in yap.json
 // (mpc.Repos) and via the repeatable --repo CLI flag (ExtraRepos). It runs
 // before any package manager update so subsequent installs can resolve the new
-// sources.
-func (mpc *MultipleProject) setupExtraRepos(distro string) error {
+// sources. release is the codename/version (e.g. "jammy", "9") so that
+// per-release filtering in the Distros field works.
+func (mpc *MultipleProject) setupExtraRepos(distro, release string) error {
 	cliRepos, err := repo.ParseFlags(mpc.Opts.ExtraRepos)
 	if err != nil {
 		return err
@@ -375,7 +376,7 @@ func (mpc *MultipleProject) setupExtraRepos(distro string) error {
 	merged := append([]repo.Repo{}, mpc.Repos...)
 	merged = append(merged, cliRepos...)
 
-	return repo.Setup(distro, merged)
+	return repo.Setup(distro, release, merged)
 }
 
 // resolveOutputPath converts the output path to an absolute path.

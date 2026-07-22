@@ -73,7 +73,7 @@ func registerPrepare(srv *mcpsdk.Server) {
 			return nil, prepareResult{Distro: distro, Release: release, Error: err.Error()}, nil //nolint:nilerr
 		}
 
-		if err := repo.Setup(distro, nil); err != nil {
+		if err := repo.Setup(distro, release, nil); err != nil {
 			return nil, prepareResult{Distro: distro, Release: release, Error: err.Error()}, nil //nolint:nilerr
 		}
 

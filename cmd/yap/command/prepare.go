@@ -82,7 +82,7 @@ var (
 				return
 			}
 
-			if err := repo.Setup(distro, cliRepos); err != nil {
+			if err := repo.Setup(distro, release, cliRepos); err != nil {
 				logger.Error(err.Error(), "error", err)
 
 				return

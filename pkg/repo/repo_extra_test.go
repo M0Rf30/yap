@@ -37,7 +37,7 @@ func TestSetupOneSkipsNonMatchingDistro(t *testing.T) {
 	}
 
 	// "ubuntu" is not in Distros → appliesTo returns false → no error, no write.
-	err := setupOne("apt", r, "ubuntu", 0)
+	err := setupOne("apt", r, "ubuntu", "", 0)
 	assert.NoError(t, err)
 }
 
@@ -49,7 +49,7 @@ func TestSetupOneRejectsEmptyName(t *testing.T) {
 		URL:  "https://example.com",
 	}
 
-	err := setupOne("apt", r, "ubuntu", 0)
+	err := setupOne("apt", r, "ubuntu", "", 0)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "name and url are required")
 }
@@ -62,7 +62,7 @@ func TestSetupOneRejectsEmptyURL(t *testing.T) {
 		URL:  "",
 	}
 
-	err := setupOne("apt", r, "ubuntu", 0)
+	err := setupOne("apt", r, "ubuntu", "", 0)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "name and url are required")
 }
@@ -72,7 +72,7 @@ func TestSetupOneRejectsEmptyURL(t *testing.T) {
 func TestSetupOneErrorMsgIncludesIndex(t *testing.T) {
 	r := &Repo{Name: "", URL: ""}
 
-	err := setupOne("apt", r, "ubuntu", 7)
+	err := setupOne("apt", r, "ubuntu", "", 7)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "7")
 }
@@ -86,7 +86,7 @@ func TestSetupOneSkipsUnsupportedFormat(t *testing.T) {
 		Format: "pacman", // not deb or rpm
 	}
 
-	err := setupOne("pacman", r, "arch", 0)
+	err := setupOne("pacman", r, "arch", "", 0)
 	assert.NoError(t, err)
 }
 
@@ -101,7 +101,7 @@ func TestSetupOneSkipsDebRepoForRPMHost(t *testing.T) {
 	}
 
 	// pm=yum but format=deb → the deb branch checks pm != PMApt and returns nil.
-	err := setupOne("yum", r, "fedora", 0)
+	err := setupOne("yum", r, "fedora", "", 0)
 	assert.NoError(t, err)
 }
 
@@ -115,7 +115,7 @@ func TestSetupOneSkipsRPMRepoForDebHost(t *testing.T) {
 	}
 
 	// pm=apt but format=rpm → the rpm branch checks pm != PMYum/PMZypper and returns nil.
-	err := setupOne("apt", r, "ubuntu", 0)
+	err := setupOne("apt", r, "ubuntu", "", 0)
 	assert.NoError(t, err)
 }
 
@@ -136,7 +136,7 @@ func TestSetupOneInfersDEBFormatFromPM(t *testing.T) {
 		// Format intentionally empty — should be inferred as "deb" for apt.
 	}
 
-	err := setupOne("apt", r, "ubuntu", 0)
+	err := setupOne("apt", r, "ubuntu", "", 0)
 	// We expect an error because /etc/apt/sources.list.d is not writable, but
 	// it must NOT be a "name and url are required" validation error.
 	if err != nil {
@@ -159,7 +159,7 @@ func TestSetupOneInfersRPMFormatFromPM(t *testing.T) {
 		// Format intentionally empty — should be inferred as "rpm" for yum.
 	}
 
-	err := setupOne("yum", r, "fedora", 0)
+	err := setupOne("yum", r, "fedora", "", 0)
 	if err != nil {
 		assert.NotContains(t, err.Error(), "name and url are required",
 			"format inference should have passed validation; got: %v", err)
@@ -389,7 +389,7 @@ func TestSetupOneAppliesToAllDistrosWhenDistrosEmpty(t *testing.T) {
 	// We expect either success (if /etc is writable) or a filesystem error,
 	// but never a "distro not matched" skip (which would return nil without
 	// touching the filesystem).
-	err := setupOne("apt", r, "ubuntu", 0)
+	err := setupOne("apt", r, "ubuntu", "", 0)
 	if err != nil {
 		// Filesystem error is expected in non-root CI; that's fine.
 		assert.NotContains(t, err.Error(), "name and url are required")
@@ -403,7 +403,7 @@ func TestSetupOneIndexInErrorMessage(t *testing.T) {
 		t.Run(fmt.Sprintf("idx=%d", idx), func(t *testing.T) {
 			r := &Repo{Name: "", URL: ""}
 
-			err := setupOne("apt", r, "ubuntu", idx)
+			err := setupOne("apt", r, "ubuntu", "", idx)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf("%d", idx))
 		})
@@ -423,7 +423,7 @@ func TestSetupOneZypperInfersRPM(t *testing.T) {
 		// Format empty → should infer "rpm" for zypper.
 	}
 
-	err := setupOne("zypper", r, "opensuse-leap", 0)
+	err := setupOne("zypper", r, "opensuse-leap", "", 0)
 	if err != nil {
 		assert.NotContains(t, err.Error(), "name and url are required")
 	}
@@ -444,7 +444,7 @@ func TestSetupOneApkPMSkipsAllFormats(t *testing.T) {
 			// apk PM: formatFor("apk") returns "" → falls to default → logs warning, returns nil.
 			// But if Format is explicitly set, the switch dispatches to deb/rpm branch
 			// which checks pm != PMApt / pm != PMYum|PMZypper and returns nil.
-			err := setupOne("apk", r, "alpine", 0)
+			err := setupOne("apk", r, "alpine", "", 0)
 			assert.NoError(t, err)
 		})
 	}
@@ -462,7 +462,7 @@ func TestSetupOnePacmanPMSkipsAllFormats(t *testing.T) {
 				Format: format,
 			}
 
-			err := setupOne("pacman", r, "arch", 0)
+			err := setupOne("pacman", r, "arch", "", 0)
 			assert.NoError(t, err)
 		})
 	}

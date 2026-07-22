@@ -373,7 +373,7 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
-	if err := mpc.setupExtraRepos(distro); err != nil {
+	if err := mpc.setupExtraRepos(distro, release); err != nil {
 		return err
 	}
 
