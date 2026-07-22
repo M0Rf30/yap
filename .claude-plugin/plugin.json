@@ -1,6 +1,6 @@
 {
   "name": "yap",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "description": "Build native Linux packages (.deb/.rpm/.apk/.pkg.tar.zst) from a single PKGBUILD. Bundles the yap-mcp server and the yap agent skill.",
   "author": {
     "name": "M0Rf30",
