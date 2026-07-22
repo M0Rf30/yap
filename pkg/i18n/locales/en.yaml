@@ -1082,6 +1082,8 @@
   translation: "Accepting unsigned Release (opt-in)"
 - id: logger.aptrepo.warn.apt_component_fetch_failed
   translation: "Apt component fetch failed"
+- id: logger.aptrepo.warn.retrying_https_fallback
+  translation: "Retrying over https after transient http failure"
 - id: logger.aptrepo.warn.skipping_inrelease_signature_check
   translation: "Skipping InRelease signature check (no trust anchor)"
 - id: logger.aptrepo.warn.skipping_inrelease_signature_check_unknown

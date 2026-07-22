@@ -328,13 +328,61 @@ const maxReleaseBytes = 16 << 20
 // httpFetch downloads a URL and returns the raw bytes, capped at
 // maxReleaseBytes. Transient network failures are retried per the
 // httpclient retry policy.
+//
+// If fetchURL is plain http and every retry exhausts with a transient
+// network error, one more retried attempt is made against the https
+// equivalent before giving up. Some networks (corporate egress proxies,
+// sandboxed CI runners) reset or drop port-80 connections outright while
+// leaving 443 untouched; upstream mirrors like archive.ubuntu.com/
+// security.ubuntu.com serve identical content on both, so this recovers
+// automatically instead of failing a build over a scheme choice baked
+// into an old sources.list entry.
 func httpFetch(ctx context.Context, fetchURL string) ([]byte, error) {
+	return httpFetchWithFetcher(ctx, fetchURL, httpFetchOnce)
+}
+
+// httpFetchWithFetcher is httpFetch's implementation, parameterized on the
+// single-attempt fetcher so tests can inject a fake one (deterministic
+// scheme-based routing, no real network) instead of mutating the shared
+// httpclient.Client() transport, which other tests may use concurrently.
+func httpFetchWithFetcher(
+	ctx context.Context, fetchURL string, fetchOnce func(context.Context, string) ([]byte, error),
+) ([]byte, error) {
+	data, err := httpFetchRetried(ctx, fetchURL, fetchOnce)
+	if err == nil || !httpclient.IsRetryable(err) {
+		return data, err
+	}
+
+	httpsURL, ok := httpclient.UpgradeToHTTPS(fetchURL)
+	if !ok {
+		return data, err
+	}
+
+	logger.Warn(i18n.T("logger.aptrepo.warn.retrying_https_fallback"), "url", fetchURL, "error", err)
+
+	httpsData, httpsErr := httpFetchRetried(ctx, httpsURL, fetchOnce)
+	if httpsErr == nil {
+		return httpsData, nil
+	}
+
+	return data, yaperrors.Wrap(err, yaperrors.ErrTypeNetwork,
+		"http fetch failed; https fallback also failed").
+		WithOperation("httpFetchWithFetcher").
+		WithContext("url", fetchURL).
+		WithContext("https_url", httpsURL).
+		WithContext("https_error", httpsErr.Error())
+}
+
+// httpFetchRetried runs fetchOnce under the httpclient retry policy.
+func httpFetchRetried(
+	ctx context.Context, fetchURL string, fetchOnce func(context.Context, string) ([]byte, error),
+) ([]byte, error) {
 	var data []byte
 
 	err := httpclient.WithRetry(ctx, fetchURL, func() error {
 		var err error
 
-		data, err = httpFetchOnce(ctx, fetchURL)
+		data, err = fetchOnce(ctx, fetchURL)
 
 		return err
 	})

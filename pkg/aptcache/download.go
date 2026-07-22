@@ -6,14 +6,17 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	stderrors "errors"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/cavaliergopher/grab/v3"
 
+	"github.com/M0Rf30/yap/v2/pkg/download"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
@@ -104,25 +107,38 @@ const downloadConcurrency = 6
 // resolution before downloading. Use Download directly only when you
 // already have an explicit, pre-resolved list of package names.
 func (c *Cache) Download(ctx context.Context, destDir string, pkgs []string) error {
+	client := grab.NewClient()
+	client.UserAgent = "YAP/2 (aptcache)"
+
+	return c.downloadWithClient(ctx, client, destDir, pkgs)
+}
+
+// downloadWithClient is Download's implementation, parameterized on the
+// grab.Client so tests can inject a fake HTTPClient/transport to exercise
+// the https-fallback path deterministically, without real network I/O.
+func (c *Cache) downloadWithClient(
+	ctx context.Context, client *grab.Client, destDir string, pkgs []string,
+) error {
 	if len(pkgs) == 0 {
 		return nil
 	}
 
-	requests, err := c.buildDownloadRequests(ctx, destDir, pkgs)
+	jobs, err := c.resolveDownloadJobs(pkgs)
 	if err != nil {
 		return err
 	}
 
-	workers := min(downloadConcurrency, len(requests))
+	requests, err := c.buildDownloadRequests(ctx, destDir, jobs)
+	if err != nil {
+		return err
+	}
 
-	client := grab.NewClient()
-	client.UserAgent = "YAP/2 (aptcache)"
-
-	respCh := client.DoBatch(workers, requests...)
+	responses := runDownloadBatch(client, requests)
+	responses = c.retryHTTPSFallback(ctx, client, destDir, jobs, responses)
 
 	var firstEr error
 
-	for resp := range respCh {
+	for _, resp := range responses {
 		if err := resp.Err(); err != nil && firstEr == nil {
 			firstEr = errors.Wrap(err, errors.ErrTypeNetwork, "failed to download package").
 				WithOperation("Download").
@@ -133,14 +149,116 @@ func (c *Cache) Download(ctx context.Context, destDir string, pkgs []string) err
 	return firstEr
 }
 
-// buildDownloadRequests turns each package name into a configured grab
-// Request with the apt-index-supplied size + SHA-256 wired in. Resolving
-// up-front means a missing-package error surfaces before any HTTP is
-// done.
-func (c *Cache) buildDownloadRequests(
-	ctx context.Context, destDir string, pkgs []string,
-) ([]*grab.Request, error) {
-	requests := make([]*grab.Request, 0, len(pkgs))
+// runDownloadBatch runs requests concurrently (capped at
+// downloadConcurrency workers) and returns the responses in the same
+// order as requests. grab.Client.Do rewraps each Request in a new
+// context-bound copy internally, so Response.Request is NOT the same
+// pointer callers submitted — index-stable dispatch (not a
+// pointer-identity map) is required to pair a failure back to its
+// originating package for the https-fallback pass.
+func runDownloadBatch(client *grab.Client, requests []*grab.Request) []*grab.Response {
+	if len(requests) == 0 {
+		return nil
+	}
+
+	responses := make([]*grab.Response, len(requests))
+	workers := min(downloadConcurrency, len(requests))
+	sem := make(chan struct{}, workers)
+
+	var wg sync.WaitGroup
+
+	for i, req := range requests {
+		wg.Add(1)
+
+		sem <- struct{}{}
+
+		go func(i int, req *grab.Request) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			resp := client.Do(req)
+			resp.Wait()
+			responses[i] = resp
+		}(i, req)
+	}
+
+	wg.Wait()
+
+	return responses
+}
+
+// retryHTTPSFallback rebuilds and re-runs, over https, any download that
+// failed with a retryable network error while declared as plain http.
+// Some networks (corporate egress proxies, sandboxed CI runners) reset or
+// drop port-80 connections outright while leaving 443 untouched; the
+// declared mirror serves identical content on both schemes, so escalating
+// here recovers automatically instead of failing the build over a scheme
+// choice baked into an old sources.list entry.
+//
+// Each failing package gets exactly one https attempt — this is a
+// scheme-level escape hatch, not a general retry policy for flaky
+// mirrors.
+func (c *Cache) retryHTTPSFallback(
+	ctx context.Context, client *grab.Client, destDir string,
+	jobs []*downloadJob, responses []*grab.Response,
+) []*grab.Response {
+	var (
+		idxs     []int
+		requests []*grab.Request
+	)
+
+	for i, resp := range responses {
+		err := resp.Err()
+		if err == nil || !download.IsRetryableGrabError(err) {
+			continue
+		}
+
+		httpsURL, ok := httpclient.UpgradeToHTTPS(resp.Request.URL().String())
+		if !ok {
+			continue
+		}
+
+		// A bad-length failure leaves an unresumable partial at Filename;
+		// clear it so the https attempt starts from scratch instead of
+		// resuming (and re-failing against) the same invalid bytes.
+		if stderrors.Is(err, grab.ErrBadLength) {
+			_ = os.Remove(resp.Filename)
+		}
+
+		req, buildErr := c.buildRequest(ctx, destDir, jobs[i], httpsURL)
+		if buildErr != nil {
+			continue
+		}
+
+		idxs = append(idxs, i)
+		requests = append(requests, req)
+	}
+
+	if len(requests) == 0 {
+		return responses
+	}
+
+	fallback := runDownloadBatch(client, requests)
+	for i, idx := range idxs {
+		responses[idx] = fallback[i]
+	}
+
+	return responses
+}
+
+// downloadJob pairs a resolved package name with its apt-index metadata so
+// a failed request can be rebuilt against a different URL (https
+// fallback) without re-parsing the package list.
+type downloadJob struct {
+	name string
+	info PackageInfo
+}
+
+// resolveDownloadJobs resolves each package name to its apt-index metadata
+// up front, so a missing package or missing BaseURL surfaces before any
+// HTTP is attempted.
+func (c *Cache) resolveDownloadJobs(pkgs []string) ([]*downloadJob, error) {
+	jobs := make([]*downloadJob, 0, len(pkgs))
 
 	for _, pkg := range pkgs {
 		name := pkg
@@ -154,47 +272,77 @@ func (c *Cache) buildDownloadRequests(
 		info, ok := c.Lookup(name)
 		if !ok || info.Filename == "" {
 			return nil, errors.New(errors.ErrTypeValidation, "package not found in apt index").
-				WithOperation("buildDownloadRequests").
+				WithOperation("resolveDownloadJobs").
 				WithContext("package", name)
 		}
 
 		if info.BaseURL == "" {
 			return nil, errors.New(errors.ErrTypeValidation, "package has no BaseURL").
-				WithOperation("buildDownloadRequests").
+				WithOperation("resolveDownloadJobs").
 				WithContext("package", name)
 		}
 
-		pkgURL := strings.TrimSuffix(info.BaseURL, "/") + "/" + info.Filename
-		destFile := filepath.Join(destDir, filepath.Base(info.Filename))
+		jobs = append(jobs, &downloadJob{name: name, info: info})
+	}
 
-		req, err := grab.NewRequest(destFile, pkgURL)
+	return jobs, nil
+}
+
+// buildDownloadRequests turns each resolved job into a configured grab
+// Request against its index-declared BaseURL.
+func (c *Cache) buildDownloadRequests(
+	ctx context.Context, destDir string, jobs []*downloadJob,
+) ([]*grab.Request, error) {
+	requests := make([]*grab.Request, 0, len(jobs))
+
+	for _, job := range jobs {
+		pkgURL := strings.TrimSuffix(job.info.BaseURL, "/") + "/" + job.info.Filename
+
+		req, err := c.buildRequest(ctx, destDir, job, pkgURL)
 		if err != nil {
-			return nil, errors.Wrap(err, errors.ErrTypeInternal, "failed to build download request").
-				WithOperation("buildDownloadRequests").
-				WithContext("package", name)
-		}
-
-		req = req.WithContext(ctx)
-		if info.Size > 0 {
-			req.Size = info.Size
-		}
-
-		if info.SHA256 != "" {
-			sum, decErr := hex.DecodeString(info.SHA256)
-			if decErr == nil {
-				// SetChecksum(hash, sum, deleteOnError=true):
-				//   - streaming SHA-256 against `sum`;
-				//   - delete the on-disk file if the hash mismatches,
-				//     so a failed download never leaves a corrupt
-				//     artifact at destFile.
-				req.SetChecksum(sha256.New(), sum, true)
-			}
+			return nil, err
 		}
 
 		requests = append(requests, req)
 	}
 
 	return requests, nil
+}
+
+// buildRequest configures a grab.Request for job against pkgURL, wiring in
+// the apt-index-supplied size and SHA-256 checksum. Factored out of
+// buildDownloadRequests so retryHTTPSFallback can rebuild the same request
+// against a different URL without re-deriving checksum/size from scratch.
+func (c *Cache) buildRequest(
+	ctx context.Context, destDir string, job *downloadJob, pkgURL string,
+) (*grab.Request, error) {
+	destFile := filepath.Join(destDir, filepath.Base(job.info.Filename))
+
+	req, err := grab.NewRequest(destFile, pkgURL)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeInternal, "failed to build download request").
+			WithOperation("buildRequest").
+			WithContext("package", job.name)
+	}
+
+	req = req.WithContext(ctx)
+	if job.info.Size > 0 {
+		req.Size = job.info.Size
+	}
+
+	if job.info.SHA256 != "" {
+		sum, decErr := hex.DecodeString(job.info.SHA256)
+		if decErr == nil {
+			// SetChecksum(hash, sum, deleteOnError=true):
+			//   - streaming SHA-256 against `sum`;
+			//   - delete the on-disk file if the hash mismatches,
+			//     so a failed download never leaves a corrupt
+			//     artifact at destFile.
+			req.SetChecksum(sha256.New(), sum, true)
+		}
+	}
+
+	return req, nil
 }
 
 // maxDebBytes caps an individual .deb download. Real Debian packages top

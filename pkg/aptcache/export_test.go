@@ -5,6 +5,8 @@ package aptcache
 import (
 	"context"
 	"io"
+
+	"github.com/cavaliergopher/grab/v3"
 )
 
 // NewCacheForTesting creates an empty Cache suitable for unit tests.
@@ -55,6 +57,15 @@ func DownloadAndVerifyForTesting(
 	ctx context.Context, pkgURL, destFile, expectedSHA256 string, expectedSize int64,
 ) error {
 	return downloadAndVerify(ctx, pkgURL, destFile, expectedSHA256, expectedSize)
+}
+
+// DownloadWithClientForTesting exposes downloadWithClient so tests can
+// inject a fake grab.Client (custom HTTPClient/transport) to exercise the
+// http->https fallback path deterministically, without real network I/O.
+func (c *Cache) DownloadWithClientForTesting(
+	ctx context.Context, client *grab.Client, destDir string, pkgs []string,
+) error {
+	return c.downloadWithClient(ctx, client, destDir, pkgs)
 }
 
 // DebReposStateSnapshot is a fully-exported snapshot of debReposState for

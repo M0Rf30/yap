@@ -109,9 +109,9 @@ func TestIsRetryableDownloadError(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := isRetryableDownloadError(tc.err)
+			result := IsRetryableGrabError(tc.err)
 			if result != tc.expected {
-				t.Errorf("isRetryableDownloadError(%v) = %v, expected %v", tc.err, result, tc.expected)
+				t.Errorf("IsRetryableGrabError(%v) = %v, expected %v", tc.err, result, tc.expected)
 			}
 		})
 	}
@@ -119,9 +119,9 @@ func TestIsRetryableDownloadError(t *testing.T) {
 	for _, tc := range stringTestCases {
 		err := errors.New(tc.errStr)
 
-		result := isRetryableDownloadError(err)
+		result := IsRetryableGrabError(err)
 		if result != tc.expected {
-			t.Errorf("isRetryableDownloadError(%q) = %v, expected %v", tc.errStr, result, tc.expected)
+			t.Errorf("IsRetryableGrabError(%q) = %v, expected %v", tc.errStr, result, tc.expected)
 		}
 	}
 }

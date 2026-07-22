@@ -13,6 +13,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -110,4 +112,28 @@ func CheckStatus(resp *http.Response, fetchURL string) error {
 	}
 
 	return nil
+}
+
+// UpgradeToHTTPS rewrites a plain-http URL to https. Returns ok=false for
+// anything that isn't parseable http (including URLs already on https).
+//
+// Used by aptrepo/aptcache to recover from networks that reset or drop
+// port-80 connections outright while leaving 443 untouched — declared
+// mirrors like archive.ubuntu.com serve identical content on both
+// schemes, so escalating on a transient http failure is safe.
+func UpgradeToHTTPS(rawURL string) (string, bool) {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "http" {
+		return "", false
+	}
+
+	// An explicit ":80" must not survive the scheme swap — TLS on port 80
+	// fails outright. Any other explicit port (custom mirror setups) is
+	// kept as-is; we assume it serves TLS on the same port too. Works for
+	// bracketed IPv6 hosts too: TrimSuffix leaves the closing "]" intact.
+	u.Host = strings.TrimSuffix(u.Host, ":80")
+
+	u.Scheme = "https"
+
+	return u.String(), true
 }

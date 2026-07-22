@@ -1086,6 +1086,8 @@
   translation: "Accettazione Release non firmato (opt-in)"
 - id: logger.aptrepo.warn.apt_component_fetch_failed
   translation: "Recupero del componente apt non riuscito"
+- id: logger.aptrepo.warn.retrying_https_fallback
+  translation: "Nuovo tentativo su https dopo un errore http transitorio"
 - id: logger.aptrepo.warn.skipping_inrelease_signature_check
   translation: "Verifica firma InRelease ignorata (nessuna ancora di fiducia)"
 - id: logger.aptrepo.warn.skipping_inrelease_signature_check_unknown

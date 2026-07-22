@@ -140,7 +140,7 @@ func retryDownload(
 		lastErr = err
 
 		// Check if it's a retryable error
-		if !isRetryableDownloadError(err) {
+		if !IsRetryableGrabError(err) {
 			break
 		}
 
@@ -299,13 +299,16 @@ func monitorDownload(
 	}
 }
 
-// isRetryableDownloadError determines if a download error is transient and
-// worth retrying. Typed checks run first: context cancellation is never
-// retried; grab status codes retry on 408/429/5xx; transport-level errors
-// (timeouts, resets, truncated bodies) defer to httpclient.IsRetryable.
-// A conservative string fallback catches errors that lost their type
-// through fmt-style wrapping.
-func isRetryableDownloadError(err error) bool {
+// IsRetryableGrabError determines if a grab-based download error is
+// transient and worth retrying. Typed checks run first: context
+// cancellation is never retried; grab status codes retry on 408/429/5xx;
+// transport-level errors (timeouts, resets, truncated bodies) defer to
+// httpclient.IsRetryable. A conservative string fallback catches errors
+// that lost their type through fmt-style wrapping.
+//
+// Exported so other grab-based downloaders (e.g. pkg/aptcache's .deb
+// fetch) can reuse the same classification instead of duplicating it.
+func IsRetryableGrabError(err error) bool {
 	if err == nil {
 		return false
 	}

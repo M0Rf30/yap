@@ -2,7 +2,11 @@
 // This file is only compiled when running tests.
 package aptrepo
 
-import "github.com/ProtonMail/go-crypto/openpgp"
+import (
+	"context"
+
+	"github.com/ProtonMail/go-crypto/openpgp"
+)
 
 // StripClearsignArmorForTesting exposes stripClearsignArmor for unit tests.
 func StripClearsignArmorForTesting(data []byte) []byte {
@@ -54,4 +58,14 @@ func LoadKeyringFileForTesting(path string) (openpgp.EntityList, error) {
 // LoadKeyringDirForTesting exposes loadKeyringDir for unit tests.
 func LoadKeyringDirForTesting(dir string) (openpgp.EntityList, error) {
 	return loadKeyringDir(dir)
+}
+
+// HTTPFetchWithFetcherForTesting exposes httpFetchWithFetcher so tests can
+// inject a fake single-attempt fetcher (deterministic scheme routing) to
+// exercise the http->https escalation deterministically, without real
+// network I/O or mutating the shared httpclient.Client() transport.
+func HTTPFetchWithFetcherForTesting(
+	ctx context.Context, fetchURL string, fetchOnce func(context.Context, string) ([]byte, error),
+) ([]byte, error) {
+	return httpFetchWithFetcher(ctx, fetchURL, fetchOnce)
 }

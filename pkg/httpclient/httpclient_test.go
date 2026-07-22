@@ -124,3 +124,40 @@ func TestClient_ReturnsSameInstance(t *testing.T) {
 		t.Errorf("Client timeout = %v, want %v", a.Timeout, httpclient.DefaultTimeout)
 	}
 }
+
+func TestUpgradeToHTTPS(t *testing.T) {
+	cases := []struct {
+		name   string
+		in     string
+		want   string
+		wantOK bool
+	}{
+		{"plain http", "http://archive.ubuntu.com/ubuntu/", "https://archive.ubuntu.com/ubuntu/", true},
+		{
+			"explicit port 80 is stripped",
+			"http://archive.ubuntu.com:80/ubuntu/", "https://archive.ubuntu.com/ubuntu/", true,
+		},
+		{
+			"non-80 port kept as-is",
+			"http://mirror.example.com:8080/repo/", "https://mirror.example.com:8080/repo/", true,
+		},
+		{"ipv6 host with port 80 is stripped", "http://[::1]:80/repo/", "https://[::1]/repo/", true},
+		{"ipv6 host without port", "http://[::1]/repo/", "https://[::1]/repo/", true},
+		{"already https", "https://archive.ubuntu.com/ubuntu/", "", false},
+		{"unsupported scheme", "ftp://archive.ubuntu.com/ubuntu/", "", false},
+		{"malformed url", "http://%zz", "", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := httpclient.UpgradeToHTTPS(tc.in)
+			if ok != tc.wantOK {
+				t.Fatalf("UpgradeToHTTPS(%q) ok = %v, want %v", tc.in, ok, tc.wantOK)
+			}
+
+			if ok && got != tc.want {
+				t.Errorf("UpgradeToHTTPS(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
