@@ -44,6 +44,14 @@ type Repo struct {
 	Distros    []string `json:"distros,omitempty"`
 	Format     string   `json:"format,omitempty"`
 	GPGCheck   bool     `json:"gpgCheck,omitempty"`
+	// Country is a two-letter country code (ISO 3166-1 alpha-2 style,
+	// e.g. "it", "de"; only the shape is validated) substituted
+	// for the "{country}" token in URL, selecting a country mirror:
+	// url="http://{country}.archive.ubuntu.com/ubuntu/" + country="it"
+	// → "http://it.archive.ubuntu.com/ubuntu/". When Country is empty the
+	// token collapses ("{country}." is removed), falling back to the bare
+	// host. Setting Country on a URL without the token is an error.
+	Country string `json:"country,omitempty" validate:"omitempty,len=2,alpha"`
 }
 
 // Setup writes apt/dnf repository definitions for every Repo applicable to the
@@ -85,6 +93,13 @@ func setupOne(pm string, r *Repo, distro, release string, idx int) error {
 			fmt.Sprintf("repo: name and url are required (entry %d)", idx)).
 			WithOperation("setupOne")
 	}
+
+	resolved := *r
+	if err := resolveCountry(&resolved); err != nil {
+		return err
+	}
+
+	r = &resolved
 
 	format := r.Format
 	if format == "" {
@@ -131,6 +146,52 @@ func appliesTo(r *Repo, distro, release string) bool {
 	return false
 }
 
+// resolveCountry substitutes the "{country}" token in r.URL with r.Country
+// (ISO 3166-1 alpha-2, lowercased). With an empty Country only the
+// host-prefix form "{country}." collapses safely to the global mirror;
+// any other token placement cannot be removed without changing path
+// semantics and is rejected. A Country set on a URL without the token is
+// also rejected: it would silently do nothing.
+func resolveCountry(r *Repo) error {
+	const token = "{country}"
+
+	hasToken := strings.Contains(r.URL, token)
+
+	if r.Country == "" {
+		if !hasToken {
+			return nil
+		}
+
+		collapsed := strings.Replace(r.URL, "://"+token+".", "://", 1)
+		if strings.Contains(collapsed, token) {
+			return errors.New(errors.ErrTypeValidation,
+				fmt.Sprintf("repo %q: url contains {country} but no country is set", r.Name)).
+				WithOperation("resolveCountry")
+		}
+
+		r.URL = collapsed
+
+		return nil
+	}
+
+	cc := strings.ToLower(r.Country)
+	if len(cc) != 2 || cc[0] < 'a' || cc[0] > 'z' || cc[1] < 'a' || cc[1] > 'z' {
+		return errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf("repo %q: country must be a two-letter code, got %q", r.Name, r.Country)).
+			WithOperation("resolveCountry")
+	}
+
+	if !hasToken {
+		return errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf("repo %q: country=%q set but url has no {country} token", r.Name, cc)).
+			WithOperation("resolveCountry")
+	}
+
+	r.URL = strings.ReplaceAll(r.URL, token, cc)
+
+	return nil
+}
+
 // formatFor returns the canonical repo format ("deb" or "rpm") for the active
 // package manager. Unsupported package managers fall back to "deb".
 func formatFor(pm string) string {
@@ -146,7 +207,7 @@ func formatFor(pm string) string {
 
 // ParseFlags converts repeatable `--repo k=v,...` tokens into Repo values.
 // Supported keys: name, url, suite, components (comma-separated subkeys are
-// escaped with '+'), keyURL, distros (use '+'), format, gpgCheck.
+// escaped with '+'), keyURL, distros (use '+'), format, gpgCheck, country.
 func ParseFlags(tokens []string) ([]Repo, error) {
 	out := make([]Repo, 0, len(tokens))
 
@@ -193,6 +254,8 @@ func parseFlag(token string) (Repo, error) {
 			r.Format = val
 		case "gpgCheck":
 			r.GPGCheck = val == "true" || val == "1"
+		case "country":
+			r.Country = val
 		default:
 			return r, errors.New(errors.ErrTypeValidation,
 				fmt.Sprintf("repo: unknown key %q", key)).

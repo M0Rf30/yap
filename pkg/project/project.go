@@ -135,7 +135,7 @@ type MultipleProject struct {
 	CompressionDeb string          `json:"compressionDeb" validate:""`
 	CompressionRpm string          `json:"compressionRpm" validate:""`
 	Signing        *signing.Config `json:"signing,omitempty"`
-	Repos          []repo.Repo     `json:"repos,omitempty"`
+	Repos          []repo.Repo     `json:"repos,omitempty" validate:"omitempty,dive"`
 	SkipDeps       []string        `json:"skipDeps,omitempty"`
 	TargetArch     string          `json:"targetArch,omitempty"`
 	DebugDir       string          `json:"debugDir,omitempty"`

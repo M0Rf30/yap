@@ -133,6 +133,11 @@
             "type": "boolean",
             "description": "Enable GPG signature verification for this repository.",
             "default": false
+          },
+          "country": {
+            "type": "string",
+            "pattern": "^[A-Za-z]{2}$",
+            "description": "Two-letter country code (ISO 3166-1 alpha-2 style; only the shape is validated) substituted for the \"{country}\" token in url, selecting a country mirror (e.g. url \"http://{country}.archive.ubuntu.com/ubuntu/\" + country \"it\"). Requires the token in url; when omitted the host-prefix token collapses to the global mirror."
           }
         }
       }

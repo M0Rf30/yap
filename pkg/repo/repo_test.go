@@ -350,3 +350,91 @@ func TestSetupRepoAppliesToSpecificDistros(t *testing.T) {
 		t.Fatalf("repo should not apply to fedora")
 	}
 }
+
+// TestParseFlagsCountry verifies that the country key is parsed into
+// Repo.Country.
+func TestParseFlagsCountry(t *testing.T) {
+	repos, err := ParseFlags([]string{
+		"name=ubuntu,url=http://{country}.archive.ubuntu.com/ubuntu/,country=IT",
+	})
+	if err != nil {
+		t.Fatalf("ParseFlags returned error: %v", err)
+	}
+
+	if repos[0].Country != "IT" {
+		t.Fatalf("expected country IT, got %q", repos[0].Country)
+	}
+}
+
+// TestResolveCountry verifies {country} token substitution, the empty-country
+// collapse fallback, and rejection of invalid codes or token-less URLs.
+func TestResolveCountry(t *testing.T) {
+	tests := []struct {
+		name    string
+		repo    Repo
+		wantURL string
+		wantErr bool
+	}{
+		{
+			name:    "substitutes and lowercases",
+			repo:    Repo{Name: "u", URL: "http://{country}.archive.ubuntu.com/ubuntu/", Country: "IT"},
+			wantURL: "http://it.archive.ubuntu.com/ubuntu/",
+		},
+		{
+			name:    "empty country collapses token with dot",
+			repo:    Repo{Name: "u", URL: "http://{country}.archive.ubuntu.com/ubuntu/"},
+			wantURL: "http://archive.ubuntu.com/ubuntu/",
+		},
+		{
+			name:    "empty country with non-prefix token rejected",
+			repo:    Repo{Name: "u", URL: "http://mirror.example/{country}/repo/"},
+			wantErr: true,
+		},
+		{
+			name:    "empty country with path-placed dotted token rejected",
+			repo:    Repo{Name: "u", URL: "http://mirror.example/dists/{country}.suite/"},
+			wantErr: true,
+		},
+		{
+			name:    "no token no country is untouched",
+			repo:    Repo{Name: "u", URL: "http://repo.example/"},
+			wantURL: "http://repo.example/",
+		},
+		{
+			name:    "invalid code rejected",
+			repo:    Repo{Name: "u", URL: "http://{country}.example/", Country: "ita"},
+			wantErr: true,
+		},
+		{
+			name:    "non-alpha code rejected",
+			repo:    Repo{Name: "u", URL: "http://{country}.example/", Country: "1t"},
+			wantErr: true,
+		},
+		{
+			name:    "country without token rejected",
+			repo:    Repo{Name: "u", URL: "http://repo.example/", Country: "it"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := resolveCountry(&tt.repo)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.repo.URL != tt.wantURL {
+				t.Fatalf("URL mismatch: got %q want %q", tt.repo.URL, tt.wantURL)
+			}
+		})
+	}
+}

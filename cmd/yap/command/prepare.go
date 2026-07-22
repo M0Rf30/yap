@@ -147,7 +147,7 @@ func init() {
 	prepareCmd.Flags().StringArrayVar(&prepareExtraRepos,
 		"repo", nil,
 		"Extra repository spec (repeatable): name=<n>,url=<u>,suite=<s>,components=<a+b>,"+
-			"keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>")
+			"keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>,country=<cc>")
 
 	// CONTAINER FLAGS
 	prepareCmd.Flags().BoolVar(&noContainer,
