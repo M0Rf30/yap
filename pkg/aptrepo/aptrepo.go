@@ -154,6 +154,8 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 
 	wg.Add(concurrency)
 
+	relCache := newReleaseCache()
+
 	for range concurrency {
 		go func() {
 			defer wg.Done()
@@ -164,7 +166,7 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 					"components", j.src.Components,
 					"arch", j.arch)
 
-				n, err := updateSource(ctx, j.src, j.arch, opts)
+				n, err := updateSource(ctx, j.src, j.arch, opts, relCache)
 				resCh <- result{src: j.src, arch: j.arch, n: n, err: err}
 			}
 		}()
@@ -226,18 +228,74 @@ func IsVerificationError(err error) bool {
 		strings.Contains(msg, ErrNoTrustAnchor.Error())
 }
 
+// releaseCache deduplicates fetchRelease calls within a single Update run.
+// Stock sources.list files commonly split one (url, suite) across several
+// deb lines (e.g. Ubuntu ships main+restricted, universe, and multiverse
+// as separate lines), and multi-arch sources fan out one job per
+// architecture — without dedup every such job would re-download and
+// re-verify the identical InRelease document, multiplying round trips on
+// slow mirrors.
+type releaseCache struct {
+	// fn is fetchRelease in production; tests inject a counter.
+	fn func(ctx context.Context, baseURL, suite, signedBy string, allowUnverified bool) (*Release, error)
+
+	mu sync.Mutex
+	m  map[string]*releaseCacheEntry
+}
+
+type releaseCacheEntry struct {
+	once sync.Once
+	rel  *Release
+	err  error
+}
+
+func newReleaseCache() *releaseCache {
+	return &releaseCache{fn: fetchRelease, m: make(map[string]*releaseCacheEntry)}
+}
+
+// fetch returns the Release for (baseURL, suite, signedBy, allowUnverified),
+// fetching and verifying it exactly once even under concurrent callers.
+// Errors are cached too: a failed mirror fails every duplicate source
+// instead of retrying once per deb line.
+func (c *releaseCache) fetch(
+	ctx context.Context, baseURL, suite, signedBy string, allowUnverified bool,
+) (*Release, error) {
+	key := baseURL + "\x00" + suite + "\x00" + signedBy
+	if allowUnverified {
+		key += "\x00u"
+	}
+
+	c.mu.Lock()
+
+	e, ok := c.m[key]
+	if !ok {
+		e = &releaseCacheEntry{}
+		c.m[key] = e
+	}
+
+	c.mu.Unlock()
+
+	e.once.Do(func() {
+		e.rel, e.err = c.fn(ctx, baseURL, suite, signedBy, allowUnverified)
+	})
+
+	return e.rel, e.err
+}
+
 // updateSource fetches Release and component indexes for a single source+arch.
 //
 // SECURITY: Signature verification is performed by fetchRelease against
 // the trust anchor declared by `Signed-By:` (or the standard apt trust
 // paths when unset). A signature that exists and fails to verify is
 // fatal regardless of AllowUnverifiedRepos.
-func updateSource(ctx context.Context, src *aptcache.SourceEntry, arch string, opts Options) (int, error) {
+func updateSource(
+	ctx context.Context, src *aptcache.SourceEntry, arch string, opts Options, rc *releaseCache,
+) (int, error) {
 	// Fetch + verify InRelease (or fall back to Release+Release.gpg).
 	// verifyInRelease / verifyDetachedRelease are called inside
 	// fetchRelease against the keyring referenced by src.SignedBy (or the
 	// default apt trust paths when SignedBy is unset).
-	rel, err := fetchRelease(ctx, src.URL, src.Suite, src.SignedBy, opts.AllowUnverifiedRepos)
+	rel, err := rc.fetch(ctx, src.URL, src.Suite, src.SignedBy, opts.AllowUnverifiedRepos)
 	if err != nil {
 		return 0, err
 	}

@@ -32,12 +32,12 @@ func EncodeListFilenameForTesting(baseURL, suite, relPath string) string {
 
 // VerifyInReleaseOrFallbackForTesting exposes verifyInReleaseOrFallback for unit tests.
 func VerifyInReleaseOrFallbackForTesting(data []byte, keyring openpgp.EntityList, keyringErr error, allowUnverified bool, baseURL string) ([]byte, error) {
-	return verifyInReleaseOrFallback(data, keyring, keyringErr, allowUnverified, baseURL)
+	return verifyInReleaseOrFallback(data, keyring, keyringErr, allowUnverified, baseURL, "")
 }
 
 // VerifyDetachedOrFallbackForTesting exposes verifyDetachedOrFallback for unit tests.
 func VerifyDetachedOrFallbackForTesting(body, sig []byte, sigErr error, keyring openpgp.EntityList, keyringErr error, allowUnverified bool, baseURL string) ([]byte, error) {
-	return verifyDetachedOrFallback(body, sig, sigErr, keyring, keyringErr, allowUnverified, baseURL)
+	return verifyDetachedOrFallback(body, sig, sigErr, keyring, keyringErr, allowUnverified, baseURL, "")
 }
 
 // DetectHostDebArchForTesting exposes detectHostDebArch for unit tests.

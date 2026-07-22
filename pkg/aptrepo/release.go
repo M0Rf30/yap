@@ -58,7 +58,7 @@ func fetchRelease(
 	releaseURL := strings.TrimRight(baseURL, "/") + "/dists/" + suite + "/InRelease"
 
 	if data, err := httpFetch(ctx, releaseURL); err == nil {
-		body, verr := verifyInReleaseOrFallback(data, keyring, keyringErr, allowUnverified, baseURL)
+		body, verr := verifyInReleaseOrFallback(data, keyring, keyringErr, allowUnverified, baseURL, suite)
 		if verr != nil {
 			return nil, verr
 		}
@@ -78,7 +78,7 @@ func fetchRelease(
 		strings.TrimRight(baseURL, "/")+"/dists/"+suite+"/Release.gpg")
 
 	body, err = verifyDetachedOrFallback(body, sig, sigErr,
-		keyring, keyringErr, allowUnverified, baseURL)
+		keyring, keyringErr, allowUnverified, baseURL, suite)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func verifyInReleaseOrFallback(
 	keyring openpgp.EntityList,
 	keyringErr error,
 	allowUnverified bool,
-	baseURL string,
+	baseURL, suite string,
 ) ([]byte, error) {
 	if len(keyring) == 0 {
 		// No trust anchor available. Either the source asked for one
@@ -110,7 +110,8 @@ func verifyInReleaseOrFallback(
 
 	res, err := verifyInRelease(data, keyring)
 	if err == nil {
-		logger.Info(i18n.T("logger.aptrepo.info.verified_inrelease_signature"), "url", baseURL, "signer", res.signer)
+		logger.Info(i18n.T("logger.aptrepo.info.verified_inrelease_signature"),
+			"url", baseURL, "suite", suite, "signer", res.signer)
 
 		return res.body, nil
 	}
@@ -156,7 +157,7 @@ func verifyDetachedOrFallback(
 	keyring openpgp.EntityList,
 	keyringErr error,
 	allowUnverified bool,
-	baseURL string,
+	baseURL, suite string,
 ) ([]byte, error) {
 	// No Release.gpg at all → defer to the opt-in. Many third-party
 	// "deb http://… ./" one-liners ship this way historically.
@@ -184,7 +185,8 @@ func verifyDetachedOrFallback(
 
 	res, err := verifyDetachedRelease(body, sig, keyring)
 	if err == nil {
-		logger.Info(i18n.T("logger.aptrepo.info.verified_release_gpg_signature"), "url", baseURL, "signer", res.signer)
+		logger.Info(i18n.T("logger.aptrepo.info.verified_release_gpg_signature"),
+			"url", baseURL, "suite", suite, "signer", res.signer)
 
 		return res.body, nil
 	}
