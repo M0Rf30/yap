@@ -28,10 +28,6 @@ func TestNewBuilder(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	builder := NewBuilder(pkgBuild)
 
-	if builder == nil {
-		t.Fatal("NewBuilder returned nil")
-	}
-
 	if builder.BaseBuilder == nil {
 		t.Fatal("BaseBuilder is nil")
 	}

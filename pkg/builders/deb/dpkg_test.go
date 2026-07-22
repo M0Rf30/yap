@@ -41,10 +41,6 @@ func TestNewBuilder(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkg := NewBuilder(pkgBuild, "")
 
-	if pkg == nil {
-		t.Fatal("NewBuilder returned nil")
-	}
-
 	if pkg.PKGBUILD != pkgBuild {
 		t.Error("PKGBUILD not set correctly")
 	}

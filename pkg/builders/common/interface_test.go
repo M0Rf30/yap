@@ -216,10 +216,6 @@ func TestCreateFileWalker(t *testing.T) {
 		builder := NewBaseBuilder(pkg, format)
 		walker := builder.CreateFileWalker()
 
-		if walker == nil {
-			t.Fatalf("Format %s: walker should not be nil", format)
-		}
-
 		if walker.BaseDir != pkg.PackageDir {
 			t.Fatalf("Format %s: expected BaseDir '%s', got '%s'", format, pkg.PackageDir, walker.BaseDir)
 		}
