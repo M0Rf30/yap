@@ -493,7 +493,7 @@
 - id: errors.validation.project_path_empty
   translation: "Project path cannot be empty"
 - id: errors.validation.unresolvable_container_image
-  translation: "No builder image available for this distribution family; pass a release-qualified distro (e.g. ubuntu-jammy) or use --no-container"
+  translation: "No builder image is published for a bare distro family; name a release (<distro>-<release>, e.g. ubuntu-jammy, rocky-9), or use --no-container to build natively"
 - id: errors.validation.unsupported_distribution
   translation: "Unsupported distribution"
 

@@ -59,12 +59,12 @@ var (
 
 			// Dispatch to container when a distro was explicitly requested and
 			// we are not already inside a container. Use --no-container to skip.
-			if len(args) > 0 && !noContainer {
+			if shouldDispatchToContainer(len(args) > 0) {
 				distroTag := args[0]
 
 				image, err := ResolveContainerImage(parseDistroAndRelease(distroTag))
 				if err != nil {
-					logger.Error(err.Error(), "error", err)
+					logger.Error(err.Error())
 
 					return
 				}

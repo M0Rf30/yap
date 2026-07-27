@@ -104,3 +104,32 @@ func TestResolveContainerImage(t *testing.T) {
 		})
 	}
 }
+
+// TestShouldDispatchToContainerInsideContainer locks the ordering invariant a
+// bare-family image resolution must respect: inside a container the build runs
+// natively for whatever distro the user named, so no builder image has to
+// exist. Resolving one first regressed `yap build rocky .` / `yap prepare
+// rocky` inside a container into a hard validation error.
+func TestShouldDispatchToContainerInsideContainer(t *testing.T) {
+	t.Setenv(inContainerEnv, "1")
+
+	if shouldDispatchToContainer(true) {
+		t.Error("shouldDispatchToContainer(true) = true inside a container, want false")
+	}
+}
+
+func TestShouldDispatchToContainerRequiresExplicitDistro(t *testing.T) {
+	if shouldDispatchToContainer(false) {
+		t.Error("shouldDispatchToContainer(false) = true, want false without an explicit distro")
+	}
+}
+
+func TestShouldDispatchToContainerNoContainerFlag(t *testing.T) {
+	t.Cleanup(func() { noContainer = false })
+
+	noContainer = true
+
+	if shouldDispatchToContainer(true) {
+		t.Error("shouldDispatchToContainer(true) = true with --no-container, want false")
+	}
+}

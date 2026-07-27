@@ -495,7 +495,7 @@
 - id: errors.validation.project_path_empty
   translation: "Il percorso del progetto non può essere vuoto"
 - id: errors.validation.unresolvable_container_image
-  translation: "Nessuna immagine di build disponibile per questa famiglia di distribuzioni; specifica una distribuzione con release (es. ubuntu-jammy) oppure usa --no-container"
+  translation: "Nessuna immagine di build è pubblicata per una famiglia di distribuzioni senza release; indica una release (<distro>-<release>, es. ubuntu-jammy, rocky-9) oppure usa --no-container per compilare nativamente"
 - id: errors.validation.unsupported_distribution
   translation: "Distribuzione non supportata"
 

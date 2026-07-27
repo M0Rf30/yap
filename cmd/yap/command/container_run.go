@@ -56,6 +56,16 @@ func IsInsideContainer() bool {
 	return false
 }
 
+// shouldDispatchToContainer reports whether a command should re-invoke itself
+// inside a builder container. It MUST be consulted before resolving a builder
+// image: when yap already runs inside a container the build proceeds natively
+// for whatever distro the user named, and no image needs to exist for it.
+// Resolving an image first would reject a perfectly valid in-container build
+// (e.g. `yap build rocky .` inside a rocky CI container).
+func shouldDispatchToContainer(userProvidedDistro bool) bool {
+	return userProvidedDistro && !noContainer && !IsInsideContainer()
+}
+
 // RunCommandInContainer re-invokes the given yap sub-command inside the
 // given builder image using the configured runtime.
 //

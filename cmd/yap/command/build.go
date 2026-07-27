@@ -108,7 +108,7 @@ var buildCmd = &cobra.Command{
 
 		// Dispatch to container when a distro was explicitly requested and
 		// we are not already inside a container. Use --no-container to skip.
-		if userProvidedDistro && !noContainer {
+		if shouldDispatchToContainer(userProvidedDistro) {
 			distroTag := distro
 			if release != "" {
 				distroTag = distro + "-" + release
