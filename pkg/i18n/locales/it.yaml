@@ -494,6 +494,8 @@
   translation: "File di progetto non trovato"
 - id: errors.validation.project_path_empty
   translation: "Il percorso del progetto non può essere vuoto"
+- id: errors.validation.unresolvable_container_image
+  translation: "Nessuna immagine di build disponibile per questa famiglia di distribuzioni; specifica una distribuzione con release (es. ubuntu-jammy) oppure usa --no-container"
 - id: errors.validation.unsupported_distribution
   translation: "Distribuzione non supportata"
 
@@ -533,7 +535,7 @@
 - id: logger.build.building_packages
   translation: "Compilazione dei pacchetti"
 - id: logger.build.auto_detected_codename
-  translation: "Codename rilevato automaticamente per la risoluzione delle dipendenze"
+  translation: "Immagine di build rilevata automaticamente da os-release dell'host"
 - id: logger.build.no_distribution_specified
   translation: "Nessuna distribuzione specificata, uso il default del sistema"
 - id: logger.build.project_init_failed

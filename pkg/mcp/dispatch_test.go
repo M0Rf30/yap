@@ -51,7 +51,7 @@ func TestBuildCLIArgsFromArgs(t *testing.T) {
 	got := buildCLIArgsFromArgs(args, "ubuntu-noble")
 
 	// Positional preamble.
-	wantHead := []string{"build", "ubuntu-noble", "/project"}
+	wantHead := []string{"build", "ubuntu-noble", containerProjectDir}
 	if !slices.Equal(got[:3], wantHead) {
 		t.Errorf("head = %v, want %v", got[:3], wantHead)
 	}
@@ -81,6 +81,51 @@ func TestBuildCLIArgsFromArgs(t *testing.T) {
 	// Passphrase MUST NOT appear in argv — it travels via env.
 	if slices.Contains(got, "secret") || slices.Contains(got, "--sign-passphrase") {
 		t.Errorf("passphrase leaked into argv: %v", got)
+	}
+}
+
+func TestInnerDistroTag(t *testing.T) {
+	if got := innerDistroTag("ubuntu", ""); got != "ubuntu" {
+		t.Errorf("innerDistroTag(bare) = %q, want %q", got, "ubuntu")
+	}
+
+	if got := innerDistroTag("ubuntu", "jammy"); got != "ubuntu-jammy" {
+		t.Errorf("innerDistroTag(release) = %q, want %q", got, "ubuntu-jammy")
+	}
+}
+
+// TestBuildCLIArgsFromArgsBareFamilyKeepsGenericSuffix guards the container
+// dispatch split: a bare distro family (release == "") MUST still reach the
+// inner yap argv bare, so the deb release suffix stays generic ("1ubuntu")
+// even though the container image tag dispatched into may be
+// release-qualified (e.g. "ubuntu-jammy").
+func TestBuildCLIArgsFromArgsBareFamilyKeepsGenericSuffix(t *testing.T) {
+	args := &buildArgs{}
+
+	distroTag := innerDistroTag("ubuntu", "")
+
+	got := buildCLIArgsFromArgs(args, distroTag)
+
+	wantHead := []string{"build", "ubuntu", containerProjectDir}
+	if !slices.Equal(got[:3], wantHead) {
+		t.Errorf("head = %v, want %v", got[:3], wantHead)
+	}
+}
+
+// TestBuildCLIArgsFromArgsReleaseQualifiedUnchanged pins the existing
+// behavior for release-qualified builds: image and inner argv both carry
+// the qualified tag, so this must not regress with the image/identity
+// split.
+func TestBuildCLIArgsFromArgsReleaseQualifiedUnchanged(t *testing.T) {
+	args := &buildArgs{}
+
+	distroTag := innerDistroTag("ubuntu", "jammy")
+
+	got := buildCLIArgsFromArgs(args, distroTag)
+
+	wantHead := []string{"build", "ubuntu-jammy", containerProjectDir}
+	if !slices.Equal(got[:3], wantHead) {
+		t.Errorf("head = %v, want %v", got[:3], wantHead)
 	}
 }
 

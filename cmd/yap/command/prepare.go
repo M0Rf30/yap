@@ -61,9 +61,17 @@ var (
 			// we are not already inside a container. Use --no-container to skip.
 			if len(args) > 0 && !noContainer {
 				distroTag := args[0]
+
+				image, err := ResolveContainerImage(parseDistroAndRelease(distroTag))
+				if err != nil {
+					logger.Error(err.Error(), "error", err)
+
+					return
+				}
+
 				// YAP_IN_CONTAINER=1 (injected by the runtime) prevents re-dispatch.
 				subArgs := []string{prepareCommand, distroTag}
-				if RunCommandInContainer(distroTag, ".", subArgs) {
+				if RunCommandInContainer(image, ".", subArgs) {
 					return
 				}
 			}

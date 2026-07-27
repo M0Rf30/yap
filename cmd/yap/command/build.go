@@ -114,6 +114,15 @@ var buildCmd = &cobra.Command{
 				distroTag = distro + "-" + release
 			}
 
+			// Resolve the container IMAGE separately from the package identity:
+			// distroTag (kept bare for a bare family) drives the inner yap argv
+			// and therefore the release suffix, while image may be
+			// release-qualified so a real builder image tag gets dispatched into.
+			image, err := ResolveContainerImage(distro, release)
+			if err != nil {
+				return err
+			}
+
 			// Run prepare+build in a single container invocation so makedeps
 			// installed by prepare are available to build. Skip prepare only
 			// when the user explicitly requested -s (skip-sync) or -d (no-makedeps),
@@ -129,9 +138,9 @@ var buildCmd = &cobra.Command{
 
 			// prepare also needs --repo/--target-arch so the makedeps step can
 			// see vendor repositories and the correct toolchain.
-			prepareArgs := forwardedPrepareFlags()
+			prepareArgs := append([]string{prepareCommand, distroTag}, forwardedPrepareFlags()...)
 
-			if RunPipelineInContainer(distroTag, fullJSONPath, buildArgs, prepareArgs, skipPrepare) {
+			if RunPipelineInContainer(image, fullJSONPath, buildArgs, prepareArgs, skipPrepare) {
 				return nil
 			}
 		}

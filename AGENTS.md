@@ -274,7 +274,9 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - Sequential build default; `--parallel` / `-P` opt-in
 - `pkg/color` + `pkg/logger` — zero external UI deps (pterm removed)
 - Structured log tree rendering
-- `/etc/os-release` auto-detection — `ResolveDistroRelease` helper
+- `/etc/os-release` auto-detection — `ResolveDistroRelease` helper: an
+  explicit bare distro family stays generic (`1ubuntu`, never host `1jammy`);
+  `ResolveContainerImage` picks the build image separately, package identity untouched
 
 ### Known limitations
 - `pacman -S` (install): still subprocess due to alpm hook complexity

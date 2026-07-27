@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -231,6 +232,48 @@ func TestGetReleaseWithDistro(t *testing.T) {
 
 	if pkg.PKGBUILD.PkgRel == originalRel {
 		t.Error("Release was not modified")
+	}
+}
+
+// TestBuildPackageNameGenericDistroSuffix locks issue #202/#214: `yap build
+// ubuntu` must produce a generic "1ubuntu" release suffix in the artifact
+// filename regardless of the host/container codename, while an explicit
+// codename still produces a release-qualified suffix.
+func TestBuildPackageNameGenericDistroSuffix(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkgBuild.PkgName = "hello214"
+	pkgBuild.PkgVer = "0.10.1"
+	pkgBuild.PkgRel = "1"
+	pkgBuild.Distro = "ubuntu"
+	pkgBuild.Codename = ""
+
+	pkg := NewBuilder(pkgBuild, "")
+	pkg.FormatRelease(map[string]string{})
+
+	got := pkg.BuildPackageName(constants.ExtDEB)
+
+	want := "hello214_0.10.1-1ubuntu_x86_64.deb"
+	if got != want {
+		t.Errorf("BuildPackageName() = %q, want %q", got, want)
+	}
+}
+
+func TestBuildPackageNameReleaseQualifiedCodename(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkgBuild.PkgName = "hello214"
+	pkgBuild.PkgVer = "0.10.1"
+	pkgBuild.PkgRel = "1"
+	pkgBuild.Distro = "ubuntu"
+	pkgBuild.Codename = "jammy"
+
+	pkg := NewBuilder(pkgBuild, "")
+	pkg.FormatRelease(map[string]string{})
+
+	got := pkg.BuildPackageName(constants.ExtDEB)
+
+	want := "hello214_0.10.1-1jammy_x86_64.deb"
+	if got != want {
+		t.Errorf("BuildPackageName() = %q, want %q", got, want)
 	}
 }
 

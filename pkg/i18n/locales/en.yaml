@@ -492,6 +492,8 @@
   translation: "Project file not found"
 - id: errors.validation.project_path_empty
   translation: "Project path cannot be empty"
+- id: errors.validation.unresolvable_container_image
+  translation: "No builder image available for this distribution family; pass a release-qualified distro (e.g. ubuntu-jammy) or use --no-container"
 - id: errors.validation.unsupported_distribution
   translation: "Unsupported distribution"
 
@@ -531,7 +533,7 @@
 - id: logger.build.building_packages
   translation: "Building packages"
 - id: logger.build.auto_detected_codename
-  translation: "Auto-detected codename for dependency resolution"
+  translation: "Auto-detected builder image from host os-release"
 - id: logger.build.no_distribution_specified
   translation: "No distribution specified, using system default"
 - id: logger.build.project_init_failed

@@ -57,9 +57,10 @@ func IsInsideContainer() bool {
 }
 
 // RunCommandInContainer re-invokes the given yap sub-command inside the
-// appropriate distro container using the configured runtime.
+// given builder image using the configured runtime.
 //
-//   - distro: distribution tag, e.g. "ubuntu-noble"
+//   - image: builder image tag, e.g. "ubuntu-noble" (see ResolveContainerImage;
+//     may be release-qualified even when subArgs carries a bare distro family)
 //   - workDir: host directory to mount as /project (must be absolute)
 //   - subArgs: the yap sub-command + arguments to run inside, e.g.
 //     ["build", "ubuntu-noble", "/workspace/mypkg"]
@@ -67,7 +68,7 @@ func IsInsideContainer() bool {
 // Returns true if the command was dispatched (caller should return immediately),
 // false if the caller should proceed natively (already inside a container, or
 // runtime detection failed non-fatally).
-func RunCommandInContainer(distro, workDir string, subArgs []string) bool {
+func RunCommandInContainer(image, workDir string, subArgs []string) bool {
 	if IsInsideContainer() {
 		return false
 	}
@@ -85,13 +86,13 @@ func RunCommandInContainer(distro, workDir string, subArgs []string) bool {
 	}
 
 	logger.Info(i18n.T("logger.command.info.dispatching_container"), "runtime", string(rt.Type()),
-		"distro", distro,
+		"image", image,
 		"workdir", workDir)
 
 	// The runtime injects YAP_IN_CONTAINER=1 so the inner process doesn't loop.
 	// Note: the container ENTRYPOINT is already "yap", so subArgs must NOT
 	// include the binary name — pass the sub-command and its arguments directly.
-	if err := rt.Run(distro, workDir, subArgs); err != nil {
+	if err := rt.Run(image, workDir, subArgs); err != nil {
 		logger.Error(i18n.T("logger.command.error.container_run_failed"), "error", err)
 		os.Exit(1)
 	}
@@ -103,18 +104,22 @@ func RunCommandInContainer(distro, workDir string, subArgs []string) bool {
 // invocation using a shell chain. This ensures makedeps installed by prepare
 // are available to build without requiring a persistent container.
 //
-//   - distro: distribution tag, e.g. "ubuntu-noble"
+//   - image: builder image tag, e.g. "ubuntu-noble" (see ResolveContainerImage;
+//     may be release-qualified even when buildArgs/prepareArgs carry a bare
+//     distro family)
 //   - workDir: host directory to mount as /project
-//   - buildArgs: arguments for the inner yap build command (distroTag + path
+//   - buildArgs: the full inner `yap build` argv (subcommand, distroTag, path,
 //     plus any forwarded build flags such as --repo, -U, --target-arch)
-//   - prepareArgs: extra flags to forward to the chained `yap prepare` step
-//     (e.g. --repo, --target-arch) so the prepare environment matches the
-//     build — repos added on the build side are not visible to prepare unless
-//     forwarded here
+//   - prepareArgs: the full inner `yap prepare` argv (subcommand, distroTag,
+//     plus any forwarded flags such as --repo, --target-arch) so the prepare
+//     environment matches the build — repos added on the build side are not
+//     visible to prepare unless forwarded here; empty to skip prepare
 //   - skipPrepare: if true, skip the prepare step (user passed -s or -d)
 //
 // Returns true if dispatched, false if caller should proceed natively.
-func RunPipelineInContainer(distro, workDir string, buildArgs, prepareArgs []string, skipPrepare bool) bool {
+func RunPipelineInContainer(
+	image, workDir string, buildArgs, prepareArgs []string, skipPrepare bool,
+) bool {
 	if IsInsideContainer() {
 		return false
 	}
@@ -131,7 +136,7 @@ func RunPipelineInContainer(distro, workDir string, buildArgs, prepareArgs []str
 	}
 
 	logger.Info(i18n.T("logger.command.info.dispatching_pipeline_container"), "runtime", string(rt.Type()),
-		"distro", distro,
+		"image", image,
 		"workdir", workDir,
 		"skip_prepare", skipPrepare)
 
@@ -140,19 +145,12 @@ func RunPipelineInContainer(distro, workDir string, buildArgs, prepareArgs []str
 	// by prepare are available to build.
 	buildCmd := "yap " + shellJoinArgs(buildArgs)
 
-	var shellCmd string
-	if skipPrepare {
-		shellCmd = buildCmd
-	} else {
-		prepareCmd := "yap prepare " + distro
-		if len(prepareArgs) > 0 {
-			prepareCmd += " " + shellJoinArgs(prepareArgs)
-		}
-
-		shellCmd = prepareCmd + " && " + buildCmd
+	shellCmd := buildCmd
+	if !skipPrepare && len(prepareArgs) > 0 {
+		shellCmd = "yap " + shellJoinArgs(prepareArgs) + " && " + buildCmd
 	}
 
-	if err := rt.RunShell(distro, workDir, shellCmd); err != nil {
+	if err := rt.RunShell(image, workDir, shellCmd); err != nil {
 		logger.Error(i18n.T("logger.command.error.container_pipeline_failed"), "error", err)
 		os.Exit(1)
 	}
