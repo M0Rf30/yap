@@ -11,7 +11,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 builder_stage() {
   cat <<'BUILDER'
 # syntax=docker/dockerfile:1
-ARG GO_VERSION=1.26.4
+ARG GO_VERSION=1.26.5
 
 # Build stage
 FROM golang:${GO_VERSION}-alpine AS builder
@@ -79,7 +79,7 @@ FROM ${base_image}
 # Build arguments for runtime stage
 ARG VERSION=dev
 ARG TARGETARCH=amd64
-ARG GO_VERSION=1.26.4
+ARG GO_VERSION=1.26.5
 
 # Metadata labels
 LABEL org.opencontainers.image.title="${title}"
@@ -304,12 +304,13 @@ APK
 # ── Generator ─────────────────────────────────────────────────────────────────
 # Write sections directly to avoid $() stripping trailing newlines.
 generate() {
-  local dir="$1"; shift
+  local dir="$1"
+  shift
   local out="${REPO_ROOT}/build/deploy/${dir}/Dockerfile"
   mkdir -p "${REPO_ROOT}/build/deploy/${dir}"
-  : > "$out"
+  : >"$out"
   for fn in "$@"; do
-    $fn >> "$out"
+    $fn >>"$out"
   done
   echo "  generated build/deploy/${dir}/Dockerfile"
 }
@@ -326,27 +327,65 @@ echo "Generating Dockerfiles..."
 # Ubuntu (apt + ccache + userdel ubuntu)
 for distro in ubuntu-focal ubuntu-jammy ubuntu-noble ubuntu-resolute; do
   case "$distro" in
-    ubuntu-focal)    base="ubuntu:focal";    title="yap-ubuntu-focal";    desc="YAP - Yet Another Packager for Ubuntu 20.04 LTS with Go runtime 📦🐹" ;;
-    ubuntu-jammy)    base="ubuntu:jammy";    title="yap-ubuntu-jammy";    desc="YAP - Yet Another Packager for Ubuntu 22.04 LTS with Go runtime 📦🐹" ;;
-    ubuntu-noble)    base="ubuntu:noble";    title="yap-ubuntu-noble";    desc="YAP - Yet Another Packager for Ubuntu 24.04 LTS with Go runtime 📦🐹" ;;
-    ubuntu-resolute) base="ubuntu:resolute"; title="yap-ubuntu-resolute"; desc="YAP - Yet Another Packager for Ubuntu 25.04 with Go runtime 📦🐹" ;;
+    ubuntu-focal)
+      base="ubuntu:focal"
+      title="yap-ubuntu-focal"
+      desc="YAP - Yet Another Packager for Ubuntu 20.04 LTS with Go runtime 📦🐹"
+      ;;
+    ubuntu-jammy)
+      base="ubuntu:jammy"
+      title="yap-ubuntu-jammy"
+      desc="YAP - Yet Another Packager for Ubuntu 22.04 LTS with Go runtime 📦🐹"
+      ;;
+    ubuntu-noble)
+      base="ubuntu:noble"
+      title="yap-ubuntu-noble"
+      desc="YAP - Yet Another Packager for Ubuntu 24.04 LTS with Go runtime 📦🐹"
+      ;;
+    ubuntu-resolute)
+      base="ubuntu:resolute"
+      title="yap-ubuntu-resolute"
+      desc="YAP - Yet Another Packager for Ubuntu 25.04 with Go runtime 📦🐹"
+      ;;
   esac
   out="${REPO_ROOT}/build/deploy/${distro}/Dockerfile"
   mkdir -p "$(dirname "$out")"
-  { builder_stage; runtime_header "$base" "$title" "$desc"; block_apt "$APT_SUDO"; runtime_footer; } > "$out"
+  {
+    builder_stage
+    runtime_header "$base" "$title" "$desc"
+    block_apt "$APT_SUDO"
+    runtime_footer
+  } >"$out"
   echo "  generated build/deploy/${distro}/Dockerfile"
 done
 
 # Debian (apt, no ccache, no userdel)
 for distro in debian-buster debian-jessie debian-stretch; do
   case "$distro" in
-    debian-buster)  base="debian:buster";  title="yap-debian-buster";  desc="YAP - Yet Another Packager for Debian Buster with Go runtime 📦🐹" ;;
-    debian-jessie)  base="debian:jessie";  title="yap-debian-jessie";  desc="YAP - Yet Another Packager for Debian Jessie with Go runtime 📦🐹" ;;
-    debian-stretch) base="debian:stretch"; title="yap-debian-stretch"; desc="YAP - Yet Another Packager for Debian Stretch with Go runtime 📦🐹" ;;
+    debian-buster)
+      base="debian:buster"
+      title="yap-debian-buster"
+      desc="YAP - Yet Another Packager for Debian Buster with Go runtime 📦🐹"
+      ;;
+    debian-jessie)
+      base="debian:jessie"
+      title="yap-debian-jessie"
+      desc="YAP - Yet Another Packager for Debian Jessie with Go runtime 📦🐹"
+      ;;
+    debian-stretch)
+      base="debian:stretch"
+      title="yap-debian-stretch"
+      desc="YAP - Yet Another Packager for Debian Stretch with Go runtime 📦🐹"
+      ;;
   esac
   out="${REPO_ROOT}/build/deploy/${distro}/Dockerfile"
   mkdir -p "$(dirname "$out")"
-  { builder_stage; runtime_header "$base" "$title" "$desc"; block_apt_debian "$DEB_SUDO"; runtime_footer; } > "$out"
+  {
+    builder_stage
+    runtime_header "$base" "$title" "$desc"
+    block_apt_debian "$DEB_SUDO"
+    runtime_footer
+  } >"$out"
   echo "  generated build/deploy/${distro}/Dockerfile"
 done
 
@@ -355,19 +394,30 @@ _gen_rocky() {
   local distro="$1" base="$2" title="$3" desc="$4" enable_cmd="$5"
   local out="${REPO_ROOT}/build/deploy/${distro}/Dockerfile"
   mkdir -p "$(dirname "$out")"
-  { builder_stage; runtime_header "$base" "$title" "$desc"; block_dnf_rocky "${title#yap-}" "$enable_cmd" "$RPM_SUDO"; runtime_footer; } > "$out"
+  {
+    builder_stage
+    runtime_header "$base" "$title" "$desc"
+    block_dnf_rocky "${title#yap-}" "$enable_cmd" "$RPM_SUDO"
+    runtime_footer
+  } >"$out"
   echo "  generated build/deploy/${distro}/Dockerfile"
 }
-_gen_rocky "rocky-8"  "rockylinux/rockylinux:8"  "yap-rocky-8"  "YAP - Yet Another Packager for Rocky-8 with Go runtime 📦🐹"  "dnf config-manager --enable powertools"
-_gen_rocky "rocky-9"  "rockylinux/rockylinux:9"  "yap-rocky-9"  "YAP - Yet Another Packager for Rocky-9 with Go runtime 📦🐹"  "dnf config-manager --enable crb"
+_gen_rocky "rocky-8" "rockylinux/rockylinux:8" "yap-rocky-8" "YAP - Yet Another Packager for Rocky-8 with Go runtime 📦🐹" "dnf config-manager --enable powertools"
+_gen_rocky "rocky-9" "rockylinux/rockylinux:9" "yap-rocky-9" "YAP - Yet Another Packager for Rocky-9 with Go runtime 📦🐹" "dnf config-manager --enable crb"
 _gen_rocky "rocky-10" "rockylinux/rockylinux:10" "yap-rocky-10" "YAP - Yet Another Packager for Rocky-10 with Go runtime 📦🐹" "dnf config-manager --enable crb"
 
 # Helper for simple single-block distros
 _gen() {
-  local distro="$1" base="$2" title="$3" desc="$4" block_fn="$5"; shift 5
+  local distro="$1" base="$2" title="$3" desc="$4" block_fn="$5"
+  shift 5
   local out="${REPO_ROOT}/build/deploy/${distro}/Dockerfile"
   mkdir -p "$(dirname "$out")"
-  { builder_stage; runtime_header "$base" "$title" "$desc"; "$block_fn" "$@"; runtime_footer; } > "$out"
+  {
+    builder_stage
+    runtime_header "$base" "$title" "$desc"
+    "$block_fn" "$@"
+    runtime_footer
+  } >"$out"
   echo "  generated build/deploy/${distro}/Dockerfile"
 }
 
@@ -379,7 +429,7 @@ _gen "amazon-1" "amazonlinux:1" "yap-amazon-1" "YAP - Yet Another Packager for A
 _gen "amazon-2" "amazonlinux:2" "yap-amazon-2" "YAP - Yet Another Packager for Amazon-2 with Go runtime 📦🐹" block_yum "$RPM_SUDO"
 
 # openSUSE (zypper)
-_gen "opensuse-leap"      "opensuse/leap:latest"       "yap-opensuse-leap"       "YAP - Yet Another Packager for openSUSE Leap with Go runtime 📦🐹"       block_zypper "$ZYPPER_SUDO"
+_gen "opensuse-leap" "opensuse/leap:latest" "yap-opensuse-leap" "YAP - Yet Another Packager for openSUSE Leap with Go runtime 📦🐹" block_zypper "$ZYPPER_SUDO"
 _gen "opensuse-tumbleweed" "opensuse/tumbleweed:latest" "yap-opensuse-tumbleweed" "YAP - Yet Another Packager for openSUSE Tumbleweed with Go runtime 📦🐹" block_zypper "$ZYPPER_SUDO"
 
 # Arch (pacman)
