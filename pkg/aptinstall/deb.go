@@ -167,8 +167,11 @@ func parseDataTar(r io.Reader, name string, contents *debContents) error {
 				WithOperation("parseDataTar")
 		}
 
-		// Skip directories and other non-regular files.
-		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA { //nolint:staticcheck
+		// Record regular files plus the link entries dpkg also lists;
+		// directories and device nodes stay out of <pkg>.list.
+		switch hdr.Typeflag {
+		case tar.TypeReg, tar.TypeRegA, tar.TypeSymlink, tar.TypeLink: //nolint:staticcheck
+		default:
 			continue
 		}
 

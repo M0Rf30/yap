@@ -192,10 +192,12 @@ func extractTarEntry(
 		return extractTarDir(hdr, fullPath, dirMap)
 	case tar.TypeSymlink:
 		return extractTarSymlink(hdr, destDir, fullPath, dirMap)
+	case tar.TypeLink:
+		return extractTarHardlink(hdr, destDir, fullPath, dirMap)
 	case tar.TypeReg, tar.TypeRegA: //nolint:staticcheck
 		return extractTarFile(tr, hdr, fullPath, dirMap, conffileSet)
 	default:
-		// Skip other types (hardlinks, devices, etc.).
+		// Skip other types (devices, fifos, etc.).
 		return nil
 	}
 }
@@ -239,6 +241,72 @@ func extractTarSymlink(hdr *tar.Header, destDir, fullPath string, dirMap map[str
 	}
 
 	return nil
+}
+
+// extractTarHardlink materialises a tar hardlink entry (typeflag '1').
+//
+// Debian packages use hardlinks for multi-call binaries — bzip2 ships
+// ./bin/bunzip2 as the regular file and ./bin/bzip2, ./bin/bzcat as
+// hardlinks to it. Dropping these entries (the previous behaviour) left
+// the package "installed" with its main binary absent.
+//
+// Linkname is a path relative to the archive root, so it is joined with
+// destDir through the same containment check as the entry itself. When
+// os.Link fails (target skipped as an existing conffile, cross-device
+// destDir, filesystem without hardlink support) the target is copied
+// instead: a divergent copy beats a missing file.
+func extractTarHardlink(hdr *tar.Header, destDir, fullPath string, dirMap map[string]bool) error {
+	target, err := safeJoin(destDir, strings.TrimPrefix(hdr.Linkname, "./"))
+	if err != nil {
+		logger.Warn(i18n.T("logger.aptinstall.warn.skipping_path_traversal_attempt"),
+			"path", hdr.Name, "error", err)
+
+		return nil
+	}
+
+	parentDir := filepath.Dir(fullPath)
+	if _, seen := dirMap[parentDir]; !seen {
+		dirMap[parentDir] = true
+		_ = os.MkdirAll(parentDir, 0o755)
+	}
+
+	_ = os.Remove(fullPath)
+
+	if err := os.Link(target, fullPath); err == nil {
+		return nil
+	}
+
+	if err := copyFile(target, fullPath, os.FileMode(hdr.Mode)); err != nil { //nolint:gosec
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "hardlink").
+			WithOperation("extractTarHardlink").
+			WithContext("path", fullPath).
+			WithContext("target", target)
+	}
+
+	return nil
+}
+
+// copyFile duplicates src to dst with the given mode.
+func copyFile(src, dst string, mode os.FileMode) error {
+	in, err := os.Open(src) //nolint:gosec // path validated by safeJoin
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = in.Close() }()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode) //nolint:gosec
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(out, in); err != nil { //nolint:gosec // trusted package payload
+		_ = out.Close()
+
+		return err
+	}
+
+	return out.Close()
 }
 
 // extractTarFile extracts a regular file from a tar entry, respecting conffiles.
