@@ -413,9 +413,65 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 					WithContext("target", hdr.Linkname)
 			}
 		}
+
+	case tar.TypeLink:
+		// Hardlink. APK uses these for multi-call binaries: the g++
+		// package ships usr/bin/c++ as the regular file and usr/bin/g++,
+		// usr/bin/x86_64-alpine-linux-musl-g++ as hardlinks to it.
+		// Dropping them left build-base "installed" without a g++.
+		if err := extractAPKHardlink(hdr, targetPath); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+// extractAPKHardlink materialises a tar hardlink entry (typeflag '1').
+//
+// Linkname is archive-relative and passes through the same containment
+// check as the entry name. When os.Link fails (cross-device, filesystem
+// without hardlink support, target skipped) the target is copied instead:
+// a divergent copy beats a missing binary.
+func extractAPKHardlink(hdr *tar.Header, targetPath string) error {
+	linkSrc, ok := safeAPKPath(hdr.Linkname)
+	if !ok {
+		logger.Warn(i18n.T("logger.apkindex.warn.skipping_unsafe_path_apk"), "path", hdr.Linkname)
+
+		return nil
+	}
+
+	_ = os.Remove(targetPath)
+
+	if err := os.Link(linkSrc, targetPath); err == nil {
+		return nil
+	}
+
+	in, err := os.Open(linkSrc) //nolint:gosec // path validated by safeAPKPath
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open hardlink target").
+			WithOperation("extractAPKHardlink").
+			WithContext("target", linkSrc)
+	}
+
+	defer func() { _ = in.Close() }()
+
+	out, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(hdr.Mode)) //nolint:gosec
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create hardlink copy").
+			WithOperation("extractAPKHardlink").
+			WithContext("path", targetPath)
+	}
+
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to copy hardlink target").
+			WithOperation("extractAPKHardlink").
+			WithContext("path", targetPath)
+	}
+
+	return out.Close()
 }
 
 // registerInstalled writes a package stanza into /lib/apk/db/installed.
