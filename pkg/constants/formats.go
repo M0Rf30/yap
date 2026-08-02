@@ -15,8 +15,27 @@ const (
 )
 
 const (
-	pkgCcache  = "ccache"
 	installArg = "install"
+)
+
+// Package names shared by the per-format build dependency lists. Declared
+// as constants so the same tool is spelled identically everywhere it is
+// guaranteed by the toolchain contract in GetBuildDeps.
+const (
+	pkgAutoconf  = "autoconf"
+	pkgAutomake  = "automake"
+	pkgBzip2     = "bzip2"
+	pkgCcache    = "ccache"
+	pkgDiffutils = "diffutils"
+	pkgFindutils = "findutils"
+	pkgGzip      = CompressionGzip
+	pkgLibtool   = "libtool"
+	pkgM4        = "m4"
+	pkgPatch     = "patch"
+	pkgPerl      = "perl"
+	pkgTar       = "tar"
+	pkgWhich     = "which"
+	pkgXz        = CompressionXz
 )
 
 // Package file extension constants.
@@ -63,36 +82,101 @@ type BuildEnvironmentDeps struct {
 }
 
 // GetBuildDeps returns the build environment dependencies for all package formats.
+//
+// Every format declares the SAME core toolchain contract, spelled with that
+// distro's package names:
+//
+//	C/C++ compiler + linker, make, patch, m4,
+//	autoconf, automake, libtool, pkg-config,
+//	bzip2, xz, gzip, tar,
+//	diffutils, findutils, which, perl, ccache
+//
+// Anything a PKGBUILD needs beyond that belongs in makedepends. Previously
+// each format carried an ad-hoc list, so what a build could rely on depended
+// on which distro's transitive closure happened to drag a tool in: DEB got
+// bzip2/xz only because dpkg-dev depends on them and had no autotools at
+// all, while RPM had autotools but no bzip2/xz. Identical PKGBUILDs
+// succeeded on one distro and failed on the other.
+//
+// fakeroot is deliberately absent: pkg/shell/fakeroot.go implements it
+// in-process via CLONE_NEWUSER and never execs the binary.
 func GetBuildDeps() *BuildEnvironmentDeps {
 	return &BuildEnvironmentDeps{
+		// alpine-sdk pulls build-base (gcc/g++/make/patch/libc-dev) plus
+		// abuild and git.
 		APK: []string{
 			"alpine-sdk",
+			pkgAutoconf,
+			pkgAutomake,
+			pkgBzip2,
 			pkgCcache,
+			pkgDiffutils,
+			pkgFindutils,
+			pkgGzip,
+			pkgLibtool,
+			pkgM4,
+			pkgPerl,
+			"pkgconf",
+			pkgTar,
+			pkgWhich,
+			pkgXz,
 		},
+		// build-essential pulls gcc/g++/make/libc6-dev/dpkg-dev. `which`
+		// lives in debianutils, which is Essential: yes.
 		DEB: []string{
+			pkgAutoconf,
+			pkgAutomake,
 			"build-essential",
+			pkgBzip2,
 			pkgCcache,
-			"fakeroot",
+			pkgDiffutils,
+			pkgFindutils,
+			pkgGzip,
+			pkgLibtool,
+			pkgM4,
+			pkgPatch,
+			pkgPerl,
+			"pkg-config",
+			pkgTar,
+			"xz-utils",
 		},
+		// libtool here is the binary (libtoolize); the previous
+		// libtool-ltdl/libtool-ltdl-devel entries are the libltdl runtime
+		// library and its headers, which ship no executable.
 		RPM: []string{
-			"autoconf",
-			"automake",
+			pkgAutoconf,
+			pkgAutomake,
+			pkgBzip2,
 			pkgCcache,
-			"diffutils",
-			"expect",
+			pkgDiffutils,
+			pkgFindutils,
 			"gcc",
 			"gcc-c++",
-			"libtool-ltdl",
-			"libtool-ltdl-devel",
+			pkgGzip,
+			pkgLibtool,
+			pkgM4,
 			"make",
-			"openssl",
-			"patch",
-			"pkgconf",
-			"which",
+			pkgPatch,
+			pkgPerl,
+			"pkgconf-pkg-config",
+			pkgTar,
+			pkgWhich,
+			pkgXz,
 		},
+		// base-devel is a meta package covering gcc/make/patch/autotools/
+		// pkgconf/m4; the rest are in base but named explicitly so the
+		// contract does not depend on the image's base group.
 		Pacman: []string{
 			"base-devel",
+			pkgBzip2,
 			pkgCcache,
+			pkgDiffutils,
+			pkgFindutils,
+			pkgGzip,
+			pkgPerl,
+			pkgTar,
+			pkgWhich,
+			pkgXz,
 		},
 	}
 }

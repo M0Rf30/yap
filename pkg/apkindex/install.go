@@ -333,60 +333,7 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 
 	switch hdr.Typeflag {
 	case tar.TypeReg:
-		// Regular file. Cap per-file size at 2 GiB.
-		const maxFileSize = 2 << 30
-
-		// Write to a sibling temp file then atomically rename over the
-		// target. This avoids ETXTBSY ("text file busy") when overwriting
-		// a binary that is currently being executed — the kernel allows
-		// unlinking a running binary but rejects truncate/write on it.
-		// Busybox-style images symlink many tools to /bin/busybox, and
-		// /bin/tar (the very tool we shell out to during the install
-		// pipeline elsewhere) is one of them, so this matters in practice.
-		tmpPath := targetPath + ".apk-new"
-
-		f, err := os.Create(tmpPath) //nolint:gosec
-		if err != nil {
-			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary file").
-				WithOperation("extractAPKEntry").
-				WithContext("path", tmpPath)
-		}
-
-		if _, err := io.Copy(f, io.LimitReader(tr, maxFileSize)); err != nil {
-			_ = f.Close()
-			_ = os.Remove(tmpPath)
-
-			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to copy file contents").
-				WithOperation("extractAPKEntry").
-				WithContext("path", tmpPath)
-		}
-
-		if err := f.Close(); err != nil {
-			_ = os.Remove(tmpPath)
-
-			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to close file").
-				WithOperation("extractAPKEntry").
-				WithContext("path", tmpPath)
-		}
-
-		// Preserve permissions before the rename so the file is in its
-		// final state when it becomes visible at targetPath.
-		if err := os.Chmod(tmpPath, os.FileMode(hdr.Mode)); err != nil { //nolint:gosec
-			_ = os.Remove(tmpPath)
-
-			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set file permissions").
-				WithOperation("extractAPKEntry").
-				WithContext("path", tmpPath)
-		}
-
-		if err := os.Rename(tmpPath, targetPath); err != nil {
-			_ = os.Remove(tmpPath)
-
-			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to rename file").
-				WithOperation("extractAPKEntry").
-				WithContext("from", tmpPath).
-				WithContext("to", targetPath)
-		}
+		return extractAPKRegular(tr, hdr, targetPath)
 
 	case tar.TypeDir:
 		// Directory.
@@ -422,6 +369,67 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 		if err := extractAPKHardlink(hdr, targetPath); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// extractAPKRegular writes a regular file entry to targetPath.
+//
+// The payload goes to a sibling temp file that is then atomically renamed
+// over the target. This avoids ETXTBSY ("text file busy") when overwriting
+// a binary that is currently being executed — the kernel allows unlinking
+// a running binary but rejects truncate/write on it. Busybox-style images
+// symlink many tools to /bin/busybox, and /bin/tar (the very tool the
+// install pipeline shells out to elsewhere) is one of them, so this
+// matters in practice.
+func extractAPKRegular(tr *tar.Reader, hdr *tar.Header, targetPath string) error {
+	// Cap per-file size at 2 GiB.
+	const maxFileSize = 2 << 30
+
+	tmpPath := targetPath + ".apk-new"
+
+	f, err := os.Create(tmpPath) //nolint:gosec
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary file").
+			WithOperation("extractAPKRegular").
+			WithContext("path", tmpPath)
+	}
+
+	if _, err := io.Copy(f, io.LimitReader(tr, maxFileSize)); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmpPath)
+
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to copy file contents").
+			WithOperation("extractAPKRegular").
+			WithContext("path", tmpPath)
+	}
+
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to close file").
+			WithOperation("extractAPKRegular").
+			WithContext("path", tmpPath)
+	}
+
+	// Preserve permissions before the rename so the file is in its final
+	// state when it becomes visible at targetPath.
+	if err := os.Chmod(tmpPath, os.FileMode(hdr.Mode)); err != nil { //nolint:gosec
+		_ = os.Remove(tmpPath)
+
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set file permissions").
+			WithOperation("extractAPKRegular").
+			WithContext("path", tmpPath)
+	}
+
+	if err := os.Rename(tmpPath, targetPath); err != nil {
+		_ = os.Remove(tmpPath)
+
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to rename file").
+			WithOperation("extractAPKRegular").
+			WithContext("from", tmpPath).
+			WithContext("to", targetPath)
 	}
 
 	return nil
