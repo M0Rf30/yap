@@ -76,7 +76,7 @@ COPY --from=builder /tmp/yap-completion.bash /usr/share/bash-completion/completi
 # Set up bash completion
 RUN echo "source /usr/share/bash-completion/bash_completion" >> /etc/bash.bashrc
 
-# Switch to non-root user
-USER yap
+# Switch to non-root user (uid 1000 = yap)
+USER 1000
 
 ENTRYPOINT ["yap"]

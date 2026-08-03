@@ -16,13 +16,13 @@ LABEL org.opencontainers.image.source="https://github.com/M0Rf30/yap"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${VERSION}"
 
-# Switch to root to install Go toolchain
-USER root
+# Switch to root (uid 0) to install Go toolchain
+USER 0
 
 # Pre-install Go toolchain via yap prepare -g
 RUN yap prepare ubuntu-jammy --no-container --skip-sync -g
 
-# Switch back to non-root user
-USER yap
+# Switch back to non-root user (uid 1000 = yap)
+USER 1000
 
 ENTRYPOINT ["yap"]
