@@ -17,7 +17,7 @@ require (
 	github.com/klauspost/pgzip v1.2.6
 	github.com/knqyf263/go-rpmdb v0.1.1
 	github.com/m0rf30/ar v1.0.0
-	github.com/modelcontextprotocol/go-sdk v1.6.1
+	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
 	github.com/nwaples/rardecode/v2 v2.3.0
 	github.com/otiai10/copy v1.14.1
@@ -33,7 +33,7 @@ require (
 	golang.org/x/term v0.45.0
 	golang.org/x/text v0.40.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.54.0
+	modernc.org/sqlite v1.55.0
 	mvdan.cc/sh/v3 v3.13.1
 )
 
@@ -92,6 +92,7 @@ require (
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	modernc.org/libc v1.74.3 // indirect
