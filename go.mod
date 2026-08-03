@@ -10,7 +10,7 @@ require (
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.7.0
-	github.com/go-git/go-git/v5 v5.19.1
+	github.com/go-git/go-git/v5 v5.19.2
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/google/go-containerregistry v0.21.7
 	github.com/klauspost/compress v1.19.1
