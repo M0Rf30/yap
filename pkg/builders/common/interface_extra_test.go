@@ -98,6 +98,41 @@ func TestFormatRelease_RPM_UnknownDistro_NoChange(t *testing.T) {
 	}
 }
 
+// Regression test for issue #218: split packages call FormatRelease once per
+// sub-package on shared PKGBUILD state; the RPM suffix must not double up.
+func TestFormatRelease_RPM_Idempotent(t *testing.T) {
+	bb := newBuilder(t, constants.FormatRPM, func(p *pkgbuild.PKGBUILD) {
+		p.PkgRel = "1"
+		p.Codename = "el9"
+		p.Distro = "rocky"
+	})
+
+	suffixMap := map[string]string{"rocky": "."}
+
+	bb.FormatRelease(suffixMap)
+	bb.FormatRelease(suffixMap)
+
+	want := "1.el9"
+	if bb.PKGBUILD.PkgRel != want {
+		t.Errorf("PkgRel = %q after repeated FormatRelease, want %q", bb.PKGBUILD.PkgRel, want)
+	}
+}
+
+func TestFormatRelease_DEB_Idempotent(t *testing.T) {
+	bb := newBuilder(t, constants.FormatDEB, func(p *pkgbuild.PKGBUILD) {
+		p.PkgRel = "1"
+		p.Codename = "jammy"
+	})
+
+	bb.FormatRelease(map[string]string{})
+	bb.FormatRelease(map[string]string{})
+
+	want := "1jammy"
+	if bb.PKGBUILD.PkgRel != want {
+		t.Errorf("PkgRel = %q after repeated FormatRelease, want %q", bb.PKGBUILD.PkgRel, want)
+	}
+}
+
 func TestFormatRelease_APK_NoChange(t *testing.T) {
 	bb := newBuilder(t, constants.FormatAPK, func(p *pkgbuild.PKGBUILD) {
 		p.PkgRel = "1"
