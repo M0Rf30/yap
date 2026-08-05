@@ -1,0 +1,52 @@
+# Example nfpm specfile — see docs/nfpm-support.md for the full field mapping
+# to PKGBUILD. Build directly with `yap build <distro> examples/nfpm`, or
+# convert it to a PKGBUILD with `yap convert examples/nfpm/nfpm.yaml`.
+name: hello-nfpm
+arch: amd64
+platform: linux
+version: 1.2.3
+release: "1"
+maintainer: "Jane Doe <jane@example.com>"
+description: >
+  Tiny example service packaged straight from an nfpm.yaml specfile and built
+  by YAP through the existing deb/rpm/apk/pacman builders.
+homepage: https://github.com/M0Rf30/yap
+license: MIT
+
+depends:
+  - bash
+
+contents:
+  # Plain file (type defaults to "file").
+  - src: files/usr/bin/hello-nfpm
+    dst: /usr/bin/hello-nfpm
+    file_info:
+      mode: 0755
+
+  # Config file the package manager must not clobber on upgrade.
+  - src: files/etc/hello-nfpm/hello-nfpm.conf
+    dst: /etc/hello-nfpm/hello-nfpm.conf
+    type: config|noreplace
+    file_info:
+      mode: 0644
+
+  # Empty directory, no src needed.
+  - dst: /var/log/hello-nfpm
+    type: dir
+    file_info:
+      mode: 0755
+
+  # Symlink: src is the link target (a runtime path), not a file resolved
+  # against the spec directory.
+  - src: /usr/bin/hello-nfpm
+    dst: /usr/local/bin/hello-nfpm
+    type: symlink
+
+scripts:
+  postinstall: scripts/postinstall.sh
+
+overrides:
+  rpm:
+    depends:
+      - bash
+      - coreutils

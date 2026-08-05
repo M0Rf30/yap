@@ -162,6 +162,7 @@ func TestUpdateSubCommandDescriptions(t *testing.T) {
 		commandZap,
 		"completion",
 		commandGensum,
+		commandConvert,
 		"unknown-cmd", // should be left untouched
 	}
 

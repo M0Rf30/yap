@@ -1,0 +1,28 @@
+# Full-featured goreleaser/chglog fixture: two entries exercising notes
+# header/footer, multiple changes, and per-entry Debian distribution/urgency
+# overrides. Used by changelog_test.go.
+name: examplepkg
+entries:
+  - semver: "1.2.3-3"
+    date: 2025-01-15T10:00:00Z
+    packager: "Release Bot <release@example.com>"
+    notes:
+      header: "Highlights"
+      footer: "See https://example.com/changes for details."
+    changes:
+      - commit: abc1234
+        note: "Fix crash on startup"
+        author: "Jane Doe"
+      - commit: def5678
+        note: "Improve startup time"
+        author: "John Roe"
+    deb:
+      urgency: medium
+      distributions:
+        - unstable
+        - experimental
+  - semver: "1.0.0-1"
+    date: 2024-06-01T08:30:00Z
+    changes:
+      - commit: "111aaa"
+        note: "Initial release"

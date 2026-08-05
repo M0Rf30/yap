@@ -85,3 +85,47 @@ func TestReadChangelog_AbsolutePath(t *testing.T) {
 		t.Fatalf("expected %q, got %q", changelogContent, string(data))
 	}
 }
+
+func TestReadChangelog_ChangelogDataPreferred(t *testing.T) {
+	// Create a temporary directory and file so we can prove ChangelogData
+	// wins even when a readable Changelog path also exists.
+	tmpDir := t.TempDir()
+	changelogPath := filepath.Join(tmpDir, "CHANGELOG.md")
+
+	err := os.WriteFile(changelogPath, []byte("native changelog\n"), 0o644)
+	if err != nil {
+		t.Fatalf("failed to create test changelog: %v", err)
+	}
+
+	p := &PKGBUILD{
+		Changelog:     "CHANGELOG.md",
+		StartDir:      tmpDir,
+		ChangelogData: []byte("rendered changelog\n"),
+	}
+
+	data, err := p.ReadChangelog()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if string(data) != "rendered changelog\n" {
+		t.Fatalf("expected ChangelogData to win, got %q", string(data))
+	}
+}
+
+func TestReadChangelog_ChangelogDataWithoutChangelogPath(t *testing.T) {
+	p := &PKGBUILD{
+		Changelog:     "",
+		StartDir:      "/tmp",
+		ChangelogData: []byte("rendered changelog\n"),
+	}
+
+	data, err := p.ReadChangelog()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if string(data) != "rendered changelog\n" {
+		t.Fatalf("expected %q, got %q", "rendered changelog\n", string(data))
+	}
+}

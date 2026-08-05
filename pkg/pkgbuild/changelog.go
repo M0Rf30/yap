@@ -9,9 +9,15 @@ import (
 )
 
 // ReadChangelog returns the changelog file contents, resolved relative to the
-// PKGBUILD directory. Returns empty bytes and nil error if Changelog is empty.
-// Returns wrapped error if the path is set but the file is unreadable.
+// PKGBUILD directory. Returns ChangelogData verbatim when it is non-empty,
+// without touching the Changelog path. Returns empty bytes and nil error if
+// both ChangelogData and Changelog are empty. Returns wrapped error if
+// Changelog is set but the file is unreadable.
 func (pkgBuild *PKGBUILD) ReadChangelog() ([]byte, error) {
+	if len(pkgBuild.ChangelogData) > 0 {
+		return pkgBuild.ChangelogData, nil
+	}
+
 	if pkgBuild.Changelog == "" {
 		return nil, nil
 	}

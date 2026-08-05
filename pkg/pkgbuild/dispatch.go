@@ -50,6 +50,9 @@ var scalarHandlers = map[string]scalarHandler{
 	"priority": {
 		apply: func(p *PKGBUILD, v string) { p.Priority = v },
 	},
+	"group": {
+		apply: func(p *PKGBUILD, v string) { p.Group = v },
+	},
 	"url": {
 		apply: func(p *PKGBUILD, v string) { p.URL = v },
 	},

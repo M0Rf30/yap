@@ -1,0 +1,3 @@
+#!/bin/sh
+# hello-nfpm — the payload binary of the examples/nfpm packaging example.
+echo "hello from a package built from nfpm.yaml"

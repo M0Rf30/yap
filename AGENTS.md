@@ -19,6 +19,7 @@
 | `pkg/graph/` | Build order / dependency resolution |
 | `pkg/source/` | Source download and validation |
 | `pkg/pkgbuild/`, `pkg/parser/` | Extended PKGBUILD format |
+| `pkg/nfpm/` | nfpm.yaml (goreleaser/nfpm-compatible) spec parsing + bidirectional PKGBUILD conversion (`yap convert`, MCP `convert_spec`) |
 | `pkg/aptcache/` | deb822 parser for apt/dpkg metadata |
 | `pkg/aptrepo/` | `apt-get update` + OpenPGP InRelease verification |
 | `pkg/aptinstall/` | `apt-get install` (transitive dep resolution, scriptlets) |
@@ -95,6 +96,7 @@ yap zap [distro] <path>
 yap prepare [distro[-release]]
 yap pull <distro>
 yap install <artifact-file>
+yap convert <spec> [--to pkgbuild|nfpm]
 yap list-distros
 yap status
 yap graph <path>
@@ -277,6 +279,13 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - `/etc/os-release` auto-detection — `ResolveDistroRelease` helper: an
   explicit bare distro family stays generic (`1ubuntu`, never host `1jammy`);
   `ResolveContainerImage` picks the build image separately, package identity untouched
+- nfpm specfile support — `pkg/nfpm` parses `nfpm.yaml`/`nfpm.yml` and converts
+  it to/from PKGBUILD (`yap convert`, MCP `convert_spec`); `yap build` also
+  runs an `nfpm.yaml` directory straight through the existing deb/rpm/apk/
+  pacman builders via `pkg/parser.DetectSpec`. See `docs/nfpm-support.md` for
+  the full field mapping and deliberate gaps. `docs/stone-format-evaluation.md`
+  evaluates (without implementing) equivalent support for AerynOS's `stone`
+  format on the same spec front-end seam.
 
 ### Known limitations
 - `pacman -S` (install): still subprocess due to alpm hook complexity
@@ -286,7 +295,7 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 
 ### MCP surface (`pkg/mcp/`, `cmd/yap-mcp/`)
 
-- Tools (19): `validate`, `parse_pkgbuild`, `graph`, `build` (async + buildID), `build_status`, `build_wait`, `build_summary`, `build_logs` (tail/since/grep), `build_cancel`, `list_artifacts`, `inspect`, `install`, `prepare`, `pull`, `zap`, `list_distros`, `list_images`, `resolve_distro`, `status`.
+- Tools (20): `validate`, `parse_pkgbuild`, `graph`, `build` (async + buildID), `build_status`, `build_wait`, `build_summary`, `build_logs` (tail/since/grep), `build_cancel`, `list_artifacts`, `inspect`, `install`, `convert_spec`, `prepare`, `pull`, `zap`, `list_distros`, `list_images`, `resolve_distro`, `status`.
 - Prompts (2): `build_single_pkg`, `cross_compile`.
 - Resources (1): `yap://distros`.
 - The exact tool/prompt/resource sets are enforced by `pkg/mcp/surface_test.go` (Test{Tool,Prompt,Resource}SurfaceExact). Adding or removing one fails CI until this list, `skills/yap/SKILL.md`, and the test's expected set are all updated together.

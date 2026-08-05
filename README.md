@@ -291,6 +291,22 @@ requires_pre=('shadow-utils')
 maintainer="John Doe <john@example.com>"
 ```
 
+### nfpm specfiles
+
+YAP also builds directly from an [nfpm](https://nfpm.goreleaser.com/)
+`nfpm.yaml` specfile — point `yap build` at a directory containing one
+instead of a `PKGBUILD` and it goes through the same deb/rpm/apk/pacman
+builders, signing, and SBOM pipeline. `yap convert <spec>` converts an
+nfpm.yaml into a PKGBUILD or back, in either direction:
+
+```bash
+yap build examples/nfpm
+yap convert examples/nfpm/nfpm.yaml --to pkgbuild -o PKGBUILD
+```
+
+See [`docs/nfpm-support.md`](docs/nfpm-support.md) for the full field
+mapping, deliberate gaps, and a worked example.
+
 ## Supported distributions
 
 | Distribution ID | Format | Package Manager |
@@ -364,6 +380,7 @@ yap zap [distro] <path>               # Clean build environment
 yap prepare [distro[-release]]        # Prepare host build environment
 yap pull <distro>                     # Pull pre-built container images
 yap install <artifact-file>           # Install a built artifact
+yap convert <spec>                    # Convert PKGBUILD <-> nfpm.yaml
 yap graph [path]                      # Show dependency graph
 yap list-distros                      # List supported distributions
 yap status                            # Show host status and runtime detection

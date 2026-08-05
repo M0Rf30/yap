@@ -262,7 +262,7 @@ linters:
 
       # Allow internal test packages for testing unexported functions
       # Many tests need to test internal implementation details and require package-level access
-      - path: "(cmd/yap/command|pkg/(builders|constants|core|crypto|download|files|git|graph|logger|packer|pkgbuild|platform|project|set|shell))/.*_test\\.go"
+      - path: "(cmd/yap/command|pkg/(builders|constants|core|crypto|download|files|git|graph|logger|nfpm|packer|pkgbuild|platform|project|set|shell))/.*_test\\.go"
         text: "package should be `.*_test` instead of"
         linters:
           - testpackage

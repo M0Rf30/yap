@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -78,7 +79,7 @@ func (m *Pkg) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 		return err
 	}
 
-	if err := m.renderPKGBUILDFile(); err != nil {
+	if err := m.renderSpecChecksum(); err != nil {
 		return err
 	}
 
@@ -112,7 +113,7 @@ func (m *Pkg) computeBuildMetadata(artifactsPath string) error {
 
 	m.PKGBUILD.InstalledSize = installedSize
 
-	sourceDateEpoch, err := files.ResolveSourceDateEpoch(m.PKGBUILD.Home)
+	sourceDateEpoch, err := files.ResolveSourceDateEpoch(m.PKGBUILD.SpecFile)
 	if err != nil {
 		return err
 	}
@@ -127,9 +128,13 @@ func (m *Pkg) computeBuildMetadata(artifactsPath string) error {
 	return nil
 }
 
-// renderPKGBUILDFile renders and writes the PKGBUILD spec, then computes its
-// SHA256 checksum for inclusion in .BUILDINFO.
-func (m *Pkg) renderPKGBUILDFile() error {
+// renderSpecChecksum renders and writes the native PKGBUILD spec (nfpm specs
+// are already synthesized in memory and are never re-rendered here), then
+// computes the SHA256 checksum of whichever specfile is on disk for
+// inclusion in .BUILDINFO: the freshly rendered/native <pacmanDir>/PKGBUILD
+// when present, otherwise the original specfile the PKGBUILD was parsed
+// from (PKGBUILD.SpecFile — a PKGBUILD or an nfpm.yaml).
+func (m *Pkg) renderSpecChecksum() error {
 	tmpl := m.PKGBUILD.RenderSpec(specFile)
 	pkgBuildFile := filepath.Join(m.pacmanDir, "PKGBUILD")
 
@@ -139,7 +144,21 @@ func (m *Pkg) renderPKGBUILDFile() error {
 		}
 	}
 
-	checksumBytes, err := crypto.CalculateSHA256(pkgBuildFile)
+	checksumPath := pkgBuildFile
+
+	switch {
+	case files.Exists(pkgBuildFile):
+	case m.PKGBUILD.SpecFile != "" && files.Exists(m.PKGBUILD.SpecFile):
+		checksumPath = m.PKGBUILD.SpecFile
+	default:
+		return errors.New(errors.ErrTypeFileSystem,
+			fmt.Sprintf(i18n.T("errors.pacman.no_spec_for_checksum"), pkgBuildFile, m.PKGBUILD.SpecFile)).
+			WithOperation("renderSpecChecksum").
+			WithContext("pkgbuildPath", pkgBuildFile).
+			WithContext("specFile", m.PKGBUILD.SpecFile)
+	}
+
+	checksumBytes, err := crypto.CalculateSHA256(checksumPath)
 	if err != nil {
 		return err
 	}

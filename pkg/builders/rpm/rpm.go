@@ -404,13 +404,28 @@ func createRPMFile(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	return file, err
 }
 
-// getGroup updates the section of the RPM struct with the corresponding
-// value from the RPMGroups map.
+// getGroup resolves the RPM package group and stores the result in
+// PKGBUILD.Section (which rpmpack.RPMMetaData.Group is populated from).
+//
+// Precedence:
+//  1. If PKGBUILD.Group is explicitly set, it is used verbatim as the RPM
+//     group, taking priority over any Section-based mapping.
+//  2. Otherwise, PKGBUILD.Section is looked up in RPMGroups and, when a
+//     mapping exists, replaced with the RPM-specific equivalent. A Section
+//     with no entry in RPMGroups is left untouched instead of being blanked.
 //
 // No parameters.
 // No return types.
 func (r *RPM) getGroup() {
-	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
+	if r.PKGBUILD.Group != "" {
+		r.PKGBUILD.Section = r.PKGBUILD.Group
+
+		return
+	}
+
+	if mapped, ok := RPMGroups[r.PKGBUILD.Section]; ok {
+		r.PKGBUILD.Section = mapped
+	}
 }
 
 // extractFileModTimeUint32 retrieves the modification time of a file and converts it to uint32.

@@ -13,7 +13,7 @@ func TestResolveSourceDateEpoch_WithValidEnvVar(t *testing.T) {
 	testEpoch := int64(1609459200) // 2021-01-01 00:00:00 UTC
 	t.Setenv("SOURCE_DATE_EPOCH", strconv.FormatInt(testEpoch, 10))
 
-	result, err := ResolveSourceDateEpoch(t.TempDir())
+	result, err := ResolveSourceDateEpoch(filepath.Join(t.TempDir(), "PKGBUILD"))
 	if err != nil {
 		t.Fatalf("ResolveSourceDateEpoch() returned error: %v", err)
 	}
@@ -28,7 +28,7 @@ func TestResolveSourceDateEpoch_WithInvalidEnvVar(t *testing.T) {
 	// Test with an invalid SOURCE_DATE_EPOCH environment variable
 	t.Setenv("SOURCE_DATE_EPOCH", "not-a-number")
 
-	_, err := ResolveSourceDateEpoch(t.TempDir())
+	_, err := ResolveSourceDateEpoch(filepath.Join(t.TempDir(), "PKGBUILD"))
 	if err == nil {
 		t.Fatal("ResolveSourceDateEpoch() returned nil error, want error for invalid epoch")
 	}
@@ -57,7 +57,7 @@ func TestResolveSourceDateEpoch_WithPKGBUILDFile(t *testing.T) {
 		t.Fatalf("Failed to set PKGBUILD mtime: %v", err)
 	}
 
-	result, err := ResolveSourceDateEpoch(tmpDir)
+	result, err := ResolveSourceDateEpoch(pkgbuildPath)
 	if err != nil {
 		t.Fatalf("ResolveSourceDateEpoch() returned error: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestResolveSourceDateEpoch_NoPKGBUILDFallback(t *testing.T) {
 	// Don't create PKGBUILD file
 
 	beforeCall := time.Now()
-	result, err := ResolveSourceDateEpoch(tmpDir)
+	result, err := ResolveSourceDateEpoch(filepath.Join(tmpDir, "PKGBUILD"))
 	afterCall := time.Now()
 
 	if err != nil {
@@ -127,7 +127,7 @@ func TestResolveSourceDateEpoch_EnvVarTakesPrecedence(t *testing.T) {
 		t.Fatalf("Failed to set PKGBUILD mtime: %v", err)
 	}
 
-	result, err := ResolveSourceDateEpoch(tmpDir)
+	result, err := ResolveSourceDateEpoch(pkgbuildPath)
 	if err != nil {
 		t.Fatalf("ResolveSourceDateEpoch() returned error: %v", err)
 	}
@@ -137,6 +137,61 @@ func TestResolveSourceDateEpoch_EnvVarTakesPrecedence(t *testing.T) {
 	if !result.Equal(expected) {
 		t.Errorf("ResolveSourceDateEpoch() = %v, want %v (env var should take precedence)",
 			result, expected)
+	}
+}
+
+func TestResolveSourceDateEpoch_EmptySpecPathFallback(t *testing.T) {
+	// Test with no env var and an empty specPath - should fallback to time.Now()
+	t.Setenv("SOURCE_DATE_EPOCH", "")
+
+	beforeCall := time.Now()
+	result, err := ResolveSourceDateEpoch("")
+	afterCall := time.Now()
+
+	if err != nil {
+		t.Fatalf("ResolveSourceDateEpoch() returned error: %v", err)
+	}
+
+	if result.Before(beforeCall) || result.After(afterCall.Add(5*time.Second)) {
+		t.Errorf("ResolveSourceDateEpoch() = %v, want time close to now (between %v and %v)",
+			result, beforeCall, afterCall)
+	}
+}
+
+func TestResolveSourceDateEpoch_DirectorySpecPathFallback(t *testing.T) {
+	// A directory passed as specPath must NOT be treated as a regular file:
+	// the old signature took a directory and directories DO have mtimes, so
+	// without the regular-file guard this would silently use the directory's
+	// mtime instead of falling back to time.Now().
+	t.Setenv("SOURCE_DATE_EPOCH", "")
+
+	dir := t.TempDir()
+
+	dirTime := time.Date(2010, 3, 3, 3, 3, 3, 0, time.UTC)
+	if err := os.Chtimes(dir, dirTime, dirTime); err != nil {
+		t.Fatalf("Failed to set dir mtime: %v", err)
+	}
+
+	beforeCall := time.Now()
+	result, err := ResolveSourceDateEpoch(dir)
+	afterCall := time.Now()
+
+	if err != nil {
+		t.Fatalf("ResolveSourceDateEpoch() returned error: %v", err)
+	}
+
+	if result.Equal(dirTime) {
+		t.Error("ResolveSourceDateEpoch() used the directory's mtime instead of falling back to time.Now()")
+	}
+
+	if result.Before(beforeCall) || result.After(afterCall.Add(5*time.Second)) {
+		t.Errorf("ResolveSourceDateEpoch() = %v, want time close to now (between %v and %v)",
+			result, beforeCall, afterCall)
+	}
+
+	envValue := os.Getenv("SOURCE_DATE_EPOCH")
+	if envValue != "" {
+		t.Errorf("SOURCE_DATE_EPOCH should not be exported for a directory specPath, got %q", envValue)
 	}
 }
 

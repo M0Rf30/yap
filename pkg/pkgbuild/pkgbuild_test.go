@@ -1003,6 +1003,12 @@ func TestPKGBUILD_mapVariables_EdgeCases(t *testing.T) {
 	if pb.Priority != "optional" {
 		t.Errorf("Expected Priority 'optional', got '%s'", pb.Priority)
 	}
+
+	pb.mapVariables("group", "Applications/Internet")
+
+	if pb.Group != "Applications/Internet" {
+		t.Errorf("Expected Group 'Applications/Internet', got '%s'", pb.Group)
+	}
 }
 
 func TestPKGBUILD_isValidArchitecture(t *testing.T) {

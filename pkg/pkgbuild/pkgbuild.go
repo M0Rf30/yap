@@ -102,13 +102,17 @@ const (
 // arrays, functions).
 // templating and other rpm/deb descriptors.
 type PKGBUILD struct {
-	Arch            []string
-	ArchComputed    string
-	Backup          []string
-	Build           string
-	BuildArch       string // Build architecture for cross-compilation (where compilation happens)
-	BuildDate       int64
-	Changelog       string `json:"changelog,omitempty"`
+	Arch         []string
+	ArchComputed string
+	Backup       []string
+	Build        string
+	BuildArch    string // Build architecture for cross-compilation (where compilation happens)
+	BuildDate    int64
+	Changelog    string `json:"changelog,omitempty"`
+	// ChangelogData, when non-empty, is used verbatim by ReadChangelog instead of
+	// reading the Changelog path. Set by spec front-ends that render a changelog from a
+	// non-native format (for example nfpm's chglog YAML).
+	ChangelogData   []byte
 	Check           string
 	Checksum        string
 	Codename        string
@@ -138,7 +142,13 @@ type PKGBUILD struct {
 	HashSums        []string
 	HelperFunctions map[string]string
 	Home            string
-	HostArch        string // Host architecture for cross-compilation (where package will run)
+	// SpecFile is the absolute path of the specfile this PKGBUILD was parsed
+	// from — a PKGBUILD for the native dialect, or an nfpm.yaml for an nfpm
+	// spec. Consumers that need the on-disk spec (reproducible-build
+	// timestamps, .BUILDINFO checksums) MUST use this instead of assuming
+	// <StartDir>/PKGBUILD exists.
+	SpecFile string
+	HostArch string // Host architecture for cross-compilation (where package will run)
 	// RepoDir is the git repository root. Walks up from the yap.json directory
 	// to find a .git dir; falls back to the parent of the yap.json directory.
 	RepoDir           string

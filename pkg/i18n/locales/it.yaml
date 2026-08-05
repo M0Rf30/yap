@@ -217,6 +217,60 @@
 - id: errors.gensum.failed
   translation: "Aggiornamento dei checksum fallito"
 
+# Comando convert
+- id: commands.convert.short
+  translation: "Converte tra nfpm.yaml e il dialetto specfile PKGBUILD"
+- id: commands.convert.long
+  translation: |
+    Converte uno specfile tra il dialetto PKGBUILD estesa di YAP e un documento
+    nfpm.yaml, in entrambe le direzioni. Il dialetto di input viene rilevato
+    dal nome del file; l'obiettivo predefinito è l'altro dialetto a meno che
+    non venga specificato --to.
+
+    --packager collassa gli override nfpm su un singolo packager (deb, rpm,
+    apk, archlinux) quando si converte verso PKGBUILD, oppure limita le
+    sezioni specifiche per packager emesse quando si converte verso nfpm.
+
+    --contents-from scorre un albero di directory preparato in voci
+    contents: nfpm quando si converte da PKGBUILD.
+- id: commands.convert.examples
+  translation: |
+    # Converte un nfpm.yaml in un PKGBUILD accanto ad esso
+    yap convert nfpm.yaml
+
+    # Converte un PKGBUILD in nfpm.yaml, stampato su stdout
+    yap convert PKGBUILD -o -
+
+    # Collassa gli override nfpm per un singolo packager
+    yap convert nfpm.yaml --packager deb
+
+    # Sovrascrive un file di output esistente
+    yap convert /percorso/al/progetto --to nfpm -f
+- id: errors.convert.path_not_found
+  translation: "Percorso dello specfile non trovato"
+- id: errors.convert.no_spec_in_dir
+  translation: "Nessun PKGBUILD o specfile nfpm trovato nella directory"
+- id: errors.convert.unrecognized_spec
+  translation: "Specfile non riconosciuto %s: attesi PKGBUILD, nfpm.yaml, nfpm.yml, .nfpm.yaml o .nfpm.yml"
+- id: errors.convert.invalid_target
+  translation: "Valore di --to non valido %q: attesi pkgbuild o nfpm"
+- id: errors.convert.same_dialect
+  translation: "L'input è già %s; niente da convertire"
+- id: errors.convert.output_exists
+  translation: "Il file di output esiste già (usa -f per sovrascrivere): %s"
+- id: errors.convert.load_failed
+  translation: "Caricamento dello specfile nfpm non riuscito"
+- id: errors.convert.packager_failed
+  translation: "Risoluzione degli override del packager non riuscita"
+- id: errors.convert.render_failed
+  translation: "Rendering dello specfile convertito non riuscito"
+- id: errors.convert.parse_failed
+  translation: "Analisi del PKGBUILD non riuscita"
+- id: errors.convert.from_pkgbuild_failed
+  translation: "Conversione del PKGBUILD in specfile nfpm non riuscita"
+- id: errors.convert.write_failed
+  translation: "Scrittura dello specfile convertito non riuscita"
+
 # Flag build
 - id: flags.build.cleanbuild
   translation: "Rimuove la directory sorgente prima della compilazione"
@@ -286,6 +340,18 @@
   translation: "Mostra le dipendenze esterne"
 - id: flags.graph.theme
   translation: "Tema del grafico (modern, dark, light)"
+
+# Flag convert
+- id: flags.convert.contents_from
+  translation: "Scorre un albero di directory preparato in voci contents: nfpm (pkgbuild->nfpm)"
+- id: flags.convert.force
+  translation: "Sovrascrive un file di output esistente"
+- id: flags.convert.output
+  translation: "Percorso di output; \"-\" scrive su stdout"
+- id: flags.convert.packager
+  translation: "Risolve gli override nfpm per un singolo packager (deb, rpm, apk, archlinux)"
+- id: flags.convert.to
+  translation: "Dialetto di destinazione: pkgbuild o nfpm (predefinito: l'altro)"
 
 # Flag globali
 - id: flags.no_color
@@ -388,6 +454,14 @@
   translation: "Distribuzione Linux non supportata"
 - id: errors.packer.unsupported_package_manager
   translation: "Gestore pacchetti non supportato"
+
+# Errori pacman
+- id: errors.pacman.no_spec_for_checksum
+  translation: "Nessun file di specifica trovato per calcolare il checksum di .BUILDINFO: controllati %s e %s"
+
+# Errori parser
+- id: errors.parser.nfpm_unsupported_distro
+  translation: "Nessun packager nfpm disponibile per questa distribuzione"
 
 # Errori PKGBUILD
 - id: errors.pkgbuild.failed_to_set_variable
@@ -1174,6 +1248,10 @@
   translation: "Nessun podman/docker utilizzabile trovato, uso del runner rootless integrato"
 - id: logger.container.warn.container_cli_installed_but
   translation: "CLI del container installata ma non raggiungibile, provo il backend successivo"
+- id: logger.convert.warn.unsupported_field
+  translation: "Campo non supportato ignorato durante la conversione"
+- id: logger.convert.written
+  translation: "Specfile convertito scritto"
 - id: logger.deb.warn.failed_close_changelog_file
   translation: "Chiusura del file changelog non riuscita"
 - id: logger.deb.warn.failed_close_file
@@ -1354,6 +1432,8 @@
   translation: "Sincronizzazione del repository non riuscita"
 - id: logger.parser.warn.failed_close_pkgbuild_file
   translation: "Chiusura del file PKGBUILD non riuscita"
+- id: logger.parser.warn.nfpm_unsupported_field
+  translation: "Il campo della spec nfpm non ha un equivalente PKGBUILD ed è stato scartato"
 - id: logger.pkgbuild.debug.legacy_bdb_host_falling
   translation: "Host BDB legacy, ripiego sul sottoprocesso"
 - id: logger.pkgbuild.info.delegating_package_install_subprocess
@@ -1526,3 +1606,67 @@
   translation: "yap-mcp arrestato"
 - id: logger.yap-mcp.warn.prctl_pr_set_pdeathsig
   translation: "prctl PR_SET_PDEATHSIG non riuscito"
+
+# Conversione nfpm -> PKGBUILD (pkg/nfpm)
+- id: errors.nfpm.convert.unsupported_packager
+  translation: "Il packager non ha un formato equivalente compilabile da PKGBUILD"
+- id: errors.nfpm.convert.resolve_overrides_failed
+  translation: "Risoluzione degli override del packager nfpm non riuscita"
+- id: errors.nfpm.convert.scriptlet_read_failed
+  translation: "Lettura del file scriptlet nfpm non riuscita"
+- id: errors.nfpm.convert.changelog_load_failed
+  translation: "Caricamento del changelog nfpm non riuscito"
+- id: messages.nfpm.convert.dropped_feature
+  translation: "La funzionalità nfpm {{.Feature}} non ha un equivalente PKGBUILD ed è stata scartata"
+- id: messages.nfpm.convert.dropped_version_metadata
+  translation: "version_metadata di nfpm non ha un equivalente nel campo versione di questo target ed è stato scartato"
+- id: messages.nfpm.convert.dropped_content_ghost
+  translation: "La voce contents {{.Destination}} di tipo \"ghost\" non ha un equivalente PKGBUILD ed è stata scartata"
+- id: messages.nfpm.convert.dropped_content_changelog
+  translation: "La voce contents {{.Destination}} di tipo \"debian changelog\" non ha un equivalente PKGBUILD ed è stata scartata"
+- id: messages.nfpm.convert.dropped_content_lang
+  translation: "file_info.lang della voce contents {{.Destination}} non ha un equivalente PKGBUILD ed è stato scartato"
+
+# Conversione PKGBUILD -> nfpm e rendering (pkg/nfpm)
+- id: errors.nfpm.split_package_unsupported
+  translation: "I PKGBUILD split-package (un array pkgname) non hanno un equivalente nfpm"
+- id: errors.nfpm.script_write_failed
+  translation: "Scrittura del file scriptlet nfpm non riuscita"
+- id: errors.nfpm.contents_walk_failed
+  translation: "Scansione dell'albero dei contenuti preparato non riuscita"
+- id: errors.nfpm.render_yaml_failed
+  translation: "Rendering di nfpm.yaml non riuscito"
+- id: errors.nfpm.changelog_write_failed
+  translation: "Scrittura del file changelog nfpm non riuscita"
+- id: messages.nfpm.convert.scripts_not_written
+  translation: "I file scriptlet non sono stati scritti (nessuna directory di output indicata): %s"
+- id: messages.nfpm.convert.changelog_not_written
+  translation: "Il file changelog non è stato scritto (nessuna directory di output indicata): %s"
+- id: messages.nfpm.convert.dropped_prepare
+  translation: "La funzione prepare() del PKGBUILD non ha un equivalente nfpm ed è stata scartata"
+- id: messages.nfpm.convert.dropped_build
+  translation: "La funzione build() del PKGBUILD non ha un equivalente nfpm ed è stata scartata"
+- id: messages.nfpm.convert.dropped_check
+  translation: "La funzione check() del PKGBUILD non ha un equivalente nfpm ed è stata scartata"
+- id: messages.nfpm.convert.dropped_helper_functions
+  translation: "Le funzioni di supporto del PKGBUILD non hanno un equivalente nfpm e sono state scartate: %s"
+- id: messages.nfpm.convert.dropped_sources
+  translation: "Gli array source/checksum del PKGBUILD non hanno un equivalente nfpm e sono stati scartati (nfpm non ha un concetto di sorgente upstream)"
+- id: messages.nfpm.convert.dropped_custom_variables
+  translation: "Le variabili personalizzate del PKGBUILD non hanno un equivalente nfpm e sono state scartate: %s"
+- id: messages.nfpm.convert.dropped_custom_arrays
+  translation: "Gli array personalizzati del PKGBUILD non hanno un equivalente nfpm e sono stati scartati: %s"
+- id: messages.nfpm.convert.dropped_makedepends
+  translation: "I makedepends del PKGBUILD non hanno un equivalente nfpm e sono stati scartati: %s"
+- id: messages.nfpm.convert.dropped_options
+  translation: "Le options del PKGBUILD non hanno un equivalente nfpm e sono state scartate: %s"
+- id: messages.nfpm.convert.dropped_no_extract
+  translation: "Il noextract del PKGBUILD non ha un equivalente nfpm ed è stato scartato: %s"
+- id: messages.nfpm.convert.dropped_enhances
+  translation: "L'enhances del PKGBUILD non ha un equivalente nfpm ed è stato scartato: %s"
+- id: messages.nfpm.convert.dropped_supplements
+  translation: "Il supplements del PKGBUILD non ha un equivalente nfpm ed è stato scartato: %s"
+- id: messages.nfpm.convert.dropped_install
+  translation: "install=%s del PKGBUILD (script .install) non ha un equivalente nfpm ed è stato scartato"
+- id: messages.nfpm.convert.dropped_copyright
+  translation: "Il copyright del PKGBUILD non ha un equivalente nfpm ed è stato scartato"

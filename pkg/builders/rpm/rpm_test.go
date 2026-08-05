@@ -245,6 +245,50 @@ func TestGetGroup(t *testing.T) {
 	t.Logf("Original section: %s, Processed section: %s", originalSection, rpm.PKGBUILD.Section)
 }
 
+// testMappableRPMSection is an RPMGroups key with no PKGBUILD.Group override,
+// used by the getGroup tests below. Kept as a single named constant (referenced
+// twice) rather than two inline literals so goconst doesn't flag the duplication.
+const testMappableRPMSection = "interpreters"
+
+func TestGetGroupExplicitGroupWinsOverSection(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkgBuild.Section = testMappableRPMSection // mappable, but must be ignored once Group is set
+	pkgBuild.Group = "Applications/Internet"
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
+
+	rpm.getGroup()
+
+	if rpm.PKGBUILD.Section != "Applications/Internet" {
+		t.Errorf("Expected explicit Group to win, got Section %q", rpm.PKGBUILD.Section)
+	}
+}
+
+func TestGetGroupMappableSectionWithoutGroup(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkgBuild.Section = testMappableRPMSection
+	pkgBuild.Group = ""
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
+
+	rpm.getGroup()
+
+	if rpm.PKGBUILD.Section != tools {
+		t.Errorf("Expected Section mapped to %q, got %q", tools, rpm.PKGBUILD.Section)
+	}
+}
+
+func TestGetGroupUnmappedSectionWithoutGroupIsPreserved(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkgBuild.Section = "not-a-known-rpm-group"
+	pkgBuild.Group = ""
+	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
+
+	rpm.getGroup()
+
+	if rpm.PKGBUILD.Section != "not-a-known-rpm-group" {
+		t.Errorf("Expected unmapped Section to be preserved, got %q", rpm.PKGBUILD.Section)
+	}
+}
+
 func TestGetRelease(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}

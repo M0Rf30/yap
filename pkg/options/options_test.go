@@ -76,6 +76,101 @@ func TestRemoveEmptyDirs(t *testing.T) {
 				assert.NoError(t, err, "non-empty nested dir should be preserved")
 			},
 		},
+		{
+			name: "Single empty directory is removed without breaking the walk",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				tempDir := t.TempDir()
+				// Regression guard: previously RemoveEmptyDirs called os.Remove
+				// from inside the filepath.WalkDir callback, so WalkDir then
+				// tried to read the directory it had just deleted and the walk
+				// failed with "open <path>: no such file or directory" even for
+				// a single, non-nested empty directory like this one.
+				err := os.MkdirAll(filepath.Join(tempDir, "var", "log", "app"), 0o755)
+				require.NoError(t, err)
+
+				return tempDir
+			},
+			wantErr: false,
+			checkFunc: func(t *testing.T, dir string) {
+				t.Helper()
+
+				_, err := os.Stat(filepath.Join(dir, "var", "log", "app"))
+				assert.True(t, os.IsNotExist(err), "empty directory should have been removed")
+			},
+		},
+		{
+			name: "Deeply nested empty directories are all removed",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				tempDir := t.TempDir()
+				err := os.MkdirAll(filepath.Join(tempDir, "a", "b", "c"), 0o755)
+				require.NoError(t, err)
+
+				return tempDir
+			},
+			wantErr: false,
+			checkFunc: func(t *testing.T, dir string) {
+				t.Helper()
+
+				for _, sub := range []string{"a", filepath.Join("a", "b"), filepath.Join("a", "b", "c")} {
+					_, err := os.Stat(filepath.Join(dir, sub))
+					assert.True(t, os.IsNotExist(err), "%s should have been removed", sub)
+				}
+
+				_, err := os.Stat(dir)
+				assert.NoError(t, err, "package root must survive")
+			},
+		},
+		{
+			name: "Mixed tree keeps the file's ancestors and drops only the empty branch",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				tempDir := t.TempDir()
+				err := os.MkdirAll(filepath.Join(tempDir, "usr", "bin"), 0o755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(tempDir, "usr", "bin", "tool"), []byte("bin"), 0o755)
+				require.NoError(t, err)
+				err = os.MkdirAll(filepath.Join(tempDir, "var", "empty"), 0o755)
+				require.NoError(t, err)
+
+				return tempDir
+			},
+			wantErr: false,
+			checkFunc: func(t *testing.T, dir string) {
+				t.Helper()
+
+				_, err := os.Stat(filepath.Join(dir, "usr", "bin", "tool"))
+				assert.NoError(t, err, "the file and its parent directories must survive")
+
+				// var/empty is empty, so var itself becomes empty once its only
+				// child is removed and must be removed too in the same call.
+				_, err = os.Stat(filepath.Join(dir, "var"))
+				assert.True(t, os.IsNotExist(err), "var should have been removed once var/empty was")
+			},
+		},
+		{
+			name: "Package root itself is never removed even when the whole tree empties out",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				tempDir := t.TempDir()
+				err := os.MkdirAll(filepath.Join(tempDir, "x", "y"), 0o755)
+				require.NoError(t, err)
+
+				return tempDir
+			},
+			wantErr: false,
+			checkFunc: func(t *testing.T, dir string) {
+				t.Helper()
+
+				_, err := os.Stat(dir)
+				require.NoError(t, err, "package root must survive")
+
+				entries, err := os.ReadDir(dir)
+				require.NoError(t, err)
+				assert.Empty(t, entries, "everything under the root should have been removed")
+			},
+		},
 	}
 
 	for _, tt := range tests {

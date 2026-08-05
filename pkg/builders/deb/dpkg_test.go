@@ -424,6 +424,11 @@ func TestCreateConfFilesEmpty(t *testing.T) {
 	}
 }
 
+// TestAddScriptlets locks Debian Policy §6.1: every maintainer script dpkg
+// executes directly must begin with a "#!" interpreter line. preinst and
+// postinst get maintainerScriptShebang prepended since their PKGBUILD bodies
+// carry no interpreter of their own; prerm and postrm already start with
+// "#!/bin/bash" via removeHeader, so they are left as-is.
 func TestAddScriptlets(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkg := NewBuilder(pkgBuild, "")
@@ -442,12 +447,98 @@ func TestAddScriptlets(t *testing.T) {
 		t.Errorf("addScriptlets failed: %v", err)
 	}
 
-	// Check that script files were created
-	scripts := []string{"preinst", "postinst", "prerm", "postrm"}
-	for _, script := range scripts {
+	expected := map[string]string{
+		preinstScript:  maintainerScriptShebang + pkgBuild.PreInst,
+		postinstScript: maintainerScriptShebang + pkgBuild.PostInst,
+		prermScript:    removeHeader + pkgBuild.PreRm,
+		postrmScript:   removeHeader + pkgBuild.PostRm,
+	}
+
+	for script, want := range expected {
 		scriptPath := filepath.Join(tempDir, script)
-		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+
+		info, err := os.Stat(scriptPath)
+		if os.IsNotExist(err) {
 			t.Errorf("Script %s was not created", script)
+
+			continue
+		}
+
+		if info.Mode().Perm() != 0o755 {
+			t.Errorf("Script %s has mode %o, want 0755", script, info.Mode().Perm())
+		}
+
+		content, err := os.ReadFile(scriptPath)
+		if err != nil {
+			t.Errorf("Failed to read %s: %v", script, err)
+
+			continue
+		}
+
+		if string(content) != want {
+			t.Errorf("Script %s content = %q, want %q", script, content, want)
+		}
+
+		firstLine := strings.SplitN(string(content), "\n", 2)[0]
+		if firstLine != "#!/bin/sh" && firstLine != "#!/bin/bash" {
+			t.Errorf("Script %s first line = %q, want an interpreter line", script, firstLine)
+		}
+	}
+}
+
+// TestAddScriptletsShebangIdempotent locks that a PKGBUILD scriptlet body
+// which already declares its own interpreter is preserved byte-for-byte:
+// addScriptlets must not prepend a second "#!" line on top of it.
+func TestAddScriptletsShebangIdempotent(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkgBuild.PreInst = "#!/bin/bash\necho 'custom interpreter'"
+	pkgBuild.PostInst = "#!/bin/bash\necho 'custom interpreter'"
+	pkg := NewBuilder(pkgBuild, "")
+
+	tempDir, err := os.MkdirTemp("", "deb-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	pkg.debDir = tempDir
+
+	err = pkg.addScriptlets()
+	if err != nil {
+		t.Errorf("addScriptlets failed: %v", err)
+	}
+
+	for _, script := range []string{preinstScript, postinstScript} {
+		scriptPath := filepath.Join(tempDir, script)
+
+		info, err := os.Stat(scriptPath)
+		if err != nil {
+			t.Fatalf("Failed to stat %s: %v", script, err)
+		}
+
+		if info.Mode().Perm() != 0o755 {
+			t.Errorf("Script %s has mode %o, want 0755", script, info.Mode().Perm())
+		}
+
+		content, err := os.ReadFile(scriptPath)
+		if err != nil {
+			t.Fatalf("Failed to read %s: %v", script, err)
+		}
+
+		got := string(content)
+
+		firstLine := strings.SplitN(got, "\n", 2)[0]
+		if firstLine != "#!/bin/bash" {
+			t.Errorf("Script %s first line = %q, want %q", script, firstLine, "#!/bin/bash")
+		}
+
+		if got != pkgBuild.PreInst && got != pkgBuild.PostInst {
+			t.Errorf("Script %s content = %q, want body preserved unchanged", script, got)
+		}
+
+		if count := strings.Count(got, "#!"); count != 1 {
+			t.Errorf("Script %s contains %d \"#!\" occurrences, want exactly 1", script, count)
 		}
 	}
 }

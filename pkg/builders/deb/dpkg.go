@@ -198,20 +198,25 @@ func addArFileFromPath(writer *ar.Writer, name string, filePath string, modtime 
 	return err
 }
 
+// preinstScript, postinstScript, prermScript, and postrmScript name the four
+// Debian maintainer script files addScriptlets writes into the control
+// directory.
+const (
+	preinstScript  = "preinst"
+	postinstScript = "postinst"
+	prermScript    = "prerm"
+	postrmScript   = "postrm"
+)
+
 // addScriptlets generates and writes the scripts for the Deb package.
 // It takes no parameters and returns an error if there was an issue
 // generating or writing the scripts.
 func (d *Package) addScriptlets() error {
-	const (
-		prermScript  = "prerm"
-		postrmScript = "postrm"
-	)
-
 	scripts := map[string]string{
-		"preinst":    d.PKGBUILD.PreInst,
-		"postinst":   d.PKGBUILD.PostInst,
-		prermScript:  d.PKGBUILD.PreRm,
-		postrmScript: d.PKGBUILD.PostRm,
+		preinstScript:  d.PKGBUILD.PreInst,
+		postinstScript: d.PKGBUILD.PostInst,
+		prermScript:    d.PKGBUILD.PreRm,
+		postrmScript:   d.PKGBUILD.PostRm,
 	}
 
 	for name, script := range scripts {
@@ -226,7 +231,11 @@ func (d *Package) addScriptlets() error {
 		script = d.PrepareScriptletWithHelpers(script)
 
 		if name == prermScript || name == postrmScript {
+			// removeHeader already begins with its own "#!/bin/bash" line, which
+			// satisfies Debian Policy §6.1, so no further interpreter line is added.
 			script = removeHeader + script
+		} else if !strings.HasPrefix(strings.TrimLeft(script, " \t\r\n"), "#!") {
+			script = maintainerScriptShebang + script
 		}
 
 		path := filepath.Join(d.debDir, name)

@@ -33,6 +33,7 @@ const ServerName = "yap-mcp"
 const (
 	toolNameListDistros = "list_distros"
 	toolNameStatus      = "status"
+	toolNameConvertSpec = "convert_spec"
 )
 
 // serverInstructions is injected into the MCP initialize response and used by
@@ -90,6 +91,7 @@ func NewServer() *mcpsdk.Server {
 	registerBuildPipelineTools(srv)
 	registerBuildExtras(srv)
 	registerArtifactTools(srv)
+	registerConvertSpec(srv)
 	registerPrompts(srv)
 
 	srv.AddReceivingMiddleware(loggingMiddleware("recv"))

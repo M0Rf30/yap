@@ -23,6 +23,7 @@ var wantTools = []string{
 	"build_status",
 	"build_summary",
 	"build_wait",
+	"convert_spec",
 	"graph",
 	"inspect",
 	"install",

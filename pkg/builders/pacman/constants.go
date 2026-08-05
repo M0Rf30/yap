@@ -49,8 +49,7 @@ arch = {{.ArchComputed}}
 {{ end }}
 {{- end }}
 {{- if .Group}}
-{{ range .Group }}group = {{ . }}
-{{ end }}
+group = {{.Group}}
 {{- end }}
 {{- if .Conflicts}}
 {{ range .Conflicts }}conflict = {{ . }}

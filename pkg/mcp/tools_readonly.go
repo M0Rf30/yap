@@ -17,6 +17,12 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
+// pkgbuildFileName is the PKGBUILD filename recognised across yap-mcp's spec
+// detection and path-resolution helpers. Extracted as a constant so goconst
+// doesn't flag its repeated use here and in tools_convert.go (mirrors
+// server.go's toolName* consts).
+const pkgbuildFileName = "PKGBUILD"
+
 func registerReadonlyTools(srv *mcpsdk.Server) {
 	registerResolveDistro(srv)
 	registerParsePkgbuild(srv)
@@ -214,7 +220,7 @@ func resolvePkgbuildDir(path string) (string, error) {
 		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "resolve path")
 	}
 
-	if filepath.Base(abs) == "PKGBUILD" {
+	if filepath.Base(abs) == pkgbuildFileName {
 		return filepath.Dir(abs), nil
 	}
 
@@ -232,7 +238,7 @@ func resolveProjectDir(path string) (string, error) {
 	}
 
 	switch filepath.Base(abs) {
-	case "yap.json", "PKGBUILD":
+	case "yap.json", pkgbuildFileName:
 		return filepath.Dir(abs), nil
 	}
 

@@ -1,0 +1,16 @@
+name: myapp
+entries:
+  - semver: 1.0.1
+    date: 2025-02-01T00:00:00Z
+    packager: "Jane Doe <jane@example.com>"
+    changes:
+      - note: Fix crash on startup
+      - note: Improve logging
+    deb:
+      urgency: medium
+      distributions: ["jammy"]
+  - semver: 1.0.0
+    date: 2025-01-01T00:00:00Z
+    packager: "Jane Doe <jane@example.com>"
+    changes:
+      - note: Initial release

@@ -40,6 +40,7 @@ description: |
 | Inspect a single artifact                | `inspect(artifact)`          |
 | Install an artifact (DESTRUCTIVE)        | `install(artifact, confirm: true)` |
 | Clean a project's build dirs             | `zap(path, confirm: true)`   |
+| Convert nfpm.yaml <-> PKGBUILD           | `convert_spec(specPath, to?, packager?, outputPath?, contentsFrom?)` |
 
 `list_images` and `pull` differ: `list_images` is a read-only inventory of
 tags you can pass as `distro` to `build`. `pull` actually downloads a tag into
@@ -119,9 +120,18 @@ worrying about argv leakage.
 - **Logs are bounded**: `build_status.log` / `build_logs.log` contain at
   most the last 256 KB of container stdout+stderr. Use `tail`, `since`,
   or `grep` on `build_logs` to keep payloads small.
-- **Destructive tools**: `install`, `zap`, and `build` are flagged
-  destructive via tool annotations. `install` and `zap` require an
-  explicit `confirm: true` arg.
+- **Destructive tools**: `install`, `zap`, `build`, and `convert_spec` are
+  flagged destructive via tool annotations. `install` and `zap` require an
+  explicit `confirm: true` arg; `convert_spec` is destructive only when
+  `outputPath` is set (it overwrites that file) — it never touches the
+  source spec.
+- **convert_spec**: detects nfpm.yaml vs PKGBUILD automatically from
+  `specPath` (a file or its directory). Omit `to` to convert to the other
+  dialect; pass `packager` (`deb`/`rpm`/`apk`/`archlinux`) to scope
+  nfpm->pkgbuild output to one packager instead of the full suffixed
+  spec. Omit `outputPath` to get the rendered text back inline; any
+  source features with no equivalent in the target dialect are listed
+  under a "Dropped features" heading in the result.
 - **Signing**: set `sign: true` and yap reads the key from `signKey`
   arg, then env vars (`YAP_DEB_KEY`, `YAP_SIGN_KEY`, …), then yap.json
   `signing.keyPath`, then `~/.config/yap/keys/{format,default}.{rsa,gpg}`.

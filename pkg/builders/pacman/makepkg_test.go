@@ -2,6 +2,8 @@ package pacman
 
 import (
 	"context"
+	"encoding/hex"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/M0Rf30/yap/v2/pkg/crypto"
+	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -288,6 +292,107 @@ func TestPrepareFakerootWithSpecCreation(t *testing.T) {
 	// Check that checksum was calculated
 	if pkg.PKGBUILD.Checksum == "" {
 		t.Error("Checksum was not calculated")
+	}
+}
+
+func TestPrepareFakeroot_NfpmSpecFileChecksum(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkg := NewBuilder(pkgBuild)
+
+	tempDir := t.TempDir()
+
+	// Create directories. StartDir == Home: this mirrors a single-project
+	// nfpm build, where no PKGBUILD is ever rendered to disk.
+	startDir := filepath.Join(tempDir, "start")
+	packageDir := filepath.Join(tempDir, "package")
+
+	if err := os.MkdirAll(startDir, 0o755); err != nil {
+		t.Fatalf("Failed to create start dir: %v", err)
+	}
+
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatalf("Failed to create package dir: %v", err)
+	}
+
+	// No PKGBUILD on disk: this project was parsed from an nfpm.yaml spec.
+	nfpmPath := filepath.Join(startDir, "nfpm.yaml")
+	nfpmContent := "name: test-package\nversion: 1.0.0\n"
+
+	if err := os.WriteFile(nfpmPath, []byte(nfpmContent), 0o644); err != nil {
+		t.Fatalf("Failed to create nfpm.yaml file: %v", err)
+	}
+
+	pkg.PKGBUILD.StartDir = startDir
+	pkg.PKGBUILD.Home = startDir // Same as StartDir: no PKGBUILD is rendered.
+	pkg.PKGBUILD.PackageDir = packageDir
+	pkg.PKGBUILD.SpecFile = nfpmPath
+
+	artifactsDir := filepath.Join(tempDir, "artifacts")
+
+	if err := os.MkdirAll(artifactsDir, 0o755); err != nil {
+		t.Fatalf("Failed to create artifacts dir: %v", err)
+	}
+
+	if err := pkg.PrepareFakeroot(context.Background(), artifactsDir, ""); err != nil {
+		t.Fatalf("PrepareFakeroot failed: %v", err)
+	}
+
+	expectedChecksum, err := crypto.CalculateSHA256(nfpmPath)
+	if err != nil {
+		t.Fatalf("Failed to compute expected checksum: %v", err)
+	}
+
+	wantChecksum := hex.EncodeToString(expectedChecksum)
+	if pkg.PKGBUILD.Checksum != wantChecksum {
+		t.Errorf("Checksum = %q, want %q", pkg.PKGBUILD.Checksum, wantChecksum)
+	}
+}
+
+func TestPrepareFakeroot_NoSpecFileTypedError(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkg := NewBuilder(pkgBuild)
+
+	tempDir := t.TempDir()
+
+	startDir := filepath.Join(tempDir, "start")
+	packageDir := filepath.Join(tempDir, "package")
+
+	if err := os.MkdirAll(startDir, 0o755); err != nil {
+		t.Fatalf("Failed to create start dir: %v", err)
+	}
+
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatalf("Failed to create package dir: %v", err)
+	}
+
+	pkg.PKGBUILD.StartDir = startDir
+	pkg.PKGBUILD.Home = startDir // Same as StartDir: no PKGBUILD is rendered.
+	pkg.PKGBUILD.PackageDir = packageDir
+	// SpecFile points at a spec that was never written to disk.
+	pkg.PKGBUILD.SpecFile = filepath.Join(startDir, "nfpm.yaml")
+
+	artifactsDir := filepath.Join(tempDir, "artifacts")
+
+	if err := os.MkdirAll(artifactsDir, 0o755); err != nil {
+		t.Fatalf("Failed to create artifacts dir: %v", err)
+	}
+
+	err := pkg.PrepareFakeroot(context.Background(), artifactsDir, "")
+	if err == nil {
+		t.Fatal("PrepareFakeroot should fail when neither a rendered PKGBUILD nor SpecFile exist")
+	}
+
+	var yapErr *yaperrors.YapError
+	if !errors.As(err, &yapErr) {
+		t.Fatalf("expected a typed *errors.YapError, got %T: %v", err, err)
+	}
+
+	if yapErr.Type != yaperrors.ErrTypeFileSystem {
+		t.Errorf("YapError.Type = %q, want %q", yapErr.Type, yaperrors.ErrTypeFileSystem)
+	}
+
+	if strings.Contains(err.Error(), "no such file or directory") {
+		t.Errorf("error leaked a bare os error instead of a typed one: %v", err)
 	}
 }
 

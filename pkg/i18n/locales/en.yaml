@@ -215,6 +215,59 @@
 - id: errors.gensum.failed
   translation: "Failed to update checksums"
 
+# Convert command
+- id: commands.convert.short
+  translation: "Convert between nfpm.yaml and PKGBUILD specfile dialects"
+- id: commands.convert.long
+  translation: |
+    Convert a specfile between YAP's extended-PKGBUILD dialect and an nfpm.yaml
+    document, in either direction. The input dialect is detected from the
+    filename; the target defaults to the other dialect unless --to is given.
+
+    --packager collapses nfpm overrides to a single packager (deb, rpm, apk,
+    archlinux) when converting to PKGBUILD, or scopes emitted packager-specific
+    sections when converting to nfpm.
+
+    --contents-from walks a staged directory tree into nfpm contents: entries
+    when converting from PKGBUILD.
+- id: commands.convert.examples
+  translation: |
+    # Convert an nfpm.yaml to a PKGBUILD next to it
+    yap convert nfpm.yaml
+
+    # Convert a PKGBUILD to nfpm.yaml, printed to stdout
+    yap convert PKGBUILD -o -
+
+    # Collapse nfpm overrides for one packager
+    yap convert nfpm.yaml --packager deb
+
+    # Overwrite an existing output file
+    yap convert /path/to/project --to nfpm -f
+- id: errors.convert.path_not_found
+  translation: "Spec path not found"
+- id: errors.convert.no_spec_in_dir
+  translation: "No PKGBUILD or nfpm spec file found in directory"
+- id: errors.convert.unrecognized_spec
+  translation: "Unrecognized spec file %s: expected PKGBUILD, nfpm.yaml, nfpm.yml, .nfpm.yaml, or .nfpm.yml"
+- id: errors.convert.invalid_target
+  translation: "Invalid --to value %q: expected pkgbuild or nfpm"
+- id: errors.convert.same_dialect
+  translation: "Input is already %s; nothing to convert"
+- id: errors.convert.output_exists
+  translation: "Output file already exists (use -f to overwrite): %s"
+- id: errors.convert.load_failed
+  translation: "Failed to load nfpm spec"
+- id: errors.convert.packager_failed
+  translation: "Failed to resolve packager overrides"
+- id: errors.convert.render_failed
+  translation: "Failed to render converted specfile"
+- id: errors.convert.parse_failed
+  translation: "Failed to parse PKGBUILD"
+- id: errors.convert.from_pkgbuild_failed
+  translation: "Failed to convert PKGBUILD to nfpm spec"
+- id: errors.convert.write_failed
+  translation: "Failed to write converted specfile"
+
 # Build flags
 - id: flags.build.cleanbuild
   translation: "Remove source directory before building"
@@ -284,6 +337,18 @@
   translation: "Show external dependencies"
 - id: flags.graph.theme
   translation: "Graph theme (modern, dark, light)"
+
+# Convert flags
+- id: flags.convert.contents_from
+  translation: "Walk a staged directory tree into nfpm contents: entries (pkgbuild->nfpm)"
+- id: flags.convert.force
+  translation: "Overwrite an existing output file"
+- id: flags.convert.output
+  translation: "Output path; \"-\" writes to stdout"
+- id: flags.convert.packager
+  translation: "Resolve nfpm overrides for one packager (deb, rpm, apk, archlinux)"
+- id: flags.convert.to
+  translation: "Target dialect: pkgbuild or nfpm (default: the other one)"
 
 # Global flags
 - id: flags.no_color
@@ -386,6 +451,14 @@
   translation: "Unsupported Linux distribution"
 - id: errors.packer.unsupported_package_manager
   translation: "Unsupported package manager"
+
+# Pacman errors
+- id: errors.pacman.no_spec_for_checksum
+  translation: "No specfile found to compute the .BUILDINFO checksum: checked %s and %s"
+
+# Parser errors
+- id: errors.parser.nfpm_unsupported_distro
+  translation: "No nfpm packager is available for this distribution"
 
 # PKGBUILD errors
 - id: errors.pkgbuild.failed_to_set_variable
@@ -1168,6 +1241,10 @@
   translation: "No usable podman/docker found, using built-in rootless runner"
 - id: logger.container.warn.container_cli_installed_but
   translation: "Container CLI installed but not reachable, trying next backend"
+- id: logger.convert.warn.unsupported_field
+  translation: "Unsupported field dropped during conversion"
+- id: logger.convert.written
+  translation: "Wrote converted specfile"
 - id: logger.deb.warn.failed_close_changelog_file
   translation: "Failed to close changelog file"
 - id: logger.deb.warn.failed_close_file
@@ -1346,6 +1423,8 @@
   translation: "Repo sync failed"
 - id: logger.parser.warn.failed_close_pkgbuild_file
   translation: "Failed to close PKGBUILD file"
+- id: logger.parser.warn.nfpm_unsupported_field
+  translation: "nfpm spec field has no PKGBUILD equivalent and was dropped"
 - id: logger.pkgbuild.debug.legacy_bdb_host_falling
   translation: "Legacy BDB host, falling back to subprocess"
 - id: logger.pkgbuild.info.delegating_package_install_subprocess
@@ -1524,3 +1603,67 @@
   translation: "Resolved signing key"
 - id: logger.common.warn.cross_strip_env_set_failed
   translation: "Cross-strip env: failed to set variable"
+
+# nfpm -> PKGBUILD conversion (pkg/nfpm)
+- id: errors.nfpm.convert.unsupported_packager
+  translation: "Packager has no PKGBUILD-buildable format equivalent"
+- id: errors.nfpm.convert.resolve_overrides_failed
+  translation: "Failed to resolve nfpm packager overrides"
+- id: errors.nfpm.convert.scriptlet_read_failed
+  translation: "Failed to read nfpm scriptlet file"
+- id: errors.nfpm.convert.changelog_load_failed
+  translation: "Failed to load nfpm changelog"
+- id: messages.nfpm.convert.dropped_feature
+  translation: "nfpm feature {{.Feature}} has no PKGBUILD equivalent and was dropped"
+- id: messages.nfpm.convert.dropped_version_metadata
+  translation: "nfpm version_metadata has no equivalent in this target's version field and was dropped"
+- id: messages.nfpm.convert.dropped_content_ghost
+  translation: "nfpm content entry {{.Destination}} of type \"ghost\" has no PKGBUILD equivalent and was dropped"
+- id: messages.nfpm.convert.dropped_content_changelog
+  translation: "nfpm content entry {{.Destination}} of type \"debian changelog\" has no PKGBUILD equivalent and was dropped"
+- id: messages.nfpm.convert.dropped_content_lang
+  translation: "nfpm content entry {{.Destination}} file_info.lang has no PKGBUILD equivalent and was dropped"
+
+# PKGBUILD -> nfpm conversion and rendering (pkg/nfpm)
+- id: errors.nfpm.split_package_unsupported
+  translation: "Split-package PKGBUILDs (a pkgname array) have no nfpm equivalent"
+- id: errors.nfpm.script_write_failed
+  translation: "Failed to write nfpm scriptlet file"
+- id: errors.nfpm.contents_walk_failed
+  translation: "Failed to walk staged content tree"
+- id: errors.nfpm.render_yaml_failed
+  translation: "Failed to render nfpm.yaml"
+- id: errors.nfpm.changelog_write_failed
+  translation: "Failed to write nfpm changelog file"
+- id: messages.nfpm.convert.scripts_not_written
+  translation: "Scriptlet files were not written (no output directory given): %s"
+- id: messages.nfpm.convert.changelog_not_written
+  translation: "Changelog file was not written (no output directory given): %s"
+- id: messages.nfpm.convert.dropped_prepare
+  translation: "PKGBUILD prepare() function has no nfpm equivalent and was dropped"
+- id: messages.nfpm.convert.dropped_build
+  translation: "PKGBUILD build() function has no nfpm equivalent and was dropped"
+- id: messages.nfpm.convert.dropped_check
+  translation: "PKGBUILD check() function has no nfpm equivalent and was dropped"
+- id: messages.nfpm.convert.dropped_helper_functions
+  translation: "PKGBUILD helper functions have no nfpm equivalent and were dropped: %s"
+- id: messages.nfpm.convert.dropped_sources
+  translation: "PKGBUILD source/checksum arrays have no nfpm equivalent and were dropped (nfpm has no upstream source concept)"
+- id: messages.nfpm.convert.dropped_custom_variables
+  translation: "PKGBUILD custom variables have no nfpm equivalent and were dropped: %s"
+- id: messages.nfpm.convert.dropped_custom_arrays
+  translation: "PKGBUILD custom arrays have no nfpm equivalent and were dropped: %s"
+- id: messages.nfpm.convert.dropped_makedepends
+  translation: "PKGBUILD makedepends have no nfpm equivalent and were dropped: %s"
+- id: messages.nfpm.convert.dropped_options
+  translation: "PKGBUILD options have no nfpm equivalent and were dropped: %s"
+- id: messages.nfpm.convert.dropped_no_extract
+  translation: "PKGBUILD noextract has no nfpm equivalent and was dropped: %s"
+- id: messages.nfpm.convert.dropped_enhances
+  translation: "PKGBUILD enhances has no nfpm equivalent and was dropped: %s"
+- id: messages.nfpm.convert.dropped_supplements
+  translation: "PKGBUILD supplements has no nfpm equivalent and was dropped: %s"
+- id: messages.nfpm.convert.dropped_install
+  translation: "PKGBUILD install=%s (.install script) has no nfpm equivalent and was dropped"
+- id: messages.nfpm.convert.dropped_copyright
+  translation: "PKGBUILD copyright has no nfpm equivalent and was dropped"

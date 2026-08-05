@@ -1,0 +1,23 @@
+# Test fixture for parser.ParseFile's nfpm dispatch (parser.DetectSpec /
+# parseNFPM). Deliberately exercises fields covered by the pipeline
+# integration test: identity, dependencies, and a config file that becomes
+# a PKGBUILD Backup entry.
+name: nfpm-single
+version: "1.2.3"
+release: "2"
+arch: all
+platform: linux
+maintainer: "YAP Test Suite <test@example.com>"
+description: "nfpm-single fixture exercising the nfpm-to-PKGBUILD parser path"
+homepage: "https://example.com/nfpm-single"
+license: MIT
+section: utils
+priority: optional
+depends:
+  - bash
+contents:
+  - src: payload/hello.txt
+    dst: /usr/share/nfpm-single/hello.txt
+  - src: payload/nfpm-single.conf
+    dst: /etc/nfpm-single/nfpm-single.conf
+    type: config|noreplace

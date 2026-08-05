@@ -65,6 +65,14 @@ Bugs: {{.Bugs}}
 Description: {{multiline .PkgDesc}}
 `
 
+// maintainerScriptShebang is the interpreter line prepended to preinst and
+// postinst maintainer scripts that do not already declare one. Debian
+// Policy §6.1 requires every maintainer script to begin with a "#!"
+// interpreter line, since dpkg execve()s these files directly rather than
+// sourcing them. prerm and postrm already gain an interpreter line via
+// removeHeader below, so they are left untouched.
+const maintainerScriptShebang = "#!/bin/sh\n"
+
 const removeHeader = `#!/bin/bash
 case $1 in
     purge|remove|abort-install) ;;

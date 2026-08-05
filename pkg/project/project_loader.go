@@ -16,6 +16,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/nfpm"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/repo"
@@ -29,7 +30,6 @@ import (
 // JSON data is invalid.
 func (mpc *MultipleProject) readProject(path string) error {
 	jsonFilePath := filepath.Join(path, "yap.json")
-	pkgbuildFilePath := filepath.Join(path, "PKGBUILD")
 
 	var projectFilePath string
 
@@ -38,8 +38,8 @@ func (mpc *MultipleProject) readProject(path string) error {
 		logger.Debug(i18n.T("logger.multi_project_file_found"), "path", projectFilePath)
 	}
 
-	if files.Exists(pkgbuildFilePath) {
-		projectFilePath = pkgbuildFilePath
+	if _, specPath, found := parser.DetectSpec(path); found {
+		projectFilePath = specPath
 		logger.Debug(i18n.T("logger.single_project_file_found"), "path", projectFilePath)
 
 		mpc.setSingleProject(path)
@@ -274,8 +274,14 @@ func shouldSkipFile(info os.FileInfo, src, dest string) (bool, error) {
 		}
 	}
 
-	// Skip temporary and build artifacts
+	// Skip temporary and build artifacts. Recognised nfpm spec filenames are
+	// exempt: dotfile aliases like .nfpm.yaml must still be copied alongside
+	// their payload files, exactly like PKGBUILD.
 	basename := filepath.Base(src)
+	if nfpm.IsSpecFile(src) {
+		return false, nil
+	}
+
 	if strings.HasPrefix(basename, ".") || strings.HasSuffix(basename, ".tmp") ||
 		strings.HasSuffix(basename, "~") || basename == "Thumbs.db" || basename == ".DS_Store" {
 		return true, nil

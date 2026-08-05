@@ -9,6 +9,7 @@ const (
 // Other command names
 const (
 	commandYap         = "yap"
+	commandConvert     = "convert"
 	commandEnvironment = "environment"
 	commandUtility     = "utility"
 	commandInstall     = "install"

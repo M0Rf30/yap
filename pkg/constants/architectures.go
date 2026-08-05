@@ -99,6 +99,18 @@ const (
 	ArchMips = "mips"
 	// ArchMipsle is 32-bit little-endian MIPS.
 	ArchMipsle = "mipsle"
+	// ArchNfpm386 is the goreleaser/nfpm alias for i686.
+	ArchNfpm386 = "386"
+	// ArchNfpmArmv7 is the goreleaser/nfpm alias for armv7.
+	ArchNfpmArmv7 = "arm7"
+	// ArchNfpmArmv6 is the goreleaser/nfpm alias for armv6.
+	ArchNfpmArmv6 = "arm6"
+	// ArchNfpmAmd64 is the goreleaser/nfpm alias for x86_64.
+	ArchNfpmAmd64 = "amd64"
+	// ArchNfpmArm64 is the goreleaser/nfpm alias for aarch64.
+	ArchNfpmArm64 = "arm64"
+	// ArchNfpmAll is the goreleaser/nfpm alias for "any" (architecture-independent).
+	ArchNfpmAll = "all"
 )
 
 // Cross-compilation toolchain triplet constants.
@@ -250,6 +262,11 @@ func NormalizeArchitecture(arch string) string {
 
 		// riscv64 aliases
 		ArchRiscv64gc: ArchRiscv64,
+
+		// goreleaser/nfpm aliases
+		ArchNfpm386:   ArchI686,
+		ArchNfpmArmv7: ArchArmv7,
+		ArchNfpmArmv6: ArchArmv6,
 	}
 
 	// Check if it's an alias

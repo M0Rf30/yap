@@ -123,6 +123,9 @@ func InitializeLocalizedDescriptions() {
 	// Update gensum command descriptions
 	InitializeGensumDescriptions()
 
+	// Update convert command descriptions
+	InitializeConvertDescriptions()
+
 	// Update other command descriptions
 	updateOtherCommandDescriptions()
 }
@@ -168,6 +171,8 @@ func updateSubCommandDescriptions(cmd *cobra.Command) {
 			subCmd.Example = i18n.T("commands.completion.examples")
 		case commandGensum:
 			subCmd.Short = i18n.T("commands.gensum.short")
+		case commandConvert:
+			subCmd.Short = i18n.T("commands.convert.short")
 		}
 	}
 }

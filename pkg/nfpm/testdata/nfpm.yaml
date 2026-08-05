@@ -1,0 +1,202 @@
+# Full-featured fixture exercising every top-level nfpm.yaml key, every
+# per-packager sub-block, every content type constant, and per-packager
+# overrides. Used by nfpm_test.go / load_test.go / contents_test.go.
+name: examplepkg
+arch: amd64
+platform: linux
+version: 1.2.3-beta.1+deadbeef
+version_schema: semver
+epoch: "2"
+release: "3"
+prerelease: rc9
+version_metadata: override123
+section: utils
+priority: extra
+maintainer: "Test Maintainer <test@example.com>"
+description: "An example package exercising every nfpm.yaml field."
+vendor: "Example Vendor"
+homepage: "https://example.com"
+license: MIT
+changelog: changelog.yaml
+disable_globbing: false
+umask: 0o022
+mtime: 2025-01-15T10:00:00Z
+
+replaces:
+  - oldpkg
+provides:
+  - exampleprovides
+depends:
+  - libc
+recommends:
+  - niceext
+suggests:
+  - extra-docs
+conflicts:
+  - badpkg
+
+scripts:
+  preinstall: "echo preinstall"
+  postinstall: "echo postinstall"
+  preremove: "echo preremove"
+  postremove: "echo postremove"
+
+rpm:
+  buildhost: build.example.com
+  scripts:
+    pretrans: "echo pretrans"
+    posttrans: "echo posttrans"
+    verify: "echo verify"
+  requires:
+    post:
+      - postreq
+  group: Applications/Tools
+  summary: Example RPM summary
+  compression: zstd
+  signature:
+    key_file: keys/rpm.key
+    key_id: RPMKEYID
+  packager: "RPM Packager <rpm@example.com>"
+  prefixes:
+    - /opt/example
+  ghost_files:
+    - /var/log/example-extra.log
+
+deb:
+  arch_variant: v7
+  scripts:
+    rules: debian/rules
+    templates: debian/templates
+    config: debian/config
+  triggers:
+    interest:
+      - /usr/share/example
+    interest_await:
+      - /usr/share/example-await
+    interest_noawait:
+      - /usr/share/example-noawait
+    activate:
+      - /usr/share/example-activate
+    activate_await:
+      - /usr/share/example-activate-await
+    activate_noawait:
+      - /usr/share/example-activate-noawait
+  breaks:
+    - oldexample
+  signature:
+    key_file: keys/deb.key
+    key_id: DEBKEYID
+    method: debsign
+    type: origin
+    signer: "Deb Signer <deb@example.com>"
+  compression: xz
+  fields:
+    Bugs: "https://example.com/bugs"
+    Multi-Arch: same
+  predepends:
+    - predepexample
+
+apk:
+  signature:
+    key_file: keys/apk.rsa
+    key_id: APKKEYID
+    key_name: apk-signing-key
+  scripts:
+    preupgrade: "echo apk-preupgrade"
+    postupgrade: "echo apk-postupgrade"
+
+archlinux:
+  pkgbase: examplepkg-base
+  packager: "Arch Packager <arch@example.com>"
+  scripts:
+    preupgrade: "echo arch-preupgrade"
+    postupgrade: "echo arch-postupgrade"
+
+ipk:
+  abi_version: "1.0"
+  alternatives:
+    - priority: 100
+      target: /usr/bin/example
+      link_name: /usr/bin/example-alt
+  auto_installed: true
+  essential: false
+  fields:
+    CustomField: customvalue
+  predepends:
+    - ipkpredep
+  tags:
+    - utility
+
+contents:
+  - src: files/bin/example
+    dst: /usr/bin/example
+    type: file
+  - src: files/bin/example2
+    dst: /usr/local/bin/example2
+  - src: files/etc/example.conf
+    dst: /etc/example/example.conf
+    type: config
+  - src: files/etc/noreplace.conf
+    dst: /etc/example/noreplace.conf
+    type: config|noreplace
+  - src: files/etc/missingok.conf
+    dst: /etc/example/missingok.conf
+    type: config|missingok
+  - dst: /var/lib/example
+    type: dir
+  - dst: /var/lib/example/state
+    type: implicit dir
+  - src: files/tree
+    dst: /usr/share/example
+    type: tree
+  - src: files/configtree
+    dst: /etc/example/configtree
+    type: config|tree
+  - src: files/noreplacetree
+    dst: /etc/example/noreplacetree
+    type: config|noreplace|tree
+  - src: files/missingoktree
+    dst: /etc/example/missingoktree
+    type: config|missingok|tree
+  - src: /usr/bin/example
+    dst: /usr/bin/example-link
+    type: symlink
+  - dst: /var/log/example.log
+    type: ghost
+  - src: files/doc/README
+    dst: /usr/share/doc/example/README
+    type: doc
+  - src: files/doc/LICENCE
+    dst: /usr/share/doc/example/LICENCE
+    type: licence
+  - src: files/doc/LICENSE
+    dst: /usr/share/doc/example/LICENSE
+    type: license
+  - src: files/doc/README2
+    dst: /usr/share/doc/example/README2
+    type: readme
+  - src: files/changelog/changelog.Debian
+    dst: /usr/share/doc/example/changelog.Debian.gz
+    type: debian changelog
+  - src: files/bin/example
+    dst: /usr/bin/example-rpm-only
+    type: file
+    packager: rpm
+
+overrides:
+  deb:
+    depends:
+      - libdeb-only
+    scripts:
+      postinstall: "echo deb postinstall override"
+    deb:
+      compression: gzip
+  rpm:
+    depends:
+      - librpm-only
+    rpm:
+      group: System/Libraries
+    contents:
+      - src: files/bin/example
+        dst: /usr/bin/example-rpm-override
+        type: file
