@@ -245,9 +245,11 @@ func (bb *BaseBuilder) LogPackageCreated(artifactPath string) {
 
 // FormatRelease formats the package release string with distribution-specific suffixes.
 // For DEB packages: always appends a distro suffix (codename or distro name) for proper
-// repository targeting. The suffix is guarded against double-append for split packages.
-// For RPM packages: appends RPM distro suffix and codename (only when codename is set)
-// For other formats: returns release unchanged
+// repository targeting.
+// For RPM packages: appends RPM distro suffix and codename (only when codename is set).
+// For other formats: returns release unchanged.
+// All appends are guarded against double-append so the method stays idempotent when
+// called once per sub-package of a split PKGBUILD sharing the same state (issue #218).
 func (bb *BaseBuilder) FormatRelease(distroSuffixMap map[string]string) {
 	switch bb.Format {
 	case formatDeb:
@@ -270,7 +272,11 @@ func (bb *BaseBuilder) FormatRelease(distroSuffixMap map[string]string) {
 		}
 
 		if suffix, exists := distroSuffixMap[bb.PKGBUILD.Distro]; exists {
-			bb.PKGBUILD.PkgRel += suffix + bb.PKGBUILD.Codename
+			full := suffix + bb.PKGBUILD.Codename
+			// Guard against double-append when called multiple times for split packages
+			if !strings.HasSuffix(bb.PKGBUILD.PkgRel, full) {
+				bb.PKGBUILD.PkgRel += full
+			}
 		}
 	}
 }
