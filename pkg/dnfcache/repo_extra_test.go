@@ -89,7 +89,7 @@ func TestParsePrimaryXMLMalformed(t *testing.T) {
 	c := newCache()
 	r := strings.NewReader(malformed)
 
-	err := c.parsePrimaryXML(r, "http://mirror.example.com/")
+	err := c.parsePrimaryXML(r, "http://mirror.example.com/", "")
 	assert.Error(t, err, "parsePrimaryXML should return error for malformed XML")
 }
 
@@ -98,7 +98,7 @@ func TestParsePrimaryXMLEmpty(t *testing.T) {
 	c := newCache()
 	r := strings.NewReader("")
 
-	err := c.parsePrimaryXML(r, "http://mirror.example.com/")
+	err := c.parsePrimaryXML(r, "http://mirror.example.com/", "")
 	assert.NoError(t, err)
 
 	_, ok := c.Lookup("anything")
@@ -109,7 +109,7 @@ func TestParsePrimaryXMLEmpty(t *testing.T) {
 func TestParsePrimaryXMLEOFReader(t *testing.T) {
 	c := newCache()
 
-	err := c.parsePrimaryXML(io.LimitReader(strings.NewReader(""), 0), "http://mirror.example.com/")
+	err := c.parsePrimaryXML(io.LimitReader(strings.NewReader(""), 0), "http://mirror.example.com/", "")
 	assert.NoError(t, err)
 }
 
@@ -214,7 +214,7 @@ func TestParsePrimaryXMLFilePathRequires(t *testing.T) {
 </metadata>`
 
 	c := newCache()
-	require.NoError(t, c.parsePrimaryXML(strings.NewReader(primary), "http://mirror/"))
+	require.NoError(t, c.parsePrimaryXML(strings.NewReader(primary), "http://mirror/", ""))
 
 	// autoconf must keep /usr/bin/perl as a require (not stripped).
 	autoconf, ok := c.Lookup("autoconf")

@@ -831,7 +831,7 @@ func (c *Cache) loadFromDisk() {
 			defer wg.Done()
 
 			for j := range jobCh {
-				if err := c.parsePrimaryFile(j.path, j.burl); err != nil {
+				if err := c.parsePrimaryFile(j.path, j.burl, j.mirrorList); err != nil {
 					logger.Warn(i18n.T("logger.dnfcache.warn.failed_parse_primary_index"), "file", j.path,
 						"error", err)
 				}
@@ -848,10 +848,13 @@ func (c *Cache) loadFromDisk() {
 	c.mu.RUnlock()
 }
 
-// primaryFileJob holds a primary.xml file path and its repo base URL.
+// primaryFileJob holds a primary.xml file path, its repo base URL, and the
+// mirrorlist URL used as a download fallback when the base URL is a lagging
+// mirror.
 type primaryFileJob struct {
-	path string
-	burl string
+	path       string
+	burl       string
+	mirrorList string // expanded mirrorlist/metalink URL; "" when none configured
 }
 
 // collectPrimaryFiles scans /etc/yum.repos.d and /var/cache/dnf to build
@@ -900,9 +903,15 @@ func collectPrimaryFiles() []primaryFileJob {
 				continue
 			}
 
+			ml := ""
+			if repo.MirrorList != "" {
+				ml = expandRepoVars(repo.MirrorList)
+			}
+
 			jobs = append(jobs, primaryFileJob{
-				path: filepath.Join(repoCache, e.Name()),
-				burl: burl,
+				path:       filepath.Join(repoCache, e.Name()),
+				burl:       burl,
+				mirrorList: ml,
 			})
 		}
 	}
@@ -948,18 +957,18 @@ func isPrimaryIndex(name string) bool {
 }
 
 // parsePrimaryFile opens and parses a primary.xml file (possibly compressed).
-func (c *Cache) parsePrimaryFile(path, baseURL string) error {
+func (c *Cache) parsePrimaryFile(path, baseURL, mirrorList string) error {
 	r, closeFn, err := openCompressed(path)
 	if err != nil {
 		return err
 	}
 	defer closeFn()
 
-	return c.parsePrimaryXML(r, baseURL)
+	return c.parsePrimaryXML(r, baseURL, mirrorList)
 }
 
 // parsePrimaryXML decodes primary.xml from r and merges packages into the cache.
-func (c *Cache) parsePrimaryXML(r io.Reader, baseURL string) error {
+func (c *Cache) parsePrimaryXML(r io.Reader, baseURL, mirrorList string) error {
 	decoder := xml.NewDecoder(r)
 
 	c.mu.Lock()
@@ -985,7 +994,7 @@ func (c *Cache) parsePrimaryXML(r io.Reader, baseURL string) error {
 			continue
 		}
 
-		if info := buildPackageInfo(&pkg, baseURL); info != nil {
+		if info := buildPackageInfo(&pkg, baseURL, mirrorList); info != nil {
 			c.addPackage(info)
 		}
 	}
@@ -995,7 +1004,7 @@ func (c *Cache) parsePrimaryXML(r io.Reader, baseURL string) error {
 
 // buildPackageInfo converts a parsed primaryPackage into a PackageInfo.
 // Returns nil if the package should be skipped (e.g. source RPMs, empty name).
-func buildPackageInfo(pkg *primaryPackage, baseURL string) *PackageInfo {
+func buildPackageInfo(pkg *primaryPackage, baseURL, mirrorList string) *PackageInfo {
 	if pkg.Name == "" || pkg.Arch == "" || pkg.Arch == "src" {
 		return nil
 	}
@@ -1056,6 +1065,7 @@ func buildPackageInfo(pkg *primaryPackage, baseURL string) *PackageInfo {
 		LocationHref: pkg.Location.Href,
 		Size:         pkg.Size.Package,
 		BaseURL:      baseURL,
+		MirrorList:   mirrorList,
 		Requires:     requires,
 		Provides:     provides,
 		Recommends:   recommends,

@@ -88,6 +88,10 @@ type PackageInfo struct {
 	Size int64
 	// BaseURL is the repo base URL where LocationHref is relative to.
 	BaseURL string
+	// MirrorList is the repo's expanded mirrorlist/metalink URL. It is only
+	// used as a download fallback when BaseURL returns a transient error
+	// (e.g. mid-sync 404); the persisted BaseURL remains the first candidate.
+	MirrorList string
 	// Requires is the list of package names this package depends on.
 	Requires []string
 	// Provides is the list of capabilities this package provides.

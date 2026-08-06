@@ -149,28 +149,73 @@ func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string,
 }
 
 // packageBaseURLs returns the candidate base URLs (trailing slash
-// included) for downloading pkg. A "mirrorlist:" placeholder set by
-// loadFromDisk (no baseurl available at index-load time) is resolved to
-// the full mirror candidate list.
+// included) for downloading pkg.
+//
+// There are two cases:
+//   - "mirrorlist:" placeholder (set by loadFromDisk when no baseurl was
+//     available at index-load time): resolve the full mirror list and return
+//     all candidates; a resolution failure is fatal here because we have no
+//     other starting point.
+//   - Normal BaseURL (persisted mirror, known to carry this metadata
+//     generation): return it as the first candidate, followed by the repo's
+//     other mirrors as fallbacks (see mirrorListFallbacks).
 func packageBaseURLs(ctx context.Context, pkg *PackageInfo) ([]string, error) {
-	rest, ok := strings.CutPrefix(pkg.BaseURL, "mirrorlist:")
-	if !ok {
-		return []string{pkg.BaseURL}, nil
+	if rest, ok := strings.CutPrefix(pkg.BaseURL, "mirrorlist:"); ok {
+		mirrors, err := resolveMirrors(ctx, rest)
+		if err != nil {
+			return nil, errors.Wrap(err, errors.ErrTypeNetwork, "failed to resolve mirrorlist").
+				WithOperation("downloadRPM").
+				WithContext("package", pkg.Name)
+		}
+
+		return withTrailingSlash(mirrors), nil
 	}
 
-	mirrors, err := resolveMirrors(ctx, rest)
+	// The persisted base URL is always the first candidate.
+	primary := strings.TrimSuffix(pkg.BaseURL, "/") + "/"
+
+	return append([]string{primary}, mirrorListFallbacks(ctx, pkg, primary)...), nil
+}
+
+// mirrorListFallbacks resolves the repo's mirrorlist into the fallback
+// candidates for pkg, excluding primary (already tried first). A resolution
+// failure is non-fatal — we already have a usable primary candidate — but it
+// is logged so transient mirrorlist outages stay visible.
+func mirrorListFallbacks(ctx context.Context, pkg *PackageInfo, primary string) []string {
+	if pkg.MirrorList == "" {
+		return nil
+	}
+
+	mirrors, err := resolveMirrors(ctx, pkg.MirrorList)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.ErrTypeNetwork, "failed to resolve mirrorlist").
-			WithOperation("downloadRPM").
-			WithContext("package", pkg.Name)
+		logger.Warn(i18n.T("logger.dnfcache.warn.mirrorlist_fallback_failed"),
+			"package", pkg.Name,
+			"mirrorlist", pkg.MirrorList,
+			"error", err)
+
+		return nil
 	}
 
+	urls := make([]string, 0, len(mirrors))
+
+	for _, url := range withTrailingSlash(mirrors) {
+		if url != primary {
+			urls = append(urls, url)
+		}
+	}
+
+	return urls
+}
+
+// withTrailingSlash normalizes mirror base URLs to exactly one trailing
+// slash, so LocationHref can be appended directly.
+func withTrailingSlash(mirrors []string) []string {
 	urls := make([]string, 0, len(mirrors))
 	for _, m := range mirrors {
 		urls = append(urls, strings.TrimSuffix(m, "/")+"/")
 	}
 
-	return urls, nil
+	return urls
 }
 
 // rpmInstall installs the given .rpm files via "rpm --install --nodeps".

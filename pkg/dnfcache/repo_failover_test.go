@@ -455,3 +455,130 @@ func TestDownloadRPMMirrorFailover(t *testing.T) {
 		t.Error("downloaded payload mismatch")
 	}
 }
+
+// ---- downloadRPM MirrorList field failover ----
+
+// TestDownloadRPMMirrorListFallbackSucceeds tests that when BaseURL returns 404
+// and MirrorList resolves a healthy mirror, the download succeeds from the
+// fallback (the mid-sync mirror scenario that triggered the CI failure).
+func TestDownloadRPMMirrorListFallbackSucceeds(t *testing.T) {
+	payload := []byte("rpm from fallback mirror")
+	sum := sha256.Sum256(payload)
+
+	// Primary mirror is stale: it served the metadata but the RPM is not there yet.
+	lagging := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.NotFound(w, nil)
+	}))
+	defer lagging.Close()
+
+	// Fallback mirror carries the RPM.
+	healthy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/pkgs/kernel-headers-4.18.rpm" {
+			_, _ = w.Write(payload)
+			return
+		}
+
+		http.NotFound(w, r)
+	}))
+	defer healthy.Close()
+
+	// Mirrorlist returns both mirrors; healthy is second (tests that loop runs).
+	ml := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprintf(w, "%s/\n%s/\n", lagging.URL, healthy.URL)
+	}))
+	defer ml.Close()
+
+	pkg := &PackageInfo{
+		Name:         "kernel-headers",
+		BaseURL:      lagging.URL + "/",
+		MirrorList:   ml.URL,
+		LocationHref: "pkgs/kernel-headers-4.18.rpm",
+		SHA256:       hex.EncodeToString(sum[:]),
+	}
+
+	dest, err := downloadRPM(context.Background(), pkg, t.TempDir())
+	if err != nil {
+		t.Fatalf("downloadRPM failed: %v", err)
+	}
+
+	data, err := os.ReadFile(dest) //nolint:gosec
+	if err != nil {
+		t.Fatalf("read downloaded rpm: %v", err)
+	}
+
+	if !bytes.Equal(data, payload) {
+		t.Error("downloaded payload mismatch")
+	}
+}
+
+// TestDownloadRPMMirrorListUnreachableDoesNotBlock tests that an unreachable
+// MirrorList URL does not prevent a successful download from a healthy BaseURL:
+// the mirrorlist resolution failure is logged as a warning and the download
+// proceeds with just the primary candidate.
+func TestDownloadRPMMirrorListUnreachableDoesNotBlock(t *testing.T) {
+	payload := []byte("rpm from primary")
+	sum := sha256.Sum256(payload)
+
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/pkgs/gcc-12.rpm" {
+			_, _ = w.Write(payload)
+			return
+		}
+
+		http.NotFound(w, r)
+	}))
+	defer primary.Close()
+
+	// Use a closed server as the mirrorlist endpoint so resolution always fails.
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.NotFound(w, nil)
+	}))
+	dead.Close() // closed immediately — any TCP connection will be refused
+
+	pkg := &PackageInfo{
+		Name:         "gcc",
+		BaseURL:      primary.URL + "/",
+		MirrorList:   dead.URL,
+		LocationHref: "pkgs/gcc-12.rpm",
+		SHA256:       hex.EncodeToString(sum[:]),
+	}
+
+	dest, err := downloadRPM(context.Background(), pkg, t.TempDir())
+	if err != nil {
+		t.Fatalf("downloadRPM failed when primary is healthy but mirrorlist is unreachable: %v", err)
+	}
+
+	data, err := os.ReadFile(dest) //nolint:gosec
+	if err != nil {
+		t.Fatalf("read downloaded rpm: %v", err)
+	}
+
+	if !bytes.Equal(data, payload) {
+		t.Error("downloaded payload mismatch")
+	}
+}
+
+// TestDownloadRPMBaseURL404NoMirrorList tests that when BaseURL returns 404 and
+// no MirrorList is set, downloadRPM returns an error (no regression).
+func TestDownloadRPMBaseURL404NoMirrorList(t *testing.T) {
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.NotFound(w, nil)
+	}))
+	defer dead.Close()
+
+	payload := []byte("unreachable")
+	sum := sha256.Sum256(payload)
+
+	pkg := &PackageInfo{
+		Name:         "glibc",
+		BaseURL:      dead.URL + "/",
+		MirrorList:   "",
+		LocationHref: "pkgs/glibc-2.28.rpm",
+		SHA256:       hex.EncodeToString(sum[:]),
+	}
+
+	_, err := downloadRPM(context.Background(), pkg, t.TempDir())
+	if err == nil {
+		t.Fatal("expected error when BaseURL returns 404 and no MirrorList, got nil")
+	}
+}

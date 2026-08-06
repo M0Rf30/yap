@@ -1061,7 +1061,7 @@ func TestBuildPackageInfoSkipSrc(t *testing.T) {
 		Location: primaryLocation{Href: "Packages/gcc-12.2.0-1.el8.src.rpm"},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	if info != nil {
 		t.Error("buildPackageInfo should return nil for src RPMs")
 	}
@@ -1078,7 +1078,7 @@ func TestBuildPackageInfoSkipEmptyName(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	if info != nil {
 		t.Error("buildPackageInfo should return nil for empty name")
 	}
@@ -1095,7 +1095,7 @@ func TestBuildPackageInfoSkipEmptyArch(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	if info != nil {
 		t.Error("buildPackageInfo should return nil for empty arch")
 	}
@@ -1120,7 +1120,7 @@ func TestBuildPackageInfoSkipsRpmlibDeps(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	if info == nil {
 		t.Fatal("buildPackageInfo should not return nil for valid package")
 	}
@@ -1159,7 +1159,7 @@ func TestBuildPackageInfoKeepsPathDeps(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	if info == nil {
 		t.Fatal("buildPackageInfo should not return nil for valid package")
 	}
@@ -1186,7 +1186,7 @@ func TestBuildPackageInfoSHA256(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	if info == nil {
 		t.Fatal("buildPackageInfo returned nil")
 	}
@@ -1212,7 +1212,7 @@ func TestBuildPackageInfoNonSHA256Checksum(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	if info == nil {
 		t.Fatal("buildPackageInfo returned nil")
 	}
@@ -1258,7 +1258,7 @@ func TestParsePrimaryXML(t *testing.T) {
 	c := newCache()
 	r := strings.NewReader(xmlContent)
 
-	if err := c.parsePrimaryXML(r, "http://mirror.example.com/"); err != nil {
+	if err := c.parsePrimaryXML(r, "http://mirror.example.com/", ""); err != nil {
 		t.Fatalf("parsePrimaryXML failed: %v", err)
 	}
 
@@ -1299,7 +1299,7 @@ func TestParsePrimaryXMLSkipsSrcRPMs(t *testing.T) {
 	c := newCache()
 	r := strings.NewReader(xmlContent)
 
-	if err := c.parsePrimaryXML(r, "http://mirror.example.com/"); err != nil {
+	if err := c.parsePrimaryXML(r, "http://mirror.example.com/", ""); err != nil {
 		t.Fatalf("parsePrimaryXML failed: %v", err)
 	}
 

@@ -1224,6 +1224,8 @@
   translation: "Failed to parse primary index"
 - id: logger.dnfcache.warn.mirror_failed_trying_next
   translation: "Mirror failed, trying next"
+- id: logger.dnfcache.warn.mirrorlist_fallback_failed
+  translation: "Mirrorlist fallback failed, proceeding with primary mirror only"
 - id: logger.dnfcache.warn.unresolvable_dependency
   translation: "Unresolvable dependency"
 - id: logger.dnfinstall.debug.downloaded_rpm

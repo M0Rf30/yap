@@ -295,7 +295,7 @@ func TestBuildPackageInfoBasic(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	assert.Equal(t, "bash", info.Name)
 	assert.Equal(t, "x86_64", info.Arch)
 	assert.Equal(t, "5.1.8", info.Version)
@@ -335,7 +335,7 @@ func TestBuildPackageInfoWithProvides(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	assert.Len(t, info.Provides, 2)
 	assert.Contains(t, info.Provides, "bash")
 	assert.Contains(t, info.Provides, "/bin/bash")
@@ -369,7 +369,7 @@ func TestBuildPackageInfoWithRequires(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	assert.Len(t, info.Requires, 2)
 	// buildPackageInfo strips version constraints from requires
 	assert.Contains(t, info.Requires, "glibc")
@@ -405,7 +405,7 @@ func TestBuildPackageInfoFiltersRpmlib(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	// Only glibc should remain; rpmlib() entries should be filtered.
 	assert.Len(t, info.Requires, 1)
 	assert.Contains(t, info.Requires, "glibc")
@@ -439,7 +439,7 @@ func TestBuildPackageInfoWithFiles(t *testing.T) {
 		},
 	}
 
-	info := buildPackageInfo(pkg, "http://mirror.example.com/")
+	info := buildPackageInfo(pkg, "http://mirror.example.com/", "")
 	// Note: PackageInfo doesn't have a Files field; files are indexed as virtual
 	// providers via the providers map. This test verifies the package is built correctly.
 	assert.Equal(t, "bash", info.Name)
@@ -559,7 +559,7 @@ func TestParsePrimaryFileWithGzipCompression(t *testing.T) {
 
 	// Parse the gzip file.
 	c := newCache()
-	err = c.parsePrimaryFile(gzPath, "http://mirror.example.com/")
+	err = c.parsePrimaryFile(gzPath, "http://mirror.example.com/", "")
 	assert.NoError(t, err)
 
 	// Verify the package was indexed.
@@ -591,7 +591,7 @@ func TestParsePrimaryFileWithPlainXML(t *testing.T) {
 	require.NoError(t, err)
 
 	c := newCache()
-	err = c.parsePrimaryFile(xmlPath, "http://mirror.example.com/")
+	err = c.parsePrimaryFile(xmlPath, "http://mirror.example.com/", "")
 	assert.NoError(t, err)
 
 	pkg, ok := c.Lookup("test")
@@ -603,7 +603,7 @@ func TestParsePrimaryFileWithPlainXML(t *testing.T) {
 // returns an error.
 func TestParsePrimaryFileNonExistent(t *testing.T) {
 	c := newCache()
-	err := c.parsePrimaryFile("/nonexistent/path/primary.xml", "http://mirror.example.com/")
+	err := c.parsePrimaryFile("/nonexistent/path/primary.xml", "http://mirror.example.com/", "")
 	assert.Error(t, err, "parsing non-existent file should return error")
 }
 
@@ -966,7 +966,7 @@ func TestParsePrimaryXMLWithMultiplePackages(t *testing.T) {
 </metadata>`
 
 	c := newCache()
-	err := c.parsePrimaryXML(strings.NewReader(xml), "http://mirror.example.com/")
+	err := c.parsePrimaryXML(strings.NewReader(xml), "http://mirror.example.com/", "")
 	assert.NoError(t, err)
 
 	bash, ok := c.Lookup("bash")
@@ -994,7 +994,7 @@ func TestParsePrimaryXMLWithNoarch(t *testing.T) {
 </metadata>`
 
 	c := newCache()
-	err := c.parsePrimaryXML(strings.NewReader(xml), "http://mirror.example.com/")
+	err := c.parsePrimaryXML(strings.NewReader(xml), "http://mirror.example.com/", "")
 	assert.NoError(t, err)
 
 	setup, ok := c.Lookup("setup")
@@ -1025,7 +1025,7 @@ func TestParsePrimaryXMLWithConstrainedRequires(t *testing.T) {
 </metadata>`
 
 	c := newCache()
-	err := c.parsePrimaryXML(strings.NewReader(xml), "http://mirror.example.com/")
+	err := c.parsePrimaryXML(strings.NewReader(xml), "http://mirror.example.com/", "")
 	assert.NoError(t, err)
 
 	bash, ok := c.Lookup("bash")

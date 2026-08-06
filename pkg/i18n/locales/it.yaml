@@ -1230,6 +1230,8 @@
   translation: "Analisi dell'indice primario non riuscita"
 - id: logger.dnfcache.warn.mirror_failed_trying_next
   translation: "Mirror non raggiungibile, provo il successivo"
+- id: logger.dnfcache.warn.mirrorlist_fallback_failed
+  translation: "Fallback mirrorlist non riuscito, procedo solo con il mirror principale"
 - id: logger.dnfcache.warn.unresolvable_dependency
   translation: "Dipendenza non risolvibile"
 - id: logger.dnfinstall.debug.downloaded_rpm
