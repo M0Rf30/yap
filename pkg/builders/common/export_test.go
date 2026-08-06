@@ -20,6 +20,9 @@ func PartitionArchAllDepsForExtract(deps []string) (archSpecific, archAll []stri
 // CountDirect exposes countDirect for unit tests.
 var CountDirect = countDirect
 
+// CrossDepDestinations exposes crossDepDestinations for unit tests.
+var CrossDepDestinations = crossDepDestinations
+
 // MakeTestCache builds a minimal aptcache.Cache from a slice of PackageInfo
 // entries and installs it as the global singleton so that partitionArchAllDeps
 // and partitionArchAllDepsForExtract see it during tests.

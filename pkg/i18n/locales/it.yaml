@@ -1158,6 +1158,10 @@
   translation: "Dipendenze cross arch-all host/transitive ignorate"
 - id: logger.common.info.skipping_toolchain_validation
   translation: "Validazione del toolchain ignorata"
+- id: logger.common.info.sysroot_only_cross_deps
+  translation: "Dipendenze cross estratte solo nel sysroot"
+- id: logger.common.warn.cross_dep_sysroot_only
+  translation: "Dipendenza cross estratta solo nel sysroot (nome in conflitto con un pacchetto host)"
 - id: logger.common.warn.cross_strip_env_failed
   translation: "Ambiente cross-strip: risoluzione del toolchain non riuscita, strip userà gli strumenti nativi"
 - id: logger.common.warn.cross_strip_env_set_failed
@@ -1168,6 +1172,8 @@
   translation: "Dipendenze cross transitive non risolvibili (proseguo)"
 - id: logger.common.warn.update_ccache_symlinks_failed
   translation: "Update-ccache-symlinks non riuscito"
+- id: logger.common.warn.yapdb_installed_names_unavailable
+  translation: "Impossibile leggere il registro dei pacchetti installati di yap; il rilevamento dei conflitti tra dipendenze cross usa solo lo stato dpkg"
 - id: logger.container.debug.container_runtime_auto_detected
   translation: "Runtime del container rilevato automaticamente"
 - id: logger.container.info.no_usable_podman_docker

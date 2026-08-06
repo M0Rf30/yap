@@ -519,6 +519,84 @@ func TestCountDirect_NilEntrySkipped(t *testing.T) {
 	}
 }
 
+// ─── crossDepDestinations ────────────────────────────────────────────────────
+
+func TestCrossDepDestinations(t *testing.T) {
+	t.Parallel()
+
+	const hostArch = "amd64"
+
+	tests := []struct {
+		name        string
+		info        *aptcache.PackageInfo
+		isSeed      bool
+		installed   map[string]bool
+		wantSysroot bool
+		wantRoot    bool
+	}{
+		{
+			name:        "host-arch package",
+			info:        &aptcache.PackageInfo{Name: "libc6", Architecture: hostArch},
+			isSeed:      true,
+			installed:   map[string]bool{},
+			wantSysroot: false,
+			wantRoot:    false,
+		},
+		{
+			name:        "arch-all transitive",
+			info:        &aptcache.PackageInfo{Name: "vendor-core", Architecture: debArchAll},
+			isSeed:      false,
+			installed:   map[string]bool{},
+			wantSysroot: false,
+			wantRoot:    false,
+		},
+		{
+			name:        "arch-all seed",
+			info:        &aptcache.PackageInfo{Name: "vendor-core", Architecture: debArchAll},
+			isSeed:      true,
+			installed:   map[string]bool{},
+			wantSysroot: true,
+			wantRoot:    true,
+		},
+		{
+			name:        "escript clobber regression: target-arch seed installed on host",
+			info:        &aptcache.PackageInfo{Name: "carbonio-erlang", Architecture: "arm64"},
+			isSeed:      true,
+			installed:   map[string]bool{"carbonio-erlang": true},
+			wantSysroot: true,
+			wantRoot:    false,
+		},
+		{
+			name:        "target-arch transitive installed on host",
+			info:        &aptcache.PackageInfo{Name: "carbonio-openssl", Architecture: "arm64"},
+			isSeed:      false,
+			installed:   map[string]bool{"carbonio-openssl": true},
+			wantSysroot: true,
+			wantRoot:    false,
+		},
+		{
+			name:        "target-arch seed not installed",
+			info:        &aptcache.PackageInfo{Name: "vendor-ffmpeg", Architecture: "arm64"},
+			isSeed:      true,
+			installed:   map[string]bool{},
+			wantSysroot: true,
+			wantRoot:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			sysroot, root := CrossDepDestinations(tc.info, hostArch, tc.isSeed, tc.installed)
+			if sysroot != tc.wantSysroot || root != tc.wantRoot {
+				t.Errorf("crossDepDestinations(%+v, isSeed=%v) = (%v, %v), want (%v, %v)",
+					tc.info, tc.isSeed, sysroot, root, tc.wantSysroot, tc.wantRoot)
+			}
+		})
+	}
+}
+
 // ─── ValidateTargetArch ───────────────────────────────────────────────────────
 
 func TestValidateTargetArch(t *testing.T) {

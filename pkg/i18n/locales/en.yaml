@@ -1154,6 +1154,10 @@
   translation: "Skipped host/transitive arch-all cross-deps"
 - id: logger.common.info.skipping_toolchain_validation
   translation: "Skipping toolchain validation"
+- id: logger.common.info.sysroot_only_cross_deps
+  translation: "Cross-deps extracted to sysroot only"
+- id: logger.common.warn.cross_dep_sysroot_only
+  translation: "Cross-dep extracted to sysroot only (name collides with a host package)"
 - id: logger.common.warn.cross_strip_env_failed
   translation: "Cross-strip env: failed to resolve toolchain, strip will use native tools"
 - id: logger.common.warn.failed_write_cmake_toolchain
@@ -1162,6 +1166,8 @@
   translation: "Unresolvable transitive cross-deps (continuing)"
 - id: logger.common.warn.update_ccache_symlinks_failed
   translation: "Update-ccache-symlinks failed"
+- id: logger.common.warn.yapdb_installed_names_unavailable
+  translation: "Could not read yap's installed-package registry; cross-dep collision detection falls back to dpkg status only"
 - id: logger.container.debug.container_runtime_auto_detected
   translation: "Container runtime auto-detected"
 - id: logger.container.info.no_usable_podman_docker

@@ -15,6 +15,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/repo"
+	"github.com/M0Rf30/yap/v2/pkg/yapdb"
 )
 
 // aptCacheDownloadClosure resolves the transitive closure of `seeds`,
@@ -359,16 +360,19 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 	return qualified
 }
 
-// DownloadAndExtractCrossDeps downloads runtime dependencies and extracts them
-// directly to the root filesystem without registering them in the dpkg database.
-// This avoids the circular dependency problem where arch-all meta-packages
-// (e.g. vendor-core) depend on arch-specific packages (e.g. vendor-openldap)
-// that conflict with the target-arch variants needed for cross-compilation.
+// DownloadAndExtractCrossDeps downloads runtime dependencies and extracts
+// them to "/" and/or a per-target-arch sysroot (see CrossSysrootDir),
+// without registering them in the dpkg database. This avoids the circular
+// dependency problem where arch-all meta-packages (e.g. vendor-core) depend
+// on arch-specific packages (e.g. vendor-openldap) that conflict with the
+// target-arch variants needed for cross-compilation.
 //
 // The function partitions deps the same way as installCrossDeps: arch-all
 // packages are downloaded unqualified, arch-specific ones are qualified with
-// the target architecture (e.g. :arm64). All packages are extracted to "/"
-// without dpkg, so there is no conflict checking.
+// the target architecture (e.g. :arm64). Packages are extracted without
+// dpkg, so there is no conflict checking; crossDepDestinations decides,
+// per package, whether "/" would clobber a host-arch file of the same
+// name, in which case only the sysroot receives it.
 //
 // **Transitive resolution**: the declared PKGBUILD dependencies are walked
 // through aptcache.DownloadClosure so transitive runtime libraries that
@@ -470,7 +474,9 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 		"closure", len(resolved),
 		"transitive", len(resolved)-countDirect(resolved, seedSet))
 
-	skipped, err := extractCrossDepsToRoot(resolved, seedSet, tmpDir)
+	sysrootDir := CrossSysrootDir(targetArch)
+
+	skipped, sysrootOnly, err := extractCrossDeps(ctx, resolved, seedSet, tmpDir, sysrootDir)
 	if err != nil {
 		return err
 	}
@@ -480,33 +486,58 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 			"target_arch", targetArch)
 	}
 
+	if sysrootOnly > 0 {
+		logger.Info(i18n.T("logger.common.info.sysroot_only_cross_deps"), "count", sysrootOnly,
+			"target_arch", targetArch,
+			"sysroot", sysrootDir)
+	}
+
 	return nil
+}
+
+// CrossSysrootDir returns the directory that holds the intact target-arch
+// payload for targetArch. Target-arch deps whose files collide with an
+// installed host package are extracted here instead of "/", so the host
+// build tools stay runnable while the PKGBUILD can still reach the
+// target-arch files (target ERTS, target libs) it needs.
+func CrossSysrootDir(targetArch string) string {
+	return filepath.Join("/opt/yap/cross-sysroot", targetArch) //nolint:gocritic
 }
 
 // debArchAll is the dpkg Architecture value for architecture-independent
 // packages (data, scripts, Perl modules, …).
 const debArchAll = "all"
 
-// extractCrossDepsToRoot extracts target-arch payload from the resolved
-// dep closure into "/". Skips:
-//   - host-arch entries (would clobber running host binaries with arch
-//     mismatch, e.g. /usr/bin/sudo, fail with ETXTBSY when the file is
-//     held open by the parent process)
-//   - transitive arch-all entries (host tools already on the build host)
+// extractCrossDeps extracts target-arch payload from the resolved dep
+// closure to the destinations crossDepDestinations picks for each entry:
+//   - host-arch entries and transitive arch-all entries go nowhere (the
+//     former would clobber running host binaries with arch mismatch and
+//     fail with ETXTBSY when the file is held open by the parent process;
+//     the latter are host tools already on the build host)
 //   - target-arch entries whose package name is already installed on the
-//     host in any arch: their payload shares /usr/bin/<name> with the
-//     host variant and would clobber it (the classic sudo:arm64 case —
-//     same /usr/bin/sudo path, no Multi-Arch-aware separation for
-//     binaries).
+//     host (any arch) go to the sysroot only: their payload shares
+//     /usr/bin/<name> (or similar) with the host variant and would
+//     clobber it — the classic sudo:arm64 vs. running sudo:amd64 case,
+//     or carbonio-erlang shipping /opt/zextras/common/bin/escript for
+//     every architecture
+//   - everything else goes to both the sysroot and "/"
 //
-// Direct arch-all seeds — declared by the PKGBUILD — are still extracted.
-func extractCrossDepsToRoot(
+// Direct arch-all seeds — declared by the PKGBUILD — are always extracted
+// to both destinations.
+func extractCrossDeps(
+	ctx context.Context,
 	resolved []*aptcache.PackageInfo,
 	seedSet map[string]bool,
 	tmpDir string,
-) (skipped int, err error) {
+	sysrootDir string,
+) (skipped int, sysrootOnly int, err error) {
 	hostArch := aptcache.GoarchToDebArch()
-	installedNames := aptcache.Load().InstalledNames()
+	installedNames := hostInstalledNames(ctx)
+
+	if err := os.MkdirAll(sysrootDir, 0o755); err != nil {
+		return 0, 0, errors.Wrap(err, errors.ErrTypeFileSystem, "create cross sysroot dir").
+			WithOperation("extractCrossDeps")
+	}
 
 	for _, info := range resolved {
 		if info == nil || info.Filename == "" {
@@ -514,7 +545,9 @@ func extractCrossDepsToRoot(
 		}
 
 		isSeed := seedSet[info.Name]
-		if shouldSkipCrossDep(info, hostArch, isSeed, installedNames) {
+
+		sysroot, root := crossDepDestinations(info, hostArch, isSeed, installedNames)
+		if !sysroot && !root {
 			logger.Debug(i18n.T("logger.common.debug.skipping_host_transitive_arch"), "package", info.Name,
 				"arch", info.Architecture,
 				"seed", isSeed)
@@ -534,49 +567,98 @@ func extractCrossDepsToRoot(
 			"origin", origin)
 
 		debPath := filepath.Join(tmpDir, filepath.Base(info.Filename))
+
+		if sysroot {
+			if err := ExtractDEB(debPath, sysrootDir); err != nil {
+				return skipped, sysrootOnly, errors.Wrap(err, errors.ErrTypeBuild, "extract cross dep to sysroot").
+					WithOperation("DownloadAndExtractCrossDeps").
+					WithContext("package", info.Name)
+			}
+		}
+
+		if !root {
+			sysrootOnly++
+
+			logger.Warn(i18n.T("logger.common.warn.cross_dep_sysroot_only"), "package", info.Name,
+				"sysroot", sysrootDir)
+
+			continue
+		}
+
 		if err := ExtractDEB(debPath, "/"); err != nil {
-			return skipped, errors.Wrap(err, errors.ErrTypeBuild, "extract cross dep").
+			return skipped, sysrootOnly, errors.Wrap(err, errors.ErrTypeBuild, "extract cross dep").
 				WithOperation("DownloadAndExtractCrossDeps").
 				WithContext("package", info.Name)
 		}
 	}
 
-	return skipped, nil
+	return skipped, sysrootOnly, nil
 }
 
-// shouldSkipCrossDep reports whether the resolved package must not be
-// extracted to "/".
+// hostInstalledNames returns the set of package names present on the build
+// host: the dpkg status overlay unioned with yap's own install registry.
 //
-// Rules:
-//   - host-arch packages: always skipped (would clobber running host
-//     binaries with cross-arch payload)
-//   - arch-all packages: kept only when directly declared by the
-//     PKGBUILD (transitive arch-all are host tools already on disk)
-//   - target-arch packages whose name is already installed on the host
-//     (any arch): skipped to avoid overlaying a sibling-arch binary onto
-//     the shared /usr/bin/<name> path (sudo:arm64 vs the running
-//     sudo:amd64). Seeds declared by the PKGBUILD bypass this guard:
-//     the user explicitly asked for that package and is responsible for
-//     the collision implications.
-func shouldSkipCrossDep(
+// Both sources are required. yap records what it installs in yapdb rather
+// than /var/lib/dpkg/status (pkg/aptinstall Options.WriteDpkgStatus is off
+// by default, since dpkg is not the source of truth in an ephemeral build
+// container), so the dpkg overlay alone sees only the base image and misses
+// every makedepend installed during this run — precisely the packages whose
+// host-arch payload a target-arch extraction would clobber.
+func hostInstalledNames(ctx context.Context) map[string]bool {
+	names := aptcache.Load().InstalledNames()
+
+	db, err := yapdb.Open(ctx, yapdb.DefaultPath("/"))
+	if err != nil {
+		logger.Warn(i18n.T("logger.common.warn.yapdb_installed_names_unavailable"), "error", err)
+
+		return names
+	}
+
+	defer func() { _ = db.Close() }()
+
+	installed, err := db.List(ctx)
+	if err != nil {
+		logger.Warn(i18n.T("logger.common.warn.yapdb_installed_names_unavailable"), "error", err)
+
+		return names
+	}
+
+	for i := range installed {
+		names[installed[i].Name] = true
+	}
+
+	return names
+}
+
+// crossDepDestinations reports where a resolved cross dep must be extracted.
+//
+//	host-arch payload            -> nowhere (would clobber running host binaries)
+//	transitive arch-all payload   -> nowhere (host tools are already on disk)
+//	name installed on the host    -> sysroot only; extracting into "/" would
+//	                                 overwrite the host-arch build tool at the
+//	                                 same absolute path (carbonio-erlang ships
+//	                                 /opt/zextras/common/bin/escript for every
+//	                                 architecture)
+//	otherwise                     -> sysroot and "/"
+func crossDepDestinations(
 	info *aptcache.PackageInfo,
 	hostArch string,
 	isSeed bool,
 	installedNames map[string]bool,
-) bool {
+) (sysroot, root bool) {
 	if info.Architecture == hostArch {
-		return true
+		return false, false
 	}
 
 	if info.Architecture == debArchAll && !isSeed {
-		return true
+		return false, false
 	}
 
-	if !isSeed && installedNames[info.Name] {
-		return true
+	if installedNames[info.Name] {
+		return true, false
 	}
 
-	return false
+	return true, true
 }
 
 // countDirect returns the number of resolved entries whose name appears in
@@ -837,7 +919,8 @@ func (bb *BaseBuilder) crossGoEnv(params *crossCompileParams,
 }
 
 // crossAutotoolsEnv returns autotools and pkg-config cross-compilation
-// environment variables.
+// environment variables, plus YAP_CROSS_SYSROOT pointing PKGBUILD build()
+// scripts at the intact target-arch payload (see CrossSysrootDir).
 func (bb *BaseBuilder) crossAutotoolsEnv(params *crossCompileParams,
 	targetArch string) []string {
 	var env []string
@@ -851,6 +934,7 @@ func (bb *BaseBuilder) crossAutotoolsEnv(params *crossCompileParams,
 		"CXXFLAGS_FOR_BUILD=",
 		"CROSS_COMPILE="+params.ccPrefix+"-",
 		"CROSS_COMPILE_HOST="+params.ccPrefix,
+		"YAP_CROSS_SYSROOT="+CrossSysrootDir(targetArch),
 	)
 
 	// Configure pkg-config for cross-compilation: prepend toolchain paths to
