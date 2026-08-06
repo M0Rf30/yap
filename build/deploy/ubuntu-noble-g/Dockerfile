@@ -19,8 +19,10 @@ LABEL org.opencontainers.image.version="${VERSION}"
 # Switch to root (uid 0) to install Go toolchain
 USER 0
 
-# Pre-install Go toolchain via yap prepare -g
-RUN yap prepare ubuntu-noble --no-container --skip-sync -g
+# Pre-install the build toolchain and Go via yap prepare -g. The base image
+# ships no package index (apt/apk caches are wiped to keep it small), so the
+# metadata sync must run here or every build dependency is unresolvable.
+RUN yap prepare ubuntu-noble --no-container -g
 
 # Switch back to non-root user (uid 1000 = yap)
 USER 1000
