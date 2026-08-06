@@ -155,8 +155,9 @@ func (bb *BaseBuilder) LogCrossCompilation(targetArch string) {
 }
 
 // SetupEnvironmentDeps gets the build environment dependency package names
-// (without install flags) for the format.
-func (bb *BaseBuilder) SetupEnvironmentDeps(golang bool) []string {
+// (without install flags) for the format. When golang is set, the Go toolchain
+// is installed too — via the distro package on Alpine, via GOSetup elsewhere.
+func (bb *BaseBuilder) SetupEnvironmentDeps(golang bool) ([]string, error) {
 	buildDeps := constants.GetBuildDeps()
 
 	var deps []string
@@ -172,38 +173,44 @@ func (bb *BaseBuilder) SetupEnvironmentDeps(golang bool) []string {
 		deps = buildDeps.Pacman
 	}
 
-	if golang {
-		// APK uses different Go setup
-		if bb.Format == constants.FormatAPK {
-			platform.CheckGO()
-		} else {
-			logger.Info(i18n.T(
-				"logger.common.info.go_detected_version_check"))
-
-			err := platform.GOSetup()
-			if err != nil {
-				logger.Warn(
-					i18n.T(
-						"logger.common.warn.failed_to_setup_go"),
-					"error", err)
-			}
-		}
+	if !golang {
+		return deps, nil
 	}
 
-	return deps
+	// Alpine is musl-based: the official Go tarball GOSetup downloads is
+	// glibc-linked and cannot execute here, so Go has to come from the distro
+	// package. Previously this branch only called CheckGO and discarded the
+	// result, so `yap prepare alpine -g` reported success without installing Go.
+	if bb.Format == constants.FormatAPK {
+		return append(deps, "go"), nil
+	}
+
+	logger.Info(i18n.T("logger.common.info.go_detected_version_check"))
+
+	// A failed Go install must not be downgraded to a warning: `-g` exists
+	// precisely to guarantee the toolchain is there afterwards.
+	if err := platform.GOSetup(); err != nil {
+		return nil, err
+	}
+
+	return deps, nil
 }
 
 // SetupEnvironmentDependencies gets the build environment dependencies for
 // the format, including install flags. Calls SetupEnvironmentDeps internally.
-func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) []string {
-	deps := bb.SetupEnvironmentDeps(golang)
+func (bb *BaseBuilder) SetupEnvironmentDependencies(golang bool) ([]string, error) {
+	deps, err := bb.SetupEnvironmentDeps(golang)
+	if err != nil {
+		return nil, err
+	}
+
 	installArgs := constants.GetInstallArgs(bb.Format)
 
 	allArgs := make([]string, len(installArgs)+len(deps))
 	copy(allArgs, installArgs)
 	copy(allArgs[len(installArgs):], deps)
 
-	return allArgs
+	return allArgs, nil
 }
 
 // CreateFileWalker creates a configured file walker for the package format.
@@ -440,7 +447,10 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 	targetArch string,
 	skipValidation bool,
 ) error {
-	deps := bb.SetupEnvironmentDeps(golang)
+	deps, err := bb.SetupEnvironmentDeps(golang)
+	if err != nil {
+		return err
+	}
 
 	// Add cross-compilation dependencies if target architecture is different
 	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {

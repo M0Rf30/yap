@@ -3,6 +3,7 @@ package common
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -190,16 +191,27 @@ func TestSetupEnvironmentDependencies(t *testing.T) {
 		{constants.FormatDEB, false},
 		{constants.FormatRPM, false},
 		{constants.FormatPacman, false},
+		// golang is only exercised for APK here: every other format routes
+		// through platform.GOSetup, which downloads a toolchain and writes to
+		// /usr/lib — not something a unit test may do.
 		{constants.FormatAPK, true},
-		{constants.FormatDEB, true},
 	}
 
 	for _, test := range tests {
 		builder := NewBaseBuilder(pkg, test.format)
-		deps := builder.SetupEnvironmentDependencies(test.golang)
+
+		deps, err := builder.SetupEnvironmentDependencies(test.golang)
+		if err != nil {
+			t.Fatalf("Format %s: SetupEnvironmentDependencies: %v", test.format, err)
+		}
 
 		if len(deps) == 0 {
 			t.Fatalf("Format %s: environment dependencies should not be empty", test.format)
+		}
+
+		if test.golang && !slices.Contains(deps, "go") {
+			t.Fatalf("Format %s: golang requested but %q missing from deps: %v",
+				test.format, "go", deps)
 		}
 	}
 }
