@@ -13,6 +13,6 @@ func TestInitializePrepareDescriptions(t *testing.T) {
 
 func TestPrepareCommandDefinition(t *testing.T) {
 	assert.Equal(t, "prepare [distro]", prepareCmd.Use)
-	assert.NotNil(t, prepareCmd.Run)
+	assert.NotNil(t, prepareCmd.RunE)
 	assert.Contains(t, prepareCmd.Aliases, "prep")
 }

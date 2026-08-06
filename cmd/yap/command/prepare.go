@@ -42,7 +42,7 @@ var (
 		Example: "",                                                        // Will be set in init()
 		Args:    cobra.RangeArgs(0, 1),
 		PreRun:  PreRunValidation,
-		Run: func(_ *cobra.Command, args []string) {
+		RunE: func(_ *cobra.Command, args []string) error {
 			// Set the skip toolchain validation flag
 			common.SkipToolchainValidation = prepareSkipToolchainValidation
 
@@ -64,36 +64,28 @@ var (
 
 				image, err := ResolveContainerImage(parseDistroAndRelease(distroTag))
 				if err != nil {
-					logger.Error(err.Error())
-
-					return
+					return err
 				}
 
 				// YAP_IN_CONTAINER=1 (injected by the runtime) prevents re-dispatch.
 				subArgs := []string{prepareCommand, distroTag}
 				if RunCommandInContainer(image, ".", subArgs) {
-					return
+					return nil
 				}
 			}
 
 			packageManager, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
 			if err != nil {
-				logger.Error(err.Error(), "error", err)
-
-				return
+				return err
 			}
 
 			cliRepos, err := repo.ParseFlags(prepareExtraRepos)
 			if err != nil {
-				logger.Error(err.Error(), "error", err)
-
-				return
+				return err
 			}
 
 			if err := repo.Setup(distro, release, cliRepos); err != nil {
-				logger.Error(err.Error(), "error", err)
-
-				return
+				return err
 			}
 
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -102,16 +94,15 @@ var (
 			if !prepareSkipSyncDeps {
 				err := packageManager.Update(ctx)
 				if err != nil {
-					logger.Error(err.Error(),
-						"error", err)
+					// A failed metadata refresh is non-fatal: stale cache lets
+					// PrepareEnvironment still install already-cached packages.
+					logger.Error(err.Error(), "error", err)
 				}
 			}
 
 			err = packageManager.PrepareEnvironment(ctx, GoLang, TargetArch)
 			if err != nil {
-				logger.Error(err.Error())
-
-				return
+				return err
 			}
 
 			logger.Info(i18n.T("logger.command.info.basic_build_environment_successfully"))
@@ -119,6 +110,8 @@ var (
 			if GoLang {
 				logger.Info(i18n.T("logger.command.info.go_successfully_installed"))
 			}
+
+			return nil
 		},
 	}
 )

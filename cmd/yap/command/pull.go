@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -25,23 +26,25 @@ var pullCmd = &cobra.Command{
 	Example: "", // Set by InitializeLocalizedDescriptions
 	Args:    createValidateDistroArgs(1),
 	PreRun:  PreRunValidation,
-	Run: func(_ *cobra.Command, args []string) {
+	RunE: func(_ *cobra.Command, args []string) error {
 		split := strings.Split(args[0], "-")
 
 		if len(split) == 1 && split[0] != alpineDistro && split[0] != archDistro {
-			logger.Fatal(i18n.T("logger.pull.specify_codename"))
+			return errors.New(i18n.T("logger.pull.specify_codename"))
 		}
 
 		rt, err := container.Detect(ContainerRuntimeOverride())
 		if err != nil {
-			logger.Fatal(i18n.T("logger.pull.failed_to_pull"), "error", err)
+			return err
 		}
 
 		logger.Info(i18n.T("logger.command.info.using_container_runtime"), "type", string(rt.Type()))
 
 		if err := rt.Pull(args[0]); err != nil {
-			logger.Fatal(i18n.T("logger.pull.failed_to_pull"), "error", err)
+			return err
 		}
+
+		return nil
 	},
 }
 
