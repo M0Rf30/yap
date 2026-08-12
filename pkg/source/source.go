@@ -217,7 +217,8 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 
 		return git.Clone(dloadFilePath, normalizedURI, sshPassword, referenceName, commitHash)
 	default:
-		// Use enhanced download with resume capability and 3 retries, with context information
+		// Use enhanced download with resume capability and the configured
+		// retry budget, with context information
 		_, err := shell.MultiPrinter.Start()
 		if err != nil {
 			return err
@@ -226,7 +227,7 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 		return download.WithResumeContext(
 			dloadFilePath,
 			normalizedURI,
-			3,
+			download.MaxRetries(),
 			src.PkgName,
 			src.SourceItemPath,
 			shell.MultiPrinter.Writer)

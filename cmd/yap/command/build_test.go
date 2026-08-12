@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/M0Rf30/yap/v2/pkg/download"
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/project"
 	"github.com/M0Rf30/yap/v2/pkg/signing"
@@ -207,4 +208,39 @@ func TestLogStructuredError_WithPackageContext(t *testing.T) {
 	assert.Equal(t, "1.0.0", err.Context["version"])
 	assert.Equal(t, "1", err.Context["release"])
 	assert.Equal(t, "compile", err.Context["stage"])
+}
+
+func TestForwardedBuildFlags_SourceRetries(t *testing.T) {
+	origOpts := buildOpts
+	defer func() { buildOpts = origOpts }()
+
+	defer download.SetMaxRetries(download.DefaultMaxRetries)
+
+	buildOpts = project.BuildOptions{}
+
+	tests := []struct {
+		name    string
+		retries int
+		want    []string
+	}{
+		{
+			name:    "default budget forwards nothing",
+			retries: download.DefaultMaxRetries,
+			want:    nil,
+		},
+		{
+			name:    "non-default budget is replayed",
+			retries: 8,
+			want:    []string{"--source-retries", "8"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			download.SetMaxRetries(tt.retries)
+
+			assert.Equal(t, tt.want, forwardedBuildFlags())
+			assert.Equal(t, tt.want, forwardedPrepareFlags())
+		})
+	}
 }

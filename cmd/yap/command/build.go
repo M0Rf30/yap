@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -15,6 +16,7 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
+	"github.com/M0Rf30/yap/v2/pkg/download"
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -233,6 +235,10 @@ func forwardedBuildFlags() []string {
 		out = append(out, "--target-arch", buildOpts.TargetArch)
 	}
 
+	if download.MaxRetries() != download.DefaultMaxRetries {
+		out = append(out, "--source-retries", strconv.Itoa(download.MaxRetries()))
+	}
+
 	return out
 }
 
@@ -248,6 +254,10 @@ func forwardedPrepareFlags() []string {
 
 	if buildOpts.TargetArch != "" {
 		out = append(out, "--target-arch", buildOpts.TargetArch)
+	}
+
+	if download.MaxRetries() != download.DefaultMaxRetries {
+		out = append(out, "--source-retries", strconv.Itoa(download.MaxRetries()))
 	}
 
 	return out

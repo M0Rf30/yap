@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/download"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -17,6 +18,7 @@ var (
 	noColor          bool
 	language         string
 	containerRuntime string // "cli", "rootless", or "" (auto-detect)
+	sourceRetries    int
 )
 
 // rootCmd represents the base command when called without any subcommands.
@@ -25,10 +27,18 @@ var rootCmd = &cobra.Command{
 	Short:   "Yet Another Packager - Multi-distribution package builder", // Will be set in init()
 	Long:    "",                                                          // Will be set in init()
 	Example: "",                                                          // Will be set in init()
-	PersistentPreRun: func(_ *cobra.Command, _ []string) {
+	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		// Set color preference based on --no-color flag and environment variables
 		shouldDisableColor := noColor || os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
 		logger.SetColorDisabled(shouldDisableColor)
+
+		// Only override the env-derived budget when the user actually passed
+		// the flag; otherwise its default would clobber YAP_SOURCE_MAX_RETRIES.
+		// cmd.Root() is unambiguous regardless of which subcommand ran, unlike
+		// relying on the child command's own (inherited) flagset.
+		if cmd.Root().PersistentFlags().Changed("source-retries") {
+			download.SetMaxRetries(sourceRetries)
+		}
 	},
 	PersistentPostRun: func(cmd *cobra.Command, _ []string) {
 		// Show helpful tips after command execution
@@ -88,6 +98,10 @@ func InitializeLocalizedDescriptions() {
 
 	if f := rootCmd.PersistentFlags().Lookup("no-color"); f != nil {
 		f.Usage = i18n.T("flags.no_color")
+	}
+
+	if f := rootCmd.PersistentFlags().Lookup("source-retries"); f != nil {
+		f.Usage = i18n.T("flags.source_retries")
 	}
 
 	// Update command groups
@@ -193,6 +207,7 @@ func init() {
 	// Global flags — descriptions are updated after ParseLanguageFlag() in main().
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "")
+	rootCmd.PersistentFlags().IntVar(&sourceRetries, "source-retries", download.DefaultMaxRetries, "")
 	rootCmd.PersistentFlags().StringVarP(&language, "language", "l", "",
 		"set language (en, it) - defaults to system locale")
 	rootCmd.PersistentFlags().StringVar(&containerRuntime, "runtime", "",

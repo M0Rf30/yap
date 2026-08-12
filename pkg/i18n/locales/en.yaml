@@ -290,6 +290,8 @@
   translation: "Disable colored output"
 - id: flags.verbose
   translation: "Enable verbose output"
+- id: flags.source_retries
+  translation: "Retries after the first attempt for source and toolchain downloads (env: YAP_SOURCE_MAX_RETRIES)"
 
 # Prepare flags
 - id: flags.prepare.golang
@@ -341,7 +343,7 @@
 - id: errors.download.download_failed
   translation: "Download failed"
 - id: errors.download.download_failed_after_attempts
-  translation: "Download failed after %d retry attempts (error: %v)"
+  translation: "Download failed after %d attempts"
 - id: errors.download.download_failed_no_response
   translation: "Download failed: no response from server"
 
@@ -1292,6 +1294,8 @@
   translation: "Some packages could not be resolved"
 - id: logger.download.info.downloading
   translation: "Downloading"
+- id: logger.download.warn.invalid_max_retries
+  translation: "Invalid source-retries value in environment, using default"
 - id: logger.gensum.info.hashed_source
   translation: "Hashed source"
 - id: logger.gensum.info.no_source_arrays_found

@@ -10,7 +10,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
@@ -24,6 +26,87 @@ import (
 // backoffBase is the first retry delay; it doubles on each subsequent
 // attempt (1s, 2s, 4s, …). Package-level var so tests can shrink it.
 var backoffBase = time.Second
+
+// DefaultMaxRetries is the retry budget used when nothing overrides it.
+const DefaultMaxRetries = 3
+
+// MaxRetriesEnv names the environment variable that overrides DefaultMaxRetries.
+const MaxRetriesEnv = "YAP_SOURCE_MAX_RETRIES"
+
+var (
+	maxRetriesMu   sync.RWMutex
+	maxRetries     = DefaultMaxRetries
+	maxRetriesOnce sync.Once
+)
+
+// MaxRetries returns the configured retry budget: retries after the first
+// attempt (so total attempts == MaxRetries()+1). Resolution order is an
+// explicit SetMaxRetries call, then the YAP_SOURCE_MAX_RETRIES environment
+// variable, then DefaultMaxRetries. The environment variable is resolved
+// lazily (on first call, not at package init) because i18n/logger are not
+// ready at init time.
+func MaxRetries() int {
+	maxRetriesOnce.Do(resolveMaxRetriesFromEnv)
+
+	maxRetriesMu.RLock()
+	defer maxRetriesMu.RUnlock()
+
+	return maxRetries
+}
+
+// SetMaxRetries overrides the budget; negative values clamp to 0. Consumes
+// the same lazy-init guard as MaxRetries so an explicit override (e.g. from
+// a CLI flag) is never clobbered by a later environment resolution.
+func SetMaxRetries(retries int) {
+	maxRetriesOnce.Do(func() {})
+
+	if retries < 0 {
+		retries = 0
+	}
+
+	maxRetriesMu.Lock()
+	defer maxRetriesMu.Unlock()
+
+	maxRetries = retries
+}
+
+// resolveMaxRetriesFromEnv applies YAP_SOURCE_MAX_RETRIES over
+// DefaultMaxRetries; an empty, unparseable, or negative value keeps the
+// default (silently for empty, with a warning otherwise).
+func resolveMaxRetriesFromEnv() {
+	raw := os.Getenv(MaxRetriesEnv)
+
+	value, ok := parseMaxRetriesEnv(raw)
+	if !ok {
+		if strings.TrimSpace(raw) != "" {
+			logger.Warn(i18n.T("logger.download.warn.invalid_max_retries"),
+				"value", raw, "default", DefaultMaxRetries)
+		}
+
+		return
+	}
+
+	maxRetriesMu.Lock()
+	defer maxRetriesMu.Unlock()
+
+	maxRetries = value
+}
+
+// parseMaxRetriesEnv parses raw as a non-negative retry count. An empty or
+// invalid value reports ok=false so the caller keeps the current default.
+func parseMaxRetriesEnv(raw string) (int, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return 0, false
+	}
+
+	value, err := strconv.Atoi(trimmed)
+	if err != nil || value < 0 {
+		return 0, false
+	}
+
+	return value, true
+}
 
 // Download downloads a file from the given URL and saves it to the specified destination.
 // Uses a simple writer for output.
@@ -64,12 +147,12 @@ func Download(destination, uri string, writer io.Writer) error {
 // WithResume downloads a file with resume capability and retry logic.
 // It extends the basic Download function with the ability to resume interrupted downloads.
 //
-// Parameters:
-// - ctx: context for cancellation.
-// - destination: the path where the downloaded file will be saved.
-// - uri: the URL of the file to download.
-// - maxRetries: maximum number of retry attempts (0 = no retries, default: 3).
-// - writer: writer for progress output (can be nil)
+//   - ctx: context for cancellation.
+//   - destination: the path where the downloaded file will be saved.
+//   - uri: the URL of the file to download.
+//   - maxRetries: retries after the first attempt; 0 = no retries; pass
+//     MaxRetries() for the configured budget.
+//   - writer: writer for progress output (can be nil)
 func WithResume(ctx context.Context, destination, uri string, maxRetries int, writer io.Writer) error {
 	return retryDownload(ctx, destination, uri, maxRetries, "", "", writer,
 		"WithResume", "logger.download.info.retrying_download")
@@ -78,10 +161,10 @@ func WithResume(ctx context.Context, destination, uri string, maxRetries int, wr
 // WithResumeContext downloads a file with context information for enhanced
 // progress reporting.
 //
-// Parameters:
 //   - destination: local file path where the downloaded content will be saved.
 //   - uri: source URL to download from.
-//   - maxRetries: maximum number of retry attempts (0 = no retries, default: 3).
+//   - maxRetries: retries after the first attempt; 0 = no retries; pass
+//     MaxRetries() for the configured budget.
 //   - packageName: package name for progress reporting (if empty, uses logger component or "yap").
 //   - sourceName: source name for progress reporting (if empty, uses filename from URI).
 //   - writer: writer for progress output (can be nil)
@@ -105,8 +188,8 @@ func retryDownload(
 	packageName, sourceName string, writer io.Writer,
 	op, retryMsgID string,
 ) error {
-	if maxRetries <= 0 {
-		maxRetries = 3
+	if maxRetries < 0 {
+		maxRetries = 0
 	}
 
 	var lastErr error

@@ -399,6 +399,7 @@ yap completion <shell>                # Generate shell completion (bash/zsh/fish
 
 # Source access
 --ssh-password pass, -p     # Password for SSH source access
+--source-retries <n>        # Retries after first attempt for source/gensum/toolchain downloads (default 3; env: YAP_SOURCE_MAX_RETRIES)
 
 # Cross-compilation
 --target-arch arm64, -t     # Cross-compile for target architecture

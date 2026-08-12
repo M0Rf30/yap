@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -505,5 +506,94 @@ func TestWithResumeCancelledStopsRetrying(t *testing.T) {
 	// but no further attempts must happen.
 	if got := hits.Load(); got > 1 {
 		t.Errorf("expected at most 1 attempt, got %d", got)
+	}
+}
+
+// TestSetMaxRetries verifies SetMaxRetries round-trips through MaxRetries
+// and clamps negative values to 0.
+func TestSetMaxRetries(t *testing.T) {
+	previous := MaxRetries()
+	defer SetMaxRetries(previous)
+
+	SetMaxRetries(7)
+
+	if got := MaxRetries(); got != 7 {
+		t.Errorf("MaxRetries() = %d, want 7", got)
+	}
+
+	SetMaxRetries(-3)
+
+	if got := MaxRetries(); got != 0 {
+		t.Errorf("MaxRetries() = %d, want 0 for negative override", got)
+	}
+}
+
+// TestParseMaxRetriesEnv table-tests the environment-variable parsing
+// helper directly, since the sync.Once-guarded public path can only be
+// exercised once per process.
+func TestParseMaxRetriesEnv(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want int
+		ok   bool
+	}{
+		{name: "empty", raw: "", want: 0, ok: false},
+		{name: "valid", raw: "7", want: 7, ok: true},
+		{name: "zero", raw: "0", want: 0, ok: true},
+		{name: "negative", raw: "-1", want: 0, ok: false},
+		{name: "non-numeric", raw: "abc", want: 0, ok: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := parseMaxRetriesEnv(test.raw)
+			if ok != test.ok || got != test.want {
+				t.Errorf("parseMaxRetriesEnv(%q) = (%d, %v), want (%d, %v)",
+					test.raw, got, ok, test.want, test.ok)
+			}
+		})
+	}
+}
+
+// TestRetryDownloadHonorsMaxRetries verifies retryDownload issues exactly
+// MaxRetries()+1 requests against a mirror that always answers 503.
+func TestRetryDownloadHonorsMaxRetries(t *testing.T) {
+	previous := MaxRetries()
+	defer SetMaxRetries(previous)
+
+	tests := []struct {
+		budget   int
+		wantHits int32
+	}{
+		{budget: 1, wantHits: 2},
+		{budget: 0, wantHits: 1},
+	}
+
+	for _, test := range tests {
+		t.Run(strconv.Itoa(test.budget), func(t *testing.T) {
+			var hits atomic.Int32
+
+			server := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, _ *http.Request) {
+					hits.Add(1)
+					w.WriteHeader(http.StatusServiceUnavailable)
+				}))
+			defer server.Close()
+
+			SetMaxRetries(test.budget)
+
+			destination := filepath.Join(t.TempDir(), "out.txt")
+
+			err := WithResumeContext(destination, server.URL, MaxRetries(), "", "", nil)
+			if err == nil {
+				t.Fatalf("budget %d: expected error from a 503-only server", test.budget)
+			}
+
+			if got := hits.Load(); got != test.wantHits {
+				t.Errorf("budget %d: expected %d hits, got %d",
+					test.budget, test.wantHits, got)
+			}
+		})
 	}
 }

@@ -292,6 +292,8 @@
   translation: "Disabilita l'output colorato"
 - id: flags.verbose
   translation: "Abilita l'output dettagliato"
+- id: flags.source_retries
+  translation: "Numero di ritentativi dopo il primo tentativo per il download di sorgenti e toolchain (env: YAP_SOURCE_MAX_RETRIES)"
 
 # Flag prepare
 - id: flags.prepare.golang
@@ -343,7 +345,7 @@
 - id: errors.download.download_failed
   translation: "Download fallito"
 - id: errors.download.download_failed_after_attempts
-  translation: "Download fallito dopo %d tentativi (errore: %v)"
+  translation: "Download fallito dopo %d tentativi"
 - id: errors.download.download_failed_no_response
   translation: "Download fallito: nessuna risposta dal server"
 
@@ -1300,6 +1302,8 @@
   translation: "Alcuni pacchetti non è stato possibile risolverli"
 - id: logger.download.info.downloading
   translation: "Scaricamento in corso"
+- id: logger.download.warn.invalid_max_retries
+  translation: "Valore di source-retries non valido nell'ambiente, uso il predefinito"
 - id: logger.gensum.info.hashed_source
   translation: "Hash della sorgente calcolato"
 - id: logger.gensum.info.no_source_arrays_found

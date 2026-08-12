@@ -322,7 +322,7 @@ func downloadAndHash(rawURI, uri, tmpDir, pkgbuildDir string) (string, error) {
 	err = download.WithResumeContext(
 		destPath,
 		uri,
-		3,
+		download.MaxRetries(),
 		"gensum",
 		filepath.Base(rawURI),
 		shell.MultiPrinter.Writer)
