@@ -400,8 +400,7 @@ func IsRetryableGrabError(err error) bool {
 		return false
 	}
 
-	var statusErr grab.StatusCodeError
-	if stderrors.As(err, &statusErr) {
+	if statusErr, ok := stderrors.AsType[grab.StatusCodeError](err); ok {
 		code := int(statusErr)
 
 		return code == http.StatusRequestTimeout ||

@@ -36,7 +36,7 @@ func ValidDistrosCompletion(_ *cobra.Command, args []string, toComplete string) 
 	var completions []string
 
 	// Extract base distro from partial input (e.g., "ubuntu" from "ubuntu-foc")
-	baseDist := strings.Split(toComplete, "-")[0]
+	baseDist, _, _ := strings.Cut(toComplete, "-")
 
 	for _, release := range &constants.Releases {
 		// Match if the release name starts with the base distro
@@ -69,7 +69,7 @@ func validateDistroArg(distro string) error {
 	}
 
 	// Extract base distribution name (everything before the first hyphen)
-	baseDist := strings.Split(distro, "-")[0]
+	baseDist, _, _ := strings.Cut(distro, "-")
 
 	// Check if base distro exists in supported releases
 	for _, release := range &constants.Releases {

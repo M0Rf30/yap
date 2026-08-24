@@ -76,8 +76,7 @@ func IsRetryable(err error) bool {
 		return false
 	}
 
-	var statusErr *HTTPStatusError
-	if errors.As(err, &statusErr) {
+	if statusErr, ok := errors.AsType[*HTTPStatusError](err); ok {
 		code := statusErr.Code
 
 		return code == 408 || code == 429 || code >= 500
@@ -93,8 +92,7 @@ func IsRetryable(err error) bool {
 		return true
 	}
 
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if _, ok := errors.AsType[net.Error](err); ok {
 		return true
 	}
 

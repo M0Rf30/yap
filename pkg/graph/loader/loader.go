@@ -318,7 +318,7 @@ func processDependencyLine(
 		return handleDependencyArrayStart(line, "optdepends=(", "optional", dependencies)
 	case dynDependsRe.MatchString(line):
 		prefix := dynDependsRe.FindString(line)
-		arrayType := strings.Split(prefix, "__")[0]
+		arrayType, _, _ := strings.Cut(prefix, "__")
 
 		return handleDependencyArrayStart(line, prefix, arrayType, dependencies)
 	case inArray:

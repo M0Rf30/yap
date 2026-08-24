@@ -31,7 +31,7 @@ func printVersion() {
 	buildTime := buildinfo.BuildTime
 
 	goVer := runtime.Version()
-	// Strip internal build tags (e.g. "go1.26.3-X:nodwarf5" → "go1.26.3")
+	// Strip internal build tags (e.g. "go1.27.0-X:nodwarf5" → "go1.27.0")
 	if idx := strings.IndexByte(goVer, '-'); idx != -1 {
 		goVer = goVer[:idx]
 	}

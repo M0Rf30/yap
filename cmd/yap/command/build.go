@@ -170,8 +170,7 @@ var buildCmd = &cobra.Command{
 
 		err = mpc.MultiProject(distro, release, fullJSONPath)
 		if err != nil {
-			var yapErr *yapErrors.YapError
-			if errors.As(err, &yapErr) {
+			if yapErr, ok := errors.AsType[*yapErrors.YapError](err); ok {
 				logStructuredError(yapErr)
 			} else {
 				logger.Fatal(i18n.T("logger.build.project_init_failed"), "error", err)
@@ -201,8 +200,7 @@ var buildCmd = &cobra.Command{
 
 		err = mpc.BuildAll(ctx)
 		if err != nil {
-			var yapErr *yapErrors.YapError
-			if errors.As(err, &yapErr) {
+			if yapErr, ok := errors.AsType[*yapErrors.YapError](err); ok {
 				logStructuredError(yapErr)
 			} else {
 				logger.Fatal(i18n.T("logger.build.build_failed"), "error", err)

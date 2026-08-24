@@ -191,7 +191,7 @@ func TestDistroExtraction(t *testing.T) {
 	// Test that distro names are correctly extracted from releases
 	// (checking the init() function logic indirectly)
 	for _, release := range Releases {
-		distro := strings.Split(release, "_")[0]
+		distro, _, _ := strings.Cut(release, "_")
 
 		// Verify this distro exists in our maps
 		if _, exists := DistroToPackageManager[distro]; !exists {
@@ -213,7 +213,7 @@ func TestConsistency(t *testing.T) {
 	releaseDistros := make(map[string]bool)
 
 	for _, release := range Releases {
-		distro := strings.Split(release, "_")[0]
+		distro, _, _ := strings.Cut(release, "_")
 		releaseDistros[distro] = true
 	}
 

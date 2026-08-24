@@ -282,8 +282,7 @@ func wrapPGPError(err error) error {
 	}
 
 	// Type-assert SignatureError (string type) for "actual bad signature".
-	var sigErr pgperrors.SignatureError
-	if errors.As(err, &sigErr) {
+	if _, ok := errors.AsType[pgperrors.SignatureError](err); ok {
 		return yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "invalid signature").
 			WithOperation("wrapPGPError")
 	}

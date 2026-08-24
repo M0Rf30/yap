@@ -16,7 +16,7 @@ const (
 	// Git defines the git command name.
 	Git = "git"
 	// goVersion defines the Go toolchain version to download.
-	goVersion = "1.26.5"
+	goVersion = "1.27.0"
 )
 
 // YAPVersion defines the current version of YAP. It mirrors the ldflags-injected
@@ -101,7 +101,7 @@ var (
 //nolint:gochecknoinits // Required for initialization of package constants and data structures
 func init() {
 	for _, release := range &Releases {
-		distro := strings.Split(release, "_")[0]
+		distro, _, _ := strings.Cut(release, "_")
 		Distros = append(Distros, distro)
 		DistrosSet.Add(distro)
 	}

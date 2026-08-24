@@ -610,7 +610,7 @@ func retryMajorVersion(ctx context.Context, mirrorListURL string, origErr error)
 		return nil, origErr
 	}
 
-	major := strings.SplitN(releasever, ".", 2)[0]
+	major, _, _ := strings.Cut(releasever, ".")
 	retryURL := strings.ReplaceAll(mirrorListURL, releasever, major)
 
 	if retryURL == mirrorListURL {

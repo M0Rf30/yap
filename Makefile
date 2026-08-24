@@ -81,7 +81,7 @@ test-e2e-rpm:
 	  -v $(PWD):/yap:Z \
 	  -w /yap \
 	  rockylinux:8 \
-	  bash -c 'dnf -y install --setopt=install_weak_deps=False make sqlite curl tar gzip >/tmp/setup.log 2>&1 || (cat /tmp/setup.log; exit 1); GO_VERSION=1.26.5; if ! go version 2>/dev/null | grep -q "go$${GO_VERSION}"; then echo "==> Installing Go $${GO_VERSION}..."; curl -fsSL "https://go.dev/dl/go$${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz; export PATH="/usr/local/go/bin:$$PATH"; fi; go version; make build && ./scripts/e2e-rpm.sh'
+	  bash -c 'dnf -y install --setopt=install_weak_deps=False make sqlite curl tar gzip >/tmp/setup.log 2>&1 || (cat /tmp/setup.log; exit 1); GO_VERSION=1.27.0; if ! go version 2>/dev/null | grep -q "go$${GO_VERSION}"; then echo "==> Installing Go $${GO_VERSION}..."; curl -fsSL "https://go.dev/dl/go$${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz; export PATH="/usr/local/go/bin:$$PATH"; fi; go version; make build && ./scripts/e2e-rpm.sh'
 
 # Run benchmarks
 bench:
