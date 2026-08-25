@@ -2,6 +2,7 @@ package shell
 
 import (
 	"compress/gzip"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,6 +25,92 @@ func createTestGzip(t *testing.T, path, content string) {
 	_, err = gw.Write([]byte(content))
 	require.NoError(t, err, "createTestGzip: write")
 	require.NoError(t, gw.Close(), "createTestGzip: close gzip writer")
+}
+
+// readGzip returns the decompressed content of a gzip file.
+func readGzip(t *testing.T, path string) string {
+	t.Helper()
+
+	f, err := os.Open(filepath.Clean(path))
+	require.NoError(t, err, "readGzip: open")
+
+	defer func() { _ = f.Close() }()
+
+	gr, err := gzip.NewReader(f)
+	require.NoError(t, err, "readGzip: gzip reader")
+
+	defer func() { _ = gr.Close() }()
+
+	content, err := io.ReadAll(gr)
+	require.NoError(t, err, "readGzip: read")
+
+	return string(content)
+}
+
+// ---------------------------------------------------------------------------
+// handleGzip — compression
+// ---------------------------------------------------------------------------
+
+func TestHandleGzip_StdoutRedirection(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "page.8"), []byte("man page"), 0o600))
+
+	// The PKGBUILD idiom: compress to stdout, redirect into the package tree.
+	err := runScript(t, dir, "gzip -c page.8 > page.8.gz")
+	require.NoError(t, err)
+
+	assert.Equal(t, "man page", readGzip(t, filepath.Join(dir, "page.8.gz")))
+
+	// -c must leave the input untouched.
+	_, statErr := os.Stat(filepath.Join(dir, "page.8"))
+	require.NoError(t, statErr, "input should remain after gzip -c")
+}
+
+func TestHandleGzip_InPlace(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data.txt"), []byte("hello gzip"), 0o600))
+
+	err := runScript(t, dir, "gzip -9 data.txt")
+	require.NoError(t, err)
+
+	assert.Equal(t, "hello gzip", readGzip(t, filepath.Join(dir, "data.txt.gz")))
+
+	_, statErr := os.Stat(filepath.Join(dir, "data.txt"))
+	assert.True(t, os.IsNotExist(statErr), "input should be removed after in-place gzip")
+}
+
+func TestHandleGzip_InPlaceKeep(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data.txt"), []byte("keep me"), 0o600))
+
+	err := runScript(t, dir, "gzip -k data.txt")
+	require.NoError(t, err)
+
+	assert.Equal(t, "keep me", readGzip(t, filepath.Join(dir, "data.txt.gz")))
+	_, statErr := os.Stat(filepath.Join(dir, "data.txt"))
+	require.NoError(t, statErr, "input should remain with -k")
+}
+
+func TestHandleGzip_StdinFilter(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data.txt"), []byte("piped"), 0o600))
+
+	err := runScript(t, dir, "cat data.txt | gzip > data.txt.gz")
+	require.NoError(t, err)
+
+	assert.Equal(t, "piped", readGzip(t, filepath.Join(dir, "data.txt.gz")))
+}
+
+func TestHandleGzip_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data.txt"), []byte("round trip"), 0o600))
+
+	require.NoError(t, runScript(t, dir, "gzip data.txt"))
+	require.NoError(t, runScript(t, dir, "gunzip data.txt.gz"))
+
+	content, err := os.ReadFile(filepath.Join(dir, "data.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "round trip", string(content))
 }
 
 // ---------------------------------------------------------------------------

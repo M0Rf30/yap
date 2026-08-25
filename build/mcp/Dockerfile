@@ -3,7 +3,9 @@
 # Published as ghcr.io/m0rf30/yap-mcp and referenced by server.json for the
 # Model Context Protocol registry (registryType: oci).
 
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+ARG GO_VERSION=1.27.0
+
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
 WORKDIR /src
 RUN apk add --no-cache git
 COPY go.mod go.sum ./

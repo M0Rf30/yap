@@ -1464,6 +1464,10 @@
   translation: "Archive handler: gunzip in-place"
 - id: logger.shell.info.archive_handler_gunzip_stdout
   translation: "Archive handler: gunzip → stdout"
+- id: logger.shell.info.archive_handler_gzip_place
+  translation: "Archive handler: gzip in-place"
+- id: logger.shell.info.archive_handler_gzip_stdout
+  translation: "Archive handler: gzip → stdout"
 - id: logger.shell.info.archive_handler_jar
   translation: "Archive handler: jar"
 - id: logger.shell.info.archive_handler_rpm2cpio

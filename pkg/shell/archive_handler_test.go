@@ -251,14 +251,15 @@ func TestArchiveHandler_Rpm2Cpio(t *testing.T) {
 	t.Skip("rpm2cpio test requires complex RPM creation; covered by archive.ExtractRPM tests")
 }
 
-// TestParseGunzipArgs tests the parseGunzipArgs function with various argument combinations.
-func TestParseGunzipArgs(t *testing.T) {
+// TestParseGzipArgs tests the parseGzipArgs function with various argument combinations.
+func TestParseGzipArgs(t *testing.T) {
 	tests := []struct {
-		name       string
-		args       []string
-		wantPath   string
-		wantStdout bool
-		wantKeep   bool
+		name         string
+		args         []string
+		wantPath     string
+		wantStdout   bool
+		wantKeep     bool
+		wantCompress bool
 	}{
 		{
 			name:       "simple file",
@@ -345,11 +346,32 @@ func TestParseGunzipArgs(t *testing.T) {
 			wantKeep:   false,
 		},
 		{
-			name:       "gzip command",
-			args:       []string{"gzip", "-c", "file.gz"},
-			wantPath:   "file.gz",
-			wantStdout: true,
-			wantKeep:   false,
+			name:         "gzip compresses by default",
+			args:         []string{"gzip", "page.8"},
+			wantPath:     "page.8",
+			wantCompress: true,
+		},
+		{
+			name:         "gzip -c compresses to stdout",
+			args:         []string{"gzip", "-c", "page.8"},
+			wantPath:     "page.8",
+			wantStdout:   true,
+			wantCompress: true,
+		},
+		{
+			name:     "gzip -d decompresses",
+			args:     []string{"gzip", "-d", "file.gz"},
+			wantPath: "file.gz",
+		},
+		{
+			name:     "gzip --uncompress decompresses",
+			args:     []string{"gzip", "--uncompress", "file.gz"},
+			wantPath: "file.gz",
+		},
+		{
+			name:         "gzip stdin filter",
+			args:         []string{"gzip"},
+			wantCompress: true,
 		},
 		{
 			name:       "multiple files (first is used)",
@@ -390,7 +412,11 @@ func TestParseGunzipArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			path, stdout, keep := ParseGunzipArgsForTesting(tt.args)
+			path, stdout, keep, decompress, _ := ParseGzipArgsForTesting(tt.args)
+			if decompress == tt.wantCompress {
+				t.Errorf("decompress: got %v, want %v", decompress, !tt.wantCompress)
+			}
+
 			if path != tt.wantPath {
 				t.Errorf("inputPath: got %q, want %q", path, tt.wantPath)
 			}

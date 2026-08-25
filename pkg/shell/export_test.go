@@ -1,8 +1,10 @@
 package shell
 
-// ParseGunzipArgsForTesting exposes parseGunzipArgs for unit tests.
-func ParseGunzipArgsForTesting(args []string) (inputPath string, toStdout, keepOrig bool) {
-	return parseGunzipArgs(args)
+// ParseGzipArgsForTesting exposes parseGzipArgs for unit tests.
+func ParseGzipArgsForTesting(args []string) (inputPath string, toStdout, keepOrig, decompress bool, level int) {
+	opts := parseGzipArgs(args)
+
+	return opts.inputPath, opts.toStdout, opts.keepOrig, opts.decompress, opts.level
 }
 
 // ParseJarArgsForTesting exposes parseJarArgs for unit tests.

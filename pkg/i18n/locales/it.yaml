@@ -1472,6 +1472,10 @@
   translation: "Gestore archivio: gunzip in loco"
 - id: logger.shell.info.archive_handler_gunzip_stdout
   translation: "Gestore archivio: gunzip → stdout"
+- id: logger.shell.info.archive_handler_gzip_place
+  translation: "Gestore archivio: gzip in loco"
+- id: logger.shell.info.archive_handler_gzip_stdout
+  translation: "Gestore archivio: gzip → stdout"
 - id: logger.shell.info.archive_handler_jar
   translation: "Gestore archivio: jar"
 - id: logger.shell.info.archive_handler_rpm2cpio
