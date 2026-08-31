@@ -70,7 +70,7 @@ jobs:
       - name: 🔍 Lint Dockerfile
         # Lint once per OS on the amd64 runner — Dockerfile is arch-agnostic.
         if: matrix.platform == 'linux/amd64'
-        uses: hadolint/hadolint-action@v3.4.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
           config: .hadolint.yml
@@ -307,7 +307,7 @@ jobs:
           fetch-depth: 0
 
       - name: 🔍 Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.4.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
           config: .hadolint.yml
