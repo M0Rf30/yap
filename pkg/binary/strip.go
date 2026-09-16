@@ -12,6 +12,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/platform"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
 
@@ -170,7 +171,30 @@ func SeparateDebugInfoWithEnv(binary, debugDir string, env map[string]string) (s
 		logger.Warn(i18n.T("logger.binary.warn.failed_add_debuglink"), "binary", binary, "error", err)
 	}
 
+	// Under sudo the .build-id tree is created as root:root 0750, so the
+	// invoking user (CI agents archiving <debugDir>/.build-id/**) cannot even
+	// list it. project.go only chowns <debugDir> itself, not what is created
+	// here, so restore ownership on every path this function creates.
+	chownToOriginalUser(filepath.Join(debugDir, ".build-id"), debugSubDir, debugFile)
+
 	return debugFile, nil
+}
+
+// chownToOriginalUser restores ownership of the given paths to the user behind
+// sudo. It is a no-op when not running under sudo, and only warns on failure:
+// missing debug symbols ownership must never fail a build.
+func chownToOriginalUser(paths ...string) {
+	originalUser, err := platform.GetOriginalUser()
+	if err != nil || originalUser == nil {
+		return
+	}
+
+	for _, path := range paths {
+		if chownErr := originalUser.ChownToOriginalUser(path); chownErr != nil {
+			logger.Warn(i18n.T("logger.common.warn.failed_to_get_original"),
+				"path", path, "error", chownErr)
+		}
+	}
 }
 
 // StripFile removes debugging symbols from a binary file.
