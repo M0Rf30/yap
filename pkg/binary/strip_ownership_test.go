@@ -1,10 +1,12 @@
-package binary
+package binary_test
 
 import (
 	"os"
 	"path/filepath"
 	"syscall"
 	"testing"
+
+	binutil "github.com/M0Rf30/yap/v2/pkg/binary"
 )
 
 // As root under sudo, every path created by SeparateDebugInfoWithEnv must end
@@ -35,7 +37,7 @@ func TestSeparateDebugInfoPreservesOwnership(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	debugFile, err := SeparateDebugInfo(bin, debugDir)
+	debugFile, err := binutil.SeparateDebugInfo(bin, debugDir)
 	if err != nil {
 		t.Fatal(err)
 	}
