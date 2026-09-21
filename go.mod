@@ -19,7 +19,7 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
 	github.com/nwaples/rardecode/v2 v2.4.1
 	github.com/otiai10/copy v1.14.1
-	github.com/pierrec/lz4/v4 v4.1.29
+	github.com/pierrec/lz4/v4 v4.1.30
 	github.com/rootless-containers/rootlesskit/v2 v2.3.6
 	github.com/sassoftware/go-rpmutils v0.4.0
 	github.com/spf13/cobra v1.10.2
