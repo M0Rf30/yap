@@ -390,6 +390,43 @@ Depends: a
 	assert.Equal(t, "a", pkgs[0].Name)
 }
 
+// TestResolveDepsDedupesSharedEntry guards against the same index entry being
+// emitted twice when it is reached under different requested arches (an
+// arch:all package pulled in both by a host seed and by an :arm64 seed).
+// Duplicates made the cross-deps download fetch one .deb twice concurrently
+// into the same file, failing with "checksum mismatch".
+func TestResolveDepsDedupesSharedEntry(t *testing.T) {
+	stanza := `Package: shared
+Architecture: all
+Version: 1.0
+Filename: pool/s/shared_1.0_all.deb
+
+Package: lib
+Architecture: arm64
+Version: 1.0
+Filename: pool/l/lib_1.0_arm64.deb
+Depends: shared
+
+`
+
+	c := aptcache.NewCacheForTesting()
+	err := c.ParseDeb822ForTesting(strings.NewReader(stanza), true)
+	require.NoError(t, err)
+
+	pkgs, unres, err := c.ResolveDeps([]string{"shared", "lib:arm64"})
+	require.NoError(t, err)
+	require.Empty(t, unres)
+
+	seen := map[string]int{}
+	for _, p := range pkgs {
+		seen[p.Filename]++
+	}
+
+	assert.Equal(t, 1, seen["pool/s/shared_1.0_all.deb"], "shared entry must be emitted once")
+	assert.Equal(t, 1, seen["pool/l/lib_1.0_arm64.deb"])
+	assert.Len(t, pkgs, 2)
+}
+
 // TestResolveDepsUnresolved tests handling of unresolvable packages.
 func TestResolveDepsUnresolved(t *testing.T) {
 	stanza := `Package: a

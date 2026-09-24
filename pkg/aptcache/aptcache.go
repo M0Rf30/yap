@@ -416,6 +416,14 @@ func (c *Cache) makeDepVisitor(visited map[string]bool, order *[]*PackageInfo, u
 ) func(string, string) error {
 	var visit func(name, arch string) error
 
+	// visited is keyed by the *requested* name:arch, but several requests
+	// can fall back to the same index entry (arch:all packages, host-only
+	// or Multi-Arch: foreign packages reached as both :arm64 and :amd64).
+	// emitted dedupes on the resolved entry so it is listed only once;
+	// otherwise the download stage fetches the same .deb twice
+	// concurrently into one destination file and fails the SHA-256 check.
+	emitted := make(map[string]bool)
+
 	visit = func(name, arch string) error {
 		name = strings.TrimSpace(name)
 		if name == "" {
@@ -484,15 +492,31 @@ func (c *Cache) makeDepVisitor(visited map[string]bool, order *[]*PackageInfo, u
 			return err
 		}
 
-		// Only add to install list if not already installed.
+		// Only add to install list if not already installed or emitted.
 		if !info.Installed {
-			*order = append(*order, info)
+			id := resolvedEntryID(info)
+			if !emitted[id] {
+				emitted[id] = true
+
+				*order = append(*order, info)
+			}
 		}
 
 		return nil
 	}
 
 	return visit
+}
+
+// resolvedEntryID identifies a concrete index entry independently of the
+// name:arch it was requested under. The pool Filename is unique per
+// (package, version, arch); fall back to name/arch/version otherwise.
+func resolvedEntryID(info *PackageInfo) string {
+	if info.Filename != "" {
+		return info.Filename
+	}
+
+	return info.Name + ":" + info.Architecture + "=" + info.Version
 }
 
 // redirectForeignToHost redirects Multi-Arch: foreign packages to host-arch.

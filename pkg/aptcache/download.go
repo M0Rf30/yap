@@ -259,6 +259,9 @@ type downloadJob struct {
 // HTTP is attempted.
 func (c *Cache) resolveDownloadJobs(pkgs []string) ([]*downloadJob, error) {
 	jobs := make([]*downloadJob, 0, len(pkgs))
+	// Two jobs sharing a destination basename would be downloaded
+	// concurrently into the same file, corrupting it (checksum mismatch).
+	seenDest := make(map[string]bool, len(pkgs))
 
 	for _, pkg := range pkgs {
 		name := pkg
@@ -281,6 +284,13 @@ func (c *Cache) resolveDownloadJobs(pkgs []string) ([]*downloadJob, error) {
 				WithOperation("resolveDownloadJobs").
 				WithContext("package", name)
 		}
+
+		dest := filepath.Base(info.Filename)
+		if seenDest[dest] {
+			continue
+		}
+
+		seenDest[dest] = true
 
 		jobs = append(jobs, &downloadJob{name: name, info: info})
 	}
