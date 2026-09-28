@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/M0Rf30/rpmpack v0.0.0-20260516153039-ce80a51ac79c
-	github.com/ProtonMail/go-crypto v1.4.1
+	github.com/ProtonMail/go-crypto v1.5.1
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/github/go-spdx/v2 v2.7.0
