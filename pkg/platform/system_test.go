@@ -376,17 +376,17 @@ func TestPullContainersWithMockContainerRuntime(t *testing.T) {
 
 func TestConstants(t *testing.T) {
 	// Test that constants are properly defined
-	if goArchivePath == "" {
-		t.Error("goArchivePath should not be empty")
+	if goArchiveName == "" {
+		t.Error("goArchiveName should not be empty")
 	}
 
 	if goExecutable == "" {
 		t.Error("goExecutable should not be empty")
 	}
 
-	// Test expected values
-	if goArchivePath != "/tmp/go.tar.gz" {
-		t.Errorf("Expected goArchivePath to be '/tmp/go.tar.gz', got '%s'", goArchivePath)
+	// The archive must never live at a fixed, world-writable path.
+	if strings.Contains(goArchiveName, "/") {
+		t.Errorf("goArchiveName must be a bare file name, got '%s'", goArchiveName)
 	}
 
 	if goExecutable != "/usr/bin/go" {
