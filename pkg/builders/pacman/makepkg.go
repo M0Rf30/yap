@@ -71,8 +71,14 @@ func (m *Pkg) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 // if any stem fails.
 func (m *Pkg) PrepareFakeroot(ctx context.Context, artifactsPath string, targetArch string) error {
 	m.pacmanDir = m.PKGBUILD.StartDir
-	// Note: Don't override ArchComputed here - it should remain the native architecture
-	// The targetArch is used for package naming in BuildPackage method
+
+	// Resolve the cross strip environment before the target arch is stored in
+	// ArchComputed: BuildCrossStripEnvSlice is a no-op when both are equal.
+	stripEnv := m.CrossStripEnvMap(targetArch)
+
+	// Render .PKGINFO/.BUILDINFO/PKGBUILD with the target architecture so the
+	// metadata matches the artifact file name produced by BuildPackage.
+	m.SetTargetArchitecture(targetArch)
 
 	if err := m.computeBuildMetadata(artifactsPath); err != nil {
 		return err
@@ -86,7 +92,7 @@ func (m *Pkg) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 		return err
 	}
 
-	if err := m.ApplyOptionsWithEnv(m.CrossStripEnvMap(targetArch)); err != nil {
+	if err := m.ApplyOptionsWithEnv(stripEnv); err != nil {
 		return err
 	}
 
