@@ -3,6 +3,7 @@ package files
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"io"
 	"io/fs"
@@ -51,17 +52,18 @@ func (w *Walker) Walk() ([]*Entry, error) {
 			return nil
 		}
 
-		// Skip dot files if requested (common for makepkg/pacman)
+		// Skip dot files if requested (common for makepkg/pacman); a skipped
+		// directory's contents are skipped with it.
 		if w.Options.SkipDotFiles {
 			filename := filepath.Base(path)
 			if filename != "" && filename[0] == '.' {
-				return nil
+				return skipEntry(dirEntry)
 			}
 		}
 
 		// Skip files matching patterns
 		if w.shouldSkipFile(filepath.Base(path)) {
-			return nil
+			return skipEntry(dirEntry)
 		}
 
 		entry, err := w.createEntry(path, dirEntry)
@@ -136,6 +138,16 @@ func (w *Walker) createEntry(path string, dirEntry fs.DirEntry) (*Entry, error) 
 	return entry, nil
 }
 
+// skipEntry returns filepath.SkipDir for directories (pruning their contents)
+// and nil for other entries.
+func skipEntry(dirEntry fs.DirEntry) error {
+	if dirEntry.IsDir() {
+		return filepath.SkipDir
+	}
+
+	return nil
+}
+
 // shouldSkipFile checks if a file should be skipped based on patterns.
 func (w *Walker) shouldSkipFile(fileName string) bool {
 	for _, pattern := range w.Options.SkipPatterns {
@@ -182,59 +194,67 @@ func CalculateDataHash(baseDir string, skipPatterns []string) (string, error) {
 			return nil
 		}
 
-		// Skip files matching patterns
+		// Skip files matching patterns (and whole directories' contents)
 		fileName := filepath.Base(path)
 		for _, pattern := range skipPatterns {
 			if matched, _ := filepath.Match(pattern, fileName); matched {
-				return nil
+				return skipEntry(dirEntry)
 			}
 		}
 
-		relPath, err := filepath.Rel(baseDir, path)
-		if err != nil {
-			return err
-		}
-
-		fileInfo, err := dirEntry.Info()
-		if err != nil {
-			return err
-		}
-
-		// Hash file path and metadata
-		hasher.Write([]byte(relPath))
-		hasher.Write([]byte{byte(fileInfo.Mode())}) //nolint:gosec // intentional: low bits of mode
-
-		// Hash file content if it's a regular file
-		if fileInfo.Mode().IsRegular() {
-			relPath2, err := filepath.Rel(baseDir, path)
-			if err != nil {
-				return err
-			}
-
-			file, err := os.OpenInRoot(baseDir, relPath2)
-			if err != nil {
-				return err
-			}
-
-			defer func() {
-				if closeErr := file.Close(); closeErr != nil {
-					logger.Warn(i18n.T("logger.files.warn.failed_to_close_file"),
-						"path", path,
-						"error", closeErr)
-				}
-			}()
-
-			_, err = io.Copy(hasher, file)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
+		return hashEntry(hasher, baseDir, path, dirEntry)
 	})
 	if err != nil {
 		return "", err
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+// hashEntry feeds the relative path, full mode, symlink target and (for
+// regular files) content of one entry into hasher.
+func hashEntry(hasher io.Writer, baseDir, path string, dirEntry fs.DirEntry) error {
+	relPath, err := filepath.Rel(baseDir, path)
+	if err != nil {
+		return err
+	}
+
+	fileInfo, err := dirEntry.Info()
+	if err != nil {
+		return err
+	}
+
+	_, _ = hasher.Write([]byte(relPath))
+	_, _ = hasher.Write(binary.BigEndian.AppendUint32(nil, uint32(fileInfo.Mode())))
+
+	// Symlink targets are part of the payload.
+	if fileInfo.Mode()&fs.ModeSymlink != 0 {
+		target, linkErr := os.Readlink(path)
+		if linkErr != nil {
+			return linkErr
+		}
+
+		_, _ = hasher.Write([]byte(target))
+	}
+
+	if !fileInfo.Mode().IsRegular() {
+		return nil
+	}
+
+	file, err := os.OpenInRoot(baseDir, relPath)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			logger.Warn(i18n.T("logger.files.warn.failed_to_close_file"),
+				"path", path,
+				"error", closeErr)
+		}
+	}()
+
+	_, err = io.Copy(hasher, file)
+
+	return err
 }
