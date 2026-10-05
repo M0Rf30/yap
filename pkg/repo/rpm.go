@@ -52,24 +52,16 @@ func setupRPM(r *Repo) error {
 		}
 	}
 
-	var b strings.Builder
+	b := renderRPMRepo(r, gpgKey)
 
-	fmt.Fprintf(&b, "[%s]\n", r.Name)
-	fmt.Fprintf(&b, "name=%s\n", r.Name)
-	fmt.Fprintf(&b, "baseurl=%s\n", r.URL)
-	fmt.Fprintf(&b, "enabled=1\n")
-
-	if r.GPGCheck && gpgKey != "" {
-		fmt.Fprintf(&b, "gpgcheck=1\n")
-		fmt.Fprintf(&b, "gpgkey=file://%s\n", gpgKey)
-	} else {
-		fmt.Fprintf(&b, "gpgcheck=0\n")
+	if !r.GPGCheck {
+		logger.Warn(i18n.T("logger.repo.warn.unsigned_yum_repo"), "name", r.Name)
 	}
 
 	dst := filepath.Join(rpmRepoDir, "yap-"+r.Name+".repo")
 	// dnf reads /etc/yum.repos.d files as the unprivileged update process, so
 	// world-readable 0o644 is the documented mode.
-	if err := os.WriteFile(dst, []byte(b.String()), 0o644); err != nil { //nolint:gosec
+	if err := os.WriteFile(dst, []byte(b), 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			fmt.Sprintf("repo %q: write %s", r.Name, dst)).
 			WithOperation("setupRPM").
@@ -81,4 +73,28 @@ func setupRPM(r *Repo) error {
 		"gpgcheck", r.GPGCheck)
 
 	return nil
+}
+
+// renderRPMRepo renders the .repo body. An explicit GPGCheck request is always
+// honoured (gpgcheck=1), even without a KeyURL, so that keys already imported
+// into the rpm database are used instead of silently disabling verification.
+func renderRPMRepo(r *Repo, gpgKey string) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "[%s]\n", r.Name)
+	fmt.Fprintf(&b, "name=%s\n", r.Name)
+	fmt.Fprintf(&b, "baseurl=%s\n", r.URL)
+	fmt.Fprintf(&b, "enabled=1\n")
+
+	if r.GPGCheck {
+		fmt.Fprintf(&b, "gpgcheck=1\n")
+
+		if gpgKey != "" {
+			fmt.Fprintf(&b, "gpgkey=file://%s\n", gpgKey)
+		}
+	} else {
+		fmt.Fprintf(&b, "gpgcheck=0\n")
+	}
+
+	return b.String()
 }

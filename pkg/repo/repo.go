@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,12 +16,16 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // keyFetchTimeout bounds how long a GPG key download may take.
 const keyFetchTimeout = 30 * time.Second
+
+// maxKeyBytes caps the size of a downloaded GPG key (1 MiB).
+const maxKeyBytes int64 = 1 << 20
 
 // Internal format identifiers used to dispatch Setup to the per-format writer
 // and to gate yap.json `format` values supplied by users.
@@ -295,40 +298,21 @@ func fetchKey(url, dst string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), keyFetchTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
-	if err != nil {
-		return err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
+	// FetchToFile enforces a size cap, retries transient failures and writes
+	// via temp file + rename, so a failed download never leaves a truncated key.
+	if err := httpclient.FetchToFile(ctx, url, dst, maxKeyBytes); err != nil {
 		return errors.Wrap(err, errors.ErrTypeNetwork,
 			"failed to fetch repo key").
 			WithOperation("fetchKey").
-			WithContext("url", url)
-	}
-	defer closeQuiet(resp.Body, "key response body")
-
-	if resp.StatusCode != http.StatusOK {
-		return errors.New(errors.ErrTypeNetwork,
-			"failed to fetch repo key").
-			WithOperation("fetchKey").
 			WithContext("url", url).
-			WithContext("status", resp.StatusCode)
+			WithContext("path", dst)
 	}
 
-	// dst is built from a constant directory plus a sanitized repo name; apt
-	// and dnf require world-readable keys so the unprivileged update process
-	// can verify package signatures.
-	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644) //nolint:gosec
-	if err != nil {
-		return err
-	}
-	defer closeQuiet(f, dst)
-
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	// apt and dnf require world-readable keys so the unprivileged update
+	// process can verify package signatures.
+	if err := os.Chmod(dst, 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to write repo key").
+			"failed to set repo key permissions").
 			WithOperation("fetchKey").
 			WithContext("path", dst)
 	}

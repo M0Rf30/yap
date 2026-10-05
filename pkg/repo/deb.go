@@ -48,23 +48,16 @@ func setupDeb(r *Repo) error {
 		return err
 	}
 
-	var b strings.Builder
+	b := renderDebSource(r, components, signedBy)
 
-	fmt.Fprintf(&b, "Types: deb\n")
-	fmt.Fprintf(&b, "URIs: %s\n", r.URL)
-	fmt.Fprintf(&b, "Suites: %s\n", r.Suite)
-	fmt.Fprintf(&b, "Components: %s\n", strings.Join(components, " "))
-
-	if signedBy != "" {
-		fmt.Fprintf(&b, "Signed-By: %s\n", signedBy)
-	} else {
-		fmt.Fprintf(&b, "Trusted: yes\n")
+	if signedBy == "" && !r.GPGCheck {
+		logger.Warn(i18n.T("logger.repo.warn.unsigned_apt_source"), "name", r.Name)
 	}
 
 	dst := filepath.Join(debSourcesDir, "yap-"+r.Name+".sources")
 	// apt must read this file as the unprivileged _apt user, so it has to be
 	// world-readable; gosec's stricter 0o600 default does not apply here.
-	if err := os.WriteFile(dst, []byte(b.String()), 0o644); err != nil { //nolint:gosec
+	if err := os.WriteFile(dst, []byte(b), 0o644); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			fmt.Sprintf("repo %q: write %s", r.Name, dst)).
 			WithOperation("setupDeb").
@@ -76,4 +69,26 @@ func setupDeb(r *Repo) error {
 		"signed", signedBy != "")
 
 	return nil
+}
+
+// renderDebSource renders the deb822 body. "Trusted: yes" (which disables apt
+// signature verification) is emitted only when there is no signing key AND
+// GPGCheck was not requested; with GPGCheck apt falls back to its system
+// keyrings and refuses unsigned indexes.
+func renderDebSource(r *Repo, components []string, signedBy string) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "Types: deb\n")
+	fmt.Fprintf(&b, "URIs: %s\n", r.URL)
+	fmt.Fprintf(&b, "Suites: %s\n", r.Suite)
+	fmt.Fprintf(&b, "Components: %s\n", strings.Join(components, " "))
+
+	switch {
+	case signedBy != "":
+		fmt.Fprintf(&b, "Signed-By: %s\n", signedBy)
+	case !r.GPGCheck:
+		fmt.Fprintf(&b, "Trusted: yes\n")
+	}
+
+	return b.String()
 }

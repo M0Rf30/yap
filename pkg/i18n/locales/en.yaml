@@ -1414,6 +1414,10 @@
   translation: "Rpm --import failed (non-fatal; dnf will still verify via gpgkey= in .repo)"
 - id: logger.repo.warn.unknown_distro_skipping_repo
   translation: "Unknown distro, skipping repo setup"
+- id: logger.repo.warn.unsigned_apt_source
+  translation: "Apt repo has no signing key; marking it Trusted: yes disables signature verification"
+- id: logger.repo.warn.unsigned_yum_repo
+  translation: "Yum repo has gpgcheck=0; package signatures will not be verified"
 - id: logger.repo.warn.unsupported_format_skipping
   translation: "Unsupported format, skipping"
 - id: logger.rootless.info.extracting_rootfs
