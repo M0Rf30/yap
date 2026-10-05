@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -53,7 +54,10 @@ func PullImage(distro string) error {
 	ref := constants.DockerOrg + distro
 	logger.Info(i18n.T("logger.rootless.info.pulling_image"), "ref", ref)
 
-	img, err := crane.Pull(ref)
+	img, err := crane.Pull(ref, crane.WithPlatform(&v1.Platform{
+		OS:           "linux",
+		Architecture: runtime.GOARCH,
+	}))
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeNetwork,
 			fmt.Sprintf("failed to pull image %s", ref)).
@@ -87,57 +91,134 @@ func PullImage(distro string) error {
 	return extractRootfs(img, distro)
 }
 
+// resolveEntry maps an archive entry name to a host path inside destDir. The
+// parent directory is resolved with chroot semantics through symlinks that
+// already exist on disk (see safepath.ResolveInRoot); the final component is
+// left unresolved so entries replace, rather than follow, an existing link.
+func resolveEntry(destDir, name string) (string, error) {
+	rel := filepath.Clean("/" + name)
+	if rel == "/" {
+		return destDir, nil
+	}
+
+	parent, err := safepath.ResolveInRoot(destDir, filepath.Dir(rel))
+	if err != nil {
+		return "", err //nolint:wrapcheck // wrapped by callers with entry context
+	}
+
+	return filepath.Join(parent, filepath.Base(rel)), nil
+}
+
 // extractRootfs flattens all image layers into a rootfs directory.
-// Existing rootfs is removed and recreated to ensure a clean state.
+// The image is extracted into a sibling temporary directory and swapped into
+// place only once extraction succeeded, so a failed pull never leaves a
+// half-populated rootfs at the path RunInRootless treats as valid.
 func extractRootfs(img v1.Image, distro string) error {
 	rootfs, err := rootfsPath(distro)
 	if err != nil {
 		return err
 	}
 
-	// Remove stale rootfs before re-extracting.
-	if err := os.RemoveAll(rootfs); err != nil {
+	if err := os.MkdirAll(filepath.Dir(rootfs), 0o755); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to remove stale rootfs").
+			"failed to create rootfs parent directory").
+			WithOperation("extractRootfs").
+			WithContext("path", filepath.Dir(rootfs))
+	}
+
+	tmp, err := os.MkdirTemp(filepath.Dir(rootfs), "."+distro+".tmp-")
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			"failed to create temporary rootfs directory").
 			WithOperation("extractRootfs").
 			WithContext("path", rootfs)
 	}
 
-	if err := os.MkdirAll(rootfs, 0o755); err != nil {
+	if err := exportToDir(img, tmp); err != nil {
+		_ = os.RemoveAll(tmp)
+
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to create rootfs directory").
+			"failed to extract rootfs").
 			WithOperation("extractRootfs").
-			WithContext("path", rootfs)
+			WithContext("distro", distro)
 	}
 
+	if err := swapRootfs(tmp, rootfs); err != nil {
+		_ = os.RemoveAll(tmp)
+
+		return err
+	}
+
+	logger.Info(i18n.T("logger.rootless.info.rootfs_ready"), "path", rootfs)
+
+	return nil
+}
+
+// exportToDir flattens img into destDir, propagating failures in either the
+// export goroutine or the tar extraction to the other side so neither leaks.
+func exportToDir(img v1.Image, destDir string) error {
 	// crane.Export flattens all layers into a single tar stream.
 	pr, pw := io.Pipe()
 
 	exportErr := make(chan error, 1)
 
 	go func() {
-		exportErr <- crane.Export(img, pw)
+		err := crane.Export(img, pw)
 
-		if err := pw.Close(); err != nil {
-			logger.Warn(i18n.T("logger.rootless.warn.pipe_writer_close_error"), "error", err)
-		}
+		_ = pw.CloseWithError(err) // nil err behaves like Close (io.EOF)
+
+		exportErr <- err
 	}()
 
-	if err := extractTar(pr, rootfs); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to extract rootfs tar").
-			WithOperation("extractRootfs").
-			WithContext("distro", distro)
+	if err := extractTar(pr, destDir); err != nil {
+		// Unblock the export goroutine's pending write, then wait for it.
+		_ = pr.CloseWithError(err)
+
+		<-exportErr
+
+		return err
 	}
 
 	if err := <-exportErr; err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to export image layers").
-			WithOperation("extractRootfs").
-			WithContext("distro", distro)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to export image layers").
+			WithOperation("exportToDir")
 	}
 
-	logger.Info(i18n.T("logger.rootless.info.rootfs_ready"), "path", rootfs)
+	return nil
+}
+
+// swapRootfs moves the freshly extracted tree at newDir to rootfs, replacing
+// any existing rootfs. The previous rootfs is restored if the swap fails.
+func swapRootfs(newDir, rootfs string) error {
+	backup := ""
+
+	if _, err := os.Lstat(rootfs); err == nil {
+		backup = newDir + ".old"
+
+		if err := os.Rename(rootfs, backup); err != nil {
+			return errors.Wrap(err, errors.ErrTypeFileSystem,
+				"failed to move stale rootfs aside").
+				WithOperation("swapRootfs").
+				WithContext("path", rootfs)
+		}
+	}
+
+	if err := os.Rename(newDir, rootfs); err != nil {
+		if backup != "" {
+			_ = os.Rename(backup, rootfs)
+		}
+
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to install new rootfs").
+			WithOperation("swapRootfs").
+			WithContext("path", rootfs)
+	}
+
+	if backup != "" {
+		if err := os.RemoveAll(backup); err != nil {
+			logger.Warn(i18n.T("logger.rootless.warn.failed_remove_rootlesskit_state"),
+				"path", backup, "error", err)
+		}
+	}
 
 	return nil
 }
@@ -167,8 +248,16 @@ func extractTar(r io.Reader, destDir string) error {
 			continue
 		}
 
-		// Sanitize path to prevent traversal (zip-slip).
-		target, err := safepath.Join(destDir, hdr.Name)
+		// Sanitize path to prevent traversal (zip-slip), then resolve the
+		// parent through symlinks planted by earlier entries so later
+		// writes cannot be redirected outside destDir.
+		if _, err := safepath.Join(destDir, hdr.Name); err != nil {
+			return errors.Wrap(err, errors.ErrTypeValidation, "unsafe tar entry path").
+				WithOperation("extractTar").
+				WithContext("entry", hdr.Name)
+		}
+
+		target, err := resolveEntry(destDir, hdr.Name)
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeValidation, "unsafe tar entry path").
 				WithOperation("extractTar").
@@ -183,11 +272,25 @@ func extractTar(r io.Reader, destDir string) error {
 	return nil
 }
 
+// extractDir creates a directory entry. The full path is resolved through
+// existing symlinks (chroot semantics) so an entry such as "var/run/" where
+// run -> /run lands inside destDir instead of creating host directories.
+func extractDir(hdr *tar.Header, destDir string) error {
+	dir, err := safepath.ResolveInRoot(destDir, hdr.Name)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeValidation, "unsafe directory in layer").
+			WithOperation("extractDir").
+			WithContext("entry", hdr.Name)
+	}
+
+	return os.MkdirAll(dir, os.FileMode(hdr.Mode)) //nolint:gosec
+}
+
 // extractTarEntry handles a single tar entry.
 func extractTarEntry(tr *tar.Reader, hdr *tar.Header, target, destDir string) error {
 	switch hdr.Typeflag {
 	case tar.TypeDir:
-		return os.MkdirAll(target, os.FileMode(hdr.Mode)) //nolint:gosec
+		return extractDir(hdr, destDir)
 
 	case tar.TypeReg:
 		return extractRegularFile(tr, hdr, target)
@@ -207,6 +310,12 @@ func extractRegularFile(tr *tar.Reader, hdr *tar.Header, target string) error {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create parent directory").
 			WithOperation("extractRegularFile").
 			WithContext("path", target)
+	}
+
+	// A layer replacing a symlink with a regular file must replace the link,
+	// not write through it (O_TRUNC follows symlinks).
+	if fi, err := os.Lstat(target); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		_ = os.Remove(target)
 	}
 
 	f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode)) //nolint:gosec
@@ -250,7 +359,15 @@ func extractSymlink(hdr *tar.Header, target, destDir string) error {
 }
 
 func extractHardLink(hdr *tar.Header, target, destDir string) error {
-	linkTarget := filepath.Join(destDir, filepath.Clean("/"+hdr.Linkname)) //nolint:gosec
+	// Resolve the link source through already-extracted symlinks with chroot
+	// semantics so it cannot point outside destDir; the final component is
+	// kept as-is so a hard link to a symlink links the symlink itself.
+	linkTarget, err := resolveEntry(destDir, hdr.Linkname)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeValidation, "unsafe hard link in layer").
+			WithOperation("extractHardLink").
+			WithContext("link_target", hdr.Linkname)
+	}
 
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create parent directory").
