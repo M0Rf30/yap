@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/deb822"
@@ -344,85 +345,13 @@ func addSourceEntries(entries *[]SourceEntry, rawURL string, curSuites, curCompo
 	}
 }
 
-// debReposState holds the state of a deb822 repo stanza being parsed.
-type debReposState struct {
-	curTypes      string
-	curURIs       string
-	curSuites     string
-	curComponents string
-	curArchs      string
-	curSignedBy   string
-}
-
-// handleDebReposLineContinuation handles continuation lines in a deb822 repo stanza.
-func handleDebReposLineContinuation(line string, st *debReposState) {
-	trimmed := strings.TrimSpace(line)
-	switch {
-	case st.curURIs != "" && strings.HasPrefix(line, " "):
-		st.curURIs += " " + trimmed
-	case st.curSuites != "" && strings.HasPrefix(line, " "):
-		st.curSuites += " " + trimmed
-	case st.curComponents != "" && strings.HasPrefix(line, " "):
-		st.curComponents += " " + trimmed
-	case st.curArchs != "" && strings.HasPrefix(line, " "):
-		st.curArchs += " " + trimmed
-	}
-}
-
-// handleDebReposLineField handles field lines in a deb822 repo stanza.
-func handleDebReposLineField(field, value string, st *debReposState) {
-	switch field {
-	case "Types":
-		st.curTypes = value
-	case "URIs":
-		st.curURIs = value
-	case "Suites":
-		st.curSuites = value
-	case "Components":
-		st.curComponents = value
-	case "Architectures":
-		st.curArchs = value
-	case "Signed-By":
-		st.curSignedBy = value
-	}
-}
-
-// handleDebReposLine processes a single line from a deb822 repo stanza.
-// Returns nothing; mutates state. Handles blank line (flush), continuation, or field.
-func handleDebReposLine(line string, st *debReposState, entries *[]SourceEntry) {
-	// Blank line → end of stanza
-	if line == "" {
-		flushDeb822RepoStanza(entries, st.curTypes, st.curURIs, st.curSuites, st.curComponents, st.curArchs, st.curSignedBy)
-		*st = debReposState{}
-
-		return
-	}
-
-	// Continuation line (starts with space) — append to current field
-	if line != "" && (line[0] == ' ' || line[0] == '\t') {
-		handleDebReposLineContinuation(line, st)
-
-		return
-	}
-
-	// Field line: "FieldName: value"
-	field, value, ok := strings.Cut(line, ":")
-	if !ok {
-		return
-	}
-
-	field = strings.TrimSpace(field)
-	value = strings.TrimSpace(value)
-
-	handleDebReposLineField(field, value, st)
-}
-
 // parseDeb822SourcesListForRepo parses /etc/apt/sources.list.d/*.sources format and returns SourceEntry slice.
 func parseDeb822SourcesListForRepo(content string) []SourceEntry {
 	var entries []SourceEntry
 
 	_ = deb822.Parse(strings.NewReader(content), func(stanzaMap deb822.Stanza) error {
-		flushDeb822RepoStanza(&entries, stanzaMap["Types"], stanzaMap["URIs"], stanzaMap["Suites"], stanzaMap["Components"], stanzaMap["Architectures"], stanzaMap["Signed-By"]) //nolint:lll
+		flushDeb822RepoStanza(&entries, stanzaMap)
+
 		return nil
 	})
 
@@ -430,12 +359,16 @@ func parseDeb822SourcesListForRepo(content string) []SourceEntry {
 }
 
 // flushDeb822RepoStanza processes a completed deb822 repo stanza by extracting URIs and adding SourceEntry records.
-// Only processes stanzas with all required fields (Types, URIs, Suites, Components).
-func flushDeb822RepoStanza(
-	entries *[]SourceEntry,
-	curTypes, curURIs, curSuites, curComponents, curArchs, curSignedBy string,
-) {
-	if curTypes == "" || curURIs == "" || curSuites == "" || curComponents == "" {
+// Only processes enabled stanzas that declare the binary "deb" type and carry
+// all required fields (Types, URIs, Suites, Components). deb-src-only and
+// "Enabled: no" stanzas are skipped, matching the legacy one-line parser.
+func flushDeb822RepoStanza(entries *[]SourceEntry, stanza deb822.Stanza) {
+	curURIs, curSuites, curComponents := stanza["URIs"], stanza["Suites"], stanza["Components"]
+	if curURIs == "" || curSuites == "" || curComponents == "" {
+		return
+	}
+
+	if !slices.Contains(strings.Fields(stanza["Types"]), "deb") || !deb822Enabled(stanza) {
 		return
 	}
 
@@ -445,6 +378,18 @@ func flushDeb822RepoStanza(
 			continue
 		}
 
-		addSourceEntries(entries, rawURL, curSuites, curComponents, curArchs, curSignedBy)
+		addSourceEntries(entries, rawURL, curSuites, curComponents,
+			stanza["Architectures"], stanza["Signed-By"])
+	}
+}
+
+// deb822Enabled reports whether the stanza is active. Per sources.list(5) the
+// Enabled field defaults to yes; only an explicit negative disables it.
+func deb822Enabled(stanza deb822.Stanza) bool {
+	switch strings.ToLower(strings.TrimSpace(stanza["Enabled"])) {
+	case "no", "false", "0":
+		return false
+	default:
+		return true
 	}
 }
