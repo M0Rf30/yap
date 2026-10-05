@@ -52,13 +52,6 @@ func LoadAptListsForTesting(c *Cache, dir string) error {
 	return c.loadAptLists(dir, map[string]sourceInfo{})
 }
 
-// DownloadAndVerifyForTesting exposes downloadAndVerify for safety tests.
-func DownloadAndVerifyForTesting(
-	ctx context.Context, pkgURL, destFile, expectedSHA256 string, expectedSize int64,
-) error {
-	return downloadAndVerify(ctx, pkgURL, destFile, expectedSHA256, expectedSize)
-}
-
 // DownloadWithClientForTesting exposes downloadWithClient so tests can
 // inject a fake grab.Client (custom HTTPClient/transport) to exercise the
 // http->https fallback path deterministically, without real network I/O.
