@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/klauspost/compress/gzip"
@@ -260,8 +261,13 @@ func tryReadPkgInfoFromNextStream(br *bufio.Reader) (string, error) {
 	return pkgInfo, nil
 }
 
-// extractAPKData reads the data.tar.gz stream from an APK file and extracts files to the filesystem.
+// extractAPKData reads the data.tar.gz stream from an APK file and extracts files to /.
 func extractAPKData(r io.Reader) error {
+	return extractAPKDataTo(r, "/")
+}
+
+// extractAPKDataTo is extractAPKData with an explicit destination root.
+func extractAPKDataTo(r io.Reader, root string) error {
 	gz2, err := gzip.NewReader(r)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeParser, "failed to create gzip reader for data stream").
@@ -282,7 +288,7 @@ func extractAPKData(r io.Reader) error {
 				WithOperation("extractAPKData")
 		}
 
-		if err := extractAPKEntry(tr2, hdr); err != nil {
+		if err := extractAPKEntryAt(tr2, hdr, root); err != nil {
 			return err
 		}
 	}
@@ -306,6 +312,33 @@ func safeAPKPath(entryName string) (string, bool) {
 	return p, true
 }
 
+// resolveAPKEntry maps an archive member name to a host path under root.
+// With root "/" this is safeAPKPath. Otherwise every component of the
+// directory part (or of the whole name when full is set) is resolved with
+// chroot semantics so pre-existing symlinks cannot redirect the write.
+func resolveAPKEntry(root, name string, full bool) (string, bool) {
+	abs, ok := safeAPKPath(name)
+	if !ok {
+		return "", false
+	}
+
+	if root == "/" {
+		return abs, true
+	}
+
+	if full {
+		p, err := safepath.ResolveInRoot(root, abs)
+		return p, err == nil
+	}
+
+	parent, err := safepath.ResolveInRoot(root, filepath.Dir(abs))
+	if err != nil {
+		return "", false
+	}
+
+	return filepath.Join(parent, filepath.Base(abs)), true
+}
+
 // safeAPKSymlinkTarget rejects symlink targets that would escape the
 // filesystem root via "..". Absolute targets are permitted because APK
 // packages commonly ship absolute symlinks (/usr/bin/foo → /usr/bin/bar).
@@ -314,10 +347,15 @@ func safeAPKSymlinkTarget(linkPath, target string) error {
 	return safepath.SymlinkTarget("/", linkPath, target)
 }
 
-// extractAPKEntry extracts a single tar entry to the filesystem.
-// Handles regular files, directories, and symlinks with proper sanitization.
+// extractAPKEntry extracts a single tar entry to the filesystem root.
 func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
-	targetPath, ok := safeAPKPath(hdr.Name)
+	return extractAPKEntryAt(tr, hdr, "/")
+}
+
+// extractAPKEntryAt extracts a single tar entry below root.
+// Handles regular files, directories, and symlinks with proper sanitization.
+func extractAPKEntryAt(tr *tar.Reader, hdr *tar.Header, root string) error {
+	targetPath, ok := resolveAPKEntry(root, hdr.Name, hdr.Typeflag == tar.TypeDir)
 	if !ok {
 		logger.Warn(i18n.T("logger.apkindex.warn.skipping_unsafe_path_apk"), "path", hdr.Name)
 
@@ -336,12 +374,7 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 		return extractAPKRegular(tr, hdr, targetPath)
 
 	case tar.TypeDir:
-		// Directory.
-		if err := os.MkdirAll(targetPath, os.FileMode(hdr.Mode)); err != nil { //nolint:gosec
-			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create directory").
-				WithOperation("extractAPKEntry").
-				WithContext("path", targetPath)
-		}
+		return extractAPKDir(hdr, targetPath)
 
 	case tar.TypeSymlink:
 		if err := safeAPKSymlinkTarget(targetPath, hdr.Linkname); err != nil {
@@ -366,8 +399,34 @@ func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
 		// package ships usr/bin/c++ as the regular file and usr/bin/g++,
 		// usr/bin/x86_64-alpine-linux-musl-g++ as hardlinks to it.
 		// Dropping them left build-base "installed" without a g++.
-		if err := extractAPKHardlink(hdr, targetPath); err != nil {
-			return err
+		linkSrc, ok := resolveAPKEntry(root, hdr.Linkname, true)
+		if !ok {
+			logger.Warn(i18n.T("logger.apkindex.warn.skipping_unsafe_path_apk"), "path", hdr.Linkname)
+
+			return nil
+		}
+
+		return hardlinkOrCopy(linkSrc, targetPath, hdr.FileInfo().Mode())
+	}
+
+	return nil
+}
+
+// extractAPKDir creates a directory entry, preserving special mode bits.
+func extractAPKDir(hdr *tar.Header, targetPath string) error {
+	mode := hdr.FileInfo().Mode()
+
+	if err := os.MkdirAll(targetPath, mode.Perm()); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create directory").
+			WithOperation("extractAPKEntry").
+			WithContext("path", targetPath)
+	}
+
+	if mode&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+		if err := os.Chmod(targetPath, mode); err != nil {
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set directory permissions").
+				WithOperation("extractAPKEntry").
+				WithContext("path", targetPath)
 		}
 	}
 
@@ -415,7 +474,7 @@ func extractAPKRegular(tr *tar.Reader, hdr *tar.Header, targetPath string) error
 
 	// Preserve permissions before the rename so the file is in its final
 	// state when it becomes visible at targetPath.
-	if err := os.Chmod(tmpPath, os.FileMode(hdr.Mode)); err != nil { //nolint:gosec
+	if err := os.Chmod(tmpPath, hdr.FileInfo().Mode()); err != nil {
 		_ = os.Remove(tmpPath)
 
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set file permissions").
@@ -435,27 +494,15 @@ func extractAPKRegular(tr *tar.Reader, hdr *tar.Header, targetPath string) error
 	return nil
 }
 
-// extractAPKHardlink materialises a tar hardlink entry (typeflag '1').
-//
-// Linkname is archive-relative and passes through the same containment
-// check as the entry name. When os.Link fails (cross-device, filesystem
-// without hardlink support, target skipped) the target is copied instead:
-// a divergent copy beats a missing binary.
-func extractAPKHardlink(hdr *tar.Header, targetPath string) error {
-	linkSrc, ok := safeAPKPath(hdr.Linkname)
-	if !ok {
-		logger.Warn(i18n.T("logger.apkindex.warn.skipping_unsafe_path_apk"), "path", hdr.Linkname)
-
-		return nil
-	}
-
+// hardlinkOrCopy links linkSrc to targetPath, falling back to a copy.
+func hardlinkOrCopy(linkSrc, targetPath string, mode os.FileMode) error {
 	_ = os.Remove(targetPath)
 
 	if err := os.Link(linkSrc, targetPath); err == nil {
 		return nil
 	}
 
-	in, err := os.Open(linkSrc) //nolint:gosec // path validated by safeAPKPath
+	in, err := os.Open(linkSrc) //nolint:gosec // path validated by caller
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open hardlink target").
 			WithOperation("extractAPKHardlink").
@@ -464,7 +511,7 @@ func extractAPKHardlink(hdr *tar.Header, targetPath string) error {
 
 	defer func() { _ = in.Close() }()
 
-	out, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(hdr.Mode)) //nolint:gosec
+	out, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode.Perm()) //nolint:gosec
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create hardlink copy").
 			WithOperation("extractAPKHardlink").
@@ -479,7 +526,18 @@ func extractAPKHardlink(hdr *tar.Header, targetPath string) error {
 			WithContext("path", targetPath)
 	}
 
-	return out.Close()
+	if err := out.Close(); err != nil {
+		return err //nolint:wrapcheck
+	}
+
+	// OpenFile applies the umask and drops setuid/setgid/sticky.
+	if err := os.Chmod(targetPath, mode); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set file permissions").
+			WithOperation("extractAPKHardlink").
+			WithContext("path", targetPath)
+	}
+
+	return nil
 }
 
 // registerInstalled writes a package stanza into /lib/apk/db/installed.
@@ -502,28 +560,7 @@ func registerInstalledAt(dbPath string, pkg *Package, pkgInfo string) error {
 	// Read existing DB → stanza map keyed by package name.
 	existing := readInstalledStanzasAt(dbPath)
 
-	// Build the new stanza.
-	var stanza string
-
-	if pkgInfo != "" {
-		stanza = pkgInfo
-	} else {
-		// Build stanza manually without fmt.Sprintf
-		var sb strings.Builder
-		sb.WriteString("P:")
-		sb.WriteString(pkg.Name)
-		sb.WriteString("\nV:")
-		sb.WriteString(pkg.Version)
-		sb.WriteString("\nA:")
-		sb.WriteString(pkg.Arch)
-		sb.WriteString("\nI:")
-		// Convert int64 to string
-		sb.WriteString(string(rune(pkg.InstSize))) //nolint:gosec
-		sb.WriteString("\n")
-		stanza = sb.String()
-	}
-
-	existing[pkg.Name] = strings.TrimRight(stanza, "\n") + "\n"
+	existing[pkg.Name] = buildInstalledStanza(pkg, pkgInfo)
 
 	return writeInstalledStanzasAt(dbPath, existing)
 }
@@ -641,4 +678,52 @@ func writeInstalledStanzasAt(dbPath string, stanzas map[string]string) error {
 	}
 
 	return nil
+}
+
+// buildInstalledStanza synthesises an installed-db stanza (single-letter
+// tags, as read by readInstalledStanzasAt) from the index entry. Dependency
+// and provides lists missing from the index are taken from .PKGINFO.
+func buildInstalledStanza(pkg *Package, pkgInfo string) string {
+	depends, provides := pkg.Depends, pkg.Provides
+
+	for line := range strings.SplitSeq(pkgInfo, "\n") {
+		key, val, ok := strings.Cut(line, " = ")
+		if !ok {
+			continue
+		}
+
+		switch strings.TrimSpace(key) {
+		case "depend":
+			if len(pkg.Depends) == 0 {
+				depends = append(depends, val)
+			}
+		case "provides":
+			if len(pkg.Provides) == 0 {
+				provides = append(provides, val)
+			}
+		}
+	}
+
+	var sb strings.Builder
+
+	add := func(tag, val string) {
+		if val != "" {
+			sb.WriteString(tag + ":" + val + "\n")
+		}
+	}
+
+	add("P", pkg.Name)
+	add("V", pkg.Version)
+	add("A", pkg.Arch)
+	add("S", strconv.FormatInt(pkg.Size, 10))
+	add("I", strconv.FormatInt(pkg.InstSize, 10))
+	add("T", pkg.Description)
+	add("U", pkg.URL)
+	add("L", pkg.License)
+	add("o", pkg.Origin)
+	add("m", pkg.Maintainer)
+	add("D", strings.Join(depends, " "))
+	add("p", strings.Join(provides, " "))
+
+	return sb.String()
 }

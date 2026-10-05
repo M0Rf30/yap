@@ -161,10 +161,9 @@ func TestResolveDeps(t *testing.T) {
 	})
 
 	t.Run("nonexistent package", func(t *testing.T) {
-		// Should not error; just skip the nonexistent package.
-		resolved, err := idx.ResolveDeps([]string{"nonexistent"})
-		require.NoError(t, err)
-		assert.Len(t, resolved, 0)
+		// Unknown seed packages are an error.
+		_, err := idx.ResolveDeps([]string{"nonexistent"})
+		require.Error(t, err)
 	})
 }
 
