@@ -2,11 +2,35 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/M0Rf30/yap/v2/cmd/yap/command"
 	"github.com/M0Rf30/yap/v2/pkg/container"
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
 )
+
+// containerTagRe restricts distro and release strings forwarded into a
+// container argv/image tag to a conservative charset, so they can never
+// carry shell metacharacters or option-like values.
+var containerTagRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// validateContainerTag rejects distro/release values that are not plain
+// tag-safe identifiers. An empty value is allowed (bare family / no release).
+func validateContainerTag(label, v string) error {
+	if v == "" || containerTagRe.MatchString(v) {
+		return nil
+	}
+
+	return errors.New(errors.ErrTypeValidation,
+		"invalid "+label+" "+v+": only letters, digits, '.', '_' and '-' are allowed").
+		WithOperation(toolNameBuild).
+		WithContext(label, v)
+}
 
 // dispatchBuildInContainer mirrors the CLI's RunPipelineInContainer flow for
 // the MCP build tool. It runs the build asynchronously (so the tool call
@@ -22,25 +46,42 @@ import (
 // match) fails the build session immediately rather than silently falling
 // back to a native host build of the wrong distro.
 //
-// Returns (result, true) when dispatch was scheduled or was rejected as a
-// failed session; (_, false) when no container runtime is available — the
-// caller should then fall back to the native in-process build path.
+// The caller invokes this only when the user explicitly requested a distro.
+// When no container runtime is available that is an error: silently building
+// natively would produce a package for the wrong distro.
 func dispatchBuildInContainer(args *buildArgs, abs, distro, release string,
-) (buildStartResult, bool) {
+) (buildStartResult, error) {
+	if err := validateContainerTag("distro", distro); err != nil {
+		return buildStartResult{}, err
+	}
+
+	if err := validateContainerTag("release", release); err != nil {
+		return buildStartResult{}, err
+	}
+
 	rt, err := container.Detect(command.ContainerRuntimeOverride())
 	if err != nil || rt == nil {
-		return buildStartResult{}, false
+		cause := err
+		if cause == nil {
+			cause = errors.New(errors.ErrTypeConfiguration, "no container runtime found")
+		}
+
+		return buildStartResult{}, errors.Wrap(cause, errors.ErrTypeConfiguration,
+			"container runtime unavailable for distro "+distro+
+				"; omit distro to build natively on the host").
+			WithOperation(toolNameBuild).
+			WithContext("distro", distro)
 	}
 
 	distroTag := innerDistroTag(distro, release)
 
 	image, err := command.ResolveContainerImage(distro, release)
 	if err != nil {
-		return containerImageResolutionFailure(distro, release, abs, err), true
+		return containerImageResolutionFailure(distro, release, abs, err), nil
 	}
 
-	cliArgs := buildCLIArgsFromArgs(args, distroTag)
 	skipPrepare := args.SkipSyncDeps || args.NoMakeDeps
+	shellCmd := containerShellCmd(args, distroTag, skipPrepare)
 
 	// Secrets (passphrase) travel via env, never as CLI args — argv is
 	// visible to other processes on the host via `ps`.
@@ -49,12 +90,13 @@ func dispatchBuildInContainer(args *buildArgs, abs, distro, release string,
 	sess, ctx := defaultRegistry.Register(context.Background(), distro, release, abs)
 	defaultRegistry.UpdateContainer(sess.ID, string(rt.Type()), image)
 
-	go func() {
-		shellCmd := "yap " + shell.Join(cliArgs)
-		if !skipPrepare {
-			shellCmd = "yap prepare " + distroTag + " && " + shellCmd
-		}
+	// Container builds write artifacts to the project's output dir, which for
+	// yap.json projects is usually a subdirectory of the mounted project.
+	if out := containerOutputDir(abs); out != "" {
+		defaultRegistry.SetOutputDir(sess.ID, out)
+	}
 
+	go func() {
 		// Capture container stdout+stderr into the session's bounded log so
 		// MCP clients can retrieve it via build_status. Pass the session
 		// context so build_cancel can terminate the container.
@@ -81,7 +123,76 @@ func dispatchBuildInContainer(args *buildArgs, abs, distro, release string,
 		InContainer:      true,
 		ContainerRuntime: string(rt.Type()),
 		ContainerImage:   image,
-	}, true
+	}, nil
+}
+
+// containerShellCmd builds the single shell string run inside the builder
+// container: an optional `yap prepare` (so makedeps are installed) chained
+// before `yap build`. Every argument of both halves goes through shell.Join,
+// so no MCP-supplied string is ever spliced into the shell unquoted.
+func containerShellCmd(args *buildArgs, distroTag string, skipPrepare bool) string {
+	shellCmd := "yap " + shell.Join(buildCLIArgsFromArgs(args, distroTag))
+	if skipPrepare {
+		return shellCmd
+	}
+
+	return "yap " + shell.Join(prepareCLIArgs(args, distroTag)) + " && " + shellCmd
+}
+
+// prepareCLIArgs builds the inner `yap prepare` argv. Like the CLI's
+// forwardedPrepareFlags it carries the extra repositories and cross arch so
+// makedeps resolve against the same vendor repos and toolchain as the build.
+func prepareCLIArgs(args *buildArgs, distroTag string) []string {
+	c := []string{"prepare", distroTag}
+
+	for _, r := range args.ExtraRepos {
+		c = append(c, "--repo", r)
+	}
+
+	if args.TargetArch != "" {
+		c = append(c, "--target-arch", args.TargetArch)
+	}
+
+	if args.SkipToolchainValidation {
+		c = append(c, "--skip-toolchain-validation")
+	}
+
+	return c
+}
+
+// containerOutputDir returns the HOST path where a container build of the
+// project at abs leaves its artifacts, or "" when it cannot be determined.
+// PKGBUILD projects output into the project dir itself; yap.json projects use
+// the file's "output" field, resolved against the in-container mount point.
+func containerOutputDir(abs string) string {
+	if _, err := os.Stat(filepath.Join(abs, "PKGBUILD")); err == nil {
+		return abs
+	}
+
+	data, err := os.ReadFile(filepath.Join(abs, "yap.json")) //nolint:gosec // user-selected project
+	if err != nil {
+		return ""
+	}
+
+	var cfg struct {
+		Output string `json:"output"`
+	}
+
+	if err := json.Unmarshal(data, &cfg); err != nil || cfg.Output == "" {
+		return ""
+	}
+
+	if !filepath.IsAbs(cfg.Output) {
+		return filepath.Join(abs, cfg.Output)
+	}
+
+	// Absolute output: only recoverable when it lives under the mount point.
+	rel, err := filepath.Rel(containerProjectDir, cfg.Output)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return ""
+	}
+
+	return filepath.Join(abs, rel)
 }
 
 // innerDistroTag derives the distro/release identity forwarded to the inner
@@ -116,15 +227,31 @@ func containerImageResolutionFailure(distro, release, abs string, err error) bui
 }
 
 // buildEnvFromArgs returns extra env vars to forward into the build
-// container. Currently used only to keep the signing passphrase off the
-// argv — yap's signing.Resolve* helpers already read YAP_SIGN_PASSPHRASE
-// from the environment.
+// container. It keeps the signing passphrase off the argv — yap's
+// signing.Resolve* helpers already read YAP_SIGN_PASSPHRASE from the
+// environment — and carries the apt unverified-repo opt-in as
+// YAP_ALLOW_UNVERIFIED_REPOS so the chained `yap prepare` step (which has no
+// such flag) honours it too.
 func buildEnvFromArgs(args *buildArgs) map[string]string {
-	if !args.Sign || args.SignPassphrase == "" {
-		return nil
+	var env map[string]string
+
+	set := func(k, v string) {
+		if env == nil {
+			env = map[string]string{}
+		}
+
+		env[k] = v
 	}
 
-	return map[string]string{"YAP_SIGN_PASSPHRASE": args.SignPassphrase}
+	if args.Sign && args.SignPassphrase != "" {
+		set("YAP_SIGN_PASSPHRASE", args.SignPassphrase)
+	}
+
+	if args.UnverifiedRepos {
+		set("YAP_ALLOW_UNVERIFIED_REPOS", "1")
+	}
+
+	return env
 }
 
 // containerProjectDir is where the host project dir is mounted inside every
@@ -152,8 +279,8 @@ func appendBoolFlags(c []string, a *buildArgs) []string {
 	}{
 		{a.UnverifiedRepos, "--allow-unverified-repos"},
 		{a.CleanBuild, "--cleanbuild"},
-		{a.SkipSyncDeps, "--skip-sync-deps"},
-		{a.NoMakeDeps, "--no-make-deps"},
+		{a.SkipSyncDeps, "--skip-sync"},
+		{a.NoMakeDeps, "--no-makedeps"},
 		{a.NoBuild, "--no-build"},
 		{a.SkipHashCheck, "--skip-hash-check"},
 		{a.NoCheck, "--nocheck"},

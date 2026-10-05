@@ -10,6 +10,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 
 	"github.com/M0Rf30/yap/v2/cmd/yap/command"
+	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/container"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -198,12 +199,17 @@ func registerBuildAndStatus(srv *mcpsdk.Server) {
 			return nil, buildStartResult{}, err
 		}
 
-		// Run cross-distro builds inside the matching yap image when invoked
-		// from a host shell; container handlers fall through to the native path.
-		if !command.IsInsideContainer() {
-			if res, ok := dispatchBuildInContainer(&args, abs, distro, release); ok {
-				return nil, res, nil
+		// Dispatch into the matching yap image only when the caller explicitly
+		// asked for a distro and we are on a host shell (the CLI's
+		// userProvidedDistro gate). With no distro the build runs natively on
+		// the host, as documented; inside a container it always runs natively.
+		if args.Distro != "" && !command.IsInsideContainer() {
+			res, err := dispatchBuildInContainer(&args, abs, distro, release)
+			if err != nil {
+				return nil, buildStartResult{}, err
 			}
+
+			return nil, res, nil
 		}
 
 		opts := buildOptionsFromArgs(&args)
@@ -374,10 +380,17 @@ func runNativeBuild(ctx context.Context, buildID string, mpc *project.MultiplePr
 		common.SkipToolchainValidation = prevSkip
 	}()
 
+	// The apt-repo trust opt-in lives in a process-global that pkg/project
+	// never reads from BuildOptions, so apply it here (the CLI does the same
+	// in its RunE) and restore it afterwards.
+	defer applyUnverifiedRepos(mpc.Opts.AllowUnverifiedRepos)()
+
 	if err := mpc.MultiProject(distro, release, path); err != nil {
 		defaultRegistry.Finish(buildID, BuildStateFailed, err.Error())
 		return
 	}
+
+	propagateSigning(mpc)
 
 	// Cache the resolved output dir so list_artifacts / build_summary
 	// don't re-parse the project.
@@ -419,4 +432,33 @@ func validateBuildCompression(deb, rpm string) error {
 	}
 
 	return check("rpm", rpm)
+}
+
+// propagateSigning copies the build-wide signing config onto every project.
+// MultiProject never does this itself: runPostBuildHooks only signs when
+// Project.Signing is set, so without this a sign=true build silently produces
+// unsigned artifacts. Mirrors the CLI (cmd/yap/command/build.go).
+func propagateSigning(mpc *project.MultipleProject) {
+	if mpc.Signing == nil {
+		return
+	}
+
+	for _, proj := range mpc.Projects {
+		proj.Signing = mpc.Signing
+	}
+}
+
+// applyUnverifiedRepos turns on the process-wide apt unverified-repo opt-in
+// when allow is true and returns a func restoring the previous state. When
+// allow is false it is a no-op and the returned func does nothing.
+func applyUnverifiedRepos(allow bool) func() {
+	if !allow {
+		return func() {}
+	}
+
+	prev := aptrepo.AllowUnverifiedRepos()
+
+	aptrepo.SetAllowUnverifiedRepos(true)
+
+	return func() { aptrepo.SetAllowUnverifiedRepos(prev) }
 }
