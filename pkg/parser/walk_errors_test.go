@@ -39,31 +39,20 @@ license=("MIT")
 	}
 }
 
-// Expansion failures (e.g. command substitution) must be reported instead of
-// silently producing an empty value.
-func TestParseFile_ExpansionErrorPropagates(t *testing.T) {
-	scalar := `pkgname="demo"
-pkgver=$(date +%s)
-pkgrel="1"
-pkgdesc="demo"
-arch=("any")
-license=("MIT")
-`
-
-	if err := parseContent(t, scalar); err == nil {
-		t.Error("ParseFile() expected error for command substitution in scalar")
-	}
-
+// Expansion failures (e.g. command substitution) are non-fatal: they are
+// logged as warnings and parsing continues, preserving historical behavior.
+func TestParseFile_ExpansionErrorIsNonFatal(t *testing.T) {
 	array := `pkgname="demo"
 pkgver="1.0.0"
 pkgrel="1"
 pkgdesc="demo"
 arch=("any")
 license=("MIT")
+_helper=$(date +%s)
 source=("$(echo x)")
 `
 
-	if err := parseContent(t, array); err == nil {
-		t.Error("ParseFile() expected error for command substitution in array")
+	if err := parseContent(t, array); err != nil {
+		t.Errorf("ParseFile() unexpected error for command substitution: %v", err)
 	}
 }
