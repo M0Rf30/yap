@@ -215,7 +215,7 @@ func (mpc *MultipleProject) BuildAll(ctx context.Context) error {
 	maxWorkers := min(runtime.NumCPU(), len(projectsToProcess))
 
 	// Process packages in dependency-aware parallel batches
-	return mpc.buildProjectsInOrder(buildOrder, maxWorkers)
+	return mpc.buildProjectsInOrder(ctx, buildOrder, maxWorkers)
 }
 
 // Clean cleans up the MultipleProject by removing the package directories and
@@ -354,6 +354,14 @@ func (mpc *MultipleProject) installRuntimeDeps(ctx context.Context, runtimeDepen
 //
 // It returns an error.
 func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
+	return mpc.MultiProjectContext(context.Background(), distro, release, path)
+}
+
+// MultiProjectContext is MultiProject with cancellation support: ctx is honoured
+// between setup phases and by repository setup and dependency installation.
+func (mpc *MultipleProject) MultiProjectContext(
+	ctx context.Context, distro, release, path string,
+) error {
 	err := mpc.readProject(path)
 	if err != nil {
 		return err
@@ -373,6 +381,10 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		return err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	if err := mpc.setupExtraRepos(distro, release); err != nil {
 		return err
 	}
@@ -388,6 +400,10 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	err = mpc.copyProjects()
 	if err != nil {
 		return err
@@ -396,7 +412,9 @@ func (mpc *MultipleProject) MultiProject(distro, release, path string) error {
 	mpc.makeDepends = mpc.getMakeDeps()
 	mpc.runtimeDepends = mpc.getRuntimeDeps()
 
-	ctx := context.Background()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	err = mpc.syncDependencies(ctx, mpc.makeDepends, mpc.runtimeDepends)
 	if err != nil {
@@ -448,7 +466,11 @@ func (mpc *MultipleProject) installPackageForWorker(proj *Project, pkgName, work
 // It returns an error.
 // Note: mpc.Output is expected to be an absolute path, resolved once in MultiProject()
 // before any parallel workers are launched.
-func (mpc *MultipleProject) createPackage(proj *Project) error {
+func (mpc *MultipleProject) createPackage(ctx context.Context, proj *Project) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	if err := files.ExistsMakeDir(mpc.Output); err != nil {
 		return err
 	}
@@ -482,21 +504,17 @@ func (mpc *MultipleProject) createPackage(proj *Project) error {
 	}
 
 	if proj.Builder.PKGBUILD.IsSplitPackage() {
-		return mpc.createSplitPackages(proj)
+		return mpc.createSplitPackages(ctx, proj)
 	}
 
-	return mpc.createSinglePackage(proj)
+	return mpc.createSinglePackage(ctx, proj)
 }
 
 // createSinglePackage handles the PrepareFakeroot → BuildPackage → post-build
 // pipeline for a non-split (single) package.
-// Note: This method is called from createPackage which is called from the build
-// pipeline. The context is created at the top level in BuildAll and passed through.
-// For now, we use context.Background() as a fallback, but ideally this would be
-// threaded through the call chain.
-func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
-	ctx := context.Background()
-
+// ctx is propagated from BuildAll so that Ctrl-C / build_cancel stops fakeroot,
+// packaging and signing.
+func (mpc *MultipleProject) createSinglePackage(ctx context.Context, proj *Project) error {
 	defer func() {
 		if err := os.RemoveAll(proj.Builder.PKGBUILD.PackageDir); err != nil {
 			logger.Warn(i18n.T("logger.failed_to_remove_package_directory"),
@@ -519,15 +537,17 @@ func (mpc *MultipleProject) createSinglePackage(proj *Project) error {
 		return err
 	}
 
-	return mpc.runPostBuildHooks(proj, artifactPath)
+	return mpc.runPostBuildHooks(ctx, proj, artifactPath)
 }
 
 // createSplitPackages iterates over each sub-package produced by a split PKGBUILD
 // and runs PrepareFakeroot → BuildPackage → post-build hooks for each one.
-func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
-	ctx := context.Background()
-
+func (mpc *MultipleProject) createSplitPackages(ctx context.Context, proj *Project) error {
 	for _, subName := range proj.Builder.PKGBUILD.PkgNames {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		// Point the PKGBUILD at this sub-package's install tree.
 		proj.Builder.PKGBUILD.PkgName = subName
 		proj.Builder.PKGBUILD.SetPackageDirForSplit(subName)
@@ -558,7 +578,7 @@ func (mpc *MultipleProject) createSplitPackages(proj *Project) error {
 			return err
 		}
 
-		if err := mpc.runPostBuildHooks(proj, artifactPath); err != nil {
+		if err := mpc.runPostBuildHooks(ctx, proj, artifactPath); err != nil {
 			return err
 		}
 

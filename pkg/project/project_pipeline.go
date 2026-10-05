@@ -16,7 +16,9 @@ import (
 
 // signArtifact signs a built package artifact based on its file extension
 // and the project's signing configuration.
-func (mpc *MultipleProject) signArtifact(proj *Project, artifactPath string) error {
+func (mpc *MultipleProject) signArtifact(
+	ctx context.Context, proj *Project, artifactPath string,
+) error {
 	format, ok := signingFormatForArtifact(artifactPath)
 	if !ok {
 		// Unknown extension; nothing to sign
@@ -36,10 +38,7 @@ func (mpc *MultipleProject) signArtifact(proj *Project, artifactPath string) err
 		"artifact", artifactPath,
 		"format", string(format))
 
-	// Note: signArtifact is called from runPostBuildHooks which is called from the
-	// build pipeline. The context should ideally be threaded through, but for now
-	// we use context.Background() as a fallback.
-	if err := signer.Sign(context.Background(), artifactPath); err != nil {
+	if err := signer.Sign(ctx, artifactPath); err != nil {
 		return yerrors.Wrap(err, yerrors.ErrTypeBuild, "failed to sign artifact").
 			WithOperation("signArtifact").
 			WithContext("artifact", artifactPath).
@@ -107,9 +106,11 @@ func (mpc *MultipleProject) generateSBOM(proj *Project, artifactPath string) err
 
 // runPostBuildHooks executes signing and SBOM generation after a successful
 // package build. Signing failures abort the build; SBOM failures only warn.
-func (mpc *MultipleProject) runPostBuildHooks(proj *Project, artifactPath string) error {
+func (mpc *MultipleProject) runPostBuildHooks(
+	ctx context.Context, proj *Project, artifactPath string,
+) error {
 	if proj.Signing != nil && proj.Signing.Enabled && artifactPath != "" {
-		if err := mpc.signArtifact(proj, artifactPath); err != nil {
+		if err := mpc.signArtifact(ctx, proj, artifactPath); err != nil {
 			return err
 		}
 	}
