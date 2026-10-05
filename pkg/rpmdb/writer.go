@@ -28,14 +28,19 @@ type Writer struct {
 // expected Fedora rpmdb schema.
 var ErrSchemaMismatch = errors.New("rpmdb: schema mismatch")
 
-// ErrPopulated is returned when attempting to write to a database that already
-// contains installed packages. Only fresh databases are supported in v1.
+// ErrPopulated was returned by OpenWriter for databases that already contain
+// packages.
+//
+// Deprecated: OpenWriter now appends to populated databases (a real host rpmdb
+// is always populated, and installing N packages opens the writer N times).
+// The value is retained so existing errors.Is checks keep compiling.
 var ErrPopulated = errors.New("rpmdb: database already populated")
 
 // OpenWriter opens a writable handle to the RPM SQLite database at dbPath.
-// It validates the schema and ensures the database is empty (no pre-existing
-// packages). Returns ErrSchemaMismatch if the schema is invalid, ErrPopulated
-// if packages already exist, or a wrapped error for other issues.
+// A missing schema is initialized; an existing one is validated. Packages
+// already present in the database are left untouched and new ones are
+// appended, so the writer may be opened repeatedly (once per installed
+// package) and against a live system rpmdb.
 //
 // The caller must call Close() to release the database handle.
 func OpenWriter(ctx context.Context, dbPath string) (*Writer, error) {
@@ -93,13 +98,8 @@ func OpenWriter(ctx context.Context, dbPath string) (*Writer, error) {
 			return nil, err
 		}
 	} else {
-		// Validate schema and check if populated
+		// Validate the existing schema; populated databases are appended to.
 		if err := w.validateSchema(ctx); err != nil {
-			_ = dbConn.Close()
-			return nil, err
-		}
-
-		if err := w.checkPopulated(ctx); err != nil {
 			_ = dbConn.Close()
 			return nil, err
 		}
@@ -500,23 +500,6 @@ func (w *Writer) validateSchema(ctx context.Context) error {
 				WithContext("path", w.path).
 				WithOperation("validateSchema")
 		}
-	}
-
-	return nil
-}
-
-// checkPopulated returns ErrPopulated if the Packages table has any rows.
-func (w *Writer) checkPopulated(ctx context.Context) error {
-	count, err := w.queries.CountPackages(ctx)
-	if err != nil {
-		return yapErrors.Wrap(err, yapErrors.ErrTypeInternal,
-			"failed to check if database is populated").
-			WithContext("path", w.path).
-			WithOperation("checkPopulated")
-	}
-
-	if count > 0 {
-		return ErrPopulated
 	}
 
 	return nil
