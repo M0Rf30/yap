@@ -2,6 +2,8 @@
 package set
 
 import (
+	"iter"
+	"maps"
 	"slices"
 	"strings"
 
@@ -49,21 +51,10 @@ func (s *Set) Contains(value string) bool {
 	return c
 }
 
-// Iter returns a channel that iterates over the elements of the set.
-//
-// It returns a channel of type string.
-func (s *Set) Iter() <-chan string {
-	iter := make(chan string)
-
-	go func() {
-		for key := range s.m {
-			iter <- key
-		}
-
-		close(iter)
-	}()
-
-	return iter
+// Iter returns an iterator over the elements of the set in unspecified order.
+// Breaking out of a range loop over it releases all resources.
+func (s *Set) Iter() iter.Seq[string] {
+	return maps.Keys(s.m)
 }
 
 // Remove removes the specified value from the set.
@@ -78,32 +69,55 @@ func Contains(array []string, str string) bool {
 	return slices.Contains(array, str)
 }
 
-// StringifyArray generates a string representation of an array in the given syntax.
-//
-// node: A pointer to the syntax.Assign node representing the array.
-// []string: An array of strings representing the stringified elements of the array.
-func StringifyArray(node *syntax.Assign) []string {
-	var fields []string
-
-	printer := syntax.NewPrinter(syntax.Indent(2))
-	out := &strings.Builder{}
-
-	if len(node.Array.Elems) == 0 {
-		return fields
+// StringifyArrayElems returns one printed string per element of the array
+// assignment in node (no trailing separator). Elements that fail to print are
+// logged and skipped.
+func StringifyArrayElems(node *syntax.Assign) []string {
+	if node == nil || node.Array == nil || len(node.Array.Elems) == 0 {
+		return nil
 	}
 
-	for index := range node.Array.Elems {
-		err := printer.Print(out, node.Array.Elems[index].Value)
+	printer := syntax.NewPrinter(syntax.Indent(2))
+	fields := make([]string, 0, len(node.Array.Elems))
+
+	for index, elem := range node.Array.Elems {
+		var out strings.Builder
+
+		err := printer.Print(&out, elem.Value)
 		if err != nil {
 			logger.Error(i18n.T("logger.set.error.unable_to_parse_array"),
-				"path", out.String())
+				"index", index, "error", err)
+
+			continue
 		}
 
-		out.WriteString(" ")
 		fields = append(fields, out.String())
 	}
 
 	return fields
+}
+
+// StringifyArray generates a string representation of an array in the given
+// syntax.
+//
+// It returns either nil (empty array) or a single-element slice holding every
+// array element, each followed by a space, so callers can pass the one string
+// to a shell field splitter. Use StringifyArrayElems to get one string per
+// element.
+func StringifyArray(node *syntax.Assign) []string {
+	elems := StringifyArrayElems(node)
+	if len(elems) == 0 {
+		return nil
+	}
+
+	var joined strings.Builder
+
+	for _, elem := range elems {
+		joined.WriteString(elem)
+		joined.WriteString(" ")
+	}
+
+	return []string{joined.String()}
 }
 
 // StringifyAssign returns a string representation of the given *syntax.Assign node.
