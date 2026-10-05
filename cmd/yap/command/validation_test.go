@@ -670,3 +670,39 @@ func TestResolveDistroReleaseExplicitReleasePreserved(t *testing.T) {
 		t.Errorf("expected (ubuntu, jammy), got (%q, %q)", distro, release)
 	}
 }
+
+func TestHyphenatedDistroIDs(t *testing.T) {
+	tests := []struct {
+		arg         string
+		wantDistro  string
+		wantRelease string
+	}{
+		{"opensuse-leap", "opensuse-leap", ""},
+		{"opensuse-leap-15.6", "opensuse-leap", "15.6"},
+		{"opensuse-tumbleweed", "opensuse-tumbleweed", ""},
+		{"ubuntu-jammy", "ubuntu", "jammy"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.arg, func(t *testing.T) {
+			if err := validateDistroArg(tt.arg); err != nil {
+				t.Errorf("validateDistroArg(%q) unexpected error: %v", tt.arg, err)
+			}
+
+			gotDistro, gotRelease := parseDistroAndRelease(tt.arg)
+			if gotDistro != tt.wantDistro || gotRelease != tt.wantRelease {
+				t.Errorf("parseDistroAndRelease(%q) = (%q, %q), want (%q, %q)",
+					tt.arg, gotDistro, gotRelease, tt.wantDistro, tt.wantRelease)
+			}
+		})
+	}
+
+	if err := validateDistroArg("opensuse"); err == nil {
+		t.Error("validateDistroArg(\"opensuse\") should be rejected")
+	}
+
+	completions, _ := ValidDistrosCompletion(nil, nil, "opensuse-l")
+	if len(completions) != 1 || completions[0] != "opensuse-leap" {
+		t.Errorf("completion for opensuse-l = %v, want [opensuse-leap]", completions)
+	}
+}

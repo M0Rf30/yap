@@ -35,20 +35,14 @@ func ValidDistrosCompletion(_ *cobra.Command, args []string, toComplete string) 
 
 	var completions []string
 
-	// Extract base distro from partial input (e.g., "ubuntu" from "ubuntu-foc")
-	baseDist, _, _ := strings.Cut(toComplete, "-")
-
 	for _, release := range &constants.Releases {
-		// Match if the release name starts with the base distro
-		if strings.HasPrefix(release, baseDist) {
-			// If user typed just base name (e.g., "ubuntu"), suggest the base name
-			if toComplete == baseDist || toComplete == "" {
-				completions = append(completions, release)
-			} else if strings.HasPrefix(toComplete, release) {
-				// If user typed something like "ubuntu-", suggest with common suffixes
-				// This is just for basic completion, they can type any suffix
-				completions = append(completions, toComplete)
-			}
+		if strings.HasPrefix(release, toComplete) {
+			// Partial or full distro ID (handles hyphenated IDs such as
+			// "opensuse-leap" because the whole prefix is compared).
+			completions = append(completions, release)
+		} else if strings.HasPrefix(toComplete, release+"-") {
+			// User is typing a release suffix (e.g. "ubuntu-foc"); echo it back.
+			completions = append(completions, toComplete)
 		}
 	}
 
@@ -68,14 +62,10 @@ func validateDistroArg(distro string) error {
 		return ErrDistributionEmpty
 	}
 
-	// Extract base distribution name (everything before the first hyphen)
-	baseDist, _, _ := strings.Cut(distro, "-")
-
-	// Check if base distro exists in supported releases
-	for _, release := range &constants.Releases {
-		if release == baseDist {
-			return nil
-		}
+	// Match the longest known distro ID (some IDs, e.g. "opensuse-leap",
+	// contain a hyphen), optionally followed by "-<release>".
+	if _, _, ok := splitKnownDistro(distro); ok {
+		return nil
 	}
 
 	return yapErrors.Wrap(ErrDistributionEmpty,
@@ -256,8 +246,33 @@ func ParseFlexibleArgs(args []string) (distro, release, fullJSONPath string, err
 	return "", "", fullJSONPath, nil
 }
 
+// splitKnownDistro splits arg into a known distro ID from constants.Releases
+// and the remainder (release). The longest matching ID wins so hyphenated IDs
+// such as "opensuse-leap" are not split at their internal hyphen. ok is false
+// when arg does not start with a known distro ID.
+func splitKnownDistro(arg string) (distro, release string, ok bool) {
+	for _, known := range &constants.Releases {
+		if len(known) <= len(distro) {
+			continue
+		}
+
+		if arg == known {
+			distro, release, ok = known, "", true
+		} else if rest, found := strings.CutPrefix(arg, known+"-"); found {
+			distro, release, ok = known, rest, true
+		}
+	}
+
+	return distro, release, ok
+}
+
 // parseDistroAndRelease parses distro-release format and returns distro and release.
+// Known hyphenated distro IDs (e.g. "opensuse-leap") are matched first.
 func parseDistroAndRelease(arg string) (distro, release string) {
+	if d, r, ok := splitKnownDistro(arg); ok {
+		return d, r
+	}
+
 	split := strings.Split(arg, "-")
 	distro = split[0]
 
