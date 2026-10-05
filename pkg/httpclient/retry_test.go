@@ -2,10 +2,13 @@ package httpclient_test
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -45,6 +48,19 @@ func TestIsRetryable(t *testing.T) {
 		{"conn reset", syscall.ECONNRESET, true},
 		{"conn refused", syscall.ECONNREFUSED, true},
 		{"generic", errors.New("boom"), false},
+		{"x509 unknown authority", &url.Error{
+			Op: "Get", URL: "https://x",
+			Err: &tls.CertificateVerificationError{Err: x509.UnknownAuthorityError{}},
+		}, false},
+		{"redirect limit", &url.Error{
+			Op: "Get", URL: "https://x", Err: errors.New("stopped after 10 redirects"),
+		}, false},
+		{"unsupported scheme", &url.Error{
+			Op: "Get", URL: "ftp://x", Err: errors.New(`unsupported protocol scheme "ftp"`),
+		}, false},
+		{"transient url error", &url.Error{
+			Op: "Get", URL: "https://x", Err: syscall.ECONNRESET,
+		}, true},
 	}
 
 	for _, tc := range cases {
