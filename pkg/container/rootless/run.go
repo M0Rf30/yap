@@ -3,11 +3,13 @@
 package rootless
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/rootless-containers/rootlesskit/v2/pkg/child"
@@ -31,7 +33,7 @@ const (
 	envChildRootfs = "_YAP_ROOTLESSKIT_ROOTFS"
 	// envChildWorkDir is the workspace path passed to the child.
 	envChildWorkDir = "_YAP_ROOTLESSKIT_WORKDIR"
-	// envChildArgs is the serialised command args passed to the child (argSep-separated).
+	// envChildArgs is the JSON-encoded command args passed to the child.
 	envChildArgs = "_YAP_ROOTLESSKIT_ARGS"
 )
 
@@ -94,22 +96,29 @@ func runExec() error {
 			WithOperation("runExec")
 	}
 
-	var args []string
-
-	if argsRaw != "" {
-		for _, a := range splitNUL(argsRaw) {
-			if a != "" {
-				args = append(args, a)
-			}
-		}
+	args, err := decodeArgs(argsRaw)
+	if err != nil {
+		return err
 	}
 
 	return execInRootfs(rootfs, workDir, args)
 }
 
+// runMu serialises rootless runs: they communicate with the child through
+// process-global environment variables.
+var runMu sync.Mutex
+
 // RunInRootless runs args inside the distro rootfs using rootlesskit for
 // user-namespace isolation. workDir is bind-mounted as /project.
 func RunInRootless(distro, workDir string, args []string) error {
+	return RunInRootlessEnv(distro, workDir, args, nil)
+}
+
+// RunInRootlessEnv is like RunInRootless but additionally exposes env to the
+// command inside the rootfs. The values are applied for the duration of the
+// call only and runs are serialised, so concurrent callers never see each
+// other's variables.
+func RunInRootlessEnv(distro, workDir string, args []string, env map[string]string) error {
 	rootfs, err := rootfsPath(distro)
 	if err != nil {
 		return err
@@ -136,20 +145,25 @@ func RunInRootless(distro, workDir string, args []string) error {
 
 	logger.Info(i18n.T("logger.rootless.info.starting_rootless_container"), "distro", distro, "rootfs", rootfs)
 
-	// Set env vars that the re-executed child will read.
-	for k, v := range map[string]string{
+	// Control data is handed to the re-executed child through the process
+	// environment, which is global state. Serialise runs and restore the
+	// previous values on return so concurrent callers cannot observe or
+	// overwrite each other's rootfs/workDir/args/secrets and nothing leaks
+	// into later execs from this process.
+	runMu.Lock()
+	defer runMu.Unlock()
+
+	ctrl := map[string]string{
 		envExecMode:        "1",
 		envChildRootfs:     rootfs,
 		envChildWorkDir:    workDir,
-		envChildArgs:       joinNUL(args),
+		envChildArgs:       encodeArgs(args),
 		"YAP_IN_CONTAINER": "1",
-	} {
-		if err := os.Setenv(k, v); err != nil {
-			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set environment variable").
-				WithOperation("RunInRootless").
-				WithContext("key", k)
-		}
 	}
+	maps.Copy(ctrl, env)
+
+	restore := setEnvOnce(ctrl)
+	defer restore()
 
 	parentOpt := parent.Opt{
 		PipeFDEnvKey:             envPipeFD,
@@ -299,44 +313,32 @@ func bindMount(src, dest string) error {
 	return syscall.Mount(src, dest, "", syscall.MS_BIND|syscall.MS_REC, "")
 }
 
-// argSep separates encoded child args. We use ASCII Unit Separator (0x1f)
-// rather than NUL: the encoded value is passed through os.Setenv, which
-// rejects any string containing a NUL byte ("setenv: invalid argument"), so a
-// NUL separator broke every command with 2+ args. 0x1f never appears in real
-// argv (paths, flags) yet is still a safe in-band delimiter.
-const argSep = '\x1f'
-
-// joinNUL encodes a string slice as argSep-separated bytes.
-func joinNUL(ss []string) string {
-	var b strings.Builder
-
-	for i, s := range ss {
-		if i > 0 {
-			b.WriteByte(argSep)
-		}
-
-		b.WriteString(s)
+// encodeArgs serialises argv for transport through an environment variable.
+// JSON keeps empty elements and arbitrary bytes intact (NUL is escaped), so
+// the child sees exactly the argv the parent was given.
+func encodeArgs(ss []string) string {
+	b, err := json.Marshal(ss)
+	if err != nil {
+		// []string always marshals; fall back to an empty list defensively.
+		return "[]"
 	}
 
-	return b.String()
+	return string(b)
 }
 
-// splitNUL decodes an argSep-separated string into a slice.
-func splitNUL(s string) []string {
+// decodeArgs is the inverse of encodeArgs.
+func decodeArgs(s string) ([]string, error) {
 	var result []string
 
-	cur := &strings.Builder{}
-
-	for _, c := range s {
-		if c == argSep {
-			result = append(result, cur.String())
-			cur.Reset()
-		} else {
-			cur.WriteRune(c)
-		}
+	if s == "" {
+		return result, nil
 	}
 
-	result = append(result, cur.String())
+	if err := json.Unmarshal([]byte(s), &result); err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeConfiguration,
+			"failed to decode rootless child arguments").
+			WithOperation("decodeArgs")
+	}
 
-	return result
+	return result, nil
 }
