@@ -77,3 +77,45 @@ func TestNewGPGSignerValidKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, signer.entity)
 }
+
+// armoredEncryptedKeyWithSigningSubkey returns a private key whose primary key
+// and signing subkey are both protected by the passphrase.
+func armoredEncryptedKeyWithSigningSubkey(t *testing.T, passphrase string) []byte {
+	t.Helper()
+
+	entity, err := openpgp.NewEntity("Test User", "test", "test@example.com", nil)
+	require.NoError(t, err)
+	require.NoError(t, entity.AddSigningSubkey(nil))
+	require.NoError(t, entity.EncryptPrivateKeys([]byte(passphrase), nil))
+
+	buf := bytes.NewBuffer(nil)
+	w, err := armor.Encode(buf, openpgp.PrivateKeyType, nil)
+	require.NoError(t, err)
+	require.NoError(t, entity.SerializePrivateWithoutSigning(w, nil))
+	require.NoError(t, w.Close())
+
+	return buf.Bytes()
+}
+
+// TestGPGSignerEncryptedSigningSubkey verifies that passphrase-protected
+// signing subkeys are decrypted so that Sign succeeds.
+func TestGPGSignerEncryptedSigningSubkey(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "test.gpg")
+	artifact := filepath.Join(tmpDir, "pkg.deb")
+
+	require.NoError(t, os.WriteFile(keyPath,
+		armoredEncryptedKeyWithSigningSubkey(t, "secret"), 0o600))
+	require.NoError(t, os.WriteFile(artifact, []byte("payload"), 0o600))
+
+	signer, err := NewGPGSigner(Config{Enabled: true, KeyPath: keyPath, Passphrase: "secret"},
+		FormatDEB)
+	require.NoError(t, err)
+
+	require.NoError(t, signer.Sign(t.Context(), artifact))
+	require.FileExists(t, artifact+".asc")
+
+	_, err = NewGPGSigner(Config{Enabled: true, KeyPath: keyPath, Passphrase: "wrong"},
+		FormatDEB)
+	require.Error(t, err)
+}
