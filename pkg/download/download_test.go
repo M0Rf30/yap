@@ -7,9 +7,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -225,7 +227,7 @@ func TestConfigureResumeIfPossible(t *testing.T) {
 	// Should configure resume - we can't easily verify this without accessing private fields
 }
 
-func TestWithResume(t *testing.T) {
+func TestWithContext(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "download-test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -236,13 +238,13 @@ func TestWithResume(t *testing.T) {
 	destination := filepath.Join(tempDir, "test.txt")
 
 	// Test with invalid URL - should fail
-	err = WithResume(context.Background(), destination, "invalid://url", 0, nil)
+	err = WithContext(context.Background(), destination, "invalid://url", 0, "", "", nil)
 	if err == nil {
 		t.Error("Expected error for invalid URL")
 	}
 
 	// Test with non-retryable error (should not retry)
-	err = WithResume(context.Background(), destination, "invalid://url", 2, nil)
+	err = WithContext(context.Background(), destination, "invalid://url", 2, "", "", nil)
 	if err == nil {
 		t.Error("Expected error for invalid URL")
 	}
@@ -286,7 +288,7 @@ func TestDownloadWithMockServer(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	err = Download(destination, server.URL, &buf)
+	err = WithContext(context.Background(), destination, server.URL, 0, "", "", &buf)
 	if err != nil {
 		t.Errorf("Download failed: %v", err)
 	}
@@ -341,9 +343,9 @@ func TestWithResumeWithMockServer(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	err = WithResume(context.Background(), destination, server.URL, 1, &buf)
+	err = WithContext(context.Background(), destination, server.URL, 1, "", "", &buf)
 	if err != nil {
-		t.Errorf("WithResume failed: %v", err)
+		t.Errorf("WithContext failed: %v", err)
 	}
 
 	// Check that file was created
@@ -442,8 +444,8 @@ func TestWithResumeRecoversFromTransient5xx(t *testing.T) {
 
 	destination := filepath.Join(t.TempDir(), "out.txt")
 
-	if err := WithResume(context.Background(), destination, server.URL, 3, nil); err != nil {
-		t.Fatalf("WithResume failed: %v", err)
+	if err := WithContext(context.Background(), destination, server.URL, 3, "", "", nil); err != nil {
+		t.Fatalf("WithContext failed: %v", err)
 	}
 
 	data, err := os.ReadFile(destination) //nolint:gosec
@@ -473,7 +475,7 @@ func TestWithResumeNoRetryOn404(t *testing.T) {
 
 	destination := filepath.Join(t.TempDir(), "out.txt")
 
-	if err := WithResume(context.Background(), destination, server.URL, 3, nil); err == nil {
+	if err := WithContext(context.Background(), destination, server.URL, 3, "", "", nil); err == nil {
 		t.Fatal("expected error for 404")
 	}
 
@@ -498,7 +500,7 @@ func TestWithResumeCancelledStopsRetrying(t *testing.T) {
 
 	destination := filepath.Join(t.TempDir(), "out.txt")
 
-	if err := WithResume(ctx, destination, server.URL, 3, nil); err == nil {
+	if err := WithContext(ctx, destination, server.URL, 3, "", "", nil); err == nil {
 		t.Fatal("expected error")
 	}
 
@@ -595,5 +597,68 @@ func TestRetryDownloadHonorsMaxRetries(t *testing.T) {
 					test.budget, test.wantHits, got)
 			}
 		})
+	}
+}
+
+func TestDownloadTransportErrorKeepsCause(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	uri := server.URL
+	server.Close() // connection refused from now on
+
+	destination := filepath.Join(t.TempDir(), "x.bin")
+
+	err := downloadWithResumeInternal(context.Background(), destination, uri, "", "", nil)
+	if err == nil {
+		t.Fatal("expected transport error")
+	}
+
+	if _, ok := errors.AsType[*url.Error](err); !ok {
+		t.Fatalf("transport cause dropped from error chain: %v", err)
+	}
+
+	if !IsRetryableGrabError(err) {
+		t.Errorf("connection refused must be classified retryable: %v", err)
+	}
+}
+
+func TestMonitorDownloadFailureDoesNotReportCompletion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	var buf bytes.Buffer
+
+	pb := NewProgressBar(&buf, "pkg", "file", 100)
+
+	buf.Reset()
+
+	req, err := grab.NewRequest(filepath.Join(t.TempDir(), "f"), server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp := grab.NewClient().Do(req)
+
+	if err := monitorDownload(resp, pb, "dest"); err == nil {
+		t.Fatal("expected error for 404")
+	}
+
+	if strings.Contains(buf.String(), "100%") {
+		t.Errorf("failed download rendered as 100%%: %q", buf.String())
+	}
+}
+
+func TestProgressBarAbortNeverCompletes(t *testing.T) {
+	var buf bytes.Buffer
+
+	pb := NewProgressBar(&buf, "pkg", "file", 100)
+
+	buf.Reset()
+	pb.Abort(10)
+
+	out := buf.String()
+	if !strings.Contains(out, " 10%") || strings.Contains(out, "100%") {
+		t.Errorf("Abort should render actual progress, got %q", out)
 	}
 }
