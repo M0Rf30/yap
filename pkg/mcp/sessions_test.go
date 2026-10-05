@@ -185,3 +185,42 @@ func TestNewBuildIDIsHex16(t *testing.T) {
 		seen[id] = true
 	}
 }
+
+func TestCancelAllCancelsRunningAndWaits(t *testing.T) {
+	r := &buildRegistry{sessions: make(map[string]*BuildSession)}
+
+	running, rctx := r.Register(context.Background(), "ubuntu", "noble", "/tmp/a")
+	finished, _ := r.Register(context.Background(), "ubuntu", "noble", "/tmp/b")
+	r.Finish(finished.ID, BuildStateSucceeded, "")
+
+	go func() {
+		<-rctx.Done()
+		r.Finish(running.ID, BuildStateCanceled, rctx.Err().Error())
+	}()
+
+	if left := r.cancelAllAndWait(2 * time.Second); left != 0 {
+		t.Fatalf("%d builds still pending after cancelAllAndWait", left)
+	}
+
+	if rctx.Err() == nil {
+		t.Error("running build context was not canceled")
+	}
+
+	if got := r.Get(running.ID).State; got != BuildStateCanceled {
+		t.Errorf("running state = %s, want canceled", got)
+	}
+
+	if got := r.Get(finished.ID).State; got != BuildStateSucceeded {
+		t.Errorf("terminal session changed to %s", got)
+	}
+}
+
+func TestCancelAllTimesOutOnStuckBuild(t *testing.T) {
+	r := &buildRegistry{sessions: make(map[string]*BuildSession)}
+
+	r.Register(context.Background(), "ubuntu", "noble", "/tmp/a")
+
+	if left := r.cancelAllAndWait(20 * time.Millisecond); left != 1 {
+		t.Errorf("left = %d, want 1", left)
+	}
+}

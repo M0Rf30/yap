@@ -294,3 +294,52 @@ func (r *buildRegistry) Cancel(id string) bool {
 
 	return true
 }
+
+// CancelAll cancels every running session and returns their Done channels so
+// the caller can wait for the build goroutines to wind down (e.g. for
+// RunShellCapture to terminate the container). Terminal sessions are skipped.
+func (r *buildRegistry) CancelAll() []<-chan struct{} {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var done []<-chan struct{}
+
+	for _, s := range r.sessions {
+		if s.State != BuildStateRunning || s.cancel == nil {
+			continue
+		}
+
+		s.cancel()
+
+		if s.done != nil {
+			done = append(done, s.done)
+		}
+	}
+
+	return done
+}
+
+// Shutdown cancels all in-flight builds and waits up to timeout for them to
+// reach a terminal state. Call it after the MCP server stops serving so
+// container builds are not left running as orphans. It returns the number of
+// builds that had not finished when the timeout elapsed.
+func Shutdown(timeout time.Duration) int {
+	return defaultRegistry.cancelAllAndWait(timeout)
+}
+
+func (r *buildRegistry) cancelAllAndWait(timeout time.Duration) int {
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+
+	pending := r.CancelAll()
+
+	for i, ch := range pending {
+		select {
+		case <-ch:
+		case <-deadline.C:
+			return len(pending) - i
+		}
+	}
+
+	return 0
+}

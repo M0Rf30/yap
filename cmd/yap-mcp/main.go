@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -27,6 +28,9 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	yapmcp "github.com/M0Rf30/yap/v2/pkg/mcp"
 )
+
+// shutdownGrace bounds how long shutdown waits for canceled builds to stop.
+const shutdownGrace = 10 * time.Second
 
 func main() {
 	if os.Getenv("YAP_VERBOSE") != "" {
@@ -50,9 +54,14 @@ func main() {
 
 	err := srv.Run(ctx, &mcpsdk.StdioTransport{})
 
-	// Cancel any in-flight async builds so background goroutines unblock and
-	// the runtime can exit promptly.
+	// stop() only releases the signal context. Cancel in-flight async builds
+	// explicitly (the registry derives their contexts from Background) and
+	// give them a moment to terminate, so container builds are not orphaned.
 	stop()
+
+	if left := yapmcp.Shutdown(shutdownGrace); left > 0 {
+		logger.Warn("in-flight builds did not stop before the shutdown deadline", "count", left)
+	}
 
 	if err != nil && !isContextError(err) {
 		logger.Fatal(i18n.T("logger.yap-mcp.error.yap_mcp_server_failed"), "error", err)
