@@ -1,8 +1,11 @@
 package logger
 
 import (
+	"bytes"
 	"io"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,23 +25,24 @@ func TestYapLoggerInfo(t *testing.T) {
 
 func TestYapLoggerDebug(t *testing.T) {
 	old := MultiPrinter.Writer
-	oldVerbose := verboseEnabled
+	oldVerbose := verboseEnabled.Load()
 
 	defer func() {
 		MultiPrinter.Writer = old
-		verboseEnabled = oldVerbose
+
+		verboseEnabled.Store(oldVerbose)
 	}()
 
 	MultiPrinter.Writer = io.Discard
 
-	verboseEnabled = false
+	verboseEnabled.Store(false)
 
 	assert.NotPanics(t, func() {
 		Logger.Debug("test debug message")
 		Logger.Debug("test debug message with args", "key", "value")
 	})
 
-	verboseEnabled = true
+	verboseEnabled.Store(true)
 
 	assert.NotPanics(t, func() {
 		Logger.Debug("test debug message with verbose enabled")
@@ -91,14 +95,14 @@ func TestSetColorDisabled(t *testing.T) {
 	oldNoColor := os.Getenv("NO_COLOR")
 	oldColorTerm := os.Getenv("COLORTERM")
 	oldTerm := os.Getenv("TERM")
-	oldColorDisabled := colorDisabled
+	oldColorDisabled := colorDisabled.Load()
 
 	defer func() {
 		_ = os.Setenv("NO_COLOR", oldNoColor)
 		_ = os.Setenv("COLORTERM", oldColorTerm)
 		_ = os.Setenv("TERM", oldTerm)
 
-		colorDisabled = oldColorDisabled
+		colorDisabled.Store(oldColorDisabled)
 
 		SetColorDisabled(false)
 	}()
@@ -116,16 +120,17 @@ func TestSetColorDisabled(t *testing.T) {
 
 func TestIsColorDisabled(t *testing.T) {
 	oldNoColor := os.Getenv("NO_COLOR")
-	oldColorDisabled := colorDisabled
+	oldColorDisabled := colorDisabled.Load()
 
 	defer func() {
 		_ = os.Setenv("NO_COLOR", oldNoColor)
-		colorDisabled = oldColorDisabled
+
+		colorDisabled.Store(oldColorDisabled)
 	}()
 
 	_ = os.Unsetenv("NO_COLOR")
 
-	colorDisabled = false
+	colorDisabled.Store(false)
 
 	assert.False(t, IsColorDisabled())
 
@@ -194,4 +199,95 @@ func TestSetWriter(t *testing.T) {
 	SetWriter(io.Discard)
 
 	assert.Equal(t, io.Discard, MultiPrinter.Writer)
+}
+
+func TestSanitizeValue(t *testing.T) {
+	assert.Equal(t, "plain", sanitizeValue("plain"))
+	assert.Equal(t, "a\nb\tc", sanitizeValue("a\nb\tc"))
+	assert.Equal(t, `\x1b[31mred`, sanitizeValue("\x1b[31mred"))
+	assert.Equal(t, `a\rb`, sanitizeValue("a\rb"))
+	assert.Equal(t, `\x00`, sanitizeValue("\x00"))
+	assert.Equal(t, "héllo", sanitizeValue("héllo"))
+}
+
+func TestHandleEscapesControlCharacters(t *testing.T) {
+	old := MultiPrinter.Writer
+	defer SetWriter(old)
+
+	var buf bytes.Buffer
+
+	SetWriter(&buf)
+
+	Info("rejected", "path", "evil\x1b[2J\rname")
+
+	out := buf.String()
+	assert.NotContains(t, out, "\x1b[2J")
+	assert.NotContains(t, out, "\r")
+	assert.Contains(t, out, `evil\x1b[2J\rname`)
+}
+
+func TestHandleMultilineValueCannotForgeLogLine(t *testing.T) {
+	old := MultiPrinter.Writer
+	defer SetWriter(old)
+
+	var buf bytes.Buffer
+
+	SetWriter(&buf)
+
+	Info("rejected", "path", "a\n2026-01-01 00:00:00 INFO [yap] forged")
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	for _, line := range lines[1:] {
+		assert.True(t, strings.HasPrefix(line, " "), "continuation must be indented: %q", line)
+	}
+}
+
+func TestLogOddArgsKeepsBadKey(t *testing.T) {
+	old := MultiPrinter.Writer
+	defer SetWriter(old)
+
+	var buf bytes.Buffer
+
+	SetWriter(&buf)
+
+	Info("odd", "k", "v", "dangling")
+
+	assert.Contains(t, buf.String(), "!BADKEY")
+	assert.Contains(t, buf.String(), "dangling")
+}
+
+func TestLoggerConcurrentUse(t *testing.T) {
+	old := MultiPrinter.Writer
+	defer SetWriter(old)
+
+	SetWriter(io.Discard)
+
+	var wg sync.WaitGroup
+
+	for i := range 8 {
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+
+			for range 50 {
+				SetVerbose(i%2 == 0)
+				Info("msg", "k", "v")
+
+				_ = IsVerboseEnabled()
+				_ = IsColorDisabled()
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+
+			for range 20 {
+				SetWriter(io.Discard)
+			}
+		}()
+	}
+
+	wg.Wait()
+	SetVerbose(false)
 }
