@@ -74,7 +74,7 @@ func archiveExecHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 
 		switch cmd {
 		case "unzip":
-			return handleUnzip(ctx, args)
+			return handleUnzip(ctx, args, next)
 		case "unrar":
 			return handleUnrar(ctx, args)
 		case "7z", "7za":
@@ -93,14 +93,34 @@ func archiveExecHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 	}
 }
 
-// handleUnzip handles: unzip [-o] [-q] [-d <destdir>] <archive> [files/globs...]
-// File/glob filters after the archive path are honoured via ExtractFiltered.
-func handleUnzip(ctx context.Context, args []string) error {
-	hc := interp.HandlerCtx(ctx)
-	destDir := hc.Dir // default: script's working directory
-	archivePath := ""
+// unzipSafeFlagChars lists the single-letter unzip options that are accepted
+// (and ignored) by the in-process extractor because they do not change what
+// is extracted: overwrite, quiet, never-overwrite and text-conversion.
+const unzipSafeFlagChars = "oqna"
 
-	var filters []string
+// isUnzipSafeFlag reports whether arg is a (possibly clustered) option made
+// only of flags that the in-process extractor can safely ignore, e.g. -o, -qq.
+func isUnzipSafeFlag(arg string) bool {
+	if len(arg) < 2 || arg[0] != '-' || arg[1] == '-' {
+		return false
+	}
+
+	return strings.Trim(arg[1:], unzipSafeFlagChars) == ""
+}
+
+// unzipArgs holds the parsed form of an unzip invocation.
+type unzipArgs struct {
+	destDir     string
+	archivePath string
+	filters     []string
+}
+
+// parseUnzipArgs parses unzip arguments. ok is false when the command line
+// uses an option the in-process extractor does not implement (list, test,
+// pipe-to-stdout, exclude, junk-paths, ...); the caller must then defer to the
+// real binary instead of silently extracting.
+func parseUnzipArgs(args []string, defaultDest string) (opts unzipArgs, ok bool) {
+	opts.destDir = defaultDest
 
 	for i := 1; i < len(args); i++ {
 		arg := args[i]
@@ -108,22 +128,36 @@ func handleUnzip(ctx context.Context, args []string) error {
 		switch {
 		case arg == "-d" && i+1 < len(args):
 			i++
-			destDir = args[i]
-		case strings.HasPrefix(arg, "-d"):
-			destDir = arg[2:]
-		case arg == "-o", arg == "-q", arg == "-n", arg == "-j", arg == "-a",
-			arg == "-aa", arg == "-p", arg == "-v", arg == "-l", arg == "-t":
-			// known flags — skip
-		case strings.HasPrefix(arg, "-"):
-			// unknown flag — skip
+			opts.destDir = args[i]
+		case strings.HasPrefix(arg, "-d") && len(arg) > 2:
+			opts.destDir = arg[2:]
+		case isUnzipSafeFlag(arg):
+			// accepted, no effect on in-process extraction
+		case strings.HasPrefix(arg, "-") && len(arg) > 1:
+			return opts, false
+		case opts.archivePath == "":
+			opts.archivePath = arg
 		default:
-			if archivePath == "" {
-				archivePath = arg
-			} else {
-				filters = append(filters, arg)
-			}
+			opts.filters = append(opts.filters, arg)
 		}
 	}
+
+	return opts, true
+}
+
+// handleUnzip handles: unzip [-o] [-q] [-d <destdir>] <archive> [files/globs...]
+// File/glob filters after the archive path are honoured via ExtractFiltered.
+// Invocations using options that cannot be reproduced in-process (-l, -t, -p,
+// -v, -x, -j, ...) are passed to the next handler (the real unzip binary).
+func handleUnzip(ctx context.Context, args []string, next interp.ExecHandlerFunc) error {
+	hc := interp.HandlerCtx(ctx)
+
+	opts, ok := parseUnzipArgs(args, hc.Dir)
+	if !ok {
+		return next(ctx, args)
+	}
+
+	archivePath, destDir, filters := opts.archivePath, opts.destDir, opts.filters
 
 	if archivePath == "" {
 		return errors.New(errors.ErrTypeBuild, "unzip: no archive specified").
