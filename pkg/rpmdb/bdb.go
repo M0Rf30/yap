@@ -63,9 +63,21 @@ func (d *LegacyDB) eachHeader(ctx context.Context, fn func(headerInfo)) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = db.Close() }()
 
-	for entry := range db.Read() {
+	entries := db.Read()
+
+	// db.Read feeds an unbuffered channel from a goroutine. On an early
+	// return (reader error, cancelled ctx) that goroutine would block on
+	// its send forever and keep reading after Close. Close the file first
+	// so the producer fails fast, then drain until it exits.
+	defer func() {
+		_ = db.Close()
+
+		for range entries { //nolint:revive // drain to let the producer exit
+		}
+	}()
+
+	for entry := range entries {
 		if entry.Err != nil {
 			return entry.Err
 		}

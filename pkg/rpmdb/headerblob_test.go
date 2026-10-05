@@ -136,3 +136,25 @@ func TestOpenLegacyMissing(t *testing.T) {
 		t.Error("expected ErrNoBDB")
 	}
 }
+
+// TestParseHeaderBlobHugeCountRejected tests that a corrupt PROVIDENAME
+// count far larger than the data region is rejected before allocation.
+func TestParseHeaderBlobHugeCountRejected(t *testing.T) {
+	data := []byte("pkg\x00")
+	blob := buildHeaderBlob([]blobEntry{
+		{tag: tagName, typ: typeString, offset: 0, count: 1},
+		{tag: tagProvideName, typ: typeStringArray, offset: 0, count: 0xFFFFFFFF},
+	}, data)
+
+	if _, err := parseHeaderBlob(blob); err == nil {
+		t.Fatal("expected error for count exceeding data size")
+	}
+
+	if _, err := readStrings(data, 0, 0xFFFFFFFF); err == nil {
+		t.Fatal("readStrings accepted oversized count")
+	}
+
+	if got, err := readStrings(data, 0, 1); err != nil || len(got) != 1 || got[0] != "pkg" {
+		t.Fatalf("readStrings valid = %v, %v", got, err)
+	}
+}

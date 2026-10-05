@@ -127,6 +127,13 @@ func readStrings(data []byte, offset int32, count uint32) ([]string, error) {
 		return nil, errMalformedHeader
 	}
 
+	// Every string needs at least its NUL terminator, so a count larger than
+	// the remaining bytes is corrupt. Checking before allocating keeps a
+	// hostile 32-bit count from requesting gigabytes.
+	if uint64(count) > uint64(len(data)-int(offset)) { //nolint:gosec // offset < len(data)
+		return nil, errMalformedHeader
+	}
+
 	out := make([]string, 0, count)
 	pos := int(offset)
 
