@@ -2,7 +2,9 @@ package mcp_test
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
+	"strings"
 	"testing"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -137,6 +139,37 @@ func TestToolSurfaceExact(t *testing.T) {
 	}
 
 	assertExactSet(t, "tool", got, wantTools)
+}
+
+// TestBuildToolExposesNoContainer asserts the build tool schema carries the
+// noContainer arg (mirrors CLI --no-container).
+func TestBuildToolExposesNoContainer(t *testing.T) {
+	cs, cleanup := connectClient(t)
+	defer cleanup()
+
+	lt, err := cs.ListTools(context.Background(), &mcpsdk.ListToolsParams{})
+	if err != nil {
+		t.Fatalf("ListTools: %v", err)
+	}
+
+	for _, tool := range lt.Tools {
+		if tool.Name != "build" {
+			continue
+		}
+
+		raw, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			t.Fatalf("marshal schema: %v", err)
+		}
+
+		if !strings.Contains(string(raw), `"noContainer"`) {
+			t.Errorf("build schema lacks noContainer: %s", raw)
+		}
+
+		return
+	}
+
+	t.Fatal("build tool not registered")
 }
 
 // TestPromptSurfaceExact asserts the registered prompt set matches the docs.
