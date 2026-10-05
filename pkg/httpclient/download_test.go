@@ -8,7 +8,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -512,4 +514,67 @@ func (tc *testCtx) Err() error {
 
 func (tc *testCtx) Value(key any) any {
 	return nil
+}
+
+// TestAtomicWrite_ConcurrentSameDestination verifies concurrent writers use
+// distinct temp files, so the destination always holds one complete payload
+// and no temp files are left behind.
+func TestAtomicWrite_ConcurrentSameDestination(t *testing.T) {
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "output.bin")
+
+	payloads := []string{
+		strings.Repeat("a", 1<<16),
+		strings.Repeat("b", 1<<16),
+		strings.Repeat("c", 1<<16),
+		strings.Repeat("d", 1<<16),
+	}
+
+	var wg sync.WaitGroup
+
+	for _, p := range payloads {
+		wg.Go(func() {
+			err := httpclient.AtomicWrite(destPath, func(w io.Writer) error {
+				for i := 0; i < len(p); i += 4096 {
+					if _, err := io.WriteString(w, p[i:i+4096]); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			})
+			if err != nil {
+				t.Errorf("AtomicWrite: %v", err)
+			}
+		})
+	}
+
+	wg.Wait()
+
+	data, err := os.ReadFile(destPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Contains(payloads, string(data)) {
+		t.Errorf("destination holds a torn/mixed payload (len=%d)", len(data))
+	}
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) != 1 {
+		t.Errorf("expected only the destination file, found %d entries", len(entries))
+	}
+
+	info, err := os.Stat(destPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if info.Mode().Perm()&0o444 != 0o444 {
+		t.Errorf("destination mode = %v, want world-readable", info.Mode().Perm())
+	}
 }

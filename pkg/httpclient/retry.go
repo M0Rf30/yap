@@ -2,11 +2,14 @@ package httpclient
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"io"
 	"math/rand/v2"
 	"net"
 	"net/url"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -72,7 +75,7 @@ func IsRetryable(err error) bool {
 		return false
 	}
 
-	if errors.Is(err, ErrTooLarge) {
+	if errors.Is(err, ErrTooLarge) || isPermanentTransportError(err) {
 		return false
 	}
 
@@ -101,6 +104,33 @@ func IsRetryable(err error) bool {
 	var urlErr *url.Error
 
 	return errors.As(err, &urlErr)
+}
+
+// isPermanentTransportError reports whether err is a definitive transport
+// failure that retrying cannot fix: certificate verification problems,
+// redirect-limit exhaustion and unsupported URL schemes.
+func isPermanentTransportError(err error) bool {
+	if _, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
+		return true
+	}
+
+	if _, ok := errors.AsType[x509.UnknownAuthorityError](err); ok {
+		return true
+	}
+
+	if _, ok := errors.AsType[x509.HostnameError](err); ok {
+		return true
+	}
+
+	if _, ok := errors.AsType[x509.CertificateInvalidError](err); ok {
+		return true
+	}
+
+	// net/http reports these as plain errors.New values wrapped in *url.Error.
+	msg := err.Error()
+
+	return strings.Contains(msg, "stopped after") && strings.Contains(msg, "redirects") ||
+		strings.Contains(msg, "unsupported protocol scheme")
 }
 
 // WithRetry runs fn until it succeeds, fails with a non-retryable error, or

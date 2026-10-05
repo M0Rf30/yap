@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -196,31 +197,48 @@ func fetchToFileOnce(ctx context.Context, url, destPath string, maxBytes int64) 
 	})
 }
 
-// AtomicWrite writes to destPath via a temp file + rename so readers never
-// see a partial file. fn receives a writer for the temp file; if fn returns
-// an error the temp file is removed.
+// AtomicWrite writes to destPath via a unique temp file in the destination
+// directory + fsync + rename, so readers never see a partial file and
+// concurrent writers to the same destination never share a temp file. fn
+// receives a writer for the temp file; if fn returns an error the temp file
+// is removed.
 func AtomicWrite(destPath string, fn func(io.Writer) error) error {
-	tmpPath := destPath + ".tmp"
-
-	f, err := os.Create(tmpPath) //nolint:gosec
+	f, err := os.CreateTemp(filepath.Dir(destPath), filepath.Base(destPath)+".*.tmp")
 	if err != nil {
 		return err
 	}
 
-	if err := fn(f); err != nil {
+	tmpPath := f.Name()
+
+	fail := func(err error) error {
 		_ = f.Close()
 		_ = os.Remove(tmpPath)
 
 		return err
 	}
 
+	// CreateTemp uses 0600; downloads are regular shareable files.
+	if err := f.Chmod(0o644); err != nil { //nolint:gosec // intentional: world-readable download
+		return fail(err)
+	}
+
+	if err := fn(f); err != nil {
+		return fail(err)
+	}
+
+	if err := f.Sync(); err != nil {
+		return fail(err)
+	}
+
 	if err := f.Close(); err != nil {
 		_ = os.Remove(tmpPath)
+
 		return err
 	}
 
 	if err := os.Rename(tmpPath, destPath); err != nil {
 		_ = os.Remove(tmpPath)
+
 		return err
 	}
 
