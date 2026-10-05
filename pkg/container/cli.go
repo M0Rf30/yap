@@ -50,16 +50,13 @@ func (r *cliRuntime) RunShell(distro, workDir, shellCmd string) error {
 }
 
 // RunShellCapture implements Runtime by tee-ing podman/docker stdout+stderr
-// into out. Falls back to the default behaviour when out is nil. env is
+// into out. When out is nil the output is streamed to the default sinks, but
+// env and ctx are still honoured. env is
 // forwarded via `-e KEY=VALUE` flags so secrets do not appear in the shell
 // argv (and therefore not in `ps`).
 func (r *cliRuntime) RunShellCapture(ctx context.Context, distro, workDir, shellCmd string,
 	env map[string]string, out io.Writer,
 ) error {
-	if out == nil {
-		return r.RunShell(distro, workDir, shellCmd)
-	}
-
 	runArgs := []string{
 		subRun, flagRm,
 		"--entrypoint", "/bin/sh",
@@ -73,6 +70,10 @@ func (r *cliRuntime) RunShellCapture(ctx context.Context, distro, workDir, shell
 		constants.DockerOrg+distro,
 		"-c", shellCmd,
 	)
+
+	if out == nil {
+		return shell.Exec(ctx, false, "", r.bin, runArgs...)
+	}
 
 	return shell.ExecCapture(ctx, out, "", r.bin, runArgs...)
 }
