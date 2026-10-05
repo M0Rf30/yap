@@ -60,7 +60,7 @@ func main() {
 	stop()
 
 	if left := yapmcp.Shutdown(shutdownGrace); left > 0 {
-		logger.Warn("in-flight builds did not stop before the shutdown deadline", "count", left)
+		logger.Warn(i18n.T("logger.yap-mcp.warn.shutdown_deadline_exceeded"), "count", left)
 	}
 
 	if err != nil && !isContextError(err) {

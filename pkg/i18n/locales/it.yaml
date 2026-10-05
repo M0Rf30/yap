@@ -552,8 +552,6 @@
   translation: "Nessuna distribuzione specificata, uso il default del sistema"
 
 # Messaggi logger - Archive
-- id: logger.archive.debug.skip_exists
-  translation: "Saltato, il file esiste già"
 - id: logger.archive.warn.close_failed
   translation: "Chiusura dell'archivio fallita"
 - id: logger.archive.warn.path_traversal_rejected
@@ -692,8 +690,6 @@
   translation: "Rilevata dipendenza circolare"
 
 # Messaggi logger - Download
-- id: logger.download.info.response_status
-  translation: "Stato della risposta"
 
 # Messaggi logger - Extract
 - id: logger.extract.extracting_package
@@ -958,8 +954,6 @@
 # Messaggi logger - With resume
 - id: logger.download.info.retrying_download_2
   translation: "Nuovo tentativo di download con supporto per la ripresa"
-- id: logger.download.info.retrying_download
-  translation: "Nuovo tentativo di download"
 
 # Messaggi logger - Zap
 - id: logger.zap.cleaning_for_distribution
@@ -1068,6 +1062,10 @@
   translation: "ldconfig non riuscito"
 - id: logger.aptinstall.warn.postinst_failed_leaving_package
   translation: "Postinst non riuscito; pacchetto lasciato estratto ma non configurato"
+- id: logger.aptinstall.warn.skipping_ldconfig_requires_root
+  translation: "ldconfig ignorato: -r RootDir richiede i privilegi di root"
+- id: logger.aptinstall.warn.skipping_maintainer_script_requires_root
+  translation: "Script del manutentore ignorato: il chroot in RootDir richiede i privilegi di root"
 - id: logger.aptinstall.warn.skipping_path_traversal_attempt
   translation: "Tentativo di path traversal ignorato"
 - id: logger.aptinstall.warn.skipping_unsafe_symlink
@@ -1128,6 +1126,8 @@
   translation: "Inoltro della pipeline al container"
 - id: logger.command.info.using_container_runtime
   translation: "Uso del runtime del container"
+- id: logger.command.warn.ssh_password_not_forwarded
+  translation: "--ssh-password non viene inoltrata nel container; usa ssh-agent o una chiave senza passphrase"
 - id: logger.common.debug.cross_compilation_toolchain_validation
   translation: "Validazione del toolchain di cross-compilazione superata"
 - id: logger.common.debug.cross_strip_env_configured
@@ -1240,6 +1240,8 @@
   translation: "Mirror non raggiungibile, provo il successivo"
 - id: logger.dnfcache.warn.mirrorlist_fallback_failed
   translation: "Fallback mirrorlist non riuscito, procedo solo con il mirror principale"
+- id: logger.dnfcache.warn.plain_http_mirrors_only
+  translation: "Disponibili solo mirror http non cifrati; ci si affida alla verifica dei checksum"
 - id: logger.dnfcache.warn.unresolvable_dependency
   translation: "Dipendenza non risolvibile"
 - id: logger.dnfcache.warn.unverified_download
@@ -1368,6 +1370,8 @@
   translation: "Sincronizzazione del repository non riuscita"
 - id: logger.parser.warn.failed_close_pkgbuild_file
   translation: "Chiusura del file PKGBUILD non riuscita"
+- id: logger.parser.warn.variable_expansion_failed
+  translation: "Impossibile espandere la variabile del PKGBUILD; viene usato un valore vuoto"
 - id: logger.pkgbuild.debug.legacy_bdb_host_falling
   translation: "Host BDB legacy, ripiego sul sottoprocesso"
 - id: logger.pkgbuild.info.delegating_package_install_subprocess
@@ -1392,6 +1396,8 @@
   translation: "Apertura non riuscita, ripiego sul sottoprocesso"
 - id: logger.platform.debug.skipping_recursive_ownership_preservation
   translation: "Preservazione ricorsiva della proprietà ignorata nel container"
+- id: logger.platform.debug.not_replacing_existing_file
+  translation: "File esistente non symlink: non viene sostituito"
 - id: logger.project.debug.treating_filtered_package_as
   translation: "Pacchetto filtrato trattato come interno (artefatto locale trovato)"
 - id: logger.project.debug.treating_filtered_package_as_external
@@ -1446,8 +1452,6 @@
   translation: "Rimozione della directory di stato di rootlesskit non riuscita"
 - id: logger.rootless.warn.failed_unmount_old_root
   translation: "Smontaggio della vecchia root non riuscito"
-- id: logger.rootless.warn.pipe_writer_close_error
-  translation: "Errore nella chiusura del writer della pipe"
 - id: logger.rootless.warn.restore_env_failed
   translation: "Ripristino dell'ambiente non riuscito"
 - id: logger.rootless.warn.rootless_runtime_does_not
@@ -1548,3 +1552,5 @@
   translation: "yap-mcp arrestato"
 - id: logger.yap-mcp.warn.prctl_pr_set_pdeathsig
   translation: "prctl PR_SET_PDEATHSIG non riuscito"
+- id: logger.yap-mcp.warn.shutdown_deadline_exceeded
+  translation: "Le build in corso non si sono fermate entro il termine di arresto"
