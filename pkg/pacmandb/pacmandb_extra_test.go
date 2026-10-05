@@ -79,7 +79,7 @@ func TestHandleSectionHeaderMultipleRepos(t *testing.T) {
 
 func TestHandleConfigKeyValueArchitecture(t *testing.T) {
 	cfg := &Config{}
-	err := handleConfigKeyValue(cfg, nil, "Architecture", "x86_64", make(map[string]bool))
+	err := handleConfigKeyValue(cfg, nil, "Architecture", "x86_64")
 	require.NoError(t, err)
 	assert.Equal(t, "x86_64", cfg.Architecture)
 }
@@ -88,7 +88,7 @@ func TestHandleConfigKeyValueArchitectureIgnoredInRepo(t *testing.T) {
 	// Architecture key inside a repo section should be ignored.
 	cfg := &Config{}
 	repo := &Repo{Name: "core"}
-	err := handleConfigKeyValue(cfg, repo, "Architecture", "x86_64", make(map[string]bool))
+	err := handleConfigKeyValue(cfg, repo, "Architecture", "x86_64")
 	require.NoError(t, err)
 	assert.Empty(t, cfg.Architecture)
 }
@@ -96,7 +96,7 @@ func TestHandleConfigKeyValueArchitectureIgnoredInRepo(t *testing.T) {
 func TestHandleConfigKeyValueServer(t *testing.T) {
 	cfg := &Config{}
 	repo := &Repo{Name: "core"}
-	err := handleConfigKeyValue(cfg, repo, "Server", "https://mirror.example.org/$repo/os/$arch", make(map[string]bool))
+	err := handleConfigKeyValue(cfg, repo, "Server", "https://mirror.example.org/$repo/os/$arch")
 	require.NoError(t, err)
 	require.Len(t, repo.Servers, 1)
 	assert.Equal(t, "https://mirror.example.org/$repo/os/$arch", repo.Servers[0])
@@ -105,16 +105,15 @@ func TestHandleConfigKeyValueServer(t *testing.T) {
 func TestHandleConfigKeyValueServerMultiple(t *testing.T) {
 	cfg := &Config{}
 	repo := &Repo{Name: "core"}
-	seen := make(map[string]bool)
-	require.NoError(t, handleConfigKeyValue(cfg, repo, "Server", "https://mirror1.example.org/$repo/os/$arch", seen))
-	require.NoError(t, handleConfigKeyValue(cfg, repo, "Server", "https://mirror2.example.org/$repo/os/$arch", seen))
+	require.NoError(t, handleConfigKeyValue(cfg, repo, "Server", "https://mirror1.example.org/$repo/os/$arch"))
+	require.NoError(t, handleConfigKeyValue(cfg, repo, "Server", "https://mirror2.example.org/$repo/os/$arch"))
 	assert.Len(t, repo.Servers, 2)
 }
 
 func TestHandleConfigKeyValueServerIgnoredOutsideRepo(t *testing.T) {
 	// Server key outside a repo section (curRepo == nil) should be ignored.
 	cfg := &Config{}
-	err := handleConfigKeyValue(cfg, nil, "Server", "https://mirror.example.org/$repo/os/$arch", make(map[string]bool))
+	err := handleConfigKeyValue(cfg, nil, "Server", "https://mirror.example.org/$repo/os/$arch")
 	require.NoError(t, err)
 	// No repos should have been created.
 	assert.Empty(t, cfg.Repos)
@@ -128,7 +127,7 @@ func TestHandleConfigKeyValueIncludeWithMirrorlist(t *testing.T) {
 
 	cfg := &Config{}
 	repo := &Repo{Name: "core"}
-	err := handleConfigKeyValue(cfg, repo, "Include", mirrorlistPath, make(map[string]bool))
+	err := handleConfigKeyValue(cfg, repo, "Include", mirrorlistPath)
 	require.NoError(t, err)
 	require.Len(t, repo.Servers, 1)
 	assert.Equal(t, "https://mirror.example.org/$repo/os/$arch", repo.Servers[0])
@@ -138,9 +137,7 @@ func TestHandleConfigKeyValueIncludeNonExistentFile(t *testing.T) {
 	// A non-existent Include file should propagate an error.
 	cfg := &Config{}
 	repo := &Repo{Name: "core"}
-	err := handleConfigKeyValue(cfg, repo, "Include", "/nonexistent/mirrorlist", make(map[string]bool))
-	// The function tries parseMirrorlist first (fails), then parseConfigWithIncludes (also fails).
-	// The error from parseConfigWithIncludes is returned.
+	err := handleConfigKeyValue(cfg, repo, "Include", "/nonexistent/mirrorlist")
 	assert.Error(t, err)
 }
 
@@ -148,7 +145,7 @@ func TestHandleConfigKeyValueUnknownKey(t *testing.T) {
 	// Unknown keys should be silently ignored.
 	cfg := &Config{}
 	repo := &Repo{Name: "core"}
-	err := handleConfigKeyValue(cfg, repo, "HoldPkg", "pacman glibc", make(map[string]bool))
+	err := handleConfigKeyValue(cfg, repo, "HoldPkg", "pacman glibc")
 	require.NoError(t, err)
 	assert.Empty(t, repo.Servers)
 }

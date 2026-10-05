@@ -85,9 +85,14 @@ func Sync(ctx context.Context) (succeeded int, err error) {
 }
 
 func syncRepo(ctx context.Context, repo Repo, arch string) error {
+	return syncRepoTo(ctx, pacmanSyncDir, repo, arch)
+}
+
+// syncRepoTo is syncRepo with an explicit destination directory.
+func syncRepoTo(ctx context.Context, syncDir string, repo Repo, arch string) error {
 	for _, server := range repo.Servers {
 		url := substituteVars(server, repo.Name, arch) + "/" + repo.Name + ".db"
-		dest := filepath.Join(pacmanSyncDir, repo.Name+".db")
+		dest := filepath.Join(syncDir, repo.Name+".db")
 
 		logger.Debug(i18n.T("logger.pacmandb.debug.trying_mirror"), "repo", repo.Name, "url", url)
 
@@ -99,8 +104,18 @@ func syncRepo(ctx context.Context, repo Repo, arch string) error {
 		}
 
 		// Also try to fetch the .sig (optional, used for signature checking).
+		// If it is unavailable, drop any previous .sig: it belongs to the old
+		// .db and would make libalpm reject the freshly downloaded database.
 		sigDest := dest + ".sig"
-		_ = downloadFile(ctx, url+".sig", sigDest) // best-effort
+		if sigErr := downloadFile(ctx, url+".sig", sigDest); sigErr != nil {
+			logger.Debug(i18n.T("logger.pacmandb.debug.mirror_failed"),
+				"repo", repo.Name, "url", url+".sig", "error", sigErr)
+
+			if rmErr := os.Remove(sigDest); rmErr != nil && !os.IsNotExist(rmErr) {
+				logger.Debug(i18n.T("logger.pacmandb.debug.mirror_failed"),
+					"repo", repo.Name, "url", sigDest, "error", rmErr)
+			}
+		}
 
 		var sizeBytes int64
 		if fi, statErr := os.Stat(dest); statErr == nil {
