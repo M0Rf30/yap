@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
@@ -19,7 +20,8 @@ import (
 var localeFS embed.FS
 
 var (
-	bundle    *i18n.Bundle
+	// mu guards localizer, which Init writes and T reads.
+	mu        sync.RWMutex
 	localizer *i18n.Localizer
 )
 
@@ -30,8 +32,8 @@ var SupportedLanguages = []string{"en", "it"}
 // If lang is empty, it will try to detect the system language.
 func Init(lang string) error {
 	// Create a new bundle
-	bundle = i18n.NewBundle(language.English)
-	bundle.RegisterUnmarshalFunc("yaml", yaml.Unmarshal)
+	b := i18n.NewBundle(language.English)
+	b.RegisterUnmarshalFunc("yaml", yaml.Unmarshal)
 
 	// Load all supported languages from embedded files
 	for _, langCode := range SupportedLanguages {
@@ -43,7 +45,7 @@ func Init(lang string) error {
 			continue
 		}
 
-		_, err = bundle.ParseMessageFileBytes(data, filename)
+		_, err = b.ParseMessageFileBytes(data, filename)
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeConfiguration,
 				fmt.Sprintf("failed to parse locale file %s", filename)).
@@ -58,46 +60,67 @@ func Init(lang string) error {
 
 	// Create localizer with fallback
 	langs := []string{lang, "en"} // Always fallback to English
-	localizer = i18n.NewLocalizer(bundle, langs...)
+	loc := i18n.NewLocalizer(b, langs...)
+
+	mu.Lock()
+	localizer = loc
+	mu.Unlock()
 
 	return nil
 }
 
-// detectSystemLanguage attempts to detect the system language from environment variables.
+// detectSystemLanguage attempts to detect the system language from environment
+// variables using POSIX/GNU gettext precedence: the effective locale is the
+// first non-empty of LC_ALL, LC_MESSAGES, LANG; unless it is "C"/"POSIX",
+// the colon-separated LANGUAGE list takes priority over it.
 func detectSystemLanguage() string {
-	// Check LANG environment variable first
-	if lang := os.Getenv("LANG"); lang != "" {
-		// Extract language code (e.g., "it_IT.UTF-8" -> "it")
-		parts := strings.Split(lang, "_")
-		if len(parts) > 0 {
-			langCode := strings.ToLower(parts[0])
-			// Check if we support this language
-			if slices.Contains(SupportedLanguages, langCode) {
-				return langCode
-			}
+	locale := ""
+
+	for _, env := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
+		if v := os.Getenv(env); v != "" {
+			locale = v
+
+			break
 		}
 	}
 
-	// Check other environment variables
-	for _, env := range []string{"LC_ALL", "LC_MESSAGES", "LANGUAGE"} {
-		if lang := os.Getenv(env); lang != "" {
-			parts := strings.Split(lang, "_")
-			if len(parts) > 0 {
-				langCode := strings.ToLower(parts[0])
-				if slices.Contains(SupportedLanguages, langCode) {
-					return langCode
-				}
-			}
+	if locale == "C" || locale == "POSIX" {
+		return "en"
+	}
+
+	for entry := range strings.SplitSeq(os.Getenv("LANGUAGE"), ":") {
+		if code := localeLanguageCode(entry); slices.Contains(SupportedLanguages, code) {
+			return code
 		}
+	}
+
+	if code := localeLanguageCode(locale); slices.Contains(SupportedLanguages, code) {
+		return code
 	}
 
 	// Default to English
 	return "en"
 }
 
+// localeLanguageCode extracts the lowercase language code from a locale name
+// such as "it_IT.UTF-8@euro" -> "it". It returns "" for empty input.
+func localeLanguageCode(locale string) string {
+	if i := strings.IndexAny(locale, "_.@-"); i >= 0 {
+		locale = locale[:i]
+	}
+
+	return strings.ToLower(locale)
+}
+
 // T translates a message using the provided ID and optional template data.
 func T(messageID string, templateData ...map[string]any) string {
-	if localizer == nil {
+	mu.RLock()
+
+	loc := localizer
+
+	mu.RUnlock()
+
+	if loc == nil {
 		// Fallback if i18n is not initialized
 		return messageID
 	}
@@ -110,7 +133,7 @@ func T(messageID string, templateData ...map[string]any) string {
 		config.TemplateData = templateData[0]
 	}
 
-	translated, err := localizer.Localize(config)
+	translated, err := loc.Localize(config)
 	if err != nil {
 		// Return the message ID if translation fails
 		return messageID
