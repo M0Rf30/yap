@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -112,26 +113,21 @@ func filterScriptletEnv() []string {
 // Heuristics: presence of common RPM-Lua API tokens that would never appear
 // as shell builtins/commands.
 func looksLikeLua(body string) bool {
-	// Only match tokens that are impossible in a POSIX shell
-	// scriptlet but are idiomatic in rpm-Lua. The RPM-Lua API exposes
-	// `path`, `posix`, `rpm`, `hashlib`, `macros`, `fd`, etc. as global
-	// tables, so a leading-token call like "path.something(" or
-	// "rpm.execute(" is a strong signal.
-	luaMarkers := []string{
-		"path.",
-		"posix.",
-		"rpm.b64",
-		"rpm.define",
-		"rpm.execute",
-		"rpm.expand",
-		"rpm.spawn",
-		"hashlib.",
-		"macros.",
-	}
-	for _, m := range luaMarkers {
-		if strings.Contains(body, m) {
-			return true
-		}
+	return luaMarkerRE.MatchString(body)
+}
+
+// luaMarkerRE matches RPM-Lua API calls at a token boundary, so paths such as
+// "profile.d/path.sh" or "filepath.x" do not match.
+var luaMarkerRE = regexp.MustCompile(
+	`(?:^|[^A-Za-z0-9_./-])(?:(?:path|posix|hashlib|macros)\.[A-Za-z_]` +
+		`|rpm\.(?:b64|define|execute|expand|spawn))`)
+
+// isShellInterpreter reports whether interpreter is a POSIX shell that can
+// take the script on stdin with positional args.
+func isShellInterpreter(interpreter string) bool {
+	switch interpreter {
+	case interpSh, "/usr/bin/sh", interpBash, "/usr/bin/bash":
+		return true
 	}
 
 	return false
@@ -175,7 +171,10 @@ func runScriptlet(
 
 	var interpreterArgs []string
 
+	progDeclared := false
+
 	if progs, err := rpm.Header.GetStrings(tags.progTag); err == nil && len(progs) > 0 {
+		progDeclared = progs[0] != ""
 		if progs[0] != "" {
 			interpreter = progs[0]
 			if len(progs) > 1 {
@@ -189,9 +188,9 @@ func runScriptlet(
 
 	// Detect Lua scriptlets and skip with warning. Some RPMs (notably
 	// json-c-devel on EL8) ship Lua bodies without setting the PROG tag,
-	// so also heuristically detect Lua syntax in the body when the
-	// declared interpreter is the default /bin/sh fallback.
-	if interpreter == "<lua>" || strings.HasPrefix(interpreter, "<lua>") || looksLikeLua(body) {
+	// so heuristically detect Lua syntax only when no interpreter was declared.
+	if interpreter == "<lua>" || strings.HasPrefix(interpreter, "<lua>") ||
+		(!progDeclared && looksLikeLua(body)) {
 		logger.Warn(i18n.T("logger.dnfinstall.warn.skipping_lua_scriptlet"), "kind", tags.kindName,
 			"package", pkgName,
 			"interpreter", interpreter)
@@ -218,6 +217,11 @@ func runScriptlet(
 		args = []string{"-e"}
 	}
 
+	if isShellInterpreter(interpreter) {
+		// Pass $1 (1 = fresh install) as rpm does; body is read from stdin.
+		args = append(append([]string{}, args...), "-s", "--", tags.argValue)
+	}
+
 	cmd := exec.CommandContext(ctx, interpreter, args...)
 	cmd.Stdin = strings.NewReader(body)
 
@@ -235,21 +239,22 @@ func runScriptlet(
 		cmd.Env = append(cmd.Env, "RPM_PACKAGE_RELEASE="+release)
 	}
 
+	// Without root we cannot chroot; running the interpreter would act on the
+	// HOST filesystem, so refuse to run scriptlets for a foreign rootDir.
+	if rootDir != "" && rootDir != "/" && os.Getuid() != 0 {
+		logger.Warn(i18n.T("logger.dnfinstall.debug.skipping_chroot_not_running"), "kind", tags.kindName,
+			"package", pkgName,
+			"rootDir", rootDir)
+
+		return nil
+	}
+
 	// Handle chroot if rootDir is set and not "/".
 	if rootDir != "" && rootDir != "/" {
-		if os.Getuid() == 0 {
-			// Running as root: use chroot.
-			cmd.SysProcAttr = &syscall.SysProcAttr{
-				Chroot: rootDir,
-			}
-			cmd.Dir = "/"
-		} else {
-			// Not root: log debug and run anyway (container build scenario).
-			logger.Debug(i18n.T("logger.dnfinstall.debug.skipping_chroot_not_running"), "kind", tags.kindName,
-				"package", pkgName,
-				"rootDir", rootDir)
-			cmd.Dir = rootDir
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Chroot: rootDir,
 		}
+		cmd.Dir = "/"
 	}
 
 	// Capture output.

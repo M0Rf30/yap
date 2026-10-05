@@ -38,31 +38,10 @@ func downloadAndInstall(
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	// Download all packages.
-	rpmPaths := make(map[string]string) // package name -> local path
-
-	var mu sync.Mutex
-
-	for _, pkg := range resolved {
-		// Check context cancellation.
-		if err := ctx.Err(); err != nil {
-			return errors.Wrap(err, errors.ErrTypeFileSystem, "context cancelled").
-				WithOperation("downloadAndInstall")
-		}
-
-		// Download the RPM.
-		path, err := downloadRPM(ctx, cache, pkg, tmpDir)
-		if err != nil {
-			return errors.Wrap(err, errors.ErrTypeBuild, "failed to download package").
-				WithOperation("downloadAndInstall").
-				WithContext("package", pkg.Name)
-		}
-
-		mu.Lock()
-		rpmPaths[pkg.Name] = path
-		mu.Unlock()
-
-		logger.Debug(i18n.T("logger.dnfinstall.debug.downloaded_rpm"), "package", pkg.Name, "path", path)
+	// Download all packages concurrently (bounded), failing fast.
+	rpmPaths, err := downloadAll(ctx, cache, resolved, tmpDir)
+	if err != nil {
+		return err
 	}
 
 	// Install packages in dependency order.
@@ -95,6 +74,76 @@ func downloadRPM(ctx context.Context, _ *dnfcache.Cache, pkg *dnfcache.PackageIn
 	}
 
 	return path, nil
+}
+
+// maxParallelDownloads bounds concurrent package downloads.
+const maxParallelDownloads = 4
+
+// downloadAll downloads every resolved package with bounded concurrency and
+// cancels outstanding downloads on the first failure.
+func downloadAll(
+	ctx context.Context,
+	cache *dnfcache.Cache,
+	resolved []*dnfcache.PackageInfo,
+	tmpDir string,
+) (map[string]string, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	rpmPaths := make(map[string]string, len(resolved)) // package name -> local path
+
+	var (
+		mu       sync.Mutex
+		wg       sync.WaitGroup
+		firstErr error
+	)
+
+	sem := make(chan struct{}, maxParallelDownloads)
+
+	for _, pkg := range resolved {
+		wg.Go(func() {
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
+
+			path, err := downloadRPM(ctx, cache, pkg, tmpDir)
+
+			mu.Lock()
+			defer mu.Unlock()
+
+			if err != nil {
+				if firstErr == nil {
+					firstErr = errors.Wrap(err, errors.ErrTypeBuild, "failed to download package").
+						WithOperation("downloadAndInstall").
+						WithContext("package", pkg.Name)
+
+					cancel()
+				}
+
+				return
+			}
+
+			rpmPaths[pkg.Name] = path
+
+			logger.Debug(i18n.T("logger.dnfinstall.debug.downloaded_rpm"), "package", pkg.Name, "path", path)
+		})
+	}
+
+	wg.Wait()
+
+	if firstErr != nil {
+		return nil, firstErr
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "context cancelled").
+			WithOperation("downloadAndInstall")
+	}
+
+	return rpmPaths, nil
 }
 
 // installPackage extracts a single RPM file to rootDir.
@@ -302,7 +351,7 @@ func toRPMDBFiles(files []installedFile) []rpmdb.InstalledFile {
 		out = append(out, rpmdb.InstalledFile{
 			Path:       f.Path,
 			Size:       f.Size,
-			Mode:       uint32(f.Mode), //nolint:gosec // os.FileMode bits fit uint32
+			Mode:       posixMode(f.Mode),
 			SHA256:     f.SHA256,
 			LinkTarget: f.LinkTarget,
 		})

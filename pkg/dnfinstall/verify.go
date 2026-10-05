@@ -40,8 +40,9 @@ var ErrInvalidSignature = errors.New("dnfinstall: invalid signature")
 var ErrNoTrustAnchor = errors.New("dnfinstall: no usable trust anchor for RPM verification")
 
 // verifyRPMSignature checks the OpenPGP signature on the RPM at path.
-// If opts.AllowUnverifiedRPMs is true, ALL outcomes (unsigned, unknown signer,
-// invalid sig) return nil with a warning logged.
+// If opts.AllowUnverifiedRPMs is true, missing trust anchors, unknown signers
+// and unsigned RPMs return nil with a warning logged; a cryptographically
+// invalid signature (ErrInvalidSignature) is always a hard failure.
 // If opts.KeyringPath is set, loads keys from that path (file OR directory).
 // Otherwise loads from /etc/pki/rpm-gpg/.
 //
@@ -111,7 +112,7 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 		// Determine the error category.
 		verifyErr := wrapRPMSignatureError(err)
 
-		if opts.AllowUnverifiedRPMs {
+		if opts.AllowUnverifiedRPMs && !errors.Is(verifyErr, ErrInvalidSignature) {
 			logger.Warn(i18n.T("logger.dnfinstall.warn.rpm_signature_verification_failed"), "path", path, "error", verifyErr)
 
 			return nil

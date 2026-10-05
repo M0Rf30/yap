@@ -6,12 +6,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/sassoftware/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // rpmEntry represents a parsed RPM file and its extracted file metadata.
@@ -186,9 +188,17 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 
 		mode := uint32(fi.Mode()) //nolint:gosec
 		fileType := mode & rpmTypeMask
-		perm := os.FileMode(mode & 0o7777)
+		perm := rpmPerm(mode)
 
 		inodeKey := (uint64(uint32(fi.Device())) << 32) | uint64(uint32(fi.Inode())) //nolint:gosec
+
+		recordPath := "/" + strings.TrimPrefix(filepath.ToSlash(name), "/")
+
+		targetPath, err = resolveTarget(rootDir, targetPath, fileType == rpmTypeDir)
+		if err != nil {
+			logger.Warn(i18n.T("logger.dnfinstall.warn.skipping_unsafe_path_rpm"), "path", name, "error", err)
+			continue
+		}
 
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 			return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create parent directories").
@@ -232,7 +242,7 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 		}
 
 		files = append(files, installedFile{
-			Path:       targetPath,
+			Path:       recordPath,
 			Mode:       perm,
 			Size:       fi.Size(),
 			IsDir:      fileType == rpmTypeDir,
@@ -248,6 +258,70 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 		RPM:   rpm,
 		Files: files,
 	}, nil
+}
+
+// rpmPerm converts POSIX mode bits to a Go FileMode, mapping setuid, setgid
+// and sticky to their Go flag equivalents.
+func rpmPerm(mode uint32) os.FileMode {
+	perm := os.FileMode(mode & 0o777)
+	if mode&0o4000 != 0 {
+		perm |= os.ModeSetuid
+	}
+
+	if mode&0o2000 != 0 {
+		perm |= os.ModeSetgid
+	}
+
+	if mode&0o1000 != 0 {
+		perm |= os.ModeSticky
+	}
+
+	return perm
+}
+
+// posixMode converts a Go FileMode back into POSIX permission bits
+// (including setuid/setgid/sticky).
+func posixMode(m os.FileMode) uint32 {
+	out := uint32(m.Perm())
+	if m&os.ModeSetuid != 0 {
+		out |= 0o4000
+	}
+
+	if m&os.ModeSetgid != 0 {
+		out |= 0o2000
+	}
+
+	if m&os.ModeSticky != 0 {
+		out |= 0o1000
+	}
+
+	return out
+}
+
+// resolveTarget re-resolves targetPath beneath rootDir following symlinks with
+// chroot semantics so an on-disk link can never redirect writes to the host.
+// For non-directory entries only the parent is resolved: the final component
+// is replaced (not followed). With rootDir "/" the path is returned as is.
+func resolveTarget(rootDir, targetPath string, isDir bool) (string, error) {
+	if rootDir == "/" {
+		return targetPath, nil
+	}
+
+	rel, err := filepath.Rel(rootDir, targetPath)
+	if err != nil {
+		return "", err //nolint:wrapcheck
+	}
+
+	if isDir {
+		return safepath.ResolveInRoot(rootDir, rel)
+	}
+
+	parent, err := safepath.ResolveInRoot(rootDir, filepath.Dir(rel))
+	if err != nil {
+		return "", err //nolint:wrapcheck
+	}
+
+	return filepath.Join(parent, filepath.Base(targetPath)), nil
 }
 
 // writeRegularFile streams the current payload entry to targetPath atomically.
