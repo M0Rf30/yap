@@ -120,7 +120,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Apk {
 
 // BuildPackage creates an APK package without external dependencies.
 // The package is created as a gzip-compressed tar archive containing the package
-// files and metadata (.PKGINFO and optional .install script).
+// files and metadata (.PKGINFO and optional .pre-*/.post-* lifecycle scripts).
 // Returns the path to the created APK file.
 func (a *Apk) BuildPackage(ctx context.Context, artifactsPath string, targetArch string) (string, error) {
 	a.SetTargetArchitecture(targetArch)
@@ -142,6 +142,13 @@ func (a *Apk) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 // It generates the .PKGINFO file and optional install scripts for lifecycle hooks.
 func (a *Apk) PrepareFakeroot(ctx context.Context, artifactsPath string, targetArch string) error {
 	a.SetTargetArchitecture(targetArch)
+
+	// Apply PKGBUILD options (strip/docs/libtool/purge/zipman/emptydirs) before
+	// measuring the payload so that the installed size reflects the final tree.
+	err := a.ApplyOptionsWithEnv(a.CrossStripEnvMap(targetArch))
+	if err != nil {
+		return err
+	}
 
 	installedSize, err := files.GetDirSize(a.PKGBUILD.PackageDir)
 	if err != nil {
@@ -167,12 +174,9 @@ func (a *Apk) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 		return err
 	}
 
-	if a.PKGBUILD.PreInst != "" || a.PKGBUILD.PostInst != "" ||
-		a.PKGBUILD.PreRm != "" || a.PKGBUILD.PostRm != "" {
-		err = a.createInstallScript()
-		if err != nil {
-			return err
-		}
+	err = a.createScriptlets()
+	if err != nil {
+		return err
 	}
 
 	// Note: APK format does not have a native changelog convention.
@@ -191,14 +195,50 @@ func (a *Apk) createPkgInfo() error {
 	return a.PKGBUILD.CreateSpec(pkginfoPath, tmpl)
 }
 
-// createInstallScript generates the install script for APK packages.
-// This script contains pre/post install/remove hooks.
-func (a *Apk) createInstallScript() error {
-	tmpl := a.PKGBUILD.RenderSpec(installScript)
+// scriptlet maps a PKGBUILD lifecycle hook to the control member names that
+// apk-tools recognises.
+type scriptlet struct {
+	body  string
+	names []string
+}
 
-	scriptPath := filepath.Join(a.PKGBUILD.PackageDir, ".install")
+// createScriptlets writes one executable shell script per lifecycle hook,
+// named as apk-tools expects (.pre-install, .post-upgrade, ...). The install
+// hooks double as upgrade hooks, matching the other builders.
+func (a *Apk) createScriptlets() error {
+	hooks := []scriptlet{
+		{a.PKGBUILD.PreInst, []string{".pre-install", ".pre-upgrade"}},
+		{a.PKGBUILD.PostInst, []string{".post-install", ".post-upgrade"}},
+		{a.PKGBUILD.PreRm, []string{".pre-deinstall"}},
+		{a.PKGBUILD.PostRm, []string{".post-deinstall"}},
+	}
 
-	return a.PKGBUILD.CreateSpec(scriptPath, tmpl)
+	for _, hook := range hooks {
+		if hook.body == "" {
+			continue
+		}
+
+		content := "#!/bin/sh\n" + a.PrepareScriptletWithHelpers(hook.body)
+		if !strings.HasSuffix(content, "\n") {
+			content += "\n"
+		}
+
+		for _, name := range hook.names {
+			path := filepath.Join(a.PKGBUILD.PackageDir, name)
+
+			err := files.CreateWrite(path, content)
+			if err != nil {
+				return err
+			}
+
+			err = files.Chmod(path, 0o755)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // pkginfoFileName is the canonical archive name for the APK metadata file.
@@ -211,7 +251,6 @@ func isControlFile(name string) bool {
 		strings.HasPrefix(name, ".SIGN") ||
 		strings.HasPrefix(name, ".pre-") ||
 		strings.HasPrefix(name, ".post-") ||
-		strings.HasPrefix(name, ".install") ||
 		strings.HasPrefix(name, ".trigger")
 }
 
