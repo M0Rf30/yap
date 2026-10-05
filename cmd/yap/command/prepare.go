@@ -4,11 +4,13 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
+	"github.com/M0Rf30/yap/v2/pkg/download"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
@@ -54,7 +56,7 @@ var (
 				distro, release = parseDistroAndRelease(args[0])
 			}
 
-			distro, _ = ResolveDistroRelease(distro, release,
+			distro, release = ResolveDistroRelease(distro, release,
 				"logger.prepare.no_distribution_specified")
 
 			// Dispatch to container when a distro was explicitly requested and
@@ -68,7 +70,7 @@ var (
 				}
 
 				// YAP_IN_CONTAINER=1 (injected by the runtime) prevents re-dispatch.
-				subArgs := []string{prepareCommand, distroTag}
+				subArgs := append([]string{prepareCommand, distroTag}, preparePassthroughFlags()...)
 				if RunCommandInContainer(image, ".", subArgs) {
 					return nil
 				}
@@ -115,6 +117,39 @@ var (
 		},
 	}
 )
+
+// preparePassthroughFlags returns the prepare flags that must be replayed
+// inside the dispatched container so it prepares the same environment the
+// user asked for (Go toolchain, cross arch, repos, sync/validation toggles).
+func preparePassthroughFlags() []string {
+	var out []string
+
+	if GoLang {
+		out = append(out, "--golang")
+	}
+
+	if TargetArch != "" {
+		out = append(out, "--target-arch", TargetArch)
+	}
+
+	for _, r := range prepareExtraRepos {
+		out = append(out, "--repo", r)
+	}
+
+	if prepareSkipSyncDeps {
+		out = append(out, "--"+flagSkipSync)
+	}
+
+	if prepareSkipToolchainValidation {
+		out = append(out, "--skip-toolchain-validation")
+	}
+
+	if download.MaxRetries() != download.DefaultMaxRetries {
+		out = append(out, "--source-retries", strconv.Itoa(download.MaxRetries()))
+	}
+
+	return out
+}
 
 // InitializePrepareDescriptions sets the localized descriptions for the prepare command.
 // This must be called after i18n is initialized.
