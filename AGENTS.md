@@ -56,9 +56,11 @@
 ## Build/test commands
 
 ```bash
-make all              # clean, deps, fmt, lint, test, doc, build
+make all              # clean, deps, fmt-check, lint, test, doc, build (non-mutating)
 make build            # build yap binary with version info
-make build-all        # linux/darwin/windows, amd64/arm64
+make build-all        # linux/darwin, amd64/arm64 (windows unsupported: dnfinstall uses flock/chroot)
+make fmt-check        # fail if gofmt/goimports would change files
+make tidy             # go mod tidy (no longer run implicitly by all/release)
 make clean
 make deps
 make fmt
@@ -186,6 +188,11 @@ Key resolution priority (highest first):
 4. `yap.json` `signing.keyPath`
 5. `~/.config/yap/keys/<format>.{rsa,gpg}` → `~/.config/yap/keys/default.{rsa,gpg}`
 
+Format-specific resolution is applied in `signing.NewSigner` via `signing.ForFormat`:
+implicit keys (global env / default files) are replaced by `YAP_<FMT>_KEY` or the
+format default; if no key of the right type exists the artifact is left unsigned.
+Explicit `--sign-key` / `yap.json` keys are never overridden.
+
 Passphrase mirrors key resolution with `_PASSPHRASE` suffix.
 
 Files: `signing.go` (enums, Config, Signer interface), `resolve.go`, `factory.go`, `rsa.go` (APK), `gpg.go` (DEB/RPM/Pacman).
@@ -283,6 +290,9 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - `pacman -S` (install): still subprocess due to alpm hook complexity
 - `pkg/dnfinstall` does NOT update `/var/lib/rpm/` by default (state lives in yapdb); set `Options.WriteSystemRpmdb=true` to also write to SQLite rpmdb (Fedora 33+/RHEL 9+/Rocky 9+ only — BDB hosts skip with warn)
 - `pkg/aptinstall` does NOT update `/var/lib/dpkg/status` by default (state lives in yapdb); set `Options.WriteDpkgStatus=true` for legacy behavior
+- `pkg/aptinstall` rejects `Options.RootDir` other than `/` (dpkg state + maintainer scripts are not yet re-rooted)
+- Extraction into a non-`/` root (archive, aptinstall, dnfinstall, apkindex, rootless pull) resolves every path through `safepath.ResolveInRoot` (chroot-semantics symlink resolution); extraction into `/` keeps plain OS semantics
+- `pkg/dnfinstall` hard-fails cryptographically invalid RPM signatures even with `AllowUnverifiedRPMs`; only missing keyring / unknown signer / unsigned are tolerated in that mode
 - `pkg/dnfinstall` coverage at ~40% (rpmpack→rpmutils interop blocks happy-path integration tests); pure-unit coverage of helpers is strong, full pipeline validated via `make test-e2e-rpm` on Rocky 8
 
 ### MCP surface (`pkg/mcp/`, `cmd/yap-mcp/`)
