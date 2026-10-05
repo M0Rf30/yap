@@ -25,3 +25,8 @@ func NormalizeScriptContentForTesting(script string) string {
 // LogScriptResultForTesting exposes logScriptResult for unit tests.
 // Re-exported as a package-level function so tests in the same package can call it.
 var LogScriptResultForTesting = logScriptResult
+
+// GzipNeedsRealToolForTesting exposes gzipNeedsRealTool for unit tests.
+func GzipNeedsRealToolForTesting(args []string, dir string) bool {
+	return gzipNeedsRealTool(parseGzipArgs(args), dir)
+}

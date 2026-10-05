@@ -185,9 +185,13 @@ func TestHandleGunzip_ToStdout(t *testing.T) {
 
 func TestHandleUnrar_MissingSubcommand(t *testing.T) {
 	dir := t.TempDir()
-	// unrar with no sub-command → error
-	err := runScript(t, dir, "unrar")
-	require.Error(t, err)
+	// unrar with no sub-command is deferred to the real binary (help/not found);
+	// it must not be extracted in-process.
+	_ = runScript(t, dir, "unrar")
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Empty(t, entries)
 }
 
 func TestHandleUnrar_UnsupportedSubcommand(t *testing.T) {
@@ -321,4 +325,45 @@ func TestArchiveExecHandler_EmptyArgs(t *testing.T) {
 	dir := t.TempDir()
 	err := runScript(t, dir, "")
 	require.NoError(t, err)
+}
+
+func TestGzipNeedsRealTool(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.gz"), nil, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a"), nil, 0o600))
+
+	cases := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"two operands", []string{"gzip", "a", "b"}, true},
+		{"list", []string{"gzip", "-l", "a.gz"}, true},
+		{"suffix", []string{"gzip", "-S", ".x", "a"}, true},
+		{"long unknown", []string{"gzip", "--rsyncable", "a"}, true},
+		{"gunzip stdin", []string{"gunzip"}, true},
+		{"gunzip no suffix", []string{"gunzip", "a"}, true},
+		{"output exists", []string{"gzip", "a"}, true},
+		{"output exists forced", []string{"gzip", "-f", "a"}, false},
+		{"stdout ok", []string{"gzip", "-c", "a"}, false},
+		{"gzip stdin", []string{"gzip"}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := GzipNeedsRealToolForTesting(c.args, dir)
+			assert.Equal(t, c.want, got)
+		})
+	}
+}
+
+func TestHandleUnrar_FallsThroughForFilterAndE(t *testing.T) {
+	dir := t.TempDir()
+	// Second operand without trailing slash is a file filter, and `e`
+	// flattens paths: neither may be handled in-process. Whether the real
+	// binary exists or not, no extraction directory must be created.
+	_ = runScript(t, dir, "unrar x nonexistent.rar subdir")
+	_ = runScript(t, dir, "unrar e nonexistent.rar")
+
+	_, err := os.Stat(filepath.Join(dir, "subdir"))
+	require.True(t, os.IsNotExist(err))
 }
