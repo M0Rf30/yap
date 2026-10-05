@@ -495,3 +495,14 @@ func TestInstallWithOptionsRootRefused(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AllowRootInstall")
 }
+
+// TestInstallWithOptionsRejectsNonHostRoot verifies a fakeroot RootDir is
+// refused rather than half-honoured (dpkg state/scripts hit the host).
+func TestInstallWithOptionsRejectsNonHostRoot(t *testing.T) {
+	t.Parallel()
+
+	err := aptinstall.InstallWithOptions(context.Background(), []string{"x"},
+		aptinstall.Options{RootDir: t.TempDir()})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "RootDir")
+}

@@ -19,6 +19,8 @@ import (
 const (
 	dpkgStatusPath = "/var/lib/dpkg/status"
 	dpkgLockPath   = "/var/lib/dpkg/lock"
+
+	dpkgLockFrontendPath = "/var/lib/dpkg/lock-frontend"
 )
 
 // dpkgStatusEntry represents a single package entry in /var/lib/dpkg/status.
@@ -496,51 +498,66 @@ func ensureDpkgDirs() error {
 	return nil
 }
 
-// dpkgLockFile is an exclusive advisory lock around /var/lib/dpkg/lock.
-// Mirrors dpkg's own locking so a concurrent dpkg/apt process can't race
-// the status file read-modify-write cycle.
+// dpkgLockFile holds dpkg's own advisory locks (lock-frontend and lock under
+// /var/lib/dpkg). They are taken with fcntl(F_SETLK) like dpkg/apt do, since
+// flock(2) locks are independent of fcntl locks on Linux and would not
+// exclude a concurrent dpkg or apt.
 type dpkgLockFile struct {
-	f *os.File
+	files []*os.File
 }
 
-// acquireDpkgLock takes an exclusive flock(2) on /var/lib/dpkg/lock.
-// The returned handle MUST be released with Release(); the lock is also
-// dropped automatically when the process exits.
+// acquireDpkgLock takes exclusive fcntl locks on lock-frontend and lock.
+// /var/lib/dpkg must already exist (see ensureDpkgDirs). The returned handle
+// MUST be released with Release(); the locks also drop at process exit.
 //
-// If the lock file cannot be created (e.g. running as non-root outside a
-// container), the function returns a sentinel "best-effort" lock that does
-// nothing on release. This keeps unit tests on a developer workstation
-// runnable while still locking properly in the build container.
+// Only permission errors (e.g. non-root on a developer workstation) yield a
+// no-op lock; every other failure, including a held lock, is returned.
 func acquireDpkgLock() (*dpkgLockFile, error) {
-	// nolint:gosec // G304: constant path
-	f, err := os.OpenFile(dpkgLockPath, os.O_CREATE|os.O_RDWR, 0o640)
-	if err != nil {
-		// Probably permission denied (non-root tests). Treat as no-op so
-		// unit tests on a developer workstation still run; production
-		// (root inside a build container) always takes the real flock.
-		_ = err
+	l := &dpkgLockFile{}
 
-		return &dpkgLockFile{f: nil}, nil //nolint:nilerr // see comment above
+	for _, path := range []string{dpkgLockFrontendPath, dpkgLockPath} {
+		// nolint:gosec // G304: constant path
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o640)
+		if err != nil {
+			if os.IsPermission(err) {
+				l.Release()
+
+				return &dpkgLockFile{}, nil
+			}
+
+			l.Release()
+
+			return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "open dpkg lock").
+				WithOperation("acquireDpkgLock").WithContext("path", path)
+		}
+
+		lk := syscall.Flock_t{Type: syscall.F_WRLCK, Whence: 0}
+		if err := syscall.FcntlFlock(f.Fd(), syscall.F_SETLKW, &lk); err != nil {
+			_ = f.Close()
+
+			l.Release()
+
+			return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "fcntl lock").
+				WithOperation("acquireDpkgLock").WithContext("path", path)
+		}
+
+		l.files = append(l.files, f)
 	}
 
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-
-		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "flock").
-			WithOperation("acquireDpkgLock").WithContext("path", dpkgLockPath)
-	}
-
-	return &dpkgLockFile{f: f}, nil
+	return l, nil
 }
 
-// Release drops the flock and closes the file.
+// Release drops the locks and closes the files.
 func (l *dpkgLockFile) Release() {
-	if l == nil || l.f == nil {
+	if l == nil {
 		return
 	}
 
-	_ = syscall.Flock(int(l.f.Fd()), syscall.LOCK_UN)
-	_ = l.f.Close()
+	for _, f := range l.files {
+		_ = f.Close() // closing releases fcntl locks
+	}
+
+	l.files = nil
 }
 
 // writeDpkgInfoFiles writes the /var/lib/dpkg/info/<pkg>.* files for an installed package.
