@@ -13,8 +13,46 @@ import (
 	"path/filepath"
 	"strings"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
+
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
+
+// ResolveInRoot resolves unsafePath (absolute or relative; always treated as
+// relative to root) component by component, following any symlinks that
+// already exist on disk with chroot semantics: absolute link targets are
+// reinterpreted relative to root and ".." is clamped at root. The returned
+// host path is cleaned and is guaranteed to be lexically AND physically
+// inside root. The final component (and any intermediate components) need
+// not exist.
+//
+// Use it before creating files/directories/links during extraction so that a
+// symlink planted earlier by the archive (e.g. link -> /etc, or the usrmerge
+// lib -> usr/lib) cannot redirect a later write outside root.
+//
+// Security note: this is TOCTOU-safe only against archive content, i.e. the
+// symlink layout produced by the extraction itself. It does NOT defend
+// against a concurrent attacker on the host who can mutate the tree between
+// resolution and use.
+func ResolveInRoot(root, unsafePath string) (string, error) {
+	resolved, err := securejoin.SecureJoin(root, unsafePath)
+	if err != nil {
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to resolve path within root").
+			WithOperation("ResolveInRoot").
+			WithContext("entry", unsafePath).
+			WithContext("root", root)
+	}
+
+	resolved = filepath.Clean(resolved)
+
+	// Defense-in-depth: re-verify containment lexically.
+	rel, err := filepath.Rel(filepath.Clean(root), resolved)
+	if err != nil || escapes(rel) {
+		return "", escapeError("ResolveInRoot", root, unsafePath, rel)
+	}
+
+	return resolved, nil
+}
 
 // Join joins root and an archive entry name and verifies the result stays
 // inside root. Absolute entry names are reinterpreted as root-relative

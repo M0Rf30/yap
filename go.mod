@@ -7,6 +7,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/cavaliergopher/grab/v3 v3.0.1
+	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/github/go-spdx/v2 v2.7.0
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/go-playground/validator/v10 v10.30.5
@@ -45,7 +46,6 @@ require (
 	github.com/cavaliergopher/cpio v1.0.1 // indirect
 	github.com/cloudflare/circl v1.6.5 // indirect
 	github.com/containernetworking/plugins v1.9.1 // indirect
-	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
 	github.com/docker/cli v29.8.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.9 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
