@@ -36,6 +36,12 @@ func (ti *tarIterator) Next() (archiveEntry, error) {
 		entry.IsSymlink = true
 		entry.LinkTarget = hdr.Linkname
 		entry.Open = nil
+	case tar.TypeLink:
+		entry.IsHardlink = true
+		entry.LinkTarget = hdr.Linkname
+		entry.Mode = hdr.FileInfo().Mode().Perm()
+	case tar.TypeXGlobalHeader, tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
+		entry.Skip = true
 	case tar.TypeReg, tar.TypeRegA: //nolint:staticcheck // TypeRegA kept for legacy tar compatibility
 		// Regular files: Open returns a reader for the tar stream
 		entry.Open = func() (io.ReadCloser, error) {
