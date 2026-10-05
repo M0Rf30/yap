@@ -141,11 +141,14 @@ func (a *Apk) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 // PrepareFakeroot sets up the APK package metadata.
 // It generates the .PKGINFO file and optional install scripts for lifecycle hooks.
 func (a *Apk) PrepareFakeroot(ctx context.Context, artifactsPath string, targetArch string) error {
+	// Resolve the cross strip env before ArchComputed is overwritten:
+	// BuildCrossStripEnvSlice is a no-op when targetArch == ArchComputed.
+	stripEnv := a.CrossStripEnvMap(targetArch)
 	a.SetTargetArchitecture(targetArch)
 
 	// Apply PKGBUILD options (strip/docs/libtool/purge/zipman/emptydirs) before
 	// measuring the payload so that the installed size reflects the final tree.
-	err := a.ApplyOptionsWithEnv(a.CrossStripEnvMap(targetArch))
+	err := a.ApplyOptionsWithEnv(stripEnv)
 	if err != nil {
 		return err
 	}

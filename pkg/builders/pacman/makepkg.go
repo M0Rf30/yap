@@ -81,6 +81,12 @@ func (m *Pkg) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 	// metadata matches the artifact file name produced by BuildPackage.
 	m.SetTargetArchitecture(targetArch)
 
+	// Apply options first so the computed installed size reflects the
+	// stripped/purged payload.
+	if err := m.ApplyOptionsWithEnv(stripEnv); err != nil {
+		return err
+	}
+
 	if err := m.computeBuildMetadata(artifactsPath); err != nil {
 		return err
 	}
@@ -90,10 +96,6 @@ func (m *Pkg) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 	}
 
 	if err := m.writePackageMetadata(); err != nil {
-		return err
-	}
-
-	if err := m.ApplyOptionsWithEnv(stripEnv); err != nil {
 		return err
 	}
 

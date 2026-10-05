@@ -167,9 +167,12 @@ func (r *RPM) PrepareFakeroot(ctx context.Context, _ string, targetArch string) 
 	r.getGroup()
 	r.getRelease()
 	r.LogCrossCompilation(targetArch)
+	// Resolve the cross strip env before ArchComputed is overwritten:
+	// BuildCrossStripEnvSlice is a no-op when targetArch == ArchComputed.
+	stripEnv := r.CrossStripEnvMap(targetArch)
 	r.SetTargetArchitecture(targetArch)
 
-	return r.ApplyOptionsWithEnv(r.CrossStripEnvMap(targetArch))
+	return r.ApplyOptionsWithEnv(stripEnv)
 }
 
 // createFilesInsideRPM prepares and adds files to the specified RPM object.
