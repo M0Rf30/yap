@@ -106,7 +106,7 @@ func (bb *BaseBuilder) BuildPackageName(extension string) string {
 	name := fmt.Sprintf("%s-%s-%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.PkgVer, bb.PKGBUILD.PkgRel)
 
 	// Handle epoch for certain package types
-	if bb.PKGBUILD.Epoch != "" && (extension == constants.ExtPacmanZst || extension == constants.ExtRPM) {
+	if bb.PKGBUILD.Epoch != "" && extension == constants.ExtPacmanZst {
 		name = fmt.Sprintf("%s-%s:%s-%s", bb.PKGBUILD.PkgName, bb.PKGBUILD.Epoch,
 			bb.PKGBUILD.PkgVer, bb.PKGBUILD.PkgRel)
 	}
