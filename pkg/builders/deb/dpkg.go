@@ -110,6 +110,9 @@ func (d *Package) BuildPackage(ctx context.Context, artifactsPath string, target
 func (d *Package) PrepareFakeroot(ctx context.Context, _ string, targetArch string) error {
 	d.FormatRelease(map[string]string{})
 	d.LogCrossCompilation(targetArch)
+	// Resolve the cross strip env before ArchComputed is overwritten:
+	// BuildCrossStripEnvSlice is a no-op when targetArch == ArchComputed.
+	stripEnv := d.CrossStripEnvMap(targetArch)
 	d.SetTargetArchitecture(targetArch)
 
 	err := os.RemoveAll(d.debDir)
@@ -120,7 +123,7 @@ func (d *Package) PrepareFakeroot(ctx context.Context, _ string, targetArch stri
 	// Apply PKGBUILD options (strip, docs, libtool, static, zipman, emptydirs)
 	// before computing Installed-Size and md5sums so both describe the final
 	// payload rather than the pre-option tree.
-	err = d.ApplyOptionsWithEnv(d.CrossStripEnvMap(targetArch))
+	err = d.ApplyOptionsWithEnv(stripEnv)
 	if err != nil {
 		return err
 	}
