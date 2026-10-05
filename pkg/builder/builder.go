@@ -385,7 +385,7 @@ func (builder *Builder) getSources(ctx context.Context) error {
 				return err
 			}
 
-			if err := sourceObj.Get(); err != nil {
+			if err := sourceObj.GetContext(gctx); err != nil {
 				return errors.Wrap(err, errors.ErrTypeBuild,
 					i18n.T("errors.build.failed_to_retrieve_source")).
 					WithContext("package", pkgName).
