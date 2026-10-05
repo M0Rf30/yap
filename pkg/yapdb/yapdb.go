@@ -3,6 +3,7 @@ package yapdb
 import (
 	"context"
 	"database/sql"
+	_ "embed" // schema.sql
 	stderrors "errors"
 	"net/url"
 	"os"
@@ -155,70 +156,87 @@ func RecordInstalled(ctx context.Context, rootDir string, pkg *Package) error {
 	return nil
 }
 
-// initSchema initializes the database schema if it doesn't exist.
+// schemaVersion is the schema_version value this code understands.
+const schemaVersion = "1"
+
+// schemaSQL is the single source of truth for the DDL (shared with sqlc).
+//
+//go:embed schema.sql
+var schemaSQL string
+
+// initSchema creates the schema if absent, or verifies its version if present.
 func (d *DB) initSchema(ctx context.Context) error {
-	// Check if meta table exists.
+	exists, err := d.metaExists(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		err = d.createSchema(ctx)
+		if err == nil {
+			return nil
+		}
+
+		// Another process may have created the schema concurrently.
+		if again, chkErr := d.metaExists(ctx); chkErr != nil || !again {
+			return err
+		}
+	}
+
+	return d.checkSchemaVersion(ctx)
+}
+
+func (d *DB) metaExists(ctx context.Context) (bool, error) {
 	var exists bool
 
 	err := d.sqlDB.QueryRowContext(ctx,
 		"SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta')").
 		Scan(&exists)
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to check schema").
+		return false, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to check schema").
 			WithOperation("initSchema")
 	}
 
-	if exists {
-		// Schema already initialized.
-		return nil
+	return exists, nil
+}
+
+// createSchema runs the DDL atomically so a crash never leaves a half-built DB
+// that would later be mistaken for an initialized one.
+func (d *DB) createSchema(ctx context.Context) error {
+	tx, err := d.sqlDB.BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to begin schema init").
+			WithOperation("initSchema")
 	}
 
-	// Read and execute schema.sql.
-	schemaSQL := `
-CREATE TABLE packages (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL,
-    epoch       TEXT NOT NULL DEFAULT '',
-    version     TEXT NOT NULL,
-    release     TEXT NOT NULL,
-    arch        TEXT NOT NULL,
-    format      TEXT NOT NULL,
-    install_time INTEGER NOT NULL,
-    summary     TEXT NOT NULL DEFAULT ''
-);
-CREATE UNIQUE INDEX packages_name_arch ON packages (name, arch);
+	if _, err := tx.ExecContext(ctx, schemaSQL); err != nil {
+		_ = tx.Rollback()
 
-CREATE TABLE files (
-    package_id  INTEGER NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
-    path        TEXT NOT NULL,
-    mode        INTEGER NOT NULL,
-    is_dir      INTEGER NOT NULL DEFAULT 0,
-    is_symlink  INTEGER NOT NULL DEFAULT 0,
-    link_target TEXT NOT NULL DEFAULT '',
-    sha256      TEXT NOT NULL DEFAULT ''
-);
-CREATE INDEX files_package ON files (package_id);
-CREATE INDEX files_path ON files (path);
-
-CREATE TABLE caps (
-    package_id  INTEGER NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
-    kind        TEXT NOT NULL,
-    name        TEXT NOT NULL,
-    flags       INTEGER NOT NULL DEFAULT 0,
-    version     TEXT NOT NULL DEFAULT ''
-);
-CREATE INDEX caps_name ON caps (name);
-CREATE INDEX caps_package ON caps (package_id);
-
-CREATE TABLE meta (
-    key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
-INSERT INTO meta (key, value) VALUES ('schema_version', '1');
-`
-
-	if _, err := d.sqlDB.ExecContext(ctx, schemaSQL); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to initialize schema").
+			WithOperation("initSchema")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to commit schema").
+			WithOperation("initSchema")
+	}
+
+	return nil
+}
+
+func (d *DB) checkSchemaVersion(ctx context.Context) error {
+	var version string
+
+	err := d.sqlDB.QueryRowContext(ctx,
+		"SELECT value FROM meta WHERE key='schema_version'").Scan(&version)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to read schema version").
+			WithOperation("initSchema")
+	}
+
+	if version != schemaVersion {
+		return errors.New(errors.ErrTypeConfiguration,
+			"unsupported yapdb schema version "+version+" (want "+schemaVersion+")").
 			WithOperation("initSchema")
 	}
 
