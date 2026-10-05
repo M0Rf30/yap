@@ -158,7 +158,7 @@ func RunMaintainerScriptForPhaseForTesting(
 		Control:    control,
 	}
 
-	return runMaintainerScript(ctx, phase, pkgName, arch, contents, oldVersion)
+	return runMaintainerScript(ctx, "/", phase, pkgName, arch, contents, oldVersion)
 }
 
 // FilterScriptletEnvForTesting exposes filterScriptletEnv for unit tests.
@@ -173,7 +173,7 @@ func ScriptletPathForPackageForTesting(pkgName, arch, control, scriptName string
 
 // RunScriptletForTesting exposes runScriptlet for unit tests.
 func RunScriptletForTesting(ctx context.Context, scriptPath, scriptName, pkgName, action string, args ...string) error {
-	return runScriptlet(ctx, scriptPath, scriptName, pkgName, action, args...)
+	return runScriptlet(ctx, "/", scriptPath, scriptName, pkgName, action, args...)
 }
 
 // WriteStatusEntryForTesting exposes writeStatusEntry for unit tests.
@@ -302,13 +302,13 @@ func UpdateDpkgStatusForPackageAtPathForTesting(
 
 // EnsureDpkgDirsForTesting exposes ensureDpkgDirs for unit tests.
 func EnsureDpkgDirsForTesting() error {
-	return ensureDpkgDirs()
+	return ensureDpkgDirs("/")
 }
 
 // AcquireDpkgLockForTesting exposes acquireDpkgLock for unit tests.
 // Returns an opaque handle; call ReleaseDpkgLockForTesting to release it.
 func AcquireDpkgLockForTesting() (interface{ Release() }, error) {
-	return acquireDpkgLock()
+	return acquireDpkgLock("/")
 }
 
 // WriteDpkgInfoFilesForTesting exposes writeDpkgInfoFiles for unit tests.
@@ -322,7 +322,7 @@ func WriteDpkgInfoFilesForTesting(pkgName, arch string, contents *DebContentsFor
 		Files:      contents.Files,
 	}
 
-	return writeDpkgInfoFiles(pkgName, arch, dc)
+	return writeDpkgInfoFiles("/", pkgName, arch, dc)
 }
 
 // DebContentsForTesting is an exported mirror of debContents for test use.
@@ -342,5 +342,40 @@ func FilterForeignArchPackagesForTesting(pkgs []*aptcache.PackageInfo) []*aptcac
 
 // CurrentInstalledVersionForTesting exposes currentInstalledVersion for unit tests.
 func CurrentInstalledVersionForTesting(pkg *aptcache.PackageInfo) string {
-	return currentInstalledVersion(pkg)
+	return currentInstalledVersion("/", pkg)
+}
+
+// RootedForTesting exposes rooted for unit tests.
+func RootedForTesting(rootDir, p string) string { return rooted(rootDir, p) }
+
+// EnsureDpkgDirsAtForTesting exposes ensureDpkgDirs with a root.
+func EnsureDpkgDirsAtForTesting(rootDir string) error { return ensureDpkgDirs(rootDir) }
+
+// AcquireDpkgLockAtForTesting exposes acquireDpkgLock with a root.
+func AcquireDpkgLockAtForTesting(rootDir string) (interface{ Release() }, error) {
+	return acquireDpkgLock(rootDir)
+}
+
+// WriteDpkgInfoFilesAtForTesting exposes writeDpkgInfoFiles with a root.
+func WriteDpkgInfoFilesAtForTesting(
+	rootDir, pkgName, arch string, contents *DebContentsForTesting,
+) error {
+	dc := &debContents{
+		Control:    contents.Control,
+		Md5sums:    contents.Md5sums,
+		Conffiles:  contents.Conffiles,
+		Scriptlets: contents.Scriptlets,
+		Triggers:   contents.Triggers,
+		Files:      contents.Files,
+	}
+
+	return writeDpkgInfoFiles(rootDir, pkgName, arch, dc)
+}
+
+// UpdateDpkgStatusAtRootForTesting exposes updateDpkgStatusForPackage.
+func UpdateDpkgStatusAtRootForTesting(
+	ctx context.Context, rootDir, pkgName, arch, control string,
+) error {
+	return updateDpkgStatusForPackage(ctx, pkgName, arch, control, "install ok installed",
+		rootDir, Options{WriteDpkgStatus: true}, nil)
 }
