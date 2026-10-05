@@ -1242,6 +1242,8 @@
   translation: "Fallback mirrorlist non riuscito, procedo solo con il mirror principale"
 - id: logger.dnfcache.warn.unresolvable_dependency
   translation: "Dipendenza non risolvibile"
+- id: logger.dnfcache.warn.unverified_download
+  translation: "Il file scaricato non ha checksum SHA256; integrità non verificata"
 - id: logger.dnfinstall.debug.downloaded_rpm
   translation: "RPM scaricato"
 - id: logger.dnfinstall.debug.extracted_rpm

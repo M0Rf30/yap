@@ -115,12 +115,19 @@ func downloadRPM(ctx context.Context, pkg *PackageInfo, destDir string) (string,
 		return "", err
 	}
 
-	dest := filepath.Join(destDir, filepath.Base(pkg.LocationHref))
+	href := strings.TrimPrefix(pkg.LocationHref, "/")
+	if href == "" || filepath.Base(href) == "." || filepath.Base(href) == "/" {
+		return "", errors.New(errors.ErrTypePackaging, "package has no location href").
+			WithOperation("downloadRPM").
+			WithContext("package", pkg.Name)
+	}
+
+	dest := filepath.Join(destDir, filepath.Base(href))
 
 	var lastErr error
 
 	for i, baseURL := range baseURLs {
-		err := downloadVerified(ctx, baseURL+pkg.LocationHref, dest, pkg.SHA256)
+		err := downloadVerified(ctx, baseURL+href, dest, pkg.SHA256)
 		if err == nil {
 			logger.Debug(i18n.T("logger.dnfcache.debug.downloaded_rpm"), "package", pkg.Name,
 				"dest", dest)

@@ -1236,6 +1236,8 @@
   translation: "Mirrorlist fallback failed, proceeding with primary mirror only"
 - id: logger.dnfcache.warn.unresolvable_dependency
   translation: "Unresolvable dependency"
+- id: logger.dnfcache.warn.unverified_download
+  translation: "Downloaded file has no SHA256 checksum; integrity not verified"
 - id: logger.dnfinstall.debug.downloaded_rpm
   translation: "Downloaded RPM"
 - id: logger.dnfinstall.debug.extracted_rpm
