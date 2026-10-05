@@ -90,7 +90,9 @@ jobs:
           # Fail on forbidden/restricted (e.g. GPL/AGPL) dependency licenses.
           STATUS=0
 
-          if go-licenses check --disallowed_types=forbidden,restricted ./...; then
+          # yap itself is GPL-3.0; only third-party dependencies are gated.
+          if go-licenses check --disallowed_types=forbidden,restricted \
+              --ignore github.com/M0Rf30/yap/v2 ./...; then
             echo "result=compliant" >> "$GITHUB_OUTPUT"
             {
               echo "### ✅ License Compliance"
