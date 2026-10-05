@@ -141,6 +141,10 @@ func configureCrossArchAndSources(
 		Components: []string{componentMain, "restricted", "universe", "multiverse"},
 	}
 
+	if err := validateRepo(&r); err != nil {
+		return err
+	}
+
 	keyring := archiveKeyringFor(distro)
 	if keyring != "" {
 		return writeCrossSource(&r, targetDebArch, codename, distro, keyring)
