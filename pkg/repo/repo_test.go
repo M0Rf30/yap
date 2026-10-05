@@ -2,6 +2,7 @@
 package repo
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -436,5 +437,16 @@ func TestResolveCountry(t *testing.T) {
 				t.Fatalf("URL mismatch: got %q want %q", tt.repo.URL, tt.wantURL)
 			}
 		})
+	}
+}
+
+func TestSetupContextCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := SetupContext(ctx, "ubuntu", "jammy",
+		[]Repo{{Name: "x", URL: "https://example.com", Suite: "jammy"}})
+	if err == nil {
+		t.Fatal("expected context cancellation error")
 	}
 }

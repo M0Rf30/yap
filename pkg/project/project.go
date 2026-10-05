@@ -385,7 +385,7 @@ func (mpc *MultipleProject) MultiProjectContext(
 		return err
 	}
 
-	if err := mpc.setupExtraRepos(distro, release); err != nil {
+	if err := mpc.setupExtraRepos(ctx, distro, release); err != nil {
 		return err
 	}
 

@@ -5,7 +5,9 @@
 package repo
 
 import (
+	"bytes"
 	"context"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +15,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/ProtonMail/go-crypto/openpgp"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -64,6 +68,12 @@ type Repo struct {
 // matches if it equals the bare distro ("ubuntu") OR the qualified form
 // ("ubuntu-jammy").
 func Setup(distro, release string, repos []Repo) error {
+	return SetupContext(context.Background(), distro, release, repos)
+}
+
+// SetupContext is Setup with a caller-supplied context that bounds key
+// fetches and other network operations.
+func SetupContext(ctx context.Context, distro, release string, repos []Repo) error {
 	if len(repos) == 0 {
 		return nil
 	}
@@ -76,7 +86,11 @@ func Setup(distro, release string, repos []Repo) error {
 	}
 
 	for i := range repos {
-		if err := setupOne(pm, &repos[i], distro, release, i); err != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		if err := setupOneContext(ctx, pm, &repos[i], distro, release, i); err != nil {
 			return err
 		}
 	}
@@ -86,7 +100,9 @@ func Setup(distro, release string, repos []Repo) error {
 
 // setupOne installs a single repository definition if it targets the active
 // distro and matches the active package format.
-func setupOne(pm string, r *Repo, distro, release string, idx int) error {
+func setupOneContext(
+	ctx context.Context, pm string, r *Repo, distro, release string, idx int,
+) error {
 	if !appliesTo(r, distro, release) {
 		return nil
 	}
@@ -119,13 +135,13 @@ func setupOne(pm string, r *Repo, distro, release string, idx int) error {
 			return nil
 		}
 
-		return setupDeb(r)
+		return setupDebContext(ctx, r)
 	case formatRPM:
 		if pm != constants.PMYum && pm != constants.PMZypper {
 			return nil
 		}
 
-		return setupRPM(r)
+		return setupRPMContext(ctx, r)
 	default:
 		logger.Warn(i18n.T("logger.repo.warn.unsupported_format_skipping"), "name", r.Name,
 			"format", format)
@@ -289,22 +305,46 @@ func splitPlus(s string) []string {
 // fetchKey downloads the GPG key referenced by KeyURL to dst. Existing files
 // are overwritten so re-runs pick up rotated keys.
 func fetchKey(url, dst string) error {
+	return fetchKeyContext(context.Background(), url, dst)
+}
+
+// fetchKeyContext is fetchKey bounded by ctx. The downloaded content must parse
+// as an OpenPGP keyring (armored or binary) before it replaces dst.
+func fetchKeyContext(ctx context.Context, url, dst string) error {
 	// /etc/apt/keyrings and /etc/pki/rpm-gpg are system-wide directories that
 	// must remain traversable by the unprivileged _apt / dnf-update accounts.
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), keyFetchTimeout)
+	ctx, cancel := context.WithTimeout(ctx, keyFetchTimeout)
 	defer cancel()
 
 	// FetchToFile enforces a size cap, retries transient failures and writes
 	// via temp file + rename, so a failed download never leaves a truncated key.
-	if err := httpclient.FetchToFile(ctx, url, dst, maxKeyBytes); err != nil {
+	// Download to a sibling temp path so invalid content never replaces dst.
+	tmp := dst + ".tmp"
+	defer os.Remove(tmp) //nolint:errcheck
+
+	if err := httpclient.FetchToFile(ctx, url, tmp, maxKeyBytes); err != nil {
 		return errors.Wrap(err, errors.ErrTypeNetwork,
 			"failed to fetch repo key").
 			WithOperation("fetchKey").
 			WithContext("url", url).
+			WithContext("path", dst)
+	}
+
+	if err := validateKeyFile(tmp); err != nil {
+		return errors.Wrap(err, errors.ErrTypeValidation,
+			"fetched repo key is not a valid OpenPGP keyring").
+			WithOperation("fetchKey").
+			WithContext("url", url)
+	}
+
+	if err := os.Rename(tmp, dst); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			"failed to install repo key").
+			WithOperation("fetchKey").
 			WithContext("path", dst)
 	}
 
@@ -325,4 +365,38 @@ func closeQuiet(c io.Closer, what string) {
 	if err := c.Close(); err != nil {
 		logger.Warn(i18n.T("logger.repo.warn.close_failed"), "target", what, "error", err)
 	}
+}
+
+// validateKeyFile checks that path holds at least one OpenPGP key, armored or
+// binary.
+func validateKeyFile(path string) error {
+	f, err := os.Open(path) //nolint:gosec
+	if err != nil {
+		return err
+	}
+	defer closeQuiet(f, path)
+
+	head := make([]byte, 64)
+	n, _ := io.ReadFull(f, head)
+
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
+	var list openpgp.EntityList
+	if bytes.Contains(head[:n], []byte("-----BEGIN")) {
+		list, err = openpgp.ReadArmoredKeyRing(f)
+	} else {
+		list, err = openpgp.ReadKeyRing(f)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if len(list) == 0 {
+		return stderrors.New("no OpenPGP keys found")
+	}
+
+	return nil
 }
