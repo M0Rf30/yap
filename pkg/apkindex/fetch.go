@@ -8,8 +8,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/cavaliergopher/grab/v3"
 	"github.com/klauspost/compress/gzip"
 	"golang.org/x/sync/errgroup"
 
@@ -126,6 +126,13 @@ func Update(ctx context.Context) (*Index, error) {
 		"packages", pkgs,
 		"capabilities", caps)
 
+	if succeeded == 0 {
+		return nil, apperrors.New(apperrors.ErrTypeNetwork,
+			"no APK repository index could be loaded").
+			WithOperation("Update").
+			WithContext("repos", len(repos))
+	}
+
 	// Cache the index globally so Install can reuse it.
 	globalIndex.Store(idx)
 
@@ -204,6 +211,14 @@ func (idx *Index) DownloadPackage(ctx context.Context, destDir, name string) (st
 		}
 	}
 
+	if !safeAPKComponent(pkg.Name) || !safeAPKComponent(pkg.Version) ||
+		!safeAPKComponent(pkg.Arch) {
+		return "", apperrors.New(apperrors.ErrTypeValidation,
+			"unsafe package name, version or arch in index").
+			WithOperation("DownloadPackage").
+			WithContext("package", name)
+	}
+
 	filename := pkg.Name + "-" + pkg.Version + ".apk"
 	url := pkg.RepoBaseURL + "/" + pkg.Arch + "/" + filename
 	destPath := filepath.Join(destDir, filename)
@@ -218,46 +233,57 @@ func (idx *Index) DownloadPackage(ctx context.Context, destDir, name string) (st
 }
 
 // DownloadPackages downloads multiple packages in parallel and returns a map of name → path.
-// Uses cavaliergopher/grab for concurrent downloads.
+// Each download goes through httpclient.FetchToFile (retry, timeout, size cap).
 func (idx *Index) DownloadPackages(ctx context.Context, destDir string, names []string) (map[string]string, error) {
 	if len(names) == 0 {
 		return make(map[string]string), nil
 	}
 
-	requests, pathMap, err := idx.buildAPKDownloadRequests(ctx, destDir, names)
+	jobs, pathMap, err := idx.buildAPKDownloadRequests(destDir, names)
 	if err != nil {
 		return nil, err
 	}
 
-	workers := min(apkDownloadConcurrency, len(requests))
-	client := grab.NewClient()
-	client.UserAgent = "YAP/2 (apkindex)"
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(min(apkDownloadConcurrency, len(jobs)))
 
-	respCh := client.DoBatch(workers, requests...)
+	for _, job := range jobs {
+		g.Go(func() error {
+			limit := int64(maxAPKPackageBytes)
+			if job.size > 0 && job.size < limit {
+				limit = job.size
+			}
 
-	var firstErr error
+			if dlErr := downloadFile(gctx, job.url, job.dest, limit); dlErr != nil {
+				return apperrors.Wrap(dlErr, apperrors.ErrTypeNetwork, "failed to download package").
+					WithOperation("DownloadPackages").
+					WithContext("filename", filepath.Base(job.dest))
+			}
 
-	for resp := range respCh {
-		if err := resp.Err(); err != nil && firstErr == nil {
-			firstErr = apperrors.Wrap(err, apperrors.ErrTypeNetwork, "failed to download package").
-				WithOperation("DownloadPackages").
-				WithContext("filename", filepath.Base(resp.Filename))
-		}
+			return nil
+		})
 	}
 
-	if firstErr != nil {
-		return nil, firstErr
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
 	return pathMap, nil
 }
 
-// buildAPKDownloadRequests builds grab.Request objects for each package name.
-// Returns the requests and a pre-built name→destPath map (populated before any HTTP).
+// apkDownload describes one package download.
+type apkDownload struct {
+	url  string
+	dest string
+	size int64
+}
+
+// buildAPKDownloadRequests builds the download jobs for each package name.
+// Returns the jobs and a pre-built name→destPath map (populated before any HTTP).
 func (idx *Index) buildAPKDownloadRequests(
-	ctx context.Context, destDir string, names []string,
-) ([]*grab.Request, map[string]string, error) {
-	requests := make([]*grab.Request, 0, len(names))
+	destDir string, names []string,
+) ([]apkDownload, map[string]string, error) {
+	jobs := make([]apkDownload, 0, len(names))
 	pathMap := make(map[string]string, len(names))
 
 	for _, name := range names {
@@ -272,26 +298,34 @@ func (idx *Index) buildAPKDownloadRequests(
 			}
 		}
 
-		filename := pkg.Name + "-" + pkg.Version + ".apk"
-		pkgURL := pkg.RepoBaseURL + "/" + pkg.Arch + "/" + filename
-		destPath := filepath.Join(destDir, filename)
-
-		req, err := grab.NewRequest(destPath, pkgURL)
-		if err != nil {
-			return nil, nil, apperrors.Wrap(err, apperrors.ErrTypeNetwork, "build request").
+		if !safeAPKComponent(pkg.Name) || !safeAPKComponent(pkg.Version) ||
+			!safeAPKComponent(pkg.Arch) {
+			return nil, nil, apperrors.New(apperrors.ErrTypeValidation,
+				"unsafe package name, version or arch in index").
 				WithOperation("buildAPKDownloadRequests").
 				WithContext("package", name)
 		}
 
-		req = req.WithContext(ctx)
+		filename := pkg.Name + "-" + pkg.Version + ".apk"
+		destPath := filepath.Join(destDir, filename)
 
-		if pkg.Size > 0 {
-			req.Size = pkg.Size
-		}
-
-		requests = append(requests, req)
+		jobs = append(jobs, apkDownload{
+			url:  pkg.RepoBaseURL + "/" + pkg.Arch + "/" + filename,
+			dest: destPath,
+			size: pkg.Size,
+		})
 		pathMap[name] = destPath
 	}
 
-	return requests, pathMap, nil
+	return jobs, pathMap, nil
+}
+
+// safeAPKComponent reports whether s is usable as a single path/URL segment
+// of a download filename (no separators, not "." or "..", no NUL).
+func safeAPKComponent(s string) bool {
+	if s == "" || s == "." || s == ".." {
+		return false
+	}
+
+	return !strings.ContainsAny(s, "/\\\x00")
 }

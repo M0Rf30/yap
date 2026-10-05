@@ -6,8 +6,6 @@ import (
 	"context"
 	"io"
 	"path/filepath"
-
-	"github.com/cavaliergopher/grab/v3"
 )
 
 // This file exports internal functions and variables for testing purposes.
@@ -53,9 +51,14 @@ func ExportSha1Hex(s string) string {
 
 // ExportBuildAPKDownloadRequests exposes buildAPKDownloadRequests for testing.
 func ExportBuildAPKDownloadRequests(
-	ctx context.Context, idx *Index, destDir string, names []string,
-) ([]*grab.Request, map[string]string, error) {
-	return idx.buildAPKDownloadRequests(ctx, destDir, names)
+	_ context.Context, idx *Index, destDir string, names []string,
+) ([]apkDownload, map[string]string, error) {
+	return idx.buildAPKDownloadRequests(destDir, names)
+}
+
+// ExportExtractAPKDataTo exposes extractAPKDataTo for testing.
+func ExportExtractAPKDataTo(r io.Reader, root string) error {
+	return extractAPKDataTo(r, root)
 }
 
 // ExportReadInstalledDB exposes readInstalledDB for testing.

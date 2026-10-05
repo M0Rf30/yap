@@ -17,6 +17,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/platform"
@@ -136,6 +137,16 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 			}
 		}
 
+		// Dedupe on the resolved name: the same package may be reached by
+		// its real name and by a virtual capability it provides.
+		if pkg.Name != n {
+			if seen[pkg.Name] {
+				return nil
+			}
+
+			seen[pkg.Name] = true
+		}
+
 		// Recursively visit dependencies.
 		for _, d := range pkg.Depends {
 			// Skip negations like "!conflict".
@@ -163,6 +174,13 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 	}
 
 	for _, n := range names {
+		if !idx.known(stripVersionConstraint(n)) {
+			return nil, errors.New(errors.ErrTypeValidation,
+				"package not found in APK index").
+				WithOperation("ResolveDeps").
+				WithContext("package", n)
+		}
+
 		if err := visit(n); err != nil {
 			return nil, err
 		}
@@ -174,6 +192,17 @@ func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
 		"unresolved", unresolved)
 
 	return out, nil
+}
+
+// known reports whether name is a package or a provided capability.
+func (idx *Index) known(name string) bool {
+	if _, ok := idx.Lookup(name); ok {
+		return true
+	}
+
+	_, ok := idx.ResolveVirtual(name)
+
+	return ok
 }
 
 // Load returns the cached Index from the most recent Update call, or nil if
