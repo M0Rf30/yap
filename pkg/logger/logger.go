@@ -8,8 +8,11 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"unicode"
 
 	"golang.org/x/term"
 
@@ -75,6 +78,9 @@ type MultiPrinterImpl struct {
 
 // Start returns the writer for concurrent output (no-op; kept for API compat).
 func (m *MultiPrinterImpl) Start() (io.Writer, error) {
+	handlerMu.Lock()
+	defer handlerMu.Unlock()
+
 	return m.Writer, nil
 }
 
@@ -85,16 +91,22 @@ var (
 	// Logger is the global YapLogger instance.
 	Logger = &YapLogger{}
 
-	colorDisabled  = false
-	verboseEnabled = false
+	colorDisabled  atomic.Bool
+	verboseEnabled atomic.Bool
 
 	// slogHandler is lazily initialised on first use via getHandler().
+	// handlerMu guards slogHandler and the MultiPrinter.Writer read/write
+	// performed by getHandler and SetWriter.
 	slogHandler slog.Handler //nolint:gochecknoglobals
+	handlerMu   sync.Mutex
 )
 
 // getHandler returns the slog handler, initialising it on first call.
 // Using a function avoids the need for an init().
 func getHandler() slog.Handler {
+	handlerMu.Lock()
+	defer handlerMu.Unlock()
+
 	if slogHandler == nil {
 		slogHandler = &CustomHandler{
 			writer: MultiPrinter.Writer,
@@ -105,10 +117,63 @@ func getHandler() slog.Handler {
 	return slogHandler
 }
 
+// sanitizeValue escapes control characters (ESC, CR, NUL, C1 controls, ...)
+// in s so untrusted strings cannot forge log lines or drive the terminal.
+// Newlines and tabs are preserved; multi-line values are rendered with
+// indented continuation lines by Handle.
+func sanitizeValue(s string) string {
+	clean := true
+
+	for _, r := range s {
+		if isUnsafeRune(r) {
+			clean = false
+
+			break
+		}
+	}
+
+	if clean {
+		return s
+	}
+
+	var sb strings.Builder
+
+	for _, r := range s {
+		if !isUnsafeRune(r) {
+			sb.WriteRune(r)
+
+			continue
+		}
+
+		q := strconv.QuoteRune(r)
+		sb.WriteString(q[1 : len(q)-1])
+	}
+
+	return sb.String()
+}
+
+func isUnsafeRune(r rune) bool {
+	return unicode.IsControl(r) && r != '\n' && r != '\t'
+}
+
 // CustomHandler implements slog.Handler for yap's custom log format.
 type CustomHandler struct {
 	writer io.Writer
 	mu     *sync.Mutex
+}
+
+// formatLevel returns the colored level label for l.
+func formatLevel(l slog.Level) string {
+	switch l { //nolint:exhaustive // slog.Level is an open int type
+	case slog.LevelInfo:
+		return color.BoldGreen("INFO ")
+	case slog.LevelWarn:
+		return color.BoldYellow("WARN ")
+	case slog.LevelError:
+		return color.Red("ERROR")
+	default:
+		return color.BoldBlue("DEBUG")
+	}
 }
 
 // Handle formats and writes a log record.
@@ -124,18 +189,7 @@ func (h *CustomHandler) Handle(_ context.Context, record slog.Record) error {
 
 	timestamp := color.Gray(record.Time.Format("2006-01-02 15:04:05"))
 
-	var levelFormatted string
-
-	switch record.Level {
-	case slog.LevelInfo:
-		levelFormatted = color.BoldGreen("INFO ")
-	case slog.LevelWarn:
-		levelFormatted = color.BoldYellow("WARN ")
-	case slog.LevelError:
-		levelFormatted = color.Red("ERROR")
-	default:
-		levelFormatted = color.BoldBlue("DEBUG")
-	}
+	levelFormatted := formatLevel(record.Level)
 
 	prefix := color.Bracket("yap")
 	header := fmt.Sprintf("%s %s %s %s", timestamp, levelFormatted, prefix, record.Message)
@@ -145,17 +199,25 @@ func (h *CustomHandler) Handle(_ context.Context, record slog.Record) error {
 
 	var pairs []kv
 
+	multiline := false
+
 	record.Attrs(func(a slog.Attr) bool {
-		keyColor, ok := KeyColorMap[a.Key]
+		key := sanitizeValue(a.Key)
+
+		keyColor, ok := KeyColorMap[key]
 		if !ok {
 			keyColor = color.White
 		}
 
 		// For inline fitting check, collapse newlines to a single space.
-		rawVal := a.Value.String()
+		rawVal := sanitizeValue(a.Value.String())
+		if strings.Contains(rawVal, "\n") {
+			multiline = true
+		}
+
 		inlineVal := strings.ReplaceAll(rawVal, "\n", " ")
-		colored := keyColor(a.Key+": ") + rawVal
-		plain := a.Key + ": " + inlineVal
+		colored := keyColor(key+": ") + rawVal
+		plain := key + ": " + inlineVal
 		pairs = append(pairs, kv{colored, plain})
 
 		return true
@@ -175,7 +237,7 @@ func (h *CustomHandler) Handle(_ context.Context, record slog.Record) error {
 
 	inlineLine := header + " " + strings.Join(inlineParts, " ")
 
-	if visibleLen(inlineLine) <= termWidth() {
+	if !multiline && visibleLen(inlineLine) <= termWidth() {
 		// Fits — render with colors inline.
 		coloredParts := make([]string, len(pairs))
 		for i, p := range pairs {
@@ -240,7 +302,7 @@ func (h *CustomHandler) WithGroup(_ string) slog.Handler { return h }
 
 // Enabled reports whether the handler handles records at the given level.
 func (h *CustomHandler) Enabled(_ context.Context, level slog.Level) bool {
-	if verboseEnabled {
+	if verboseEnabled.Load() {
 		return level >= slog.LevelDebug
 	}
 
@@ -257,7 +319,7 @@ func (y *YapLogger) Info(msg string, args ...any) {
 
 // Debug logs a debug message (no-op unless verbose is enabled).
 func (y *YapLogger) Debug(msg string, args ...any) {
-	if !verboseEnabled {
+	if !verboseEnabled.Load() {
 		return
 	}
 
@@ -295,7 +357,13 @@ func logWithLevel(level slog.Level, msg string, args ...any) {
 
 	var attrs []slog.Attr
 
-	for i := 0; i < len(args)-1; i += 2 {
+	for i := 0; i < len(args); i += 2 {
+		if i+1 >= len(args) {
+			attrs = append(attrs, slog.Any("!BADKEY", args[i]))
+
+			break
+		}
+
 		key := fmt.Sprintf("%v", args[i])
 		attrs = append(attrs, slog.Any(key, args[i+1]))
 	}
@@ -309,12 +377,16 @@ func logWithLevel(level slog.Level, msg string, args ...any) {
 
 // SetVerbose configures the logger verbosity level.
 func SetVerbose(verbose bool) {
-	verboseEnabled = verbose
+	verboseEnabled.Store(verbose)
 }
 
 // SetWriter redirects the underlying logger's output to the given writer.
-// Not goroutine-safe; call before spinning up any concurrent loggers.
+// Safe for concurrent use; loggers already holding the previous handler
+// finish writing to the previous writer.
 func SetWriter(w io.Writer) {
+	handlerMu.Lock()
+	defer handlerMu.Unlock()
+
 	MultiPrinter.Writer = w
 	// Reset handler so it picks up the new writer on next use.
 	slogHandler = nil
@@ -322,12 +394,12 @@ func SetWriter(w io.Writer) {
 
 // IsVerboseEnabled returns true if verbose logging is enabled.
 func IsVerboseEnabled() bool {
-	return verboseEnabled
+	return verboseEnabled.Load()
 }
 
 // IsColorDisabled checks if color output is disabled.
 func IsColorDisabled() bool {
-	if colorDisabled {
+	if colorDisabled.Load() {
 		return true
 	}
 
@@ -336,7 +408,7 @@ func IsColorDisabled() bool {
 
 // SetColorDisabled enables or disables color output.
 func SetColorDisabled(disabled bool) {
-	colorDisabled = disabled
+	colorDisabled.Store(disabled)
 
 	if disabled {
 		color.Disable()
