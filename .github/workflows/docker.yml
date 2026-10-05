@@ -63,14 +63,14 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🔍 Lint Dockerfile
         # Lint once per OS on the amd64 runner — Dockerfile is arch-agnostic.
         if: matrix.platform == 'linux/amd64'
-        uses: hadolint/hadolint-action@v3.5.0
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
           config: .hadolint.yml
@@ -80,18 +80,18 @@ jobs:
       - name: 📋 Upload Hadolint results
         if: always() && matrix.platform == 'linux/amd64'
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
         with:
           sarif_file: hadolint-${{ matrix.os }}.sarif
           wait-for-processing: true
           category: hadolint-${{ matrix.os }}
 
       - name: 🐳 Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: 🔐 Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -100,7 +100,7 @@ jobs:
       - name: 🔐 Log in to Docker Hub
         if: github.event_name != 'pull_request'
         continue-on-error: true
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -121,7 +121,7 @@ jobs:
 
       - name: 📋 Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ steps.images.outputs.list }}
           labels: |
@@ -141,7 +141,7 @@ jobs:
       - name: 🔨 Build and push by digest (jammy multi-arch)
         if: matrix.os == 'ubuntu-jammy' && github.event_name != 'pull_request'
         id: build-digest
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
@@ -168,7 +168,7 @@ jobs:
 
       - name: ⬆️  Upload digest (jammy multi-arch)
         if: matrix.os == 'ubuntu-jammy' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: digests-${{ matrix.os }}-${{ matrix.platform-suffix == ' (arm64)' && 'arm64' || 'amd64' }}
           path: /tmp/digests/*
@@ -177,7 +177,7 @@ jobs:
 
       - name: 🔨 Build and push Docker image (single-arch)
         if: matrix.os != 'ubuntu-jammy'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
@@ -195,7 +195,7 @@ jobs:
 
       - name: 🔨 Build jammy (PR — single platform, no push)
         if: matrix.os == 'ubuntu-jammy' && github.event_name == 'pull_request' && matrix.platform == 'linux/amd64'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
@@ -220,17 +220,17 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: ⬇️  Download digests
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: /tmp/digests
           pattern: digests-ubuntu-jammy-*
           merge-multiple: true
 
       - name: 🐳 Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: 🔐 Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -238,7 +238,7 @@ jobs:
 
       - name: 🔐 Log in to Docker Hub
         continue-on-error: true
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -256,7 +256,7 @@ jobs:
 
       - name: 📋 Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ steps.images.outputs.list }}
           tags: |
@@ -302,12 +302,12 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🔍 Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.5.0
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: build/deploy/${{ matrix.os }}/Dockerfile
           config: .hadolint.yml
@@ -317,17 +317,17 @@ jobs:
       - name: 📋 Upload Hadolint results
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
         with:
           sarif_file: hadolint-${{ matrix.os }}.sarif
           wait-for-processing: true
           category: hadolint-${{ matrix.os }}
 
       - name: 🐳 Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: 🔐 Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -335,7 +335,7 @@ jobs:
 
       - name: 🔐 Log in to Docker Hub
         continue-on-error: true
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -353,7 +353,7 @@ jobs:
 
       - name: 📋 Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ steps.images.outputs.list }}
           labels: |
@@ -384,7 +384,7 @@ jobs:
           echo "base=${{ env.REGISTRY }}/${owner,,}/yap" >> "$GITHUB_OUTPUT"
 
       - name: 🔨 Build and push Docker image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
