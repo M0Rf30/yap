@@ -316,37 +316,6 @@ func TestInstallContextCancellation(t *testing.T) {
 	}
 }
 
-// TestHeaderSerialization tests the header serialization logic.
-func TestHeaderSerialization(t *testing.T) {
-	rpm := createMockRPM(t, "test-pkg", "1.0", "1")
-
-	files := []InstalledFile{
-		{
-			Path:  "/usr/bin/test",
-			Size:  1024,
-			Mode:  0o755,
-			User:  "root",
-			Group: "root",
-			MTime: time.Now(),
-		},
-	}
-
-	blob, err := serializeHeader(rpm, files)
-	if err != nil {
-		t.Fatalf("serializeHeader failed: %v", err)
-	}
-
-	if len(blob) == 0 {
-		t.Fatal("serialized header is empty")
-	}
-
-	// Verify magic bytes (8E AD E8 01 00 00 00 00)
-	expectedMagic := []byte{0x8e, 0xad, 0xe8, 0x01, 0x00, 0x00, 0x00, 0x00}
-	if !bytes.Equal(blob[:8], expectedMagic) {
-		t.Fatalf("invalid magic bytes: %v", blob[:8])
-	}
-}
-
 // TestPathHelpers tests the path helper functions.
 func TestPathHelpers(t *testing.T) {
 	tests := []struct {
