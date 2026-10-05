@@ -4,7 +4,8 @@
 // For each source=() / source_<arch>=() block in the PKGBUILD:
 //   - git+… entries keep their existing value (SKIP or a commit hash).
 //   - All other entries (http/https/ftp/file) are downloaded to a temporary
-//     directory and hashed with SHA-256.
+//     directory and hashed with the algorithm of the checksum array already
+//     declared in the PKGBUILD (sha512sums, b2sums, …; sha256 when none).
 //
 // The rewrite preserves the original formatting exactly: single-line vs
 // multi-line, quote characters (' or "), indentation, and spacing.
@@ -13,14 +14,19 @@ package gensum
 
 import (
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode"
 
+	"golang.org/x/crypto/blake2b"
 	mvdanshell "mvdan.cc/sh/v3/shell"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -97,9 +103,90 @@ func extractScalarVars(content string) func(string) string {
 // Captures: [1] everything before the hash, [2] the hash/SKIP, [3] closing quote.
 var hashValueRe = regexp.MustCompile(`(['"])([0-9a-fA-F]{32,128}|SKIP)(['"])`)
 
+// checksumAlgo describes one makepkg checksum array (sha256sums, b2sums, …).
+type checksumAlgo struct {
+	field   string
+	newHash func() hash.Hash
+}
+
+func newBlake2b512() hash.Hash {
+	h, err := blake2b.New512(nil)
+	if err != nil {
+		// Unreachable: an unkeyed blake2b-512 never fails.
+		panic(err)
+	}
+
+	return h
+}
+
+// sha256Algo is used when the PKGBUILD declares no checksum array yet.
+var sha256Algo = checksumAlgo{"sha256sums", sha256.New}
+
+// checksumAlgos lists every checksum array gensum can regenerate. cksums
+// (CRC) is intentionally unsupported.
+var checksumAlgos = []checksumAlgo{
+	{"sha512sums", sha512.New},
+	{"b2sums", newBlake2b512},
+	{"sha384sums", sha512.New384},
+	sha256Algo,
+	{"sha224sums", sha256.New224},
+}
+
+// declaredAlgos returns the checksum algorithms whose array for the given arch
+// suffix is already declared in content, or sha256 when there is none.
+func declaredAlgos(content, suffix string) []checksumAlgo {
+	var algos []checksumAlgo
+
+	for _, algo := range checksumAlgos {
+		re := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(algo.field+suffix) + `\s*=\s*\(`)
+		if re.MatchString(content) {
+			algos = append(algos, algo)
+		}
+	}
+
+	if len(algos) == 0 {
+		return []checksumAlgo{sha256Algo}
+	}
+
+	return algos
+}
+
+// parenDelta returns the net "(" minus ")" count of a line, ignoring
+// parentheses inside quotes and in a trailing '#' comment.
+func parenDelta(line string) int {
+	delta := 0
+
+	var quote rune
+
+	prevSpace := true
+
+	for _, c := range line {
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+		case c == '\'' || c == '"':
+			quote = c
+		case c == '#' && prevSpace:
+			return delta
+		case c == '(':
+			delta++
+		case c == ')':
+			delta--
+		}
+
+		prevSpace = unicode.IsSpace(c)
+	}
+
+	return delta
+}
+
 // UpdateChecksums reads the PKGBUILD at pkgbuildDir, downloads every
-// non-VCS source, computes its SHA-256 digest, and rewrites the checksum
-// array(s) in the file preserving the original formatting.
+// non-VCS source, computes its digest, and rewrites the checksum array(s) in
+// the file preserving the original formatting. Every checksum array already
+// declared (sha256sums, sha512sums, b2sums, …) is regenerated with its own
+// algorithm; when none exists a sha256sums array is added.
 func UpdateChecksums(pkgbuildDir string) error {
 	pkgbuildPath := filepath.Join(pkgbuildDir, "PKGBUILD")
 
@@ -142,23 +229,28 @@ func UpdateChecksums(pkgbuildDir string) error {
 			continue
 		}
 
-		newHashes, err := computeHashes(uris, tmpDir, pkgbuildDir, expandVar)
+		// Rewrite whichever checksum arrays the PKGBUILD already declares for
+		// this arch block (sha512sums, b2sums, …); default to sha256sums.
+		algos := declaredAlgos(content, suffix)
+
+		newHashes, err := computeHashes(uris, tmpDir, pkgbuildDir, expandVar, algos)
 		if err != nil {
 			return err
 		}
 
-		// Find the checksum block with the same arch suffix.
-		checksumKey := "sha256sums" + suffix
+		for _, algo := range algos {
+			checksumKey := algo.field + suffix
 
-		result, err = replaceChecksumValues(result, checksumKey, newHashes)
-		if err != nil {
-			return err
+			result, err = replaceChecksumValues(result, checksumKey, newHashes[algo.field])
+			if err != nil {
+				return err
+			}
+
+			logger.Info(i18n.T("logger.gensum.info.updated_checksums"), "field", checksumKey,
+				"count", len(uris))
 		}
 
 		changed = true
-
-		logger.Info(i18n.T("logger.gensum.info.updated_checksums"), "field", checksumKey,
-			"count", len(newHashes))
 	}
 
 	if !changed {
@@ -198,13 +290,13 @@ func extractArrayBlocks(content string, re *regexp.Regexp) map[string]string {
 		// Collect the full block until the closing ")".
 		var blockLines []string
 
-		depth := strings.Count(line, "(") - strings.Count(line, ")")
+		depth := parenDelta(line)
 		blockLines = append(blockLines, line)
 		i++
 
 		for i < len(lines) && depth > 0 {
 			l := lines[i]
-			depth += strings.Count(l, "(") - strings.Count(l, ")")
+			depth += parenDelta(l)
 			blockLines = append(blockLines, l)
 			i++
 		}
@@ -217,36 +309,119 @@ func extractArrayBlocks(content string, re *regexp.Regexp) map[string]string {
 
 // parseArrayValues extracts the URI/value strings from a raw array block.
 // It handles both single-line  source=('a' 'b')  and multi-line forms.
+// Quotes are honoured, '#' comments (outside quotes) are ignored, and
+// parsing stops at the closing ")" of the array.
 func parseArrayValues(block string) []string {
-	// Strip the field name and outer parens.
+	// Strip the field name and the opening paren.
 	inner := block
 	if idx := strings.Index(inner, "("); idx != -1 {
 		inner = inner[idx+1:]
 	}
 
-	if idx := strings.LastIndex(inner, ")"); idx != -1 {
-		inner = inner[:idx]
-	}
+	var (
+		values []string
+		cur    strings.Builder
+		inTok  bool
+		quote  rune
+		inCmt  bool
+	)
 
-	// Split on whitespace and strip quotes.
-	var values []string
+	flush := func() {
+		if inTok {
+			values = append(values, cur.String())
+			cur.Reset()
 
-	for tok := range strings.FieldsSeq(inner) {
-		tok = strings.Trim(tok, `'"`)
-		if tok != "" {
-			values = append(values, tok)
+			inTok = false
 		}
 	}
 
-	return values
+scan:
+	for _, c := range inner {
+		switch {
+		case inCmt:
+			inCmt = c != '\n'
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			} else {
+				cur.WriteRune(c)
+			}
+		case c == '\'' || c == '"':
+			quote = c
+			inTok = true
+		case c == '#' && !inTok:
+			inCmt = true
+		case c == ')':
+			break scan
+		case unicode.IsSpace(c):
+			flush()
+		default:
+			cur.WriteRune(c)
+
+			inTok = true
+		}
+	}
+
+	flush()
+
+	// Drop empty tokens (e.g. an empty "" entry).
+	return slices.DeleteFunc(values, func(s string) bool { return s == "" })
 }
 
-// computeHashes downloads each URI (unless it is a VCS source) and returns
-// the SHA-256 hex digest.  VCS sources keep their existing value "SKIP".
+// findArrayEnd returns the index of the ")" closing the array whose field name
+// starts at start, or -1 when unclosed. Parentheses inside quotes and in
+// '#' comments are ignored.
+func findArrayEnd(content string, start int) int {
+	depth := 0
+
+	var quote byte
+
+	inCmt := false
+
+	for i := start; i < len(content); i++ {
+		c := content[i]
+
+		switch {
+		case inCmt:
+			inCmt = c != '\n'
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+		case c == '\'' || c == '"':
+			quote = c
+		case c == '#' && (i == 0 || isSpaceByte(content[i-1])):
+			inCmt = true
+		case c == '(':
+			depth++
+		case c == ')':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+
+	return -1
+}
+
+func isSpaceByte(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
+}
+
+// computeHashes downloads each URI (unless it is a VCS source) and returns the
+// hex digests for every requested algorithm, keyed by checksum field name
+// (each slice is aligned with uris). VCS sources keep the value "SKIP".
 // pkgbuildDir is used to resolve local file sources relative to the PKGBUILD.
 // expandVar is used to substitute PKGBUILD variables (e.g. ${pkgver}) in URIs.
-func computeHashes(uris []string, tmpDir, pkgbuildDir string, expandVar func(string) string) ([]string, error) {
-	hashes := make([]string, len(uris))
+func computeHashes(
+	uris []string, tmpDir, pkgbuildDir string, expandVar func(string) string,
+	algos []checksumAlgo,
+) (map[string][]string, error) {
+	hashes := make(map[string][]string, len(algos))
+	for _, algo := range algos {
+		hashes[algo.field] = make([]string, len(uris))
+	}
 
 	for i, rawURI := range uris {
 		// Expand PKGBUILD variables (e.g. ${pkgver}, $pkgname) in the URI.
@@ -259,13 +434,9 @@ func computeHashes(uris []string, tmpDir, pkgbuildDir string, expandVar func(str
 		}
 
 		// Strip VCS fragment: "url#branch=foo" → "url"
-		fragment := ""
 		if idx := strings.Index(uri, "#"); idx != -1 {
-			fragment = uri[idx+1:]
 			uri = uri[:idx]
 		}
-
-		_ = fragment // kept for future commit-hash support
 
 		// Git / VCS sources: keep SKIP.
 		if strings.HasPrefix(uri, constants.Git+"+") ||
@@ -273,37 +444,44 @@ func computeHashes(uris []string, tmpDir, pkgbuildDir string, expandVar func(str
 			strings.HasPrefix(uri, "svn+") ||
 			strings.HasPrefix(uri, "hg+") ||
 			strings.HasPrefix(uri, "bzr+") {
-			hashes[i] = "SKIP"
+			for _, algo := range algos {
+				hashes[algo.field][i] = "SKIP"
+			}
 
 			logger.Info(i18n.T("logger.gensum.info.skipping_vcs_source"), "uri", rawURI)
 
 			continue
 		}
 
-		h, err := downloadAndHash(expanded, uri, tmpDir, pkgbuildDir)
+		sums, err := downloadAndHash(expanded, uri, tmpDir, pkgbuildDir, algos)
 		if err != nil {
 			return nil, err
 		}
 
-		logger.Info(i18n.T("logger.gensum.info.hashed_source"), "file", filepath.Base(uri),
-			"sha256", h[:16]+"…")
+		for _, algo := range algos {
+			hashes[algo.field][i] = sums[algo.field]
+		}
 
-		hashes[i] = h
+		logger.Info(i18n.T("logger.gensum.info.hashed_source"), "file", filepath.Base(uri),
+			"sha256", sums[algos[0].field][:16]+"…")
 	}
 
 	return hashes, nil
 }
 
-// downloadAndHash downloads uri to tmpDir and returns its SHA-256 hex digest.
-// Local file sources (no scheme) are resolved relative to pkgbuildDir.
-func downloadAndHash(rawURI, uri, tmpDir, pkgbuildDir string) (string, error) {
+// downloadAndHash downloads uri to tmpDir and returns its digests, keyed by
+// checksum field name. Local file sources (no scheme) are resolved relative
+// to pkgbuildDir.
+func downloadAndHash(
+	rawURI, uri, tmpDir, pkgbuildDir string, algos []checksumAlgo,
+) (map[string]string, error) {
 	if !strings.Contains(uri, "://") {
 		localPath := uri
 		if !filepath.IsAbs(localPath) {
 			localPath = filepath.Join(pkgbuildDir, localPath)
 		}
 
-		return hashFile(localPath)
+		return hashFile(localPath, algos)
 	}
 
 	destName := filepath.Base(uri)
@@ -315,7 +493,7 @@ func downloadAndHash(rawURI, uri, tmpDir, pkgbuildDir string) (string, error) {
 	// share a basename (e.g. .../a/archive/v1.0.tar.gz and .../b/archive/v1.0.tar.gz).
 	srcDir, err := os.MkdirTemp(tmpDir, "src-*")
 	if err != nil {
-		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create source temp dir").
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create source temp dir").
 			WithOperation("downloadAndHash").
 			WithContext("uri", uri)
 	}
@@ -324,7 +502,7 @@ func downloadAndHash(rawURI, uri, tmpDir, pkgbuildDir string) (string, error) {
 
 	_, err = shell.MultiPrinter.Start()
 	if err != nil {
-		return "", errors.Wrap(err, errors.ErrTypeBuild, "failed to start printer").
+		return nil, errors.Wrap(err, errors.ErrTypeBuild, "failed to start printer").
 			WithOperation("downloadAndHash")
 	}
 
@@ -336,34 +514,46 @@ func downloadAndHash(rawURI, uri, tmpDir, pkgbuildDir string) (string, error) {
 		filepath.Base(rawURI),
 		shell.MultiPrinter.Writer)
 	if err != nil {
-		return "", errors.Wrap(err, errors.ErrTypeBuild, "failed to download source").
+		return nil, errors.Wrap(err, errors.ErrTypeBuild, "failed to download source").
 			WithOperation("downloadAndHash").
 			WithContext("uri", uri)
 	}
 
-	return hashFile(destPath)
+	return hashFile(destPath, algos)
 }
 
-// hashFile computes the SHA-256 digest of the file at path.
-func hashFile(path string) (string, error) {
+// hashFile computes, in a single pass, the digest of the file at path for
+// every requested algorithm. The result is keyed by checksum field name.
+func hashFile(path string, algos []checksumAlgo) (map[string]string, error) {
 	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
-		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open file for hashing").
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open file for hashing").
 			WithOperation("hashFile").
 			WithContext("path", path)
 	}
 
 	defer func() { _ = f.Close() }()
 
-	h := sha256.New()
+	hashers := make([]hash.Hash, len(algos))
+	writers := make([]io.Writer, len(algos))
 
-	if _, err := io.Copy(h, f); err != nil {
-		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to hash file").
+	for i, algo := range algos {
+		hashers[i] = algo.newHash()
+		writers[i] = hashers[i]
+	}
+
+	if _, err := io.Copy(io.MultiWriter(writers...), f); err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to hash file").
 			WithOperation("hashFile").
 			WithContext("path", path)
 	}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+	sums := make(map[string]string, len(algos))
+	for i, algo := range algos {
+		sums[algo.field] = hex.EncodeToString(hashers[i].Sum(nil))
+	}
+
+	return sums, nil
 }
 
 // replaceChecksumValues finds the checksum array named fieldName in content
@@ -395,26 +585,8 @@ func replaceChecksumValues(content, fieldName string, newHashes []string) (strin
 		return content + block + "\n", nil
 	}
 
-	// Find the closing ")" of this array.
 	start := loc[0]
-	depth := 0
-	end := -1
-
-	for i := loc[0]; i < len(content); i++ {
-		switch content[i] {
-		case '(':
-			depth++
-		case ')':
-			depth--
-			if depth == 0 {
-				end = i
-			}
-		}
-
-		if end != -1 {
-			break
-		}
-	}
+	end := findArrayEnd(content, start)
 
 	if end == -1 {
 		return "", errors.New(errors.ErrTypeValidation,
