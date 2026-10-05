@@ -83,16 +83,16 @@ const dotMtree = `#mtree
 /set type=file uid=0 gid=0 mode=644
 {{- range . }}
 {{- if eq .Type "dir" }}
-.{{ .Destination }} time={{ .ModTime.Unix }}.0 mode={{ printf "%o" .Mode }} type=dir
+.{{ .Destination }} time={{ .ModTime.Unix }}.0 mode={{ mode .Mode }} type=dir
 {{- else if eq .Type "symlink" }}
-.{{ .Destination }} time={{ .ModTime.Unix }}.0 mode={{ printf "%o" .Mode }} type=link link={{ .LinkTarget }}
+.{{ .Destination }} time={{ .ModTime.Unix }}.0 mode={{ mode .Mode }} type=link link={{ .LinkTarget }}
 {{- else }}
 {{- if eq .Destination "/.BUILDINFO" }}
 .{{ .Destination }} time={{ .ModTime.Unix }}.0 size={{ .Size }} sha256digest={{ printf "%x" .SHA256 }}
 {{- else if eq .Destination "/.PKGINFO" }}
 .{{ .Destination }} time={{ .ModTime.Unix }}.0 size={{ .Size }} sha256digest={{ printf "%x" .SHA256 }}
 {{- else }}
-.{{ .Destination }} time={{ .ModTime.Unix }}.0 mode={{ printf "%o" .Mode }} size={{ .Size }} sha256digest={{ printf "%x" .SHA256 }}
+.{{ .Destination }} time={{ .ModTime.Unix }}.0 mode={{ mode .Mode }} size={{ .Size }} sha256digest={{ printf "%x" .SHA256 }}
 {{- end }}
 {{- end }}
 {{- end }}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -172,8 +173,13 @@ func (m *Pkg) writePackageMetadata() error {
 }
 
 // writeMTREE walks the package directory and writes a gzip-compressed .MTREE.
+// Dotfiles are included (.PKGINFO, .BUILDINFO, .INSTALL and legitimately
+// packaged ones such as /etc/skel/.bashrc); only .MTREE itself is skipped.
 func (m *Pkg) writeMTREE() error {
-	walker := m.CreateFileWalker()
+	walker := files.NewWalker(m.PKGBUILD.PackageDir, files.WalkOptions{
+		BackupFiles:  m.PKGBUILD.Backup,
+		SkipPatterns: []string{".MTREE"},
+	})
 
 	entries, err := walker.Walk()
 	if err != nil {
@@ -242,8 +248,31 @@ func (m *Pkg) writeChangelogIfPresent() error {
 	return os.WriteFile(filepath.Clean(changelogPath), changelogData, 0o644) //nolint:gosec
 }
 
+// mtreeMode converts a Go os.FileMode into the POSIX octal permission string
+// used by mtree: permission bits plus setuid (4000), setgid (2000) and
+// sticky (1000). Go's type bits (ModeDir, ModeSymlink, ...) are dropped.
+func mtreeMode(mode os.FileMode) string {
+	posix := uint32(mode.Perm())
+
+	if mode&os.ModeSetuid != 0 {
+		posix |= 0o4000
+	}
+
+	if mode&os.ModeSetgid != 0 {
+		posix |= 0o2000
+	}
+
+	if mode&os.ModeSticky != 0 {
+		posix |= 0o1000
+	}
+
+	return strconv.FormatUint(uint64(posix), 8)
+}
+
 func renderMtree(entries []*files.Entry) (string, error) {
-	tmpl, err := template.New("mtree").Parse(dotMtree)
+	tmpl, err := template.New("mtree").
+		Funcs(template.FuncMap{"mode": mtreeMode}).
+		Parse(dotMtree)
 	if err != nil {
 		return "", err
 	}
