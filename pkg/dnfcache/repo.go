@@ -998,9 +998,6 @@ func (c *Cache) parsePrimaryFile(path, baseURL, mirrorList string) error {
 func (c *Cache) parsePrimaryXML(r io.Reader, baseURL, mirrorList string) error {
 	decoder := xml.NewDecoder(r)
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	for {
 		tok, err := decoder.Token()
 		if errors.Is(err, io.EOF) {
@@ -1022,7 +1019,9 @@ func (c *Cache) parsePrimaryXML(r io.Reader, baseURL, mirrorList string) error {
 		}
 
 		if info := buildPackageInfo(&pkg, baseURL, mirrorList); info != nil {
+			c.mu.Lock()
 			c.addPackage(info)
+			c.mu.Unlock()
 		}
 	}
 

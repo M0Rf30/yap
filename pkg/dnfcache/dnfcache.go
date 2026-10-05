@@ -205,12 +205,26 @@ func (c *Cache) ResolveVirtual(name string) string {
 	return name
 }
 
+// lateHardMiss reports whether name, already visited, was previously found
+// unresolvable via a weak edge and is now being required as a hard dependency
+// (and so must be reported). It clears the weak-miss marker when it fires.
+func lateHardMiss(softMissing map[string]bool, name string, soft bool) bool {
+	if soft || !softMissing[name] {
+		return false
+	}
+
+	delete(softMissing, name)
+
+	return true
+}
+
 // ResolveDeps performs transitive dependency resolution starting from the
 // given seed package names. Returns packages in dependency order (deps
 // before dependents) and a list of unresolvable names.
 //
-// Already-installed packages (detected via rpmdb) are skipped but their
-// dependency edges are still walked so transitive-only packages are pulled in.
+// Already-installed packages (detected via rpmdb), and capabilities already
+// provided by an installed package, are skipped entirely: neither they nor
+// their dependency edges are walked, so no alternative provider is pulled in.
 func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo, []string, error) {
 	installed := loadInstalledSet(ctx)
 	provides := loadInstalledProvides(ctx)
@@ -224,6 +238,9 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 		"index_capabilities", len(c.providers))
 
 	seen := make(map[string]bool)
+	// softMissing records names first reached via a weak edge that turned out
+	// unresolvable, so a later hard Requires on the same name is still reported.
+	softMissing := make(map[string]bool)
 
 	var (
 		order              []*PackageInfo
@@ -236,7 +253,15 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 
 	visit = func(name string, soft bool) {
 		name = StripRPMConstraint(name)
-		if name == "" || seen[name] {
+		if name == "" {
+			return
+		}
+
+		if seen[name] {
+			if lateHardMiss(softMissing, name, soft) {
+				unres = append(unres, name)
+			}
+
 			return
 		}
 
@@ -283,6 +308,9 @@ func (c *Cache) ResolveDeps(ctx context.Context, seeds []string) ([]*PackageInfo
 
 			if soft {
 				logger.Debug(i18n.T("logger.dnfcache.debug.unresolved_weak_ignored"), "package", name)
+
+				softMissing[name] = true
+
 				return
 			}
 
