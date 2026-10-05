@@ -89,6 +89,14 @@ func Parse(r io.Reader, fn func(Stanza) error) error {
 		currentValue.WriteString(strings.TrimSpace(value))
 	}
 
+	// A scanner failure (bufio.ErrTooLong, decompressor read error) means the
+	// trailing stanza is truncated: report the error without handing the
+	// partial stanza to fn.
+	if err := scanner.Err(); err != nil {
+		return errors.Wrap(err, errors.ErrTypeParser, "failed to parse deb822 format").
+			WithOperation("Parse")
+	}
+
 	// Flush the last stanza (file may not end with a blank line).
 	if currentField != "" {
 		stanza[currentField] = currentValue.String()
@@ -98,11 +106,6 @@ func Parse(r io.Reader, fn func(Stanza) error) error {
 		if err := fn(stanza); err != nil {
 			return err
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return errors.Wrap(err, errors.ErrTypeParser, "failed to parse deb822 format").
-			WithOperation("Parse")
 	}
 
 	return nil
