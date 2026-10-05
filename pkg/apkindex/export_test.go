@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bufio"
 	"context"
+	"crypto/sha1" //nolint:gosec
 	"io"
 	"path/filepath"
 )
@@ -88,4 +89,11 @@ func ExportTryReadPkgInfoFromNextStream(br *bufio.Reader) string {
 func ExportRegisterInstalled(tmpDir string, pkg *Package, pkgInfo string) error {
 	dbPath := filepath.Join(tmpDir, "lib", "apk", "db", "installed")
 	return registerInstalledAt(dbPath, pkg, pkgInfo)
+}
+
+// ExportReadControlVerified exposes readControlVerified for testing.
+func ExportReadControlVerified(r io.Reader, pkg *Package) (string, error) {
+	hr := &hashingReader{br: bufio.NewReader(r), h: sha1.New()} //nolint:gosec
+
+	return readControlVerified(hr, pkg)
 }
