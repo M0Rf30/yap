@@ -3,7 +3,6 @@ package rpmdb //nolint:testpackage
 import (
 	"bytes"
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -85,14 +84,14 @@ func TestOpenWriterExisting(t *testing.T) {
 	}
 }
 
-// TestOpenWriterPopulated tests that OpenWriter rejects populated databases.
+// TestOpenWriterPopulated tests that OpenWriter appends to populated
+// databases and that successive writers can each install a package.
 func TestOpenWriterPopulated(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "rpmdb.sqlite")
 
 	ctx := context.Background()
 
-	// Create and populate database
 	w1, err := OpenWriter(ctx, dbPath)
 	if err != nil {
 		t.Fatalf("first OpenWriter failed: %v", err)
@@ -106,16 +105,38 @@ func TestOpenWriterPopulated(t *testing.T) {
 
 	_ = w1.Close()
 
-	// Try to open again; should fail with ErrPopulated
-	w2, err := OpenWriter(ctx, dbPath)
-	if w2 != nil {
-		_ = w2.Close()
+	// Reopen per package, as dnfinstall does: each must succeed and append.
+	for i, name := range []string{"pkg1", "pkg2"} {
+		w, err := OpenWriter(ctx, dbPath)
+		if err != nil {
+			t.Fatalf("OpenWriter #%d on populated database failed: %v", i+2, err)
+		}
 
-		t.Fatal("expected OpenWriter to fail on populated database")
+		if err := w.Install(ctx, buildTestRPM(t), []InstalledFile{
+			{Path: "/usr/bin/" + name, Mode: 0o755},
+		}); err != nil {
+			_ = w.Close()
+
+			t.Fatalf("Install %s failed: %v", name, err)
+		}
+
+		_ = w.Close()
 	}
 
-	if !errors.Is(err, ErrPopulated) {
-		t.Fatalf("expected ErrPopulated, got %v", err)
+	w, err := OpenWriter(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("final OpenWriter failed: %v", err)
+	}
+
+	defer func() { _ = w.Close() }()
+
+	var count int
+	if err := w.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM Packages").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+
+	if count != 3 {
+		t.Fatalf("expected 3 packages (1 pre-existing + 2 appended), got %d", count)
 	}
 }
 
