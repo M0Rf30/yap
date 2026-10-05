@@ -20,6 +20,14 @@ func TestSkipToolchainValidationFlag(t *testing.T) {
 	// Create a BaseBuilder
 	bb := NewBaseBuilder(pb, "deb")
 
+	// Never touch the real package manager from a unit test.
+	origInstall := installDeps
+	defer func() { installDeps = origInstall }()
+
+	installDeps = func(context.Context, *pkgbuild.PKGBUILD, string, []string, []string) error {
+		return nil
+	}
+
 	tests := []struct {
 		name             string
 		skipValidation   bool
@@ -93,4 +101,87 @@ func TestSkipValidationIntegration(t *testing.T) {
 
 	// Restore original value
 	SkipToolchainValidation = originalValue
+}
+
+type ctxKey struct{}
+
+// TestPrepareEnvironmentPropagatesContext verifies the caller's context
+// reaches the dependency installer instead of context.Background().
+func TestPrepareEnvironmentPropagatesContext(t *testing.T) {
+	pb := &pkgbuild.PKGBUILD{PkgName: "p", PkgVer: "1", PkgRel: "1", ArchComputed: "x86_64"}
+	bb := NewBaseBuilder(pb, "deb")
+
+	orig := installDeps
+	defer func() { installDeps = orig }()
+
+	var got context.Context
+
+	installDeps = func(ctx context.Context, _ *pkgbuild.PKGBUILD, _ string, _, _ []string) error {
+		got = ctx
+
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), ctxKey{}, "marker"))
+	cancel()
+
+	if err := bb.PrepareEnvironment(ctx, false, ""); err != nil {
+		t.Fatalf("PrepareEnvironment: %v", err)
+	}
+
+	if got == nil || got.Value(ctxKey{}) != "marker" {
+		t.Fatal("installer did not receive the caller's context")
+	}
+
+	if got.Err() == nil {
+		t.Error("installer context should be the cancelled caller context")
+	}
+}
+
+// TestResolveToolchainPackagesNoRandomFallback verifies a format whose distro
+// is absent from CrossToolchainMap (Alpine) yields an error rather than a
+// random other distro's toolchain.
+func TestResolveToolchainPackagesNoRandomFallback(t *testing.T) {
+	pb := &pkgbuild.PKGBUILD{PkgName: "p", PkgVer: "1", PkgRel: "1", ArchComputed: "x86_64"}
+	bb := NewBaseBuilder(pb, "apk")
+
+	for range 20 {
+		if tc, err := bb.resolveToolchainPackages("aarch64"); err == nil {
+			t.Fatalf("expected error for apk toolchain, got %+v", tc)
+		}
+	}
+}
+
+// TestPrepareEnvironmentValidatesToolchainAfterInstall verifies the flag is
+// honoured: with validation enabled a missing toolchain is an error, with
+// SkipToolchainValidation it is not.
+func TestPrepareEnvironmentValidatesToolchainAfterInstall(t *testing.T) {
+	pb := &pkgbuild.PKGBUILD{PkgName: "p", PkgVer: "1", PkgRel: "1", ArchComputed: "x86_64"}
+	bb := NewBaseBuilder(pb, "pacman")
+
+	origInstall, origSkip := installDeps, SkipToolchainValidation
+
+	defer func() {
+		installDeps = origInstall
+		SkipToolchainValidation = origSkip
+	}()
+
+	installDeps = func(context.Context, *pkgbuild.PKGBUILD, string, []string, []string) error {
+		return nil
+	}
+
+	// Empty PATH: no cross compiler can be found.
+	t.Setenv("PATH", t.TempDir())
+
+	SkipToolchainValidation = false
+
+	if err := bb.PrepareEnvironment(context.Background(), false, "aarch64"); err == nil {
+		t.Error("expected validation error for missing cross toolchain")
+	}
+
+	SkipToolchainValidation = true
+
+	if err := bb.PrepareEnvironment(context.Background(), false, "aarch64"); err != nil {
+		t.Errorf("validation should be skipped, got %v", err)
+	}
 }

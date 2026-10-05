@@ -160,3 +160,35 @@ func TestGetExecutableNameAllDistributions(t *testing.T) {
 		}
 	}
 }
+
+func TestCrossExecutableNamesUsePackageIndependentPrefix(t *testing.T) {
+	tests := []struct {
+		arch, distro, wantGCC, wantGPP, wantAR string
+	}{
+		{"x86_64", "debian", "x86_64-linux-gnu-gcc", "x86_64-linux-gnu-g++", "x86_64-linux-gnu-ar"},
+		{"x86_64", "ubuntu", "x86_64-linux-gnu-gcc", "x86_64-linux-gnu-g++", "x86_64-linux-gnu-ar"},
+		{"x86_64", "fedora", "x86_64-linux-gnu-gcc", "x86_64-linux-gnu-g++", "x86_64-linux-gnu-ar"},
+		{"i686", "arch", "gcc", "g++", "ar"},
+		{"i686", "debian", "i686-linux-gnu-gcc", "i686-linux-gnu-g++", "i686-linux-gnu-ar"},
+		{"s390x", "fedora", "s390x-redhat-linux-gcc", "s390x-redhat-linux-g++", "s390x-redhat-linux-ar"},
+		{"aarch64", "arch", "aarch64-linux-gnu-gcc", "aarch64-linux-gnu-g++", "aarch64-linux-gnu-ar"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.arch+"_"+tt.distro, func(t *testing.T) {
+			ct := CrossToolchainMap[tt.arch][tt.distro]
+
+			if got := ct.GetExecutableName(ct.GCCPackage); got != tt.wantGCC {
+				t.Errorf("gcc = %q, want %q", got, tt.wantGCC)
+			}
+
+			if got := ct.GetExecutableName(ct.GPlusPlusPackage); got != tt.wantGPP {
+				t.Errorf("g++ = %q, want %q", got, tt.wantGPP)
+			}
+
+			if got := ct.ToolExecutable("ar"); got != tt.wantAR {
+				t.Errorf("ar = %q, want %q", got, tt.wantAR)
+			}
+		})
+	}
+}

@@ -1184,6 +1184,13 @@ func TestQualifyDepsForTargetArch(t *testing.T) {
 			targetArch: "armv7",
 			want:       []string{"libssl-dev:armhf"},
 		},
+		{
+			name:       "DEB epoch in version constraint is qualified",
+			deps:       []string{"libfoo (>= 1:2.0)", "libbar:arm64 (>= 1:1.0)"},
+			format:     constants.FormatDEB,
+			targetArch: "aarch64",
+			want:       []string{"libfoo:arm64 (>= 1:2.0)", "libbar:arm64 (>= 1:1.0)"},
+		},
 		// RPM: qualifyDepsForTargetArch still handles RPM correctly at the
 		// function level, but Prepare() does not call it for RPM (Rocky/Fedora
 		// x86_64 containers don't carry aarch64 -devel packages in their repos).
