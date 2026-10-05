@@ -81,7 +81,7 @@ func Resolve(
 
 // ResolveGeneric produces a final Config without format-specific resolution.
 // This is used at the project level where the actual artifact format is not yet known.
-// Format-specific resolution happens later in signArtifact() for each artifact.
+// Per-format selection is applied later by ForFormat (called by NewSigner).
 //
 // For keys, the resolution order is:
 //  1. flagKey (CLI --sign-key)
@@ -338,4 +338,97 @@ func algorithmForFormat(format Format) Algorithm {
 	default:
 		return AlgorithmGPG // Default to GPG for unknown formats
 	}
+}
+
+// defaultKeysDir returns ~/.config/yap/keys, or "" when the home directory
+// cannot be determined.
+func defaultKeysDir() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	return filepath.Join(homeDir, ".config", "yap", "keys")
+}
+
+// isGenericDefaultKey reports whether keyPath is one of the keys that
+// findGenericDefaultKey auto-discovers (default.rsa / default.gpg).
+func isGenericDefaultKey(keyPath string) bool {
+	dir := defaultKeysDir()
+	if dir == "" || keyPath == "" {
+		return false
+	}
+
+	clean := filepath.Clean(keyPath)
+
+	return clean == filepath.Join(dir, "default."+string(AlgorithmRSA)) ||
+		clean == filepath.Join(dir, "default."+string(AlgorithmGPG))
+}
+
+// isGlobalEnvKey reports whether keyPath is the key named by YAP_SIGN_KEY.
+func isGlobalEnvKey(keyPath string) bool {
+	envVal := os.Getenv("YAP_SIGN_KEY")
+	if envVal == "" || keyPath == "" {
+		return false
+	}
+
+	abs, err := filepath.Abs(envVal)
+	if err != nil {
+		return false
+	}
+
+	return abs == filepath.Clean(keyPath)
+}
+
+// ForFormat adapts a generic Config (see ResolveGeneric) to a concrete package
+// format. Keys that were chosen implicitly (auto-discovered defaults or the
+// global YAP_SIGN_KEY) are replaced by the format-specific selection:
+//
+//   - YAP_<FORMAT>_KEY / YAP_<FORMAT>_PASSPHRASE take precedence over the
+//     global values;
+//   - an auto-discovered default key is re-resolved with findDefaultKey so
+//     that e.g. a .deb never receives default.rsa (and vice versa).
+//
+// Keys given explicitly (CLI flag, project config) are left untouched. If an
+// auto-discovered default has no counterpart for the format, signing is
+// disabled for that artifact.
+func ForFormat(format Format, cfg Config) (Config, error) {
+	if !cfg.Enabled || cfg.KeyPath == "" {
+		return cfg, nil
+	}
+
+	implicit := isGenericDefaultKey(cfg.KeyPath) || isGlobalEnvKey(cfg.KeyPath)
+	if !implicit {
+		return cfg, nil
+	}
+
+	envKey := fmt.Sprintf("YAP_%s_KEY", strings.ToUpper(string(format)))
+	if envVal := os.Getenv(envKey); envVal != "" {
+		keyPath, err := resolveAndValidateKeyPath(envVal, envKey, "format-specific env var")
+		if err != nil {
+			return cfg, err
+		}
+
+		cfg.KeyPath = keyPath
+	} else if isGenericDefaultKey(cfg.KeyPath) {
+		keyPath, found := findDefaultKey(format)
+		if !found {
+			cfg.Clear()
+
+			return cfg, nil
+		}
+
+		cfg.KeyPath = keyPath
+	}
+
+	passEnv := fmt.Sprintf("YAP_%s_PASSPHRASE", strings.ToUpper(string(format)))
+	if envVal := os.Getenv(passEnv); envVal != "" &&
+		(cfg.Passphrase == "" || cfg.Passphrase == os.Getenv("YAP_SIGN_PASSPHRASE")) {
+		logger.Debug(i18n.T("logger.signing.debug.resolved_passphrase_format_specific"),
+			"env_var", passEnv)
+
+		cfg.Passphrase = envVal
+	}
+
+	return cfg, nil
 }

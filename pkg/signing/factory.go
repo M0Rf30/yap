@@ -9,9 +9,22 @@ import (
 // For FormatAPK, returns an RSASigner (PKCS#1 v1.5 SHA1).
 // For FormatDEB, FormatRPM, FormatPacman, returns a GPGSigner (OpenPGP).
 //
+// The config is first adapted with ForFormat so that format-specific
+// environment variables and default keys are honoured even when cfg came
+// from ResolveGeneric.
+//
 // If signing is disabled (cfg.Enabled == false), a NoopSigner is returned.
 func NewSigner(format Format, cfg Config) (Signer, error) {
 	// If signing is disabled, return a no-op signer
+	if !cfg.Enabled {
+		return NoopSigner{}, nil
+	}
+
+	cfg, err := ForFormat(format, cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	if !cfg.Enabled {
 		return NoopSigner{}, nil
 	}
