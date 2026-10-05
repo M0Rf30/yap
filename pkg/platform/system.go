@@ -165,7 +165,16 @@ func CheckGO() bool {
 // The tarball is downloaded into a private (0700) temporary directory and
 // verified against the SHA-256 published next to it on go.dev before being
 // extracted as root, so a pre-planted or truncated file can never be installed.
+//
+// GOSetup is not cancellable; use GOSetupContext to bound the download and
+// archive extraction with a context.
 func GOSetup() error {
+	return GOSetupContext(context.Background())
+}
+
+// GOSetupContext is GOSetup with a context that cancels the download, checksum
+// verification and archive extraction.
+func GOSetupContext(ctx context.Context) error {
 	if CheckGO() {
 		return nil
 	}
@@ -195,7 +204,8 @@ func GOSetup() error {
 	archivePath := filepath.Join(tmpDir, goArchiveName)
 	archiveURL := constants.GoArchiveURL()
 
-	if err := download.WithResumeContext(
+	if err := download.WithContext(
+		ctx,
 		archivePath,
 		archiveURL,
 		download.MaxRetries(),
@@ -206,11 +216,11 @@ func GOSetup() error {
 			WithOperation("GOSetup")
 	}
 
-	if err := verifyGoArchive(context.Background(), archivePath, archiveURL); err != nil {
+	if err := verifyGoArchive(ctx, archivePath, archiveURL); err != nil {
 		return err
 	}
 
-	if err := archive.Extract(context.Background(), archivePath, "/usr/lib"); err != nil {
+	if err := archive.Extract(ctx, archivePath, "/usr/lib"); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild,
 			i18n.T("errors.platform.extract_go_archive_failed")).
 			WithOperation("GOSetup")
