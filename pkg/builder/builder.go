@@ -128,13 +128,12 @@ func (builder *Builder) processFunction(ctx context.Context, pkgbuildFunction, m
 
 		// Collect cross-compilation env vars without mutating os.Setenv
 		if builder.PKGBUILD.IsCrossCompilation() {
-			crossEnv, err := tempBuilder.BuildCrossEnvSlice(builder.PKGBUILD.TargetArch)
+			crossEnv, err := builder.crossEnvSlice(tempBuilder)
 			if err != nil {
-				logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
-					"package", pkgName, "target_arch", builder.PKGBUILD.TargetArch, "error", err)
-			} else if len(crossEnv) > 0 {
-				pkgEnv = append(pkgEnv, crossEnv...)
+				return err
 			}
+
+			pkgEnv = append(pkgEnv, crossEnv...)
 		}
 	}
 
@@ -326,13 +325,12 @@ func (builder *Builder) processFunctionInFakeroot(ctx context.Context, pkgbuildF
 			Format:   format,
 		}
 
-		crossEnv, err := tempBuilder.BuildCrossEnvSlice(builder.PKGBUILD.TargetArch)
+		crossEnv, err := builder.crossEnvSlice(tempBuilder)
 		if err != nil {
-			logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
-				"package", pkgName, "target_arch", builder.PKGBUILD.TargetArch, "error", err)
-		} else if len(crossEnv) > 0 {
-			pkgEnv = append(pkgEnv, crossEnv...)
+			return err
 		}
+
+		pkgEnv = append(pkgEnv, crossEnv...)
 	}
 
 	preamble := builder.PKGBUILD.BuildScriptPreamble()
@@ -380,6 +378,10 @@ func (builder *Builder) getSources(ctx context.Context) error {
 			SkipHashCheck:  builder.SkipHashCheck,
 		}
 
+		if index < len(builder.PKGBUILD.HashAlgos) {
+			sourceObj.HashAlgo = builder.PKGBUILD.HashAlgos[index]
+		}
+
 		g.Go(func() error {
 			if err := gctx.Err(); err != nil {
 				return err
@@ -412,4 +414,29 @@ func (builder *Builder) initDirs() error {
 	}
 
 	return nil
+}
+
+// crossEnvSlice resolves the cross-compilation environment. Failure is fatal
+// for every format except APK, where cross toolchains are unavailable and a
+// warning is emitted instead.
+func (builder *Builder) crossEnvSlice(bb *common.BaseBuilder) ([]string, error) {
+	targetArch := builder.PKGBUILD.TargetArch
+
+	crossEnv, err := bb.BuildCrossEnvSlice(targetArch)
+	if err == nil {
+		return crossEnv, nil
+	}
+
+	if bb.Format == constants.FormatAPK {
+		logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
+			"package", builder.PKGBUILD.PkgName, "target_arch", targetArch, "error", err)
+
+		return nil, nil
+	}
+
+	return nil, errors.Wrap(err, errors.ErrTypeBuild,
+		"cross-compilation environment setup failed").
+		WithContext("package", builder.PKGBUILD.PkgName).
+		WithContext("target_arch", targetArch).
+		WithContext("format", bb.Format)
 }
