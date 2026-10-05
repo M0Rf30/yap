@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	stderrors "errors"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -107,10 +106,7 @@ const downloadConcurrency = 6
 // resolution before downloading. Use Download directly only when you
 // already have an explicit, pre-resolved list of package names.
 func (c *Cache) Download(ctx context.Context, destDir string, pkgs []string) error {
-	client := grab.NewClient()
-	client.UserAgent = "YAP/2 (aptcache)"
-
-	return c.downloadWithClient(ctx, client, destDir, pkgs)
+	return c.downloadWithClient(ctx, newGrabClient(), destDir, pkgs)
 }
 
 // downloadWithClient is Download's implementation, parameterized on the
@@ -326,6 +322,11 @@ func (c *Cache) buildDownloadRequests(
 func (c *Cache) buildRequest(
 	ctx context.Context, destDir string, job *downloadJob, pkgURL string,
 ) (*grab.Request, error) {
+	sum, err := validateDebIntegrity(job)
+	if err != nil {
+		return nil, err
+	}
+
 	destFile := filepath.Join(destDir, filepath.Base(job.info.Filename))
 
 	req, err := grab.NewRequest(destFile, pkgURL)
@@ -336,21 +337,14 @@ func (c *Cache) buildRequest(
 	}
 
 	req = req.WithContext(ctx)
-	if job.info.Size > 0 {
-		req.Size = job.info.Size
-	}
+	req.Size = job.info.Size
 
-	if job.info.SHA256 != "" {
-		sum, decErr := hex.DecodeString(job.info.SHA256)
-		if decErr == nil {
-			// SetChecksum(hash, sum, deleteOnError=true):
-			//   - streaming SHA-256 against `sum`;
-			//   - delete the on-disk file if the hash mismatches,
-			//     so a failed download never leaves a corrupt
-			//     artifact at destFile.
-			req.SetChecksum(sha256.New(), sum, true)
-		}
-	}
+	// SetChecksum(hash, sum, deleteOnError=true):
+	//   - streaming SHA-256 against `sum`;
+	//   - delete the on-disk file if the hash mismatches,
+	//     so a failed download never leaves a corrupt
+	//     artifact at destFile.
+	req.SetChecksum(sha256.New(), sum, true)
 
 	return req, nil
 }
@@ -360,156 +354,40 @@ func (c *Cache) buildRequest(
 // still defending against an unbounded mirror stream.
 const maxDebBytes int64 = 2 << 30
 
-// downloadAndVerify downloads a file from pkgURL to destFile and verifies its
-// SHA-256 checksum and size.
-//
-// The download is streamed through a size-capped io.LimitReader, written
-// first to "<destFile>.tmp", hashed inline, and only renamed onto destFile
-// after every verification step succeeds. A failed verification leaves no
-// partial file at destFile — preventing callers from mistaking a corrupt
-// stub for a verified package.
-// Transient network failures (connection reset, mid-body EOF, HTTP 5xx)
-// are retried per the httpclient retry policy.
-func downloadAndVerify(ctx context.Context, pkgURL, destFile, expectedSHA256 string, expectedSize int64) error {
-	return httpclient.WithRetry(ctx, pkgURL, func() error {
-		return downloadAndVerifyOnce(ctx, pkgURL, destFile, expectedSHA256, expectedSize)
-	})
-}
-
-// downloadAndVerifyOnce performs a single download + verify attempt.
-func downloadAndVerifyOnce(
-	ctx context.Context, pkgURL, destFile, expectedSHA256 string, expectedSize int64,
-) error {
-	resp, err := startDownload(ctx, pkgURL)
-	if err != nil {
-		return err
+// validateDebIntegrity enforces that a download is verifiable before any
+// byte is fetched: the apt index must supply a well-formed SHA-256 and a
+// positive Size within maxDebBytes. A missing or malformed digest (for
+// example an odd-length value from a truncated index) would otherwise
+// yield an unverified .deb that is later extracted as root.
+func validateDebIntegrity(job *downloadJob) ([]byte, error) {
+	sum, err := hex.DecodeString(job.info.SHA256)
+	if err != nil || len(sum) != sha256.Size {
+		return nil, errors.New(errors.ErrTypeValidation,
+			"package has missing or invalid SHA256 in apt index").
+			WithOperation("buildRequest").
+			WithContext("package", job.name).
+			WithContext("sha256", job.info.SHA256)
 	}
 
-	defer func() { _ = resp.Body.Close() }()
-
-	if err := preflightContentLength(resp, pkgURL, expectedSize); err != nil {
-		return err
-	}
-
-	tmpFile := destFile + ".tmp"
-
-	got, n, err := streamToTmp(resp, tmpFile)
-	if err != nil {
-		_ = os.Remove(tmpFile)
-		return err
-	}
-
-	if err := verifySizeAndHash(n, got, expectedSize, expectedSHA256, pkgURL); err != nil {
-		_ = os.Remove(tmpFile)
-		return err
-	}
-
-	if err := os.Rename(tmpFile, destFile); err != nil {
-		_ = os.Remove(tmpFile)
-		return err
-	}
-
-	return nil
-}
-
-// startDownload issues the GET and validates the response status.
-func startDownload(ctx context.Context, pkgURL string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pkgURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpclient.Client().Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := httpclient.CheckStatus(resp, pkgURL); err != nil {
-		_ = resp.Body.Close()
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-// preflightContentLength fails fast if the server advertised a length that
-// either exceeds the cap or contradicts the apt-index's expected size.
-func preflightContentLength(resp *http.Response, pkgURL string, expectedSize int64) error {
-	if resp.ContentLength <= 0 {
-		return nil
-	}
-
-	if resp.ContentLength > maxDebBytes {
-		return errors.New(errors.ErrTypeValidation, "response body too large").
-			WithOperation("checkContentLength").
-			WithContext("url", pkgURL).
-			WithContext("size", resp.ContentLength).
+	if job.info.Size <= 0 || job.info.Size > maxDebBytes {
+		return nil, errors.New(errors.ErrTypeValidation,
+			"package has missing or out-of-range Size in apt index").
+			WithOperation("buildRequest").
+			WithContext("package", job.name).
+			WithContext("size", job.info.Size).
 			WithContext("cap", maxDebBytes)
 	}
 
-	if expectedSize > 0 && resp.ContentLength != expectedSize {
-		return errors.New(errors.ErrTypeValidation, "Content-Length mismatch").
-			WithOperation("checkContentLength").
-			WithContext("url", pkgURL).
-			WithContext("got", resp.ContentLength).
-			WithContext("expected", expectedSize)
-	}
-
-	return nil
+	return sum, nil
 }
 
-// streamToTmp copies the response body into tmpFile, computing the SHA-256
-// inline. Returns the hex-encoded hash and the byte count actually
-// written. The LimitReader+1 trick detects servers that lie about
-// Content-Length by yielding one byte beyond the cap.
-func streamToTmp(resp *http.Response, tmpFile string) (hashHex string, written int64, err error) {
-	f, err := os.Create(tmpFile) //nolint:gosec
-	if err != nil {
-		return "", 0, err
-	}
+// newGrabClient returns a grab.Client that shares the pooled transport
+// (proxy, dial and TLS timeouts) of the common httpclient but carries no
+// overall request timeout, which would abort large .deb transfers.
+func newGrabClient() *grab.Client {
+	client := grab.NewClient()
+	client.UserAgent = "YAP/2 (aptcache)"
+	client.HTTPClient = &http.Client{Transport: httpclient.Client().Transport}
 
-	defer func() { _ = f.Close() }()
-
-	h := sha256.New()
-	w := io.MultiWriter(f, h)
-	body := io.LimitReader(resp.Body, maxDebBytes+1)
-
-	n, err := io.Copy(w, body)
-	if err != nil {
-		return "", n, err
-	}
-
-	if err := f.Sync(); err != nil {
-		return "", n, err
-	}
-
-	return hex.EncodeToString(h.Sum(nil)), n, nil
-}
-
-// verifySizeAndHash checks the streamed size against the cap and the
-// expected size, and the hash against the expected SHA-256.
-func verifySizeAndHash(n int64, gotHash string, expectedSize int64, expectedSHA256, pkgURL string) error {
-	if n > maxDebBytes {
-		return errors.New(errors.ErrTypeValidation, "downloaded size exceeded cap").
-			WithOperation("verifySizeAndHash").
-			WithContext("url", pkgURL).
-			WithContext("size", n).
-			WithContext("cap", maxDebBytes)
-	}
-
-	if expectedSize > 0 && n != expectedSize {
-		return errors.New(errors.ErrTypeValidation, "size mismatch").
-			WithOperation("verifySizeAndHash").
-			WithContext("got", n).
-			WithContext("expected", expectedSize)
-	}
-
-	if expectedSHA256 != "" && gotHash != expectedSHA256 {
-		return errors.New(errors.ErrTypeValidation, "SHA256 mismatch").
-			WithOperation("verifySizeAndHash").
-			WithContext("got", gotHash).
-			WithContext("expected", expectedSHA256)
-	}
-
-	return nil
+	return client
 }
