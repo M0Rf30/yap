@@ -89,8 +89,32 @@ License: {{ . }}{{- end }}
 `
 
 const (
-	binaryContent   = "2.0\n"
-	binaryFilename  = "debian-binary"
-	controlFilename = "control.tar.zst"
-	dataFilename    = "data.tar.zst"
+	binaryContent  = "2.0\n"
+	binaryFilename = "debian-binary"
+	// controlBasename and dataBasename are the ar member names without the
+	// compression suffix; dpkg picks the decompressor from that suffix.
+	controlBasename = "control.tar"
+	dataBasename    = "data.tar"
 )
+
+// compressionSuffix returns the ar member suffix dpkg expects for the given
+// compression algorithm ("zstd" -> ".zst", "gzip" -> ".gz", "xz" -> ".xz").
+// Unknown or empty values map to ".zst", the default algorithm.
+func compressionSuffix(compression string) string {
+	switch compression {
+	case "gzip":
+		return ".gz"
+	case "xz":
+		return ".xz"
+	default:
+		return ".zst"
+	}
+}
+
+// memberNames returns the control and data ar member names for the
+// compression algorithm, e.g. control.tar.gz / data.tar.gz.
+func memberNames(compression string) (control, data string) {
+	suffix := compressionSuffix(compression)
+
+	return controlBasename + suffix, dataBasename + suffix
+}
