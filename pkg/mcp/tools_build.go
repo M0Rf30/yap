@@ -385,7 +385,7 @@ func runNativeBuild(ctx context.Context, buildID string, mpc *project.MultiplePr
 	// in its RunE) and restore it afterwards.
 	defer applyUnverifiedRepos(mpc.Opts.AllowUnverifiedRepos)()
 
-	if err := mpc.MultiProject(distro, release, path); err != nil {
+	if err := mpc.MultiProjectContext(ctx, distro, release, path); err != nil {
 		defaultRegistry.Finish(buildID, BuildStateFailed, err.Error())
 		return
 	}

@@ -177,7 +177,7 @@ var buildCmd = &cobra.Command{
 			mpc.CompressionRpm = compressionRpm
 		}
 
-		err = mpc.MultiProject(distro, release, fullJSONPath)
+		err = mpc.MultiProjectContext(ctx, distro, release, fullJSONPath)
 		if err != nil {
 			if yapErr, ok := errors.AsType[*yapErrors.YapError](err); ok {
 				logStructuredError(yapErr)
