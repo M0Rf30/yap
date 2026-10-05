@@ -30,10 +30,10 @@ DOCKER_BUILD_FLAGS = --progress=plain --no-cache
 # Available distributions (dynamically retrieved from build/deploy folder)
 DISTROS = $(shell find build/deploy -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
-.PHONY: all build build-mcp clean test test-coverage test-e2e-rpm bench deps fmt lint lint-md help run docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats rpmdb-gen
+.PHONY: all build build-all build-mcp clean test test-coverage test-e2e-rpm bench deps tidy fmt fmt-check lint lint-md help run release docker-build docker-build-all docker-list-distros doc doc-serve doc-package doc-deps doc-generate doc-serve-static i18n-tool i18n-check i18n-stats rpmdb-gen
 
 # Default target
-all: clean deps fmt lint lint-md test doc build
+all: clean deps fmt-check lint lint-md test doc build
 
 # Build the application
 build:
@@ -92,21 +92,35 @@ bench:
 deps:
 	@echo "Downloading dependencies..."
 	$(GOMOD) download
+
+# Tidy go.mod/go.sum (mutates the tree; not part of all/release)
+tidy:
+	@echo "Tidying modules..."
 	$(GOMOD) tidy
 
-# Format code
+# Format code (rewrites files)
 fmt:
 	@echo "Formatting code..."
 	$(GOFMT) -s -w .
 
+# Verify formatting without modifying the tree
+fmt-check:
+	@echo "Checking formatting..."
+	@out="$$($(GOFMT) -s -l .)"; \
+	if [ -n "$$out" ]; then \
+		echo "Files need formatting (run 'make fmt'):"; \
+		echo "$$out"; \
+		exit 1; \
+	fi
+
 # Lint code
 lint:
 	@echo "Linting code..."
-	@if command -v $(GOLINT) > /dev/null; then \
-		$(GOLINT) run ./...; \
-	else \
-		echo "golangci-lint not installed, skipping lint"; \
-	fi
+	@command -v $(GOLINT) > /dev/null || { \
+		echo "$(GOLINT) not installed; install it from https://golangci-lint.run"; \
+		exit 1; \
+	}
+	$(GOLINT) run ./...
 
 # Lint markdown files
 lint-md:
@@ -160,7 +174,7 @@ doc-generate:
 	@for pkg in $$(find ./pkg -name "*.go" -exec dirname {} \; | sort -u); do \
 		pkg_name=$$(basename $$pkg); \
 		echo "Generating docs for $$pkg_name..."; \
-		$(GOCMD) doc -all $$pkg > docs/api/$$pkg_name.txt 2>/dev/null || true; \
+		$(GOCMD) doc -all $$pkg > docs/api/$$pkg_name.txt || exit 1; \
 	done
 	@echo "Documentation files generated in docs/api/"
 
@@ -186,17 +200,15 @@ build-all:
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 $(MAIN_PATH)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 $(MAIN_PATH)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 $(MAIN_PATH)
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PATH)
 
 # Create release packages
-release: clean deps fmt lint lint-md test doc build-all
+release: clean deps fmt-check lint lint-md test doc build-all
 	@echo "Creating release packages..."
 	@mkdir -p releases
 	@tar -czf releases/$(BINARY_NAME)-linux-amd64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-linux-amd64
 	@tar -czf releases/$(BINARY_NAME)-linux-arm64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-linux-arm64
 	@tar -czf releases/$(BINARY_NAME)-darwin-amd64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-darwin-amd64
 	@tar -czf releases/$(BINARY_NAME)-darwin-arm64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-darwin-arm64
-	@zip -j releases/$(BINARY_NAME)-windows-amd64.zip $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe
 	@echo "Release packages created in releases/"
 
 # Build Docker image for specific distribution
