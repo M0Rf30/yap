@@ -432,17 +432,29 @@ func (bb *BaseBuilder) Prepare(ctx context.Context, makeDepends []string, target
 
 // PrepareEnvironment sets up the build environment with necessary tools.
 // This consolidates duplicated PrepareEnvironment methods across all builders.
-// Toolchain validation is always skipped here: PrepareEnvironment is called by
-// "yap prepare" whose job is to *install* the cross-compiler — the toolchain
-// cannot be present before it is installed.  Validation runs later during the
-// build stage (builder.processFunction → SetupCrossCompilationEnvironment).
+//
+// Cross-compilation toolchain validation honours SkipToolchainValidation
+// (--skip-toolchain-validation) but runs only AFTER the dependency install:
+// "yap prepare" exists to *install* the cross-compiler, so the toolchain
+// cannot be validated before that step.
 func (bb *BaseBuilder) PrepareEnvironment(ctx context.Context, golang bool, targetArch string) error {
-	return bb.prepareEnvironmentWithValidation(golang, targetArch, true)
+	return bb.prepareEnvironmentWithValidation(ctx, golang, targetArch, SkipToolchainValidation)
+}
+
+// installDeps installs environment dependencies. It is a variable so tests
+// can verify that the caller's context reaches the installer.
+var installDeps = func(
+	ctx context.Context, pb *pkgbuild.PKGBUILD, pm string, args, deps []string,
+) error {
+	return pb.GetDepends(ctx, pm, args, deps)
 }
 
 // prepareEnvironmentWithValidation sets up the build environment with optional toolchain validation.
-// This version allows callers to skip toolchain validation if needed.
+// This version allows callers to skip toolchain validation if needed. ctx is
+// propagated to dependency installation so cancellation (Ctrl-C, MCP
+// build_cancel) interrupts it.
 func (bb *BaseBuilder) prepareEnvironmentWithValidation(
+	ctx context.Context,
 	golang bool,
 	targetArch string,
 	skipValidation bool,
@@ -452,8 +464,10 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 		return err
 	}
 
+	crossBuild := targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed
+
 	// Add cross-compilation dependencies if target architecture is different
-	if targetArch != "" && targetArch != bb.PKGBUILD.ArchComputed {
+	if crossBuild {
 		// Register the foreign architecture and its ports repo before apt-get
 		// install pulls cross-arch libraries. This keeps `yap prepare` and `yap
 		// build` symmetrical: both paths reach apt with the right sources in
@@ -462,12 +476,9 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 			return err
 		}
 
-		if err := bb.handleCrossCompilation(targetArch, skipValidation, &deps); err != nil {
-			return err
-		}
+		bb.handleCrossCompilation(targetArch, &deps)
 	}
 
-	ctx := context.Background()
 	installArgs := constants.GetInstallArgs(bb.Format)
 	pm := getPackageManager(bb.Format)
 
@@ -479,7 +490,7 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 	// and only pacman/zypper still hit the subprocess. Mirrors what
 	// pkg/builders/common cross-deps does and avoids the prepare-time
 	// "unauthenticated packages" failure on apt-get with --repo flags.
-	if err := bb.PKGBUILD.GetDepends(ctx, pm, installArgs, deps); err != nil {
+	if err := installDeps(ctx, bb.PKGBUILD, pm, installArgs, deps); err != nil {
 		return err
 	}
 
@@ -487,6 +498,10 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 	// wrapped automatically when /usr/lib/ccache (or /usr/lib64/ccache) is in
 	// PATH.
 	bb.refreshCcacheSymlinks()
+
+	if crossBuild {
+		return bb.verifyCrossToolchain(targetArch, skipValidation)
+	}
 
 	return nil
 }

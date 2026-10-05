@@ -32,6 +32,7 @@ func TestCrossToolchainValidateMissingGCC(t *testing.T) {
 	// Test with missing GCC (nonexistent executable)
 	toolchain := CrossToolchainMap["x86_64"]["ubuntu"]
 	toolchain.GCCPackage = "nonexistent-gcc-totally-fake"
+	toolchain.ExecPrefix = "" // exercise legacy package-name parsing
 
 	missing, err := toolchain.Validate()
 	if err == nil {
@@ -52,6 +53,7 @@ func TestCrossToolchainValidateMissingGPlus(t *testing.T) {
 	// Test with missing G++ (nonexistent executable)
 	toolchain := CrossToolchainMap["x86_64"]["ubuntu"]
 	toolchain.GPlusPlusPackage = "nonexistent-gpp-totally-fake"
+	toolchain.ExecPrefix = "" // exercise legacy package-name parsing
 
 	missing, err := toolchain.Validate()
 	if err == nil {
@@ -74,6 +76,7 @@ func TestCrossToolchainValidateMissingBinutils(t *testing.T) {
 	// prefix "totally-fake" → checked executables "totally-fake-ar", etc.
 	toolchain := CrossToolchainMap["x86_64"]["ubuntu"]
 	toolchain.BinutilsPackage = "binutils-totally-fake"
+	toolchain.ExecPrefix = "" // exercise legacy package-name parsing
 
 	missing, err := toolchain.Validate()
 	if err == nil {
@@ -109,6 +112,7 @@ func TestCrossToolchainValidateMultipleMissing(t *testing.T) {
 	toolchain.GCCPackage = "gcc-fake-arch"
 	toolchain.GPlusPlusPackage = "g++-fake-arch"
 	toolchain.BinutilsPackage = "binutils-fake-arch"
+	toolchain.ExecPrefix = "" // exercise legacy package-name parsing
 
 	missing, err := toolchain.Validate()
 	if err == nil {

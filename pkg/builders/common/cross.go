@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -35,6 +36,9 @@ func aptCacheDownloadClosure(
 // crossCompileParams holds pre-computed cross-compilation parameters
 // shared between SetupCrossCompilationEnvironment and BuildCrossEnvSlice.
 type crossCompileParams struct {
+	pathTriplet      string
+	ccFlags          string
+	targetArch       string
 	gccExecutable    string
 	gppExecutable    string
 	binutilsPrefix   string
@@ -99,18 +103,14 @@ func (bb *BaseBuilder) resolveToolchainPackages(targetArch string) (CrossToolcha
 	distro := bb.formatToDistro()
 
 	packages, exists := toolchain[distro]
-	if !exists {
-		for _, p := range toolchain {
-			packages = p
-			break
-		}
-
-		if packages.GCCPackage == "" {
-			return CrossToolchain{}, errors.New(errors.ErrTypeBuild, "no cross-compilation toolchain available").
-				WithOperation("resolveToolchainPackages").
-				WithContext("targetArch", targetArch).
-				WithContext("distro", distro)
-		}
+	if !exists || packages.GCCPackage == "" {
+		// No fallback to an arbitrary distro: map iteration order is random
+		// and another distro's toolchain would be wrong (e.g. glibc triplets
+		// for Alpine/musl). Alpine is intentionally absent from the map.
+		return CrossToolchain{}, errors.New(errors.ErrTypeBuild, "no cross-compilation toolchain available").
+			WithOperation("resolveToolchainPackages").
+			WithContext("targetArch", targetArch).
+			WithContext("distro", distro)
 	}
 
 	return packages, nil
@@ -157,7 +157,20 @@ func (bb *BaseBuilder) buildCrossParams(targetArch string, toolchainPackages *Cr
 
 	configureWrapper := buildConfigureWrapper(hostTriplet, buildTriplet)
 
+	pathTriplet := ccPrefix
+	if pathTriplet == "" {
+		pathTriplet = hostTriplet
+	}
+
+	ccFlags := ""
+	if toolchainPackages.NativeExec && targetArch == constants.ArchI686 {
+		ccFlags = " -m32"
+	}
+
 	return crossCompileParams{
+		targetArch:       targetArch,
+		pathTriplet:      pathTriplet,
+		ccFlags:          ccFlags,
 		gccExecutable:    gccExecutable,
 		gppExecutable:    gppExecutable,
 		binutilsPrefix:   binutilsPrefix,
@@ -324,14 +337,17 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 		switch format {
 		case constants.FormatDEB:
 			// DEB version constraint: "libssl-dev (>= 1.0)" — suffix name only.
-			// Skip if already qualified (contains ':').
-			if strings.Contains(dep, ":") {
+			// Skip if the NAME token is already arch-qualified (contains ':').
+			// Only the name is inspected: an epoch in the version constraint
+			// ("libfoo (>= 1:2.0)") also contains ':' but is not a qualifier.
+			name, constraint, hasConstraint := strings.Cut(dep, " (")
+			if strings.Contains(name, ":") {
 				qualified[i] = dep
 				continue
 			}
 
-			if idx := strings.Index(dep, " ("); idx != -1 {
-				qualified[i] = dep[:idx] + ":" + fmtArch + dep[idx:]
+			if hasConstraint {
+				qualified[i] = name + ":" + fmtArch + " (" + constraint
 			} else {
 				qualified[i] = dep + ":" + fmtArch
 			}
@@ -769,26 +785,15 @@ func (bb *BaseBuilder) getCrossCompilerDependencies(targetArch string) []string 
 	return (&toolchain).GetAllPackages()
 }
 
-// handleCrossCompilation handles cross-compilation setup including validation
-// and dependency collection. This helper reduces nesting complexity in
+// handleCrossCompilation handles cross-compilation setup: it appends the
+// cross-compiler packages to deps. Toolchain validation is intentionally not
+// done here — the toolchain is only present after deps are installed (see
+// verifyCrossToolchain). This helper reduces nesting complexity in
 // prepareEnvironmentWithValidation.
-func (bb *BaseBuilder) handleCrossCompilation(
-	targetArch string,
-	skipValidation bool,
-	deps *[]string,
-) error {
+func (bb *BaseBuilder) handleCrossCompilation(targetArch string, deps *[]string) {
 	logger.Info(i18n.T("logger.cross_compilation.detected_target_architecture"),
 		"target_arch", targetArch,
 		"build_arch", bb.PKGBUILD.ArchComputed)
-
-	// Validate toolchain availability before attempting installation
-	if !skipValidation {
-		if err := bb.validateCrossToolchain(targetArch); err != nil {
-			return err
-		}
-	} else {
-		logger.Info(i18n.T("logger.common.info.skipping_toolchain_validation"), "target_arch", targetArch)
-	}
 
 	// Add cross-compilation dependencies
 	crossDeps := bb.getCrossCompilerDependencies(targetArch)
@@ -801,8 +806,28 @@ func (bb *BaseBuilder) handleCrossCompilation(
 	}
 
 	*deps = append(*deps, crossDeps...)
+}
 
-	return nil
+// verifyCrossToolchain validates, after installation, that the cross
+// toolchain is usable. It is a no-op when skip is true
+// (--skip-toolchain-validation). APK (Alpine) has no host cross-toolchain
+// packages, so for it the failure is reported as a warning only.
+func (bb *BaseBuilder) verifyCrossToolchain(targetArch string, skip bool) error {
+	if skip {
+		logger.Info(i18n.T("logger.common.info.skipping_toolchain_validation"), "target_arch", targetArch)
+
+		return nil
+	}
+
+	err := bb.validateCrossToolchain(targetArch)
+	if err != nil && bb.Format == constants.FormatAPK {
+		logger.Warn(i18n.T("logger.cross_compilation.cross_compilation_environment_setup_failed"),
+			"target_arch", targetArch, "error", err)
+
+		return nil
+	}
+
+	return err
 }
 
 // validateCrossToolchain validates that the cross-compilation toolchain is available.
@@ -826,8 +851,8 @@ func (bb *BaseBuilder) crossCCEnv(params *crossCompileParams) []string {
 	var env []string
 
 	env = append(env,
-		"CC="+params.gccExecutable,
-		"CXX="+params.gppExecutable,
+		"CC="+params.gccExecutable+params.ccFlags,
+		"CXX="+params.gppExecutable+params.ccFlags,
 	)
 
 	if params.ccacheAvailable {
@@ -838,22 +863,32 @@ func (bb *BaseBuilder) crossCCEnv(params *crossCompileParams) []string {
 			"via", "/usr/lib/ccache/"+params.gccExecutable)
 	}
 
+	// Native (unprefixed) toolchains such as Arch i686 multilib use bare tool
+	// names; cross toolchains use "<prefix>-<tool>".
+	tool := func(name string) string {
+		if params.binutilsPrefix == "" {
+			return name
+		}
+
+		return params.binutilsPrefix + "-" + name
+	}
+
 	env = append(env,
-		"AR="+params.binutilsPrefix+"-ar",
-		"STRIP="+params.binutilsPrefix+"-strip",
-		"RANLIB="+params.binutilsPrefix+"-ranlib",
-		"OBJDUMP="+params.binutilsPrefix+"-objdump",
-		"OBJCOPY="+params.binutilsPrefix+"-objcopy",
-		"LD="+params.binutilsPrefix+"-ld",
-		"NM="+params.binutilsPrefix+"-nm",
+		"AR="+tool("ar"),
+		"STRIP="+tool("strip"),
+		"RANLIB="+tool("ranlib"),
+		"OBJDUMP="+tool("objdump"),
+		"OBJCOPY="+tool("objcopy"),
+		"LD="+tool("ld"),
+		"NM="+tool("nm"),
 	)
 
 	// Generate a standard CMake cross-compilation toolchain file and point
-	// CMAKE_TOOLCHAIN_FILE at it.
-	// Note: targetArch is not used by writeCMakeToolchainFile, but we pass
-	// empty string for consistency with the original implementation.
+	// CMAKE_TOOLCHAIN_FILE at it. The file is written to a private temp
+	// directory (see writeCMakeToolchainFile), keyed by target + compilers.
 	cmakeToolchain, err := writeCMakeToolchainFile(
-		"", params.gccExecutable, params.gppExecutable, params.ccPrefix)
+		params.targetArch, params.gccExecutable, params.gppExecutable,
+		params.pathTriplet, strings.TrimSpace(params.ccFlags))
 	if err != nil {
 		logger.Warn(i18n.T("logger.common.warn.failed_write_cmake_toolchain"), "error", err)
 	} else {
@@ -878,8 +913,8 @@ func (bb *BaseBuilder) crossRustEnv(params *crossCompileParams,
 			params.gccExecutable,
 		// Rust build script CC/CXX: use bare cross-compiler; ccache wraps
 		// via /usr/lib/ccache/<cross-compiler> symlinks on PATH.
-		"TARGET_" + params.rustTargetUpper + "_CC=" + params.gccExecutable,
-		"TARGET_" + params.rustTargetUpper + "_CXX=" + params.gppExecutable,
+		"TARGET_" + params.rustTargetUpper + "_CC=" + params.gccExecutable + params.ccFlags,
+		"TARGET_" + params.rustTargetUpper + "_CXX=" + params.gppExecutable + params.ccFlags,
 		// Prevent the host's -m64 (or other host-arch flags) from leaking
 		// into C code compiled by Rust's cc crate for the target.
 		"CFLAGS_" + params.rustTargetUpper + "=-O2 -fPIC",
@@ -905,8 +940,8 @@ func (bb *BaseBuilder) crossGoEnv(params *crossCompileParams,
 		"GOARCH=" + params.goArch,
 		// CGO: bare cross-compiler; ccache wraps via CCACHE_PREFIX.
 		"CGO_ENABLED=1",
-		"CC_FOR_TARGET=" + params.gccExecutable,
-		"CXX_FOR_TARGET=" + params.gppExecutable,
+		"CC_FOR_TARGET=" + params.gccExecutable + params.ccFlags,
+		"CXX_FOR_TARGET=" + params.gppExecutable + params.ccFlags,
 	}
 
 	logger.Info(i18n.T("logger.cross_compilation.go_cross_compilation_configured"),
@@ -931,16 +966,16 @@ func (bb *BaseBuilder) crossAutotoolsEnv(params *crossCompileParams,
 		"CXX_FOR_BUILD=g++",
 		"CFLAGS_FOR_BUILD=",
 		"CXXFLAGS_FOR_BUILD=",
-		"CROSS_COMPILE="+params.ccPrefix+"-",
-		"CROSS_COMPILE_HOST="+params.ccPrefix,
+		"CROSS_COMPILE="+crossCompilePrefix(params.ccPrefix),
+		"CROSS_COMPILE_HOST="+params.pathTriplet,
 		"YAP_CROSS_SYSROOT="+CrossSysrootDir(targetArch),
 	)
 
 	// Configure pkg-config for cross-compilation: prepend toolchain paths to
 	// any existing PKG_CONFIG_PATH.
 	crossPkgConfigPaths := []string{
-		"/usr/lib/" + params.ccPrefix + "/pkgconfig",
-		"/usr/local/lib/" + params.ccPrefix + "/pkgconfig",
+		"/usr/lib/" + params.pathTriplet + "/pkgconfig",
+		"/usr/local/lib/" + params.pathTriplet + "/pkgconfig",
 	}
 
 	existingPkgConfig := os.Getenv("PKG_CONFIG_PATH")
@@ -950,7 +985,7 @@ func (bb *BaseBuilder) crossAutotoolsEnv(params *crossCompileParams,
 
 	env = append(env,
 		"PKG_CONFIG_PATH="+strings.Join(crossPkgConfigPaths, ":"),
-		"PKG_CONFIG_LIBDIR=/usr/lib/"+params.ccPrefix+"/pkgconfig",
+		"PKG_CONFIG_LIBDIR=/usr/lib/"+params.pathTriplet+"/pkgconfig",
 	)
 
 	// Set up autoconf cross-compilation configuration
@@ -1248,21 +1283,35 @@ func NormalizeTargetArch(arch string) string {
 	return arch
 }
 
-// writeCMakeToolchainFile writes a standard CMake cross-compilation toolchain
-// file to a temp path and returns the path. The file is written once per
-// target arch; subsequent calls for the same arch return the existing path.
-// The file is cleaned up when the process exits (os.CreateTemp uses the OS
-// temp dir which is cleaned on reboot, but we also register an atexit via
-// a finalizer-free approach: the caller sets CMAKE_TOOLCHAIN_FILE and the
-// file persists for the process lifetime).
-func writeCMakeToolchainFile(targetArch, gccExecutable, gppExecutable, ccPrefix string) (string, error) {
-	path := filepath.Join(os.TempDir(), "yap-cross-"+targetArch+".cmake")
+// cmakeToolchainCache remembers toolchain files already written during this
+// process, keyed by their full content, so repeated BuildCrossEnvSlice calls
+// for the same target reuse one file instead of leaking a directory each time.
+var (
+	cmakeToolchainMu    sync.Mutex
+	cmakeToolchainCache = map[string]string{}
+)
 
-	// Return existing file if already written (idempotent).
-	if _, err := os.Stat(path); err == nil {
-		return path, nil
+// crossCompilePrefix returns the CROSS_COMPILE value ("<prefix>-") for a
+// compiler prefix, or "" for native (unprefixed) toolchains.
+func crossCompilePrefix(ccPrefix string) string {
+	if ccPrefix == "" {
+		return ""
 	}
 
+	return ccPrefix + "-"
+}
+
+// writeCMakeToolchainFile writes a standard CMake cross-compilation toolchain
+// file and returns its path. The file lives in a private (0700) directory
+// created with os.MkdirTemp, never at a predictable shared /tmp path, so a
+// local attacker cannot pre-create or symlink it (CMake toolchain files run
+// arbitrary CMake code). The content is derived from targetArch, the compiler
+// executables and ccPrefix; identical content within one process reuses the
+// same file, different targets/compilers get distinct files. ccFlags, when
+// non-empty, are added as the initial C/C++ flags (e.g. "-m32").
+func writeCMakeToolchainFile(
+	targetArch, gccExecutable, gppExecutable, ccPrefix, ccFlags string,
+) (string, error) {
 	sysroot := "/usr/" + ccPrefix
 
 	// On Debian/Ubuntu multiarch layouts, cross-arch packages install their
@@ -1277,7 +1326,7 @@ func writeCMakeToolchainFile(targetArch, gccExecutable, gppExecutable, ccPrefix 
 	// by cmake at configure time via $ENV{...}, so PKGBUILDs can export it
 	// without yap regenerating the toolchain file.
 	content := fmt.Sprintf(`# Auto-generated by yap for cross-compilation to %s
-# Do not edit — regenerated on each build.
+# Do not edit — generated per target by yap.
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR %s)
 
@@ -1294,10 +1343,36 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 `, targetArch, targetArch, gccExecutable, gppExecutable, sysroot, multarchLib)
 
+	if ccFlags != "" {
+		content += fmt.Sprintf("set(CMAKE_C_FLAGS_INIT %q)\nset(CMAKE_CXX_FLAGS_INIT %q)\n",
+			ccFlags, ccFlags)
+	}
+
+	cmakeToolchainMu.Lock()
+	defer cmakeToolchainMu.Unlock()
+
+	if path, ok := cmakeToolchainCache[content]; ok {
+		if info, err := os.Lstat(path); err == nil && info.Mode().IsRegular() {
+			return path, nil
+		}
+	}
+
+	dir, err := os.MkdirTemp("", "yap-cross-cmake-*")
+	if err != nil {
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "creating CMake toolchain dir").
+			WithOperation("writeCMakeToolchainFile")
+	}
+
+	path := filepath.Join(dir, "toolchain.cmake")
+
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		_ = os.RemoveAll(dir)
+
 		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "writing CMake toolchain file").
 			WithOperation("writeCMakeToolchainFile")
 	}
+
+	cmakeToolchainCache[content] = path
 
 	return path, nil
 }

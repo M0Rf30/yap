@@ -60,6 +60,13 @@ type CrossToolchain struct {
 	Triple string
 	// InstallCommands provides distribution-specific installation commands
 	InstallCommands map[string]string
+	// ExecPrefix is the executable-name prefix of the cross tools (for
+	// example "aarch64-linux-gnu" for aarch64-linux-gnu-gcc). When empty and
+	// NativeExec is false it is derived from the package names (legacy path).
+	ExecPrefix string
+	// NativeExec reports that the toolchain ships unprefixed native tools
+	// (Arch multilib for i686): gcc, g++, ar, strip, ...
+	NativeExec bool
 }
 
 // Validate checks if the required toolchain executables are available in PATH.
@@ -87,10 +94,9 @@ func (ct *CrossToolchain) Validate() ([]string, error) {
 	// binutils package name.  We skip the host-native tools (ar, ld, …) because
 	// those are always present and checking them adds no signal for cross builds.
 	if ct.BinutilsPackage != "" {
-		prefix := ct.binutilsPrefix()
-		if prefix != "" {
+		if prefix := ct.binutilsPrefix(); prefix != "" || ct.NativeExec {
 			for _, tool := range []string{"ar", "strip", "nm", "objdump", "objcopy"} {
-				exe := prefix + "-" + tool
+				exe := ct.ToolExecutable(tool)
 				if _, err := exec.LookPath(exe); err != nil {
 					missing = append(missing, exe)
 				}
@@ -107,12 +113,41 @@ func (ct *CrossToolchain) Validate() ([]string, error) {
 	return nil, nil
 }
 
-// binutilsPrefix derives the cross-tool prefix from the BinutilsPackage name.
+// hasExplicitPrefix reports whether the toolchain carries an explicit
+// executable prefix (set by CrossToolchainMap) rather than relying on package
+// name parsing.
+func (ct *CrossToolchain) hasExplicitPrefix() bool {
+	return ct.NativeExec || ct.ExecPrefix != ""
+}
+
+// ToolExecutable returns the executable name of a cross tool such as "gcc",
+// "g++", "ar" or "strip", e.g. "aarch64-linux-gnu-strip". For native
+// toolchains (Arch i686 multilib) the bare tool name is returned.
+func (ct *CrossToolchain) ToolExecutable(tool string) string {
+	prefix := ct.binutilsPrefix()
+	if prefix == "" {
+		return tool
+	}
+
+	return prefix + "-" + tool
+}
+
+// binutilsPrefix returns the cross-tool executable prefix. An explicit
+// ExecPrefix takes precedence; otherwise it is derived from the
+// BinutilsPackage name (legacy path for hand-built toolchains).
 // Examples:
 //   - "binutils-aarch64-linux-gnu"  → "aarch64-linux-gnu"   (Debian/Ubuntu/Fedora)
 //   - "aarch64-linux-gnu-binutils"  → "aarch64-linux-gnu"   (Arch)
 //   - "binutils-armv7"              → "armv7"               (Alpine)
 func (ct *CrossToolchain) binutilsPrefix() string {
+	if ct.NativeExec {
+		return ""
+	}
+
+	if ct.ExecPrefix != "" {
+		return ct.ExecPrefix
+	}
+
 	pkg := ct.BinutilsPackage
 
 	// "binutils-<prefix>" style (Debian, Ubuntu, Fedora, Alpine)
@@ -369,6 +404,8 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 				installCommands[distro] = fmt.Sprintf("sudo apk add %s %s", gcc, gpp)
 			}
 
+			execPrefix, native := crossExecPrefix(arch, distro, triple)
+
 			result[arch][distro] = CrossToolchain{
 				GCCPackage:         gcc,
 				GPlusPlusPackage:   gpp,
@@ -376,12 +413,36 @@ var CrossToolchainMap = func() map[string]map[string]CrossToolchain {
 				AdditionalPackages: additional,
 				Triple:             triple,
 				InstallCommands:    installCommands,
+				ExecPrefix:         execPrefix,
+				NativeExec:         native,
 			}
 		}
 	}
 
 	return result
 }()
+
+// crossExecPrefix returns the executable-name prefix of the cross tools
+// shipped by distro for arch (e.g. "x86_64-linux-gnu" for x86_64-linux-gnu-gcc).
+// It is deliberately independent of package names: Debian/Ubuntu package
+// suffixes use "x86-64-linux-gnu" while the installed tools use
+// "x86_64-linux-gnu-", and Arch's i686 "multilib" packages ship the native
+// gcc/binutils with no prefix at all (native is then true).
+func crossExecPrefix(arch, distro, pkgTriple string) (prefix string, native bool) {
+	if arch == constants.ArchI686 && distro == constants.DistroArch {
+		return "", true
+	}
+
+	if arch == constants.ArchX86_64 {
+		pkgTriple = constants.TripletX8664Linux
+	}
+
+	if arch == constants.ArchS390x && distro == constants.DistroFedora {
+		return "s390x-redhat-linux", false
+	}
+
+	return pkgTriple, false
+}
 
 // alpineMuslTriplets maps Alpine arch names (as used in package names like
 // "gcc-aarch64") to their full musl cross-compiler triplet prefixes.
@@ -404,6 +465,18 @@ var alpineMuslTriplets = map[string]string{
 //   - Arch:          aarch64-linux-gnu-gcc  → aarch64-linux-gnu-gcc (already correct)
 //   - Alpine:        gcc-aarch64            → aarch64-alpine-linux-musl-gcc
 func (ct *CrossToolchain) GetExecutableName(packageName string) string {
+	// Explicit prefix wins over parsing package names (which is wrong for
+	// Debian's x86-64 package suffix and Arch's multilib packages).
+	if ct.hasExplicitPrefix() {
+		switch packageName {
+		case "":
+		case ct.GCCPackage:
+			return ct.ToolExecutable("gcc")
+		case ct.GPlusPlusPackage:
+			return ct.ToolExecutable("g++")
+		}
+	}
+
 	// Fedora G++: "gcc-c++-<triplet>" → "<triplet>-g++"
 	if after, ok := strings.CutPrefix(packageName, "gcc-c++-"); ok {
 		return after + "-g++"
