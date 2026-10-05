@@ -4,6 +4,7 @@ package parser //nolint:revive // intentional name; conflicts with stdlib go/par
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
@@ -144,17 +145,16 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 		name := nodeType.Name.Value
 
 		if nodeType.Array != nil {
-			// StringifyArray accumulates output across elements (shared builder),
-			// so only the last element contains the full expanded array.
-			// Use shell.Fields on the last element only to get all values.
-			lines := set.StringifyArray(nodeType)
+			// StringifyArrayElems yields one string per element; join them so
+			// shell.Fields expands the whole array in one pass.
+			elems := set.StringifyArrayElems(nodeType)
 
 			var arrayDecl []string
 
-			if len(lines) > 0 {
+			if len(elems) > 0 {
 				var fieldsErr error
 
-				arrayDecl, fieldsErr = shell.Fields(lines[len(lines)-1], expandFunc)
+				arrayDecl, fieldsErr = shell.Fields(strings.Join(elems, " "), expandFunc)
 				warnExpansion(name, fieldsErr)
 			}
 

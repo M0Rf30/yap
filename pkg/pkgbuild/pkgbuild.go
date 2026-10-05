@@ -136,6 +136,9 @@ type PKGBUILD struct {
 	FullDistroName  string
 	Group           string
 	HashSums        []string
+	// HashAlgos holds, parallel to HashSums, the name of the checksum array
+	// (sha256sums, b2sums, …) that supplied each entry.
+	HashAlgos       []string
 	HelperFunctions map[string]string
 	Home            string
 	HostArch        string // Host architecture for cross-compilation (where package will run)
@@ -174,6 +177,7 @@ type PKGBUILD struct {
 	priorities        map[string]int
 	archSourceURI     []string  // arch-specific source_<arch> entries, merged into SourceURI at Finalize
 	archHashSums      []string  // arch-specific sha*sums_<arch> entries, merged into HashSums at Finalize
+	archHashAlgos     []string  // checksum array name per archHashSums entry
 	topLevelSnap      *PKGBUILD // snapshot of overrideable fields before any package_<name>() runs
 	Priority          string
 	Provides          []string
@@ -532,6 +536,7 @@ func (pkgBuild *PKGBUILD) Init() {
 
 	pkgBuild.archSourceURI = nil
 	pkgBuild.archHashSums = nil
+	pkgBuild.archHashAlgos = nil
 
 	// Apply option defaults so PKGBUILDs without an options=() array still
 	// get the correct behaviour (e.g. emptydirs=true keeps empty dirs).
@@ -545,8 +550,10 @@ func (pkgBuild *PKGBUILD) Init() {
 func (pkgBuild *PKGBUILD) Finalize() {
 	pkgBuild.SourceURI = append(pkgBuild.SourceURI, pkgBuild.archSourceURI...)
 	pkgBuild.HashSums = append(pkgBuild.HashSums, pkgBuild.archHashSums...)
+	pkgBuild.HashAlgos = append(pkgBuild.HashAlgos, pkgBuild.archHashAlgos...)
 	pkgBuild.archSourceURI = nil
 	pkgBuild.archHashSums = nil
+	pkgBuild.archHashAlgos = nil
 
 	// For split packages, capture the top-level overrideable fields now —
 	// before any package_<name>() function runs — so both compileSplitPackages
@@ -731,10 +738,11 @@ func (pkgBuild *PKGBUILD) applyOverrideAssign(node syntax.Node) error {
 	if assign.Array != nil {
 		var arrVal []string
 
-		for _, line := range set.StringifyArray(assign) {
+		elems := set.StringifyArrayElems(assign)
+		if len(elems) > 0 {
 			var fieldsErr error
 
-			arrVal, fieldsErr = mvdanshell.Fields(line, lookup)
+			arrVal, fieldsErr = mvdanshell.Fields(strings.Join(elems, " "), lookup)
 			if fieldsErr != nil {
 				return errors.Wrap(fieldsErr, errors.ErrTypeParser,
 					"failed to expand split package override").
@@ -1066,8 +1074,11 @@ func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any, priority int)
 			if priority > priorityBase {
 				// Arch-specific: accumulate separately; merged by Finalize().
 				pkgBuild.archHashSums = append(pkgBuild.archHashSums, arrVal...)
+				pkgBuild.archHashAlgos = append(pkgBuild.archHashAlgos,
+					repeatAlgo(key, len(arrVal))...)
 			} else {
 				pkgBuild.HashSums = arrVal
+				pkgBuild.HashAlgos = repeatAlgo(key, len(arrVal))
 			}
 		}
 
@@ -1075,6 +1086,16 @@ func (pkgBuild *PKGBUILD) mapChecksumsArrays(key string, data any, priority int)
 	default:
 		return false
 	}
+}
+
+// repeatAlgo returns n copies of the checksum array name key.
+func repeatAlgo(key string, n int) []string {
+	algos := make([]string, n)
+	for i := range algos {
+		algos[i] = key
+	}
+
+	return algos
 }
 
 // mapFunctions reads a function name and its content and maps them to the
