@@ -172,12 +172,49 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 			continue
 		}
 
+		fullPath, err = confineEntry(destDir, fullPath, path, hdr.Typeflag)
+		if err != nil {
+			logger.Warn(i18n.T("logger.aptinstall.warn.skipping_path_traversal_attempt"),
+				"path", path, "error", err)
+
+			continue
+		}
+
 		if err := extractTarEntry(tr, hdr, destDir, fullPath, conffileSet, dirMap); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// confineEntry re-resolves fullPath so no pre-existing symlink in destDir can
+// redirect the write outside it. For root "/" the lexical path is kept. For
+// directories the whole path is resolved (usrmerge links like lib -> usr/lib
+// keep working); for other entries only the parent is resolved so the final
+// component is never followed.
+func confineEntry(destDir, fullPath, rel string, typeflag byte) (string, error) {
+	if filepath.Clean(destDir) == "/" {
+		return fullPath, nil
+	}
+
+	if typeflag == tar.TypeDir {
+		return safepath.ResolveInRoot(destDir, rel)
+	}
+
+	parent, err := safepath.ResolveInRoot(destDir, filepath.Dir(rel))
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(parent, filepath.Base(fullPath)), nil
+}
+
+// tarMode returns the permission bits plus setuid/setgid/sticky from hdr.
+func tarMode(hdr *tar.Header) os.FileMode {
+	m := hdr.FileInfo().Mode()
+
+	return m.Perm() | m&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky)
 }
 
 // extractTarEntry dispatches tar entry extraction based on type.
@@ -207,8 +244,13 @@ func extractTarDir(hdr *tar.Header, fullPath string, dirMap map[string]bool) err
 	dirMap[fullPath] = true
 
 	// nolint:gosec // G301: mode is from tar header, constrained by safeJoin
-	if err := os.MkdirAll(fullPath, os.FileMode(hdr.Mode)); err != nil {
+	if err := os.MkdirAll(fullPath, tarMode(hdr)); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "mkdir").
+			WithOperation("extractTarDir").WithContext("path", fullPath)
+	}
+
+	if err := os.Chmod(fullPath, tarMode(hdr)); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "chmod dir").
 			WithOperation("extractTarDir").WithContext("path", fullPath)
 	}
 
@@ -257,6 +299,10 @@ func extractTarSymlink(hdr *tar.Header, destDir, fullPath string, dirMap map[str
 // instead: a divergent copy beats a missing file.
 func extractTarHardlink(hdr *tar.Header, destDir, fullPath string, dirMap map[string]bool) error {
 	target, err := safeJoin(destDir, strings.TrimPrefix(hdr.Linkname, "./"))
+	if err == nil && filepath.Clean(destDir) != "/" {
+		target, err = safepath.ResolveInRoot(destDir, strings.TrimPrefix(hdr.Linkname, "./"))
+	}
+
 	if err != nil {
 		logger.Warn(i18n.T("logger.aptinstall.warn.skipping_path_traversal_attempt"),
 			"path", hdr.Name, "error", err)
@@ -276,7 +322,7 @@ func extractTarHardlink(hdr *tar.Header, destDir, fullPath string, dirMap map[st
 		return nil
 	}
 
-	if err := copyFile(target, fullPath, os.FileMode(hdr.Mode)); err != nil { //nolint:gosec
+	if err := copyFile(target, fullPath, tarMode(hdr)); err != nil { //nolint:gosec
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "hardlink").
 			WithOperation("extractTarHardlink").
 			WithContext("path", fullPath).
@@ -306,7 +352,11 @@ func copyFile(src, dst string, mode os.FileMode) error {
 		return err
 	}
 
-	return out.Close()
+	if err := out.Close(); err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, mode)
 }
 
 // extractTarFile extracts a regular file from a tar entry, respecting conffiles.
@@ -337,9 +387,14 @@ func extractTarFile(
 		_ = os.MkdirAll(parentDir, 0o755)
 	}
 
+	// Never write through a symlink at the final component.
+	if fi, lerr := os.Lstat(fullPath); lerr == nil && fi.Mode()&os.ModeSymlink != 0 {
+		_ = os.Remove(fullPath)
+	}
+
 	// Create the file.
 	// nolint:gosec // G304: fullPath is constrained by safeJoin; G306: mode is from tar header
-	f, err := os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode))
+	f, err := os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, tarMode(hdr))
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "create file").
 			WithOperation("extractTarFile").WithContext("path", fullPath)
@@ -357,6 +412,11 @@ func extractTarFile(
 
 	if err := f.Close(); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "close file").
+			WithOperation("extractTarFile").WithContext("path", fullPath)
+	}
+
+	if err := os.Chmod(fullPath, tarMode(hdr)); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "chmod file").
 			WithOperation("extractTarFile").WithContext("path", fullPath)
 	}
 

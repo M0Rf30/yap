@@ -415,3 +415,51 @@ func TestExtractTarSymlink_ReplacesExistingSymlink(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "libfoo.so.1", target)
 }
+
+// TestExtract_SymlinkEscapeContained verifies a link -> /outside entry cannot
+// redirect a later link/x write outside destDir, while usrmerge links work.
+func TestExtract_SymlinkEscapeContained(t *testing.T) {
+	t.Parallel()
+
+	outside := t.TempDir()
+	dataTarGz := buildDataTarGzEntries(t, []tarEntry{
+		{name: "./usr/lib/", typeflag: tar.TypeDir, mode: 0o755},
+		{name: "./lib", typeflag: tar.TypeSymlink, linkname: "usr/lib"},
+		{name: "./lib/ok", content: "ok", mode: 0o644},
+		{name: "./link", typeflag: tar.TypeSymlink, linkname: outside},
+		{name: "./link/x", content: "pwn", mode: 0o644},
+	})
+	debPath := buildDEB(t, dataTarGz)
+	destDir := t.TempDir()
+
+	require.NoError(t, aptinstall.ExtractDataTarForTesting(debPath, destDir, nil))
+
+	_, err := os.Stat(filepath.Join(outside, "x"))
+	assert.True(t, os.IsNotExist(err), "write escaped destDir")
+
+	got, err := os.ReadFile(filepath.Join(destDir, "usr", "lib", "ok"))
+	require.NoError(t, err)
+	assert.Equal(t, "ok", string(got))
+}
+
+// TestExtract_PreservesSetuidAndSticky verifies special mode bits survive.
+func TestExtract_PreservesSetuidAndSticky(t *testing.T) {
+	t.Parallel()
+
+	dataTarGz := buildDataTarGzEntries(t, []tarEntry{
+		{name: "./tmpd/", typeflag: tar.TypeDir, mode: 0o1777},
+		{name: "./bin/su", content: "x", mode: 0o4755},
+	})
+	debPath := buildDEB(t, dataTarGz)
+	destDir := t.TempDir()
+
+	require.NoError(t, aptinstall.ExtractDataTarForTesting(debPath, destDir, nil))
+
+	fi, err := os.Stat(filepath.Join(destDir, "bin", "su"))
+	require.NoError(t, err)
+	assert.NotZero(t, fi.Mode()&os.ModeSetuid)
+
+	di, err := os.Stat(filepath.Join(destDir, "tmpd"))
+	require.NoError(t, err)
+	assert.NotZero(t, di.Mode()&os.ModeSticky)
+}
