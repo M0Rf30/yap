@@ -562,3 +562,25 @@ func setupTestDB(t *testing.T) *DB {
 
 	return db
 }
+
+func TestOpenRejectsUnknownSchemaVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "v.db")
+
+	d, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = d.sqlDB.ExecContext(context.Background(),
+		"UPDATE meta SET value='99' WHERE key='schema_version'"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = d.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = Open(context.Background(), path); err == nil {
+		t.Fatal("expected error for unsupported schema version")
+	}
+}
