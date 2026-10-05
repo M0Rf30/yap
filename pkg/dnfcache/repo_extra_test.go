@@ -14,6 +14,40 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 )
 
+// TestParseRepoFileContentEmptyMirrorList verifies that empty mirrorlist=
+// and metalink= values do not panic.
+func TestParseRepoFileContentEmptyMirrorList(t *testing.T) {
+	content := "[a]\nmirrorlist=\nmetalink=   \nbaseurl=https://x.example.com/\n"
+
+	repos := ParseRepoFileContent(content)
+	require.Len(t, repos, 1)
+	assert.Empty(t, repos[0].MirrorList)
+	assert.Equal(t, []string{"https://x.example.com/"}, repos[0].BaseURLs)
+}
+
+// TestParseRepoFileContentGPGKeyContinuation verifies that continuation URLs
+// of keys other than baseurl are not treated as baseurl entries.
+func TestParseRepoFileContentGPGKeyContinuation(t *testing.T) {
+	content := `[a]
+metalink=https://mirrors.example.com/metalink?repo=a
+gpgkey=https://example.com/key1
+       https://example.com/key2
+[b]
+baseurl=https://b1.example.com/
+        https://b2.example.com/
+gpgkey=https://example.com/key3
+       https://example.com/key4
+`
+
+	repos := ParseRepoFileContent(content)
+	require.Len(t, repos, 2)
+	assert.Empty(t, repos[0].BaseURLs)
+	assert.Empty(t, repos[0].BaseURL)
+	assert.Equal(t, "https://mirrors.example.com/metalink?repo=a", repos[0].MirrorList)
+	assert.Equal(t, []string{"https://b1.example.com/", "https://b2.example.com/"},
+		repos[1].BaseURLs)
+}
+
 // ---- isNonFatalRepoError ----
 
 // TestIsNonFatalRepoErrorNil tests that nil is not a non-fatal error.

@@ -86,6 +86,8 @@ func ParseRepoFileContent(content string) []RepoEntry {
 
 	var cur RepoEntry
 
+	var lastKey string
+
 	scanner := bufio.NewScanner(strings.NewReader(content))
 
 	for scanner.Scan() {
@@ -106,10 +108,12 @@ func ParseRepoFileContent(content string) []RepoEntry {
 				Enabled: true, // default enabled
 			}
 
+			lastKey = ""
+
 			continue
 		}
 
-		applyRepoLine(&cur, line)
+		lastKey = applyRepoLine(&cur, line, lastKey)
 	}
 
 	if cur.ID != "" {
@@ -121,21 +125,24 @@ func ParseRepoFileContent(content string) []RepoEntry {
 
 // applyRepoLine folds one non-section line of a .repo file into cur:
 // bare-URL baseurl continuation lines and key=value assignments.
-func applyRepoLine(cur *RepoEntry, line string) {
+func applyRepoLine(cur *RepoEntry, line, lastKey string) string {
 	// Multi-line baseurl continuation: dnf's INI dialect allows extra
-	// URLs on indented lines following a "baseurl=" line.
+	// URLs on indented lines following a "baseurl=" line. Continuation
+	// lines belonging to other keys (gpgkey=, ...) are ignored.
 	if cur.ID != "" && isRepoURL(line) {
-		cur.BaseURLs = append(cur.BaseURLs, line)
-		if cur.BaseURL == "" {
-			cur.BaseURL = line
+		if lastKey == "baseurl" {
+			cur.BaseURLs = append(cur.BaseURLs, line)
+			if cur.BaseURL == "" {
+				cur.BaseURL = line
+			}
 		}
 
-		return
+		return lastKey
 	}
 
 	key, val, ok := strings.Cut(line, "=")
 	if !ok {
-		return
+		return lastKey
 	}
 
 	key = strings.TrimSpace(key)
@@ -151,12 +158,14 @@ func applyRepoLine(cur *RepoEntry, line string) {
 			cur.BaseURL = urls[0]
 		}
 	case "mirrorlist", "metalink":
-		if cur.MirrorList == "" {
-			cur.MirrorList = strings.Fields(val)[0]
+		if fields := strings.Fields(val); len(fields) > 0 && cur.MirrorList == "" {
+			cur.MirrorList = fields[0]
 		}
 	case "enabled":
 		cur.Enabled = val != "0"
 	}
+
+	return key
 }
 
 // isRepoURL reports whether line looks like a bare repository URL
