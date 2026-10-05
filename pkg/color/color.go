@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 )
 
 // ANSI escape sequences.
@@ -25,17 +26,18 @@ const (
 	fgHiCyan  = "\033[96m"
 )
 
-var disabled bool
+// disabled is atomic so Disable/Enable may race with concurrent color calls.
+var disabled atomic.Bool
 
 // Disable turns off all color output (called by --no-color flag).
-func Disable() { disabled = true }
+func Disable() { disabled.Store(true) }
 
 // Enable turns color output back on.
-func Enable() { disabled = false }
+func Enable() { disabled.Store(false) }
 
 // IsDisabled reports whether color is currently disabled.
 func IsDisabled() bool {
-	return disabled || os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
+	return disabled.Load() || os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
 }
 
 func wrap(code, s string) string {
