@@ -1422,6 +1422,10 @@
   translation: "Rpm --import non riuscito (non fatale; dnf verificherà comunque tramite gpgkey= nel .repo)"
 - id: logger.repo.warn.unknown_distro_skipping_repo
   translation: "Distribuzione sconosciuta, configurazione del repository ignorata"
+- id: logger.repo.warn.unsigned_apt_source
+  translation: "Il repository apt non ha una chiave di firma; Trusted: yes disabilita la verifica delle firme"
+- id: logger.repo.warn.unsigned_yum_repo
+  translation: "Il repository yum ha gpgcheck=0; le firme dei pacchetti non saranno verificate"
 - id: logger.repo.warn.unsupported_format_skipping
   translation: "Formato non supportato, ignorato"
 - id: logger.rootless.info.extracting_rootfs

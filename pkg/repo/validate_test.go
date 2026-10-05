@@ -1,3 +1,4 @@
+//nolint:testpackage // exercises unexported validation helpers
 package repo
 
 import (
