@@ -164,6 +164,7 @@ type buildArgs struct {
 	UnverifiedRepos         bool     `json:"unverifiedRepos,omitempty" jsonschema:"allow apt sources w/o Signed-By"`
 	ExtraRepos              []string `json:"extraRepos,omitempty" jsonschema:"extra apt/dnf repo defs (--repo syntax)"`
 	Verbose                 bool     `json:"verbose,omitempty" jsonschema:"enable verbose logging for the build"`
+	NoContainer             bool     `json:"noContainer,omitempty" jsonschema:"force native build (CLI --no-container)"`
 }
 
 type buildStartResult struct {
@@ -201,9 +202,10 @@ func registerBuildAndStatus(srv *mcpsdk.Server) {
 
 		// Dispatch into the matching yap image only when the caller explicitly
 		// asked for a distro and we are on a host shell (the CLI's
-		// userProvidedDistro gate). With no distro the build runs natively on
+		// userProvidedDistro gate), unless noContainer forces a native build
+		// (CLI --no-container). With no distro the build runs natively on
 		// the host, as documented; inside a container it always runs natively.
-		if args.Distro != "" && !command.IsInsideContainer() {
+		if args.Distro != "" && !args.NoContainer && !command.IsInsideContainer() {
 			res, err := dispatchBuildInContainer(&args, abs, distro, release)
 			if err != nil {
 				return nil, buildStartResult{}, err

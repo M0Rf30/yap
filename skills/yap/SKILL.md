@@ -107,7 +107,9 @@ worrying about argv leakage.
   Provide a distro tag (e.g. `ubuntu-jammy`) to dispatch the build into a
   matching container image (requires a container runtime; without one the
   build fails instead of silently building natively for the wrong distro,
-  and inside a container it always builds natively). Cross-arch builds
+  and inside a container it always builds natively). Set `noContainer: true`
+  to force a native host build even with a distro (mirrors CLI
+  `--no-container`). Cross-arch builds
   usually need a distro arg so the right cross-toolchain is available.
 - **Formats & package managers**: 15 distros across 5 package managers —
   `apt` (Debian/Ubuntu/Mint/Pop → `.deb`), `yum` and `zypper`
