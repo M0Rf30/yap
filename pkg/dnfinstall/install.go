@@ -283,7 +283,9 @@ func writeYapdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir
 
 	// Convert installedFile to yapdb.File.
 	var files []yapdb.File
-	for _, f := range entry.Files {
+
+	for i := range entry.Files {
+		f := &entry.Files[i]
 		files = append(files, yapdb.File{
 			Path:       f.Path,
 			Mode:       f.Mode,
@@ -351,8 +353,11 @@ func toRPMDBFiles(files []installedFile) []rpmdb.InstalledFile {
 		out = append(out, rpmdb.InstalledFile{
 			Path:       f.Path,
 			Size:       f.Size,
-			Mode:       posixMode(f.Mode),
+			Mode:       posixMode(f.Mode) | f.TypeBits,
 			SHA256:     f.SHA256,
+			User:       f.User,
+			Group:      f.Group,
+			MTime:      f.MTime,
 			LinkTarget: f.LinkTarget,
 		})
 	}

@@ -2,6 +2,8 @@ package dnfinstall //nolint:testpackage
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -52,8 +54,52 @@ func TestExtractSymlinkCannotEscapeRoot(t *testing.T) {
 	_, err := extractRPM(context.Background(), rpmPath, root, Options{})
 	require.NoError(t, err)
 
+	li, lerr := os.Lstat(filepath.Join(root, "link"))
+	require.NoError(t, lerr, "absolute symlink must be created so the escape path is exercised")
+	require.NotZero(t, li.Mode()&os.ModeSymlink)
+
+	tgt, rerr := os.Readlink(filepath.Join(root, "link"))
+	require.NoError(t, rerr)
+	assert.Equal(t, outside, tgt)
+
 	_, statErr := os.Stat(filepath.Join(outside, "x"))
 	assert.True(t, os.IsNotExist(statErr), "write escaped rootDir")
+
+	data, rdErr := os.ReadFile(filepath.Join(root, outside, "x"))
+	require.NoError(t, rdErr, "file must be confined beneath rootDir")
+	assert.Equal(t, "pwn", string(data))
+}
+
+func TestExtractUsrmergeSymlinkUnderRoot(t *testing.T) {
+	root := t.TempDir()
+	rpmPath := buildFilesRPM(t, []rpmpack.RPMFile{
+		{Name: "/lib", Body: []byte("usr/lib"), Mode: 0o120777},
+		{Name: "/lib/x", Body: []byte("hello"), Mode: 0o644},
+	})
+
+	entry, err := extractRPM(context.Background(), rpmPath, root, Options{})
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(root, "usr", "lib", "x"))
+	require.NoError(t, err)
+	assert.Equal(t, "hello", string(data))
+
+	sum := sha256.Sum256([]byte("hello"))
+
+	for _, f := range entry.Files {
+		if f.Path == "/lib/x" {
+			assert.Equal(t, hex.EncodeToString(sum[:]), f.SHA256)
+			assert.Equal(t, uint32(rpmTypeReg), f.TypeBits)
+			assert.False(t, f.MTime.IsZero())
+		}
+	}
+
+	out := toRPMDBFiles(entry.Files)
+	for _, f := range out {
+		if f.Path == "/lib/x" {
+			assert.Equal(t, uint32(0o100644), f.Mode)
+		}
+	}
 }
 
 func TestExtractPreservesSetuidAndRootRelativePaths(t *testing.T) {

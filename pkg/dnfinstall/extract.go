@@ -2,11 +2,14 @@ package dnfinstall
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	stderrors "errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/sassoftware/go-rpmutils"
 
@@ -29,6 +32,10 @@ type installedFile struct {
 	Mode        os.FileMode
 	Size        int64
 	SHA256      string
+	TypeBits    uint32
+	MTime       time.Time
+	User        string
+	Group       string
 	IsDir       bool
 	IsSymlink   bool
 	IsConfig    bool
@@ -122,16 +129,17 @@ const (
 // If pr.IsLink() is true, it handles hardlink resolution via the tracker.
 // Otherwise, it writes the file data and materializes any queued hardlinks.
 func handleRegularEntry(pr rpmutils.PayloadReader, targetPath string,
-	perm os.FileMode, inodeKey uint64, tracker *hardlinkTracker) error {
+	perm os.FileMode, inodeKey uint64, tracker *hardlinkTracker) (string, error) {
 	if pr.IsLink() {
-		return tracker.handleHardlink(inodeKey, targetPath)
+		return "", tracker.handleHardlink(inodeKey, targetPath)
 	}
 
-	if err := writeRegularFile(pr, targetPath, perm); err != nil {
-		return err
+	digest, err := writeRegularFile(pr, targetPath, perm)
+	if err != nil {
+		return "", err
 	}
 
-	return tracker.materializeData(inodeKey, targetPath)
+	return digest, tracker.materializeData(inodeKey, targetPath)
 }
 
 // extractRPMWithHeader extracts an already-parsed RPM to rootDir using
@@ -156,6 +164,8 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 
 	var files []installedFile
 
+	hashes := make(map[uint64]string)
+	linkIdx := make(map[uint64][]int)
 	tracker := newHardlinkTracker()
 
 	for {
@@ -206,6 +216,8 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 				WithContext("path", targetPath)
 		}
 
+		var digest string
+
 		switch fileType {
 		case rpmTypeDir:
 			if err := os.MkdirAll(targetPath, perm); err != nil {
@@ -231,8 +243,8 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 			}
 
 		case rpmTypeReg, 0:
-			if err := handleRegularEntry(pr, targetPath, perm, inodeKey,
-				tracker); err != nil {
+			digest, err = handleRegularEntry(pr, targetPath, perm, inodeKey, tracker)
+			if err != nil {
 				return nil, err
 			}
 
@@ -244,11 +256,28 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 		files = append(files, installedFile{
 			Path:       recordPath,
 			Mode:       perm,
+			TypeBits:   fileType,
 			Size:       fi.Size(),
+			MTime:      time.Unix(int64(fi.Mtime()), 0),
+			User:       fi.UserName(),
+			Group:      fi.GroupName(),
+			SHA256:     digest,
 			IsDir:      fileType == rpmTypeDir,
 			IsSymlink:  fileType == rpmTypeLink,
 			LinkTarget: fi.Linkname(),
 		})
+
+		if digest != "" {
+			hashes[inodeKey] = digest
+		} else if fileType != rpmTypeDir && fileType != rpmTypeLink && pr.IsLink() {
+			linkIdx[inodeKey] = append(linkIdx[inodeKey], len(files)-1)
+		}
+	}
+
+	for key, idxs := range linkIdx {
+		for _, i := range idxs {
+			files[i].SHA256 = hashes[key]
+		}
 	}
 
 	logger.Debug(i18n.T("logger.dnfinstall.debug.extracted_rpm"), "path", path, "files", len(files))
@@ -325,23 +354,26 @@ func resolveTarget(rootDir, targetPath string, isDir bool) (string, error) {
 }
 
 // writeRegularFile streams the current payload entry to targetPath atomically.
-func writeRegularFile(pr rpmutils.PayloadReader, targetPath string, perm os.FileMode) error {
+func writeRegularFile(pr rpmutils.PayloadReader, targetPath string,
+	perm os.FileMode) (string, error) {
 	const maxFileSize = 2 << 30 // 2 GiB
 
 	tmpPath := targetPath + ".rpm-new"
 
 	f, err := os.Create(tmpPath) //nolint:gosec
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary file").
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary file").
 			WithOperation("extractCPIOEntry").
 			WithContext("path", tmpPath)
 	}
 
-	if _, err := io.Copy(f, io.LimitReader(pr, maxFileSize)); err != nil {
+	h := sha256.New()
+
+	if _, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(pr, maxFileSize)); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmpPath)
 
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to copy file contents").
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to copy file contents").
 			WithOperation("extractCPIOEntry").
 			WithContext("path", tmpPath)
 	}
@@ -349,7 +381,7 @@ func writeRegularFile(pr rpmutils.PayloadReader, targetPath string, perm os.File
 	if err := f.Close(); err != nil {
 		_ = os.Remove(tmpPath)
 
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to close file").
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to close file").
 			WithOperation("extractCPIOEntry").
 			WithContext("path", tmpPath)
 	}
@@ -357,7 +389,7 @@ func writeRegularFile(pr rpmutils.PayloadReader, targetPath string, perm os.File
 	if err := os.Chmod(tmpPath, perm); err != nil {
 		_ = os.Remove(tmpPath)
 
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set file permissions").
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to set file permissions").
 			WithOperation("extractCPIOEntry").
 			WithContext("path", tmpPath)
 	}
@@ -365,13 +397,13 @@ func writeRegularFile(pr rpmutils.PayloadReader, targetPath string, perm os.File
 	if err := os.Rename(tmpPath, targetPath); err != nil {
 		_ = os.Remove(tmpPath)
 
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to rename file").
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to rename file").
 			WithOperation("extractCPIOEntry").
 			WithContext("from", tmpPath).
 			WithContext("to", targetPath)
 	}
 
-	return nil
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // makeHardlink creates target as a hardlink to source.
