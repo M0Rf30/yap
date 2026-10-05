@@ -518,3 +518,19 @@ func TestResolveCrossDistroCodenameEmptyOpts(t *testing.T) {
 		_, _, _ = resolveCrossDistroCodename(opts)
 	})
 }
+
+func TestPatchDeb822FilePerStanza(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "multi.sources")
+	in := "Types: deb\nURIs: http://a\nArchitectures: arm64\n\n" +
+		"Types: deb\nURIs: http://b\nSuites: x\n"
+	require.NoError(t, os.WriteFile(path, []byte(in), 0o644))
+
+	require.NoError(t, patchDeb822File(path, "amd64"))
+
+	want := "Types: deb\nURIs: http://a\nArchitectures: arm64\n\n" +
+		"Types: deb\nArchitectures: amd64\nURIs: http://b\nSuites: x\n"
+	assert.Equal(t, want, readFile(t, path))
+
+	require.NoError(t, patchDeb822File(path, "amd64"))
+	assert.Equal(t, want, readFile(t, path))
+}

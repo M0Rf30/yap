@@ -389,15 +389,55 @@ func patchDeb822File(path, hostDebArch string) error {
 		return err
 	}
 
-	if strings.Contains(string(data), "Architectures:") {
+	original := string(data)
+	patched := patchDeb822Stanzas(original, hostDebArch)
+
+	if patched == original {
 		return nil
 	}
 
-	patched := deb822TypesLine.ReplaceAllStringFunc(string(data), func(match string) string {
+	return writeRoot(path, []byte(patched))
+}
+
+// deb822Separator splits a deb822 file into stanzas on blank lines.
+var deb822Separator = regexp.MustCompile(`\n[ \t]*\n`)
+
+// patchDeb822Stanzas adds `Architectures: <arch>` to every stanza that has a
+// Types: line but no Architectures: field. Stanzas that already constrain
+// architectures are left untouched.
+func patchDeb822Stanzas(content, hostDebArch string) string {
+	var out strings.Builder
+
+	last := 0
+
+	for _, loc := range deb822Separator.FindAllStringIndex(content, -1) {
+		out.WriteString(patchDeb822Stanza(content[last:loc[0]], hostDebArch))
+		out.WriteString(content[loc[0]:loc[1]])
+
+		last = loc[1]
+	}
+
+	out.WriteString(patchDeb822Stanza(content[last:], hostDebArch))
+
+	return out.String()
+}
+
+func patchDeb822Stanza(stanza, hostDebArch string) string {
+	if strings.Contains(stanza, "Architectures:") {
+		return stanza
+	}
+
+	done := false
+
+	return deb822TypesLine.ReplaceAllStringFunc(stanza, func(match string) string {
+		if done {
+			return match
+		}
+
+		done = true
+
 		return match + "\nArchitectures: " + hostDebArch
 	})
-
-	return writeRoot(path, []byte(patched))
 }
 
 func restrictLegacySourcesList(hostDebArch string) error {
