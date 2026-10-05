@@ -89,7 +89,7 @@ func TestGenerateUnknownFormat(t *testing.T) {
 	}
 
 	generatedFiles, err := sbom.Generate(pkg, "/tmp/artifact", opts)
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Empty(t, generatedFiles)
 }
 
@@ -105,6 +105,18 @@ func TestGenerateWriteError(t *testing.T) {
 	}
 
 	generatedFiles, err := sbom.Generate(pkg, "/nonexistent/dir/artifact", opts)
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Empty(t, generatedFiles)
+}
+
+func TestGeneratePartialFailureReturnsError(t *testing.T) {
+	pkg := &pkgbuild.PKGBUILD{PkgName: "testpkg", PkgVer: "1.0.0"}
+	artifact := filepath.Join(t.TempDir(), "artifact")
+
+	opts := sbom.Options{Formats: []sbom.Format{sbom.FormatSPDX, "bogus"}}
+
+	generatedFiles, err := sbom.Generate(pkg, artifact, opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bogus")
+	assert.Equal(t, []string{artifact + ".spdx.json"}, generatedFiles)
 }

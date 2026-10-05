@@ -3,7 +3,6 @@ package sbom
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
@@ -71,7 +70,7 @@ func generateSPDX(pkg *pkgbuild.PKGBUILD) *SPDXDocument {
 		Name:              fmt.Sprintf("YAP Package: %s", pkg.PkgName),
 		DocumentNamespace: generateDocumentNamespace(pkg),
 		CreationInfo: &SPDXCreationInfo{
-			Created:  time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+			Created:  documentTime().Format("2006-01-02T15:04:05Z"),
 			Creators: []string{"Tool: yap"},
 		},
 	}
@@ -110,48 +109,6 @@ func generateSPDX(pkg *pkgbuild.PKGBUILD) *SPDXDocument {
 
 	doc.Packages = append(doc.Packages, mainPkg)
 
-	// Add runtime dependencies as packages
-	depPackages := make(map[string]*SPDXPackage)
-
-	for _, dep := range pkg.Depends {
-		depName := extractDepName(dep)
-		if depName == "" {
-			continue
-		}
-
-		depPkg := &SPDXPackage{
-			SPDXID:           fmt.Sprintf("SPDXRef-Dependency-%s", depName),
-			Name:             depName,
-			DownloadLocation: noAssertion,
-			FilesAnalyzed:    false,
-			CopyrightText:    noAssertion,
-			LicenseConcluded: noAssertion,
-			LicenseDeclared:  noAssertion,
-		}
-		depPackages[depName] = depPkg
-		doc.Packages = append(doc.Packages, depPkg)
-	}
-
-	// Add make dependencies as packages
-	for _, dep := range pkg.MakeDepends {
-		depName := extractDepName(dep)
-		if depName == "" || depPackages[depName] != nil {
-			continue
-		}
-
-		depPkg := &SPDXPackage{
-			SPDXID:           fmt.Sprintf("SPDXRef-Dependency-%s", depName),
-			Name:             depName,
-			DownloadLocation: noAssertion,
-			FilesAnalyzed:    false,
-			CopyrightText:    noAssertion,
-			LicenseConcluded: noAssertion,
-			LicenseDeclared:  noAssertion,
-		}
-		depPackages[depName] = depPkg
-		doc.Packages = append(doc.Packages, depPkg)
-	}
-
 	// Create relationships
 	// Main relationship: document describes package
 	doc.Relationships = append(doc.Relationships, &SPDXRelationship{
@@ -160,14 +117,27 @@ func generateSPDX(pkg *pkgbuild.PKGBUILD) *SPDXDocument {
 		RelatedSpdxElement: spdxRefPackage,
 	})
 
-	// Dependency relationships
-	for _, dep := range pkg.Depends {
-		depName := extractDepName(dep)
-		if depName != "" {
+	// Add runtime and make dependencies as packages (unique names, unique IDs)
+	ids := newSPDXIDGenerator()
+	ids.used[spdxRefPackage] = true
+
+	for _, dep := range collectDependencies(pkg) {
+		depID := ids.next("Dependency", dep.name)
+		doc.Packages = append(doc.Packages, &SPDXPackage{
+			SPDXID:           depID,
+			Name:             dep.name,
+			DownloadLocation: noAssertion,
+			FilesAnalyzed:    false,
+			CopyrightText:    noAssertion,
+			LicenseConcluded: noAssertion,
+			LicenseDeclared:  noAssertion,
+		})
+
+		if dep.runtime {
 			doc.Relationships = append(doc.Relationships, &SPDXRelationship{
 				SpdxElementID:      spdxRefPackage,
 				RelationshipType:   "DEPENDS_ON",
-				RelatedSpdxElement: fmt.Sprintf("SPDXRef-Dependency-%s", depName),
+				RelatedSpdxElement: depID,
 			})
 		}
 	}

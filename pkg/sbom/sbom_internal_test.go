@@ -1,6 +1,7 @@
 package sbom
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -106,9 +107,9 @@ func TestGenerateCycloneDX(t *testing.T) {
 
 	// Verify dependencies relationships
 	assert.NotEmpty(t, bom.Dependencies)
-	assert.Equal(t, "testpkg", bom.Dependencies[0].Ref)
-	assert.Contains(t, bom.Dependencies[0].Depends, "gcc")
-	assert.Contains(t, bom.Dependencies[0].Depends, "make")
+	assert.Equal(t, bom.Metadata.Component.BOMRef, bom.Dependencies[0].Ref)
+	assert.Contains(t, bom.Dependencies[0].Depends, "pkg:generic/gcc")
+	assert.Contains(t, bom.Dependencies[0].Depends, "pkg:generic/make")
 }
 
 func TestGenerateSPDX(t *testing.T) {
@@ -243,4 +244,107 @@ func TestGenerateSPDXMakeDepsDeduplicated(t *testing.T) {
 	}
 
 	assert.True(t, cmakeFound)
+}
+
+func TestExtractDepNameSingleEquals(t *testing.T) {
+	assert.Equal(t, "glibc", extractDepName("glibc=2.38"))
+	assert.Equal(t, "glibc", extractDepName("glibc=2.38-1"))
+	assert.Equal(t, "libfoo", extractDepName("libfoo~1.0"))
+	assert.Equal(t, "libstdc++", extractDepName("libstdc++>=13"))
+}
+
+var (
+	serialRe  = regexp.MustCompile(`^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	spdxIDRe  = regexp.MustCompile(`^SPDXRef-[A-Za-z0-9.-]+$`)
+	sha256Sum = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+)
+
+func TestCycloneDXSchemaCompliance(t *testing.T) {
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName:     "testpkg",
+		PkgVer:      "1.0.0",
+		SourceURI:   []string{"https://example.com/a.tar.gz", "https://example.com/b.tar.gz"},
+		HashSums:    []string{sha256Sum, "SKIP"},
+		Depends:     []string{"libstdc++", "glibc=2.38", "glibc>=2.30", "pkg:any"},
+		MakeDepends: []string{"cmake"},
+	}
+
+	bom := generateCycloneDX(pkg)
+	assert.Regexp(t, serialRe, bom.SerialNumber)
+
+	// Serial numbers are unique per generation unless SOURCE_DATE_EPOCH is set.
+	assert.NotEqual(t, bom.SerialNumber, generateCycloneDX(pkg).SerialNumber)
+
+	refs := map[string]bool{bom.Metadata.Component.BOMRef: true}
+
+	for _, c := range bom.Components {
+		assert.NotEmpty(t, c.BOMRef)
+		assert.False(t, refs[c.BOMRef], "duplicate bom-ref %q", c.BOMRef)
+		refs[c.BOMRef] = true
+	}
+
+	// Duplicate Depends collapse to one component; '=' is stripped.
+	assert.Len(t, bom.Components, 4)
+
+	require.Len(t, bom.Dependencies, 1)
+	assert.Equal(t, bom.Metadata.Component.BOMRef, bom.Dependencies[0].Ref)
+	assert.Len(t, bom.Dependencies[0].Depends, 3)
+
+	for _, ref := range bom.Dependencies[0].Depends {
+		assert.True(t, refs[ref], "dangling dependency ref %q", ref)
+	}
+
+	// Checksums are attached to the matching distribution reference.
+	extRefs := bom.Metadata.Component.ExternalReferences
+	require.Len(t, extRefs, 2)
+	require.Len(t, extRefs[0].Hashes, 1)
+	assert.Equal(t, "SHA-256", extRefs[0].Hashes[0].Alg)
+	assert.Equal(t, sha256Sum, extRefs[0].Hashes[0].Value)
+	assert.Empty(t, extRefs[1].Hashes)
+}
+
+func TestCycloneDXReproducibleWithSourceDateEpoch(t *testing.T) {
+	t.Setenv("SOURCE_DATE_EPOCH", "1609459200")
+
+	pkg := &pkgbuild.PKGBUILD{PkgName: "testpkg", PkgVer: "1.0.0", PkgRel: "1"}
+	a, b := generateCycloneDX(pkg), generateCycloneDX(pkg)
+
+	assert.Regexp(t, serialRe, a.SerialNumber)
+	assert.Equal(t, a.SerialNumber, b.SerialNumber)
+	assert.Equal(t, "2021-01-01T00:00:00Z", a.Metadata.Timestamp)
+	assert.Equal(t, "2021-01-01T00:00:00Z", generateSPDX(pkg).CreationInfo.Created)
+}
+
+func TestSPDXIDsAreValidAndUnique(t *testing.T) {
+	pkg := &pkgbuild.PKGBUILD{
+		PkgName: "testpkg",
+		PkgVer:  "1.0.0",
+		Depends: []string{
+			"libstdc++", "lib_foo", "pkg:any", "libstdc++>=13", "libstdc--", "lib_foo=1",
+		},
+		MakeDepends: []string{"pkg:any", "cmake"},
+	}
+
+	doc := generateSPDX(pkg)
+
+	ids := map[string]bool{}
+
+	for _, p := range doc.Packages {
+		assert.Regexp(t, spdxIDRe, p.SPDXID)
+		assert.False(t, ids[p.SPDXID], "duplicate SPDXID %q", p.SPDXID)
+		ids[p.SPDXID] = true
+	}
+
+	// main + libstdc++, lib_foo, pkg:any, libstdc-- (collides after sanitising), cmake
+	assert.Len(t, doc.Packages, 6)
+
+	seenRel := map[string]bool{}
+
+	for _, r := range doc.Relationships {
+		assert.True(t, ids[r.RelatedSpdxElement] || r.RelatedSpdxElement == "SPDXRef-Package")
+
+		key := r.SpdxElementID + r.RelationshipType + r.RelatedSpdxElement
+		assert.False(t, seenRel[key], "duplicate relationship %s", key)
+		seenRel[key] = true
+	}
 }

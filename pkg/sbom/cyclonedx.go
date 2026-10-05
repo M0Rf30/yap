@@ -31,6 +31,7 @@ type CycloneDXMetadata struct {
 // CycloneDXComponent represents a component in CycloneDX BOM.
 type CycloneDXComponent struct {
 	Type               string              `json:"type"`
+	BOMRef             string              `json:"bom-ref,omitempty"`
 	Name               string              `json:"name"`
 	Version            string              `json:"version,omitempty"`
 	Description        string              `json:"description,omitempty"`
@@ -75,13 +76,14 @@ func generateCycloneDX(pkg *pkgbuild.PKGBUILD) *CycloneDXBOM {
 	bom := &CycloneDXBOM{
 		BOMFormat:    "CycloneDX",
 		SpecVersion:  "1.5",
-		SerialNumber: fmt.Sprintf("urn:uuid:yap-%s-%s", pkg.PkgName, pkg.PkgVer),
+		SerialNumber: "urn:uuid:" + newSerialUUID(pkg),
 		Version:      1,
 	}
 
 	// Create main component
 	mainComponent := &CycloneDXComponent{
 		Type:        componentTypeLibrary,
+		BOMRef:      generatePurl(pkg),
 		Name:        pkg.PkgName,
 		Version:     pkg.PkgVer,
 		Description: pkg.PkgDesc,
@@ -97,69 +99,50 @@ func generateCycloneDX(pkg *pkgbuild.PKGBUILD) *CycloneDXBOM {
 		})
 	}
 
-	// Add external references for source URLs
-	for _, sourceURL := range pkg.SourceURI {
-		mainComponent.ExternalReferences = append(
-			mainComponent.ExternalReferences,
-			&CycloneDXExtRef{
-				Type: "distribution",
-				URL:  sourceURL,
-			},
-		)
+	// Add external references for source URLs, with checksums when they line
+	// up one-to-one with the sources.
+	checksumsAligned := len(pkg.HashSums) == len(pkg.SourceURI)
+
+	for i, sourceURL := range pkg.SourceURI {
+		ref := &CycloneDXExtRef{
+			Type: "distribution",
+			URL:  sourceURL,
+		}
+
+		if checksumsAligned {
+			if h := hashFromSum(pkg.HashSums[i]); h != nil {
+				ref.Hashes = []*CycloneDXHash{h}
+			}
+		}
+
+		mainComponent.ExternalReferences = append(mainComponent.ExternalReferences, ref)
 	}
 
 	// Set metadata
 	bom.Metadata = &CycloneDXMetadata{
+		Timestamp: documentTime().Format("2006-01-02T15:04:05Z"),
 		Component: mainComponent,
 	}
 
-	// Add runtime dependencies as components
-	depComponents := make(map[string]*CycloneDXComponent)
+	// Add runtime and make dependencies as components
+	mainDep := &CycloneDXDependency{Ref: mainComponent.BOMRef}
 
-	for _, dep := range pkg.Depends {
-		depName := extractDepName(dep)
-		if depName == "" {
-			continue
-		}
+	for _, dep := range collectDependencies(pkg) {
+		purl := "pkg:generic/" + purlName(dep.name)
+		bom.Components = append(bom.Components, &CycloneDXComponent{
+			Type:   componentTypeLibrary,
+			BOMRef: purl,
+			Name:   dep.name,
+			Purl:   purl,
+		})
 
-		component := &CycloneDXComponent{
-			Type: componentTypeLibrary,
-			Name: depName,
-			Purl: fmt.Sprintf("pkg:generic/%s", depName),
+		if dep.runtime {
+			mainDep.Depends = append(mainDep.Depends, purl)
 		}
-		depComponents[depName] = component
-		bom.Components = append(bom.Components, component)
-	}
-
-	// Add make dependencies as optional components
-	for _, dep := range pkg.MakeDepends {
-		depName := extractDepName(dep)
-		if depName == "" || depComponents[depName] != nil {
-			continue
-		}
-
-		component := &CycloneDXComponent{
-			Type: componentTypeLibrary,
-			Name: depName,
-			Purl: fmt.Sprintf("pkg:generic/%s", depName),
-		}
-		depComponents[depName] = component
-		bom.Components = append(bom.Components, component)
 	}
 
 	// Create dependencies relationships
-	if len(pkg.Depends) > 0 {
-		mainDep := &CycloneDXDependency{
-			Ref: mainComponent.Name,
-		}
-
-		for _, dep := range pkg.Depends {
-			depName := extractDepName(dep)
-			if depName != "" {
-				mainDep.Depends = append(mainDep.Depends, depName)
-			}
-		}
-
+	if len(mainDep.Depends) > 0 {
 		bom.Dependencies = append(bom.Dependencies, mainDep)
 	}
 
@@ -170,24 +153,21 @@ func generateCycloneDX(pkg *pkgbuild.PKGBUILD) *CycloneDXBOM {
 func generatePurl(pkg *pkgbuild.PKGBUILD) string {
 	// Basic purl format: pkg:type/namespace/name@version
 	// For generic packages: pkg:generic/name@version
-	return fmt.Sprintf("pkg:generic/%s@%s", pkg.PkgName, pkg.PkgVer)
+	return fmt.Sprintf("pkg:generic/%s@%s", purlName(pkg.PkgName), purlName(pkg.PkgVer))
 }
 
 // extractDepName extracts the package name from a dependency string.
-// Handles formats like "gcc", "gcc>=11.0", "python3 >=3.9", etc.
+// Handles formats like "gcc", "gcc>=11.0", "glibc=2.38", "python3 >=3.9", etc.
 func extractDepName(dep string) string {
 	fields := strings.Fields(dep)
 	if len(fields) == 0 {
 		return ""
 	}
 
-	// Remove version constraints
+	// Remove version constraints (any of <, >, =, !, ~ starts one).
 	name := fields[0]
-	for _, op := range []string{">=", "<=", "==", "!=", ">", "<", "~"} {
-		if idx := strings.Index(name, op); idx != -1 {
-			name = name[:idx]
-			break
-		}
+	if idx := strings.IndexAny(name, "<>=!~"); idx != -1 {
+		name = name[:idx]
 	}
 
 	return strings.TrimSpace(name)
