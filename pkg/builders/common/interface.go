@@ -158,6 +158,14 @@ func (bb *BaseBuilder) LogCrossCompilation(targetArch string) {
 // (without install flags) for the format. When golang is set, the Go toolchain
 // is installed too — via the distro package on Alpine, via GOSetup elsewhere.
 func (bb *BaseBuilder) SetupEnvironmentDeps(golang bool) ([]string, error) {
+	return bb.SetupEnvironmentDepsContext(context.Background(), golang)
+}
+
+// SetupEnvironmentDepsContext is SetupEnvironmentDeps with a context that
+// cancels the Go toolchain download when golang is set.
+func (bb *BaseBuilder) SetupEnvironmentDepsContext(
+	ctx context.Context, golang bool,
+) ([]string, error) {
 	buildDeps := constants.GetBuildDeps()
 
 	var deps []string
@@ -189,7 +197,7 @@ func (bb *BaseBuilder) SetupEnvironmentDeps(golang bool) ([]string, error) {
 
 	// A failed Go install must not be downgraded to a warning: `-g` exists
 	// precisely to guarantee the toolchain is there afterwards.
-	if err := platform.GOSetup(); err != nil {
+	if err := platform.GOSetupContext(ctx); err != nil {
 		return nil, err
 	}
 
@@ -455,7 +463,7 @@ func (bb *BaseBuilder) prepareEnvironmentWithValidation(
 	targetArch string,
 	skipValidation bool,
 ) error {
-	deps, err := bb.SetupEnvironmentDeps(golang)
+	deps, err := bb.SetupEnvironmentDepsContext(ctx, golang)
 	if err != nil {
 		return err
 	}
