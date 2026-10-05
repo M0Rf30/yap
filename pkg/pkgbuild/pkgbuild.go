@@ -205,12 +205,15 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 		return err
 	}
 
-	// Allow base items (priority 0) to be added even if a higher-priority item
-	// was already set. This enables order-independent accumulation of arch-specific
-	// sources/checksums: base items always go to SourceURI/HashSums, arch-specific
-	// items accumulate in archSourceURI/archHashSums and are merged by Finalize().
+	// Allow base items (priority 0) of source/checksum arrays to be added even
+	// if a higher-priority item was already set. This enables order-independent
+	// accumulation of arch-specific sources/checksums: base items always go to
+	// SourceURI/HashSums, arch-specific items accumulate in archSourceURI/
+	// archHashSums and are merged by Finalize(). Every other directive is
+	// replaced, so a later base directive must NOT overwrite an earlier
+	// distro/arch-specific one.
 	oldPriority := pkgBuild.priorities[key]
-	if priority < oldPriority && priority != priorityBase {
+	if priority < oldPriority && (priority != priorityBase || !isAccumulatingKey(key)) {
 		return nil
 	}
 
@@ -232,6 +235,18 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	}
 
 	return nil
+}
+
+// isAccumulatingKey reports whether key is a source or checksum array, whose
+// base and arch-specific variants are accumulated rather than replaced.
+func isAccumulatingKey(key string) bool {
+	switch key {
+	case sourceKey, sha512sumsKey, sha384sumsKey, sha256sumsKey, sha224sumsKey,
+		b2sumsKey, cksumsKey:
+		return true
+	default:
+		return false
+	}
 }
 
 // ComputeArchitecture checks if the specified architecture is supported.
@@ -621,6 +636,8 @@ func (pkgBuild *PKGBUILD) ParseSplitOverrides(funcBody string) error {
 		return nil
 	}
 
+	var firstErr error
+
 	syntax.Walk(f, func(node syntax.Node) bool {
 		fd, ok := node.(*syntax.FuncDecl)
 		if !ok {
@@ -629,7 +646,11 @@ func (pkgBuild *PKGBUILD) ParseSplitOverrides(funcBody string) error {
 
 		// Walk assignments inside the dummy function body.
 		syntax.Walk(fd.Body, func(inner syntax.Node) bool {
-			pkgBuild.applyOverrideAssign(inner)
+			// Best effort: keep applying remaining overrides but remember the
+			// first failure so callers can surface it.
+			if applyErr := pkgBuild.applyOverrideAssign(inner); applyErr != nil && firstErr == nil {
+				firstErr = applyErr
+			}
 
 			return true
 		})
@@ -637,15 +658,52 @@ func (pkgBuild *PKGBUILD) ParseSplitOverrides(funcBody string) error {
 		return false // don't recurse further into the FuncDecl
 	})
 
-	return nil
+	return firstErr
+}
+
+// overrideLookup returns a variable lookup function for expanding split-package
+// override values. PKGBUILD-level variables (pkgname, pkgver, ...) and custom
+// variables take priority over the process environment, because they are not
+// exported to it.
+func (pkgBuild *PKGBUILD) overrideLookup() func(string) string {
+	return func(name string) string {
+		switch name {
+		case pkgnameKey:
+			if pkgBuild.PkgName != "" {
+				return pkgBuild.PkgName
+			}
+		case pkgbaseKey:
+			if base := pkgBuild.EffectivePkgBase(); base != "" {
+				return base
+			}
+		case pkgverKey:
+			if pkgBuild.PkgVer != "" {
+				return pkgBuild.PkgVer
+			}
+		case pkgrelKey:
+			if pkgBuild.PkgRel != "" {
+				return pkgBuild.PkgRel
+			}
+		case "epoch":
+			if pkgBuild.Epoch != "" {
+				return pkgBuild.Epoch
+			}
+		}
+
+		if v, ok := pkgBuild.CustomVariables[name]; ok {
+			return v
+		}
+
+		return os.Getenv(name)
+	}
 }
 
 // applyOverrideAssign checks whether a syntax node is an assignment for a
 // recognized split-package override variable and, if so, applies it via AddItem.
-func (pkgBuild *PKGBUILD) applyOverrideAssign(node syntax.Node) {
+func (pkgBuild *PKGBUILD) applyOverrideAssign(node syntax.Node) error {
 	assign, ok := node.(*syntax.Assign)
 	if !ok {
-		return
+		return nil
 	}
 
 	name := assign.Name.Value
@@ -664,23 +722,43 @@ func (pkgBuild *PKGBUILD) applyOverrideAssign(node syntax.Node) {
 	}
 
 	if _, known := splitOverrideKeys[baseKey]; !known {
-		return
+		return nil
 	}
+
+	lookup := pkgBuild.overrideLookup()
 
 	// Apply via AddItem — handles __distro / _arch priority automatically.
 	if assign.Array != nil {
 		var arrVal []string
 
 		for _, line := range set.StringifyArray(assign) {
-			arrVal, _ = mvdanshell.Fields(line, os.Getenv)
+			var fieldsErr error
+
+			arrVal, fieldsErr = mvdanshell.Fields(line, lookup)
+			if fieldsErr != nil {
+				return errors.Wrap(fieldsErr, errors.ErrTypeParser,
+					"failed to expand split package override").
+					WithContext("variable", name).
+					WithOperation("applyOverrideAssign")
+			}
 		}
 
-		_ = pkgBuild.AddItem(name, arrVal)
-	} else {
-		strVal, _ := set.StringifyAssign(assign)
-		varVal, _ := mvdanshell.Expand(strVal, os.Getenv)
-		_ = pkgBuild.AddItem(name, varVal)
+		return pkgBuild.AddItem(name, arrVal)
 	}
+
+	strVal, strErr := set.StringifyAssign(assign)
+	if strErr != nil {
+		return strErr
+	}
+
+	varVal, expandErr := mvdanshell.Expand(strVal, lookup)
+	if expandErr != nil {
+		return errors.Wrap(expandErr, errors.ErrTypeParser, "failed to expand split package override").
+			WithContext("variable", name).
+			WithOperation("applyOverrideAssign")
+	}
+
+	return pkgBuild.AddItem(name, varVal)
 }
 
 // IsSplitPackage reports whether this PKGBUILD defines multiple packages
