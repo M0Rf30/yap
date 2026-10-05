@@ -96,15 +96,17 @@ func (m *Pkg) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 		return err
 	}
 
-	if err := m.writeMTREE(); err != nil {
-		return err
-	}
-
 	if err := m.writeInstallScriptIfNeeded(); err != nil {
 		return err
 	}
 
-	return m.writeChangelogIfPresent()
+	// .CHANGELOG and .INSTALL are part of the payload, so they must exist
+	// before .MTREE is generated.
+	if err := m.writeChangelogIfPresent(); err != nil {
+		return err
+	}
+
+	return m.writeMTREE()
 }
 
 // computeBuildMetadata computes installed size, source date epoch, and other
@@ -186,8 +188,11 @@ func (m *Pkg) writeMTREE() error {
 	return createMTREEGzip(mtreeFile, filepath.Join(m.PKGBUILD.PackageDir, ".MTREE"))
 }
 
-// writeInstallScriptIfNeeded writes the <pkgname>.install file when the
-// PKGBUILD declares any of the six scriptlet hooks.
+// writeInstallScriptIfNeeded renders the pacman install scriptlet when the
+// PKGBUILD declares any of the six hooks. It is shipped inside the package
+// payload as .INSTALL (the only name pacman honours), prefixed with the
+// PKGBUILD helper functions the hooks call. A <pkgname>.install copy is also
+// kept next to the generated PKGBUILD, which references it via install=.
 func (m *Pkg) writeInstallScriptIfNeeded() error {
 	if m.PKGBUILD.PreInst == "" && m.PKGBUILD.PostInst == "" &&
 		m.PKGBUILD.PreRm == "" && m.PKGBUILD.PostRm == "" &&
@@ -195,10 +200,29 @@ func (m *Pkg) writeInstallScriptIfNeeded() error {
 		return nil
 	}
 
-	tmpl := m.PKGBUILD.RenderSpec(postInstall)
+	var buf bytes.Buffer
 
-	return m.PKGBUILD.CreateSpec(
-		filepath.Join(m.pacmanDir, m.PKGBUILD.PkgName+".install"), tmpl)
+	if err := m.PKGBUILD.RenderSpec(postInstall).Execute(&buf, m.PKGBUILD); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to render .INSTALL").
+			WithOperation("writeInstallScriptIfNeeded")
+	}
+
+	script := []byte(m.PrepareScriptletWithHelpers(buf.String()))
+
+	targets := []string{
+		filepath.Join(m.PKGBUILD.PackageDir, ".INSTALL"),
+		filepath.Join(m.pacmanDir, m.PKGBUILD.PkgName+".install"),
+	}
+
+	for _, target := range targets {
+		if err := os.WriteFile(filepath.Clean(target), script, 0o644); err != nil { //nolint:gosec
+			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write install scriptlet").
+				WithContext("path", target).
+				WithOperation("writeInstallScriptIfNeeded")
+		}
+	}
+
+	return nil
 }
 
 // writeChangelogIfPresent writes a .CHANGELOG file in the package root when

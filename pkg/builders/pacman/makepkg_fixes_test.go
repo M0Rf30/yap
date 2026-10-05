@@ -9,11 +9,11 @@ import (
 )
 
 // newPrepared builds a Pkg with a populated PackageDir ready for PrepareFakeroot.
-func newPrepared(t *testing.T) (pkg *Pkg, startDir, packageDir, artifactsDir string) {
+func newPrepared(t *testing.T) (pkg *Pkg, packageDir, artifactsDir string) {
 	t.Helper()
 
 	root := t.TempDir()
-	startDir = filepath.Join(root, "start")
+	startDir := filepath.Join(root, "start")
 	packageDir = filepath.Join(root, "package")
 	artifactsDir = filepath.Join(root, "artifacts")
 
@@ -36,11 +36,11 @@ func newPrepared(t *testing.T) (pkg *Pkg, startDir, packageDir, artifactsDir str
 	pb.PackageDir = packageDir
 	pb.Home = startDir
 
-	return NewBuilder(pb), startDir, packageDir, artifactsDir
+	return NewBuilder(pb), packageDir, artifactsDir
 }
 
 func TestPrepareFakerootUsesTargetArchInMetadata(t *testing.T) {
-	pkg, _, packageDir, artifactsDir := newPrepared(t)
+	pkg, packageDir, artifactsDir := newPrepared(t)
 
 	if err := pkg.PrepareFakeroot(context.Background(), artifactsDir, "aarch64"); err != nil {
 		t.Fatalf("PrepareFakeroot failed: %v", err)
@@ -62,5 +62,60 @@ func TestPrepareFakerootUsesTargetArchInMetadata(t *testing.T) {
 
 	if !strings.Contains(string(buildinfo), "pkgarch = aarch64") {
 		t.Errorf(".BUILDINFO should declare the target arch, got:\n%s", buildinfo)
+	}
+}
+
+func TestPrepareFakerootShipsInstallScriptlet(t *testing.T) {
+	pkg, packageDir, artifactsDir := newPrepared(t)
+	pkg.PKGBUILD.PostInst = "echo installed"
+	pkg.PKGBUILD.PreRm = "echo removing"
+
+	if err := pkg.PrepareFakeroot(context.Background(), artifactsDir, ""); err != nil {
+		t.Fatalf("PrepareFakeroot failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(packageDir, ".INSTALL"))
+	if err != nil {
+		t.Fatalf(".INSTALL must be shipped inside the package payload: %v", err)
+	}
+
+	content := string(data)
+	for _, want := range []string{"post_install()", "echo installed", "pre_remove()", "echo removing"} {
+		if !strings.Contains(content, want) {
+			t.Errorf(".INSTALL missing %q, got:\n%s", want, content)
+		}
+	}
+}
+
+func TestPrepareFakerootNoScriptletsNoInstall(t *testing.T) {
+	pkg, packageDir, artifactsDir := newPrepared(t)
+
+	if err := pkg.PrepareFakeroot(context.Background(), artifactsDir, ""); err != nil {
+		t.Fatalf("PrepareFakeroot failed: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(packageDir, ".INSTALL")); err == nil {
+		t.Error(".INSTALL must not be created without scriptlets")
+	}
+}
+
+func TestPrepareFakerootInstallIncludesHelpers(t *testing.T) {
+	pkg, packageDir, artifactsDir := newPrepared(t)
+	pkg.PKGBUILD.HelperFunctions = map[string]string{
+		"_my_helper": "function _my_helper() { echo helper; }\n",
+	}
+	pkg.PKGBUILD.PostInst = "_my_helper\n"
+
+	if err := pkg.PrepareFakeroot(context.Background(), artifactsDir, ""); err != nil {
+		t.Fatalf("PrepareFakeroot failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(packageDir, ".INSTALL"))
+	if err != nil {
+		t.Fatalf("read .INSTALL: %v", err)
+	}
+
+	if !strings.Contains(string(data), "function _my_helper()") {
+		t.Errorf(".INSTALL should contain the helper preamble, got:\n%s", data)
 	}
 }
