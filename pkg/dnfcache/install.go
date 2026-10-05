@@ -42,31 +42,32 @@ func (c *Cache) downloadAndInstall(ctx context.Context, pkgs []*PackageInfo) err
 }
 
 // downloadAll downloads pkgs concurrently into destDir and returns the local
-// file paths in the same order as pkgs.
+// file paths in the same order as pkgs. The first failure cancels the
+// remaining in-flight and queued downloads and is the error returned.
 func (c *Cache) downloadAll(ctx context.Context, pkgs []*PackageInfo, destDir string) ([]string, error) {
-	type result struct {
-		idx  int
-		path string
-		err  error
+	if len(pkgs) == 0 {
+		return []string{}, nil
 	}
 
-	concurrency := min(min(runtime.GOMAXPROCS(0), 4), len(pkgs))
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	type job struct {
-		idx int
-		pkg *PackageInfo
-	}
+	concurrency := max(1, min(min(runtime.GOMAXPROCS(0), 4), len(pkgs)))
 
-	jobCh := make(chan job, len(pkgs))
-	for i, p := range pkgs {
-		jobCh <- job{idx: i, pkg: p}
+	jobCh := make(chan int, len(pkgs))
+	for i := range pkgs {
+		jobCh <- i
 	}
 
 	close(jobCh)
 
-	resCh := make(chan result, len(pkgs))
+	paths := make([]string, len(pkgs))
 
-	var wg sync.WaitGroup
+	var (
+		wg       sync.WaitGroup
+		errOnce  sync.Once
+		firstErr error
+	)
 
 	wg.Add(concurrency)
 
@@ -74,24 +75,35 @@ func (c *Cache) downloadAll(ctx context.Context, pkgs []*PackageInfo, destDir st
 		go func() {
 			defer wg.Done()
 
-			for j := range jobCh {
-				path, err := downloadRPM(ctx, j.pkg, destDir)
-				resCh <- result{idx: j.idx, path: path, err: err}
+			for idx := range jobCh {
+				if ctx.Err() != nil {
+					return
+				}
+
+				path, err := downloadRPM(ctx, pkgs[idx], destDir)
+				if err != nil {
+					errOnce.Do(func() {
+						firstErr = err
+
+						cancel()
+					})
+
+					return
+				}
+
+				paths[idx] = path
 			}
 		}()
 	}
 
 	wg.Wait()
-	close(resCh)
 
-	paths := make([]string, len(pkgs))
+	if firstErr != nil {
+		return nil, firstErr
+	}
 
-	for res := range resCh {
-		if res.err != nil {
-			return nil, res.err
-		}
-
-		paths[res.idx] = res.path
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	return paths, nil
