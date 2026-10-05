@@ -2,6 +2,7 @@
 package repo
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,5 +43,5 @@ func TestValidateRepo(t *testing.T) {
 
 func TestSetupOneRejectsInjection(t *testing.T) {
 	r := &Repo{Name: "../../evil", URL: "https://example.com", Suite: "jammy"}
-	require.Error(t, setupOne("apt", r, "ubuntu", "", 0))
+	require.Error(t, setupOneContext(context.Background(), "apt", r, "ubuntu", "", 0))
 }
