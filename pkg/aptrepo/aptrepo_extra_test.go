@@ -6,6 +6,7 @@ package aptrepo_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -98,26 +99,40 @@ func TestIsVerificationError(t *testing.T) {
 		assert.True(t, aptrepo.IsVerificationError(err))
 	})
 
-	t.Run("wrapped ErrNoTrustAnchor → true", func(t *testing.T) {
-		wrapped := errors.Join(errors.New("outer"), aptrepo.ErrNoTrustAnchor)
+	t.Run("fmt-wrapped ErrNoTrustAnchor → true", func(t *testing.T) {
+		wrapped := fmt.Errorf("outer: %w", aptrepo.ErrNoTrustAnchor)
 		assert.True(t, aptrepo.IsVerificationError(wrapped))
 	})
 
-	t.Run("wrapped ErrUnknownSigner → true", func(t *testing.T) {
-		wrapped := errors.Join(errors.New("outer"), aptrepo.ErrUnknownSigner)
+	t.Run("fmt-wrapped ErrUnknownSigner → true", func(t *testing.T) {
+		wrapped := fmt.Errorf("outer: %w", aptrepo.ErrUnknownSigner)
 		assert.True(t, aptrepo.IsVerificationError(wrapped))
 	})
 
-	t.Run("error containing ErrNoTrustAnchor text → true", func(t *testing.T) {
-		// IsVerificationError uses string containment, so a fmt.Errorf wrapping
-		// the sentinel also matches.
+	t.Run("joined verification errors only → true", func(t *testing.T) {
+		joined := errors.Join(
+			fmt.Errorf("repo a: %w", aptrepo.ErrNoTrustAnchor),
+			fmt.Errorf("repo b: %w", aptrepo.ErrUnknownSigner),
+		)
+		assert.True(t, aptrepo.IsVerificationError(joined))
+	})
+
+	t.Run("verification error joined with network error → false", func(t *testing.T) {
+		// A real network failure must not be downgraded to a warning just
+		// because another source failed signature verification, whatever
+		// order the sources completed in.
+		for _, joined := range []error{
+			errors.Join(errors.New("network timeout"), aptrepo.ErrNoTrustAnchor),
+			errors.Join(aptrepo.ErrNoTrustAnchor, errors.New("network timeout")),
+		} {
+			assert.False(t, aptrepo.IsVerificationError(joined))
+		}
+	})
+
+	t.Run("sentinel text without wrapping chain → false", func(t *testing.T) {
+		// Matching is by error identity (errors.Is), not string containment.
 		msg := "aptrepo: " + aptrepo.ErrNoTrustAnchor.Error() + ": extra context"
-		assert.True(t, aptrepo.IsVerificationError(errors.New(msg)))
-	})
-
-	t.Run("error containing ErrUnknownSigner text → true", func(t *testing.T) {
-		msg := "aptrepo: " + aptrepo.ErrUnknownSigner.Error() + ": extra context"
-		assert.True(t, aptrepo.IsVerificationError(errors.New(msg)))
+		assert.False(t, aptrepo.IsVerificationError(errors.New(msg)))
 	})
 
 	t.Run("ErrUnsigned → false (not a verification error)", func(t *testing.T) {
