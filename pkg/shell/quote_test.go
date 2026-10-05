@@ -17,6 +17,7 @@ func TestSingleQuote(t *testing.T) {
 		{"a'b'c", `'a'\''b'\''c'`},
 		{"$VAR", "'$VAR'"},
 		{"line1\nline2", "'line1\nline2'"},
+		{"bad\xff\xfeutf8", "'bad\xff\xfeutf8'"},
 	}
 
 	for _, c := range cases {

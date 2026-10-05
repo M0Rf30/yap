@@ -6,21 +6,8 @@ import "strings"
 // the standard POSIX `'\”` trick. Safe for use in arbitrary `/bin/sh -c`
 // command bodies. The empty string returns `”`.
 func SingleQuote(s string) string {
-	var b strings.Builder
-
-	b.WriteByte('\'')
-
-	for _, c := range s {
-		if c == '\'' {
-			b.WriteString(`'\''`)
-		} else {
-			b.WriteRune(c)
-		}
-	}
-
-	b.WriteByte('\'')
-
-	return b.String()
+	// strings.ReplaceAll operates on bytes, so invalid UTF-8 is preserved.
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // Join single-quotes each arg and joins them with a space — suitable for
