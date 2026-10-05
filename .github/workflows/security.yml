@@ -13,8 +13,6 @@ on:
 permissions:
   actions: read
   contents: read
-  security-events: write
-  issues: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -33,6 +31,7 @@ jobs:
     with:
       go-version: "1.27.0"
       upload-sarif: true
+      run-sast: true
       run-vulncheck: false
 
   # ===================================
@@ -56,12 +55,12 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🐹 Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -70,7 +69,7 @@ jobs:
         run: go mod download
 
       - name: 📜 Install go-licenses
-        run: go install github.com/google/go-licenses@latest
+        run: go install github.com/google/go-licenses@v1.6.0
 
       - name: 🔍 Check license compliance
         id: license-check
@@ -88,16 +87,17 @@ jobs:
             echo ""
           } > licenses/report.md
 
-          # Check for forbidden licenses (variable defined for future use)
-          # FORBIDDEN_LICENSES="GPL-2.0,GPL-3.0,AGPL-1.0,AGPL-3.0"
+          # Fail on forbidden/restricted (e.g. GPL/AGPL) dependency licenses.
+          STATUS=0
 
-          if go-licenses check ./...; then
+          if go-licenses check --disallowed_types=forbidden,restricted ./...; then
             echo "result=compliant" >> "$GITHUB_OUTPUT"
             {
               echo "### ✅ License Compliance"
               echo "All dependencies use compatible licenses."
             } >> licenses/report.md
           else
+            STATUS=1
             echo "result=issues_found" >> "$GITHUB_OUTPUT"
             {
               echo "### ⚠️ License Issues Found"
@@ -114,8 +114,10 @@ jobs:
           # List all licenses
           go-licenses report ./... >> licenses/report.md 2>/dev/null || echo "Unable to generate detailed license report" >> licenses/report.md
 
+          exit "$STATUS"
+
       - name: 📤 Upload license compliance results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: license-compliance-results
           path: licenses/
@@ -131,12 +133,12 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🔐 Run TruffleHog secrets detection
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@4dd8831c5f12599465d4d45c3c447b4018a34c85 # v3.97.9
         with:
           base: main
           path: ./
@@ -157,15 +159,15 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🐳 Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: 🔨 Build container image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: build/deploy/${{ matrix.os }}/Dockerfile
@@ -174,6 +176,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: 🛡️ Scan container image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: yap-${{ matrix.os }}:security-scan
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
   # ===================================
   # Security Summary Report
   # ===================================
@@ -181,12 +191,12 @@ jobs:
     name: 📊 Security Summary
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [sast, vulnerability-scan, license-check, secrets-detection]
+    needs: [sast, vulnerability-scan, license-check, secrets-detection, container-security]
     if: always()
 
     steps:
       - name: 📥 Download security artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: "*-results"
           merge-multiple: true
@@ -206,6 +216,7 @@ jobs:
             echo "| 🛡️ Vulnerability Scan | ${{ needs.vulnerability-scan.result }} | Go vulnerability database |"
             echo "| 📜 License Compliance | ${{ needs.license-check.result }} | Dependency license check |"
             echo "| 🔐 Secrets Detection | ${{ needs.secrets-detection.result }} | TruffleHog scan |"
+            echo "| 🐳 Container Security | ${{ needs.container-security.result }} | Trivy image scan (scheduled/manual) |"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -213,7 +224,9 @@ jobs:
           if [[ "${{ needs.sast.result }}" == "success" && \
                 "${{ needs.vulnerability-scan.result }}" == "success" && \
                 "${{ needs.license-check.result }}" == "success" && \
-                "${{ needs.secrets-detection.result }}" == "success" ]]; then
+                "${{ needs.secrets-detection.result }}" == "success" && \
+                ( "${{ needs.container-security.result }}" == "success" || \
+                  "${{ needs.container-security.result }}" == "skipped" ) ]]; then
             {
               echo "### ✅ Overall Security Status: PASS"
               echo "All security checks completed successfully."
@@ -223,6 +236,7 @@ jobs:
               echo "### ⚠️ Overall Security Status: REVIEW REQUIRED"
               echo "Some security checks require attention. Please review the failed checks above."
             } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
           {

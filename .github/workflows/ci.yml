@@ -15,6 +15,9 @@ on:
       - ".gitignore"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -33,12 +36,12 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🐹 Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -59,12 +62,12 @@ jobs:
         run: go vet ./...
 
       - name: 📊 Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
-          version: latest
+          version: v2.14.0
 
       - name: 📝 Run markdownlint
-        uses: DavidAnson/markdownlint-cli2-action@v24
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24
         with:
           globs: "**/*.md"
 
@@ -77,6 +80,7 @@ jobs:
     with:
       go-version: "1.27.0"
       upload-sarif: true
+      run-sast: true
       run-vulncheck: false
 
   # ===================================
@@ -96,12 +100,12 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🐹 Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
@@ -129,12 +133,12 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🐹 Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -148,12 +152,9 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/yap-linux-amd64 ./cmd/yap
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o dist/yap-linux-arm64 ./cmd/yap
 
-          # # macOS
-          # CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o dist/yap-darwin-amd64 ./cmd/yap
-          # CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o dist/yap-darwin-arm64 ./cmd/yap
-
-          # # Windows
-          # CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/yap-windows-amd64.exe ./cmd/yap
+          # macOS (compiles darwin build-tagged files; windows is unsupported)
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o dist/yap-darwin-amd64 ./cmd/yap
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o dist/yap-darwin-arm64 ./cmd/yap
 
           echo "✅ Multi-architecture build successful"
 
@@ -163,7 +164,7 @@ jobs:
           echo "✅ Binary execution test passed"
 
       - name: 📦 Upload build artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: build-artifacts
           path: dist/
@@ -187,21 +188,21 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🐹 Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: 🐳 Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: 📥 Download build artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: build-artifacts
           path: dist/
@@ -230,12 +231,12 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: 🐹 Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -246,7 +247,7 @@ jobs:
           make doc-generate
 
       - name: 📤 Upload documentation artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: documentation
           path: docs/api/
