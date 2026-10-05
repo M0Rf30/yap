@@ -19,6 +19,7 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/repo"
+	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // readProject reads the project file at the specified path
@@ -119,8 +120,10 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 	projects := make([]*Project, 0)
 
 	for _, child := range mpc.Projects {
-		startDir := filepath.Join(mpc.BuildDir, child.Name)
-		home := filepath.Join(path, child.Name)
+		startDir, home, err := mpc.resolveProjectDirs(path, child.Name)
+		if err != nil {
+			return err
+		}
 
 		pkgbuildFile, err := parser.ParseFile(distro,
 			release,
@@ -185,6 +188,31 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 	}
 
 	return nil
+}
+
+// resolveProjectDirs joins a yap.json project name onto the build directory and
+// the yap.json directory, rejecting names that escape either root (for example
+// "a/../.." or an absolute path). Multi-project names must name a subdirectory,
+// because zap later removes the resolved build directory recursively.
+func (mpc *MultipleProject) resolveProjectDirs(path, name string) (startDir, home string, err error) {
+	join := safepath.JoinStrict
+	if mpc.singleProject {
+		join = safepath.Join
+	}
+
+	startDir, err = join(mpc.BuildDir, name)
+	if err != nil {
+		return "", "", yerrors.Wrap(err, yerrors.ErrTypeValidation,
+			"invalid project name: "+name).WithOperation("resolveProjectDirs")
+	}
+
+	home, err = join(path, name)
+	if err != nil {
+		return "", "", yerrors.Wrap(err, yerrors.ErrTypeValidation,
+			"invalid project name: "+name).WithOperation("resolveProjectDirs")
+	}
+
+	return startDir, home, nil
 }
 
 // filterProjects filters mpc.Projects by a comma-separated name list.
