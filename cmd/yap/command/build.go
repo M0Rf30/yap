@@ -6,11 +6,14 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 
@@ -64,7 +67,7 @@ var buildCmd = &cobra.Command{
 	Example: "",                                                // Will be set in init()
 	Args:    cobra.RangeArgs(1, 2),                             // Allow 1-2 arguments
 	PreRun:  PreRunValidation,
-	RunE: func(_ *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Set up signal-cancellation context for Ctrl-C / SIGTERM
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
@@ -135,14 +138,20 @@ var buildCmd = &cobra.Command{
 			// container. Without this, extra repos (--repo), the unverified
 			// trust opt-in (-U) and the cross arch (--target-arch) are lost on
 			// dispatch, so vendor packages fail to resolve inside the builder.
-			buildArgs := append([]string{buildCommand, distroTag, "/project"},
-				forwardedBuildFlags()...)
+			if sshPassword != "" {
+				logger.Warn("--ssh-password is not forwarded into the container; " +
+					"use ssh-agent or a key without a passphrase")
+			}
+
+			buildArgs := append([]string{buildCommand, distroTag, containerProjectMount},
+				forwardedBuildFlagsFor(cmd, fullJSONPath)...)
 
 			// prepare also needs --repo/--target-arch so the makedeps step can
 			// see vendor repositories and the correct toolchain.
 			prepareArgs := append([]string{prepareCommand, distroTag}, forwardedPrepareFlags()...)
 
-			if RunPipelineInContainer(image, fullJSONPath, buildArgs, prepareArgs, skipPrepare) {
+			if RunPipelineInContainerEnv(image, fullJSONPath, buildArgs, prepareArgs,
+				skipPrepare, forwardedBuildEnv()) {
 				return nil
 			}
 		}
@@ -215,29 +224,99 @@ var buildCmd = &cobra.Command{
 	},
 }
 
-// forwardedBuildFlags returns the subset of build flags that must be replayed
-// inside the dispatched container so dependency resolution matches the host
-// invocation: extra repos, the unverified-trust opt-in, and the cross arch.
+// flagSSHPassword is the name of the --ssh-password flag.
+const flagSSHPassword = "ssh-password"
+
+// dispatchSkipFlags lists build flags that must NOT be replayed verbatim into
+// the dispatched container: no-container only matters on the host, and the
+// secrets travel by env (passphrase) or are unsupported (ssh password) so they
+// never appear on a process command line.
+var dispatchSkipFlags = map[string]bool{
+	"no-container":    true,
+	"sign-passphrase": true,
+	flagSSHPassword:   true,
+}
+
+// forwardedBuildFlags returns the flags that must be replayed inside the
+// dispatched container so the inner build matches the host invocation: every
+// build flag the user explicitly set (signing, SBOM, compression, version
+// overrides, range/filter flags, extra repos, ...) plus the global source
+// retry budget.
 func forwardedBuildFlags() []string {
+	return forwardedBuildFlagsFor(buildCmd, "")
+}
+
+// forwardedBuildFlagsFor is forwardedBuildFlags with host project-dir
+// awareness: an absolute --sign-key under hostDir is rewritten to its
+// location below the container mount point.
+func forwardedBuildFlagsFor(cmd *cobra.Command, hostDir string) []string {
 	var out []string
 
-	for _, r := range buildOpts.ExtraRepos {
-		out = append(out, "--repo", r)
-	}
+	local := cmd.LocalFlags()
 
-	if buildOpts.AllowUnverifiedRepos {
-		out = append(out, "--allow-unverified-repos")
-	}
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if !f.Changed || dispatchSkipFlags[f.Name] || local.Lookup(f.Name) == nil {
+			return
+		}
 
-	if buildOpts.TargetArch != "" {
-		out = append(out, "--target-arch", buildOpts.TargetArch)
-	}
+		values := []string{f.Value.String()}
+		if sv, ok := f.Value.(pflag.SliceValue); ok {
+			values = sv.GetSlice()
+		}
+
+		for _, v := range values {
+			if f.Name == "sign-key" {
+				v = containerKeyPath(hostDir, v)
+			}
+
+			out = append(out, "--"+f.Name+"="+v)
+		}
+	})
 
 	if download.MaxRetries() != download.DefaultMaxRetries {
 		out = append(out, "--source-retries", strconv.Itoa(download.MaxRetries()))
 	}
 
 	return out
+}
+
+// containerKeyPath maps an absolute host path inside hostDir onto the
+// container mount point; any other value is returned unchanged.
+func containerKeyPath(hostDir, p string) string {
+	if hostDir == "" || !filepath.IsAbs(p) {
+		return p
+	}
+
+	rel, err := filepath.Rel(hostDir, p)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return p
+	}
+
+	return path.Join(containerProjectMount, filepath.ToSlash(rel))
+}
+
+// containerProjectMount is where the host project directory is mounted inside
+// a dispatched builder container.
+const containerProjectMount = "/project"
+
+// forwardedBuildEnv returns env vars to inject into the dispatched container.
+// The signing passphrase travels via YAP_SIGN_PASSPHRASE rather than argv so
+// it is not visible through `ps`.
+func forwardedBuildEnv() map[string]string {
+	if !sign {
+		return nil
+	}
+
+	pass := signPassphrase
+	if pass == "" {
+		pass = os.Getenv("YAP_SIGN_PASSPHRASE")
+	}
+
+	if pass == "" {
+		return nil
+	}
+
+	return map[string]string{"YAP_SIGN_PASSPHRASE": pass}
 }
 
 // forwardedPrepareFlags returns the flags the chained `yap prepare` step needs
@@ -252,6 +331,10 @@ func forwardedPrepareFlags() []string {
 
 	if buildOpts.TargetArch != "" {
 		out = append(out, "--target-arch", buildOpts.TargetArch)
+	}
+
+	if buildOpts.SkipToolchainValidation {
+		out = append(out, "--skip-toolchain-validation")
 	}
 
 	if download.MaxRetries() != download.DefaultMaxRetries {
@@ -447,7 +530,7 @@ func init() {
 
 	// SOURCE ACCESS FLAGS
 	buildCmd.Flags().StringVarP(&sshPassword,
-		"ssh-password", "p", "", "")
+		flagSSHPassword, "p", "", "")
 
 	// BUILD RANGE CONTROL FLAGS
 	buildCmd.Flags().StringVarP(&buildOpts.FromPkgName,
