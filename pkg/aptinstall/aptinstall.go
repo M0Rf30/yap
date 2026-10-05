@@ -36,7 +36,9 @@ import (
 
 // Options controls Install's runtime behaviour.
 //
-// RootDir is the filesystem root the installation writes into.
+// RootDir is the filesystem root the installation writes into. Only "/"
+// (or empty) is currently supported by InstallWithOptions: dpkg state and
+// maintainer scripts are host-global, so other values are rejected.
 //
 //   - "" / "/" → install into the live system root. Refused unless
 //     AllowRootInstall is true: the typical caller is yap running inside a
@@ -87,6 +89,22 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 		return err
 	}
 
+	// dpkg state files, maintainer scripts and the lock are only handled
+	// on the live host root; a non-"/" RootDir would silently mutate the
+	// host, so refuse it instead of half-honouring it.
+	if filepath.Clean(rootDir) != "/" {
+		return errors.New(errors.ErrTypeConfiguration,
+			"aptinstall: Options.RootDir other than \"/\" is not supported "+
+				"(dpkg state and maintainer scripts operate on the host)").
+			WithOperation("Install").WithContext("root_dir", rootDir)
+	}
+
+	// Ensure dpkg directories exist before locking inside them.
+	if err := ensureDpkgDirs(); err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "ensure dpkg dirs").
+			WithOperation("Install")
+	}
+
 	// Take the dpkg lock for the duration of the transaction so concurrent
 	// dpkg/apt processes (or accidental re-entry) can't race the status
 	// file read-modify-write cycle.
@@ -97,12 +115,6 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 	}
 
 	defer lock.Release()
-
-	// Ensure dpkg directories exist.
-	if err := ensureDpkgDirs(); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "ensure dpkg dirs").
-			WithOperation("Install")
-	}
 
 	pkgs, tmpDir, debMetadata, err := resolveAndPrepare(ctx, names)
 	if err != nil {
@@ -119,7 +131,7 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 
 	// Install packages in dependency order.
 	for _, p := range pkgs {
-		contents := debMetadata[p.Name]
+		contents := debMetadata[p.Filename]
 
 		if err := installPackage(ctx, p, contents, tmpDir, rootDir, opts); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "install package").
@@ -240,7 +252,7 @@ func resolveAndPrepare(
 				WithOperation("Install")
 		}
 
-		debMetadata[p.Name] = contents
+		debMetadata[p.Filename] = contents
 	}
 
 	return pkgs, tmpDir, debMetadata, nil
