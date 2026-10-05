@@ -10,6 +10,8 @@ COMMIT=$(shell git rev-parse HEAD)
 
 # Go parameters
 GOCMD=go
+# Pinned pkgsite version (avoid @latest for reproducible doc builds)
+PKGSITE_VERSION=v0.5.1-0.20261001125358-b0feb34c6d91
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
@@ -147,7 +149,7 @@ doc-serve:
 	elif [ -f $(HOME)/go/bin/pkgsite ]; then \
 		$(HOME)/go/bin/pkgsite -http=localhost:8080 .; \
 	else \
-		echo "pkgsite not found. Install with: go install golang.org/x/pkgsite/cmd/pkgsite@latest"; \
+		echo "pkgsite not found. Install with: go install golang.org/x/pkgsite/cmd/pkgsite@$(PKGSITE_VERSION)"; \
 		echo "Falling back to go doc..."; \
 		$(MAKE) doc; \
 	fi
@@ -164,7 +166,7 @@ doc-package:
 # Install documentation dependencies
 doc-deps:
 	@echo "Installing documentation dependencies..."
-	@$(GOCMD) install golang.org/x/pkgsite/cmd/pkgsite@latest
+	@$(GOCMD) install golang.org/x/pkgsite/cmd/pkgsite@$(PKGSITE_VERSION)
 	@echo "Documentation tools installed"
 
 # Generate static documentation files

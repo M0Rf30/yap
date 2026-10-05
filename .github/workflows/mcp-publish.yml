@@ -121,9 +121,15 @@ jobs:
           cat server.json
 
       - name: 📥 Install mcp-publisher
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.1
+          MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
         run: |
-          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
-            | tar -xz mcp-publisher
+          f=mcp-publisher_linux_amd64.tar.gz
+          curl -fsSL -o "$f" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/${f}"
+          echo "${MCP_PUBLISHER_SHA256}  ${f}" | sha256sum -c -
+          tar -xzf "$f" mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
 
       - name: 🔐 Authenticate (GitHub OIDC)
