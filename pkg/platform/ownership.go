@@ -6,7 +6,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
-	"syscall"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -82,7 +81,8 @@ func (ou *OriginalUser) ChownToOriginalUser(path string) error {
 		return nil // No original user, nothing to do
 	}
 
-	err := os.Chown(path, ou.UID, ou.GID)
+	// Lchown: never follow symlinks while running as root.
+	err := os.Lchown(path, ou.UID, ou.GID)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			i18n.T("errors.platform.chown_failed")).
@@ -106,7 +106,7 @@ func (ou *OriginalUser) ChownRecursiveToOriginalUser(path string) error {
 		return nil // No original user, nothing to do
 	}
 
-	err := syscall.Chown(path, ou.UID, ou.GID)
+	err := os.Lchown(path, ou.UID, ou.GID)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem,
 			i18n.T("errors.platform.chown_root_directory_failed")).
@@ -114,13 +114,35 @@ func (ou *OriginalUser) ChownRecursiveToOriginalUser(path string) error {
 			WithContext("path", path)
 	}
 
-	// Use filepath.Walk to recursively change ownership
-	return filepath.Walk(path, func(walkPath string, info os.FileInfo, err error) error {
+	// A symlink or plain file root was already handled above; only descend
+	// into real directories.
+	info, err := os.Lstat(path)
+	if err != nil || !info.IsDir() {
+		return err
+	}
+
+	// os.Root confines every chown to the tree, defeating symlink races.
+	root, err := os.OpenRoot(path)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeFileSystem,
+			i18n.T("errors.platform.chown_root_directory_failed")).
+			WithOperation("ChownRecursiveToOriginalUser").
+			WithContext("path", path)
+	}
+
+	defer func() { _ = root.Close() }()
+
+	return filepath.WalkDir(path, func(walkPath string, _ os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		err = syscall.Chown(walkPath, ou.UID, ou.GID)
+		rel, err := filepath.Rel(path, walkPath)
+		if err != nil || rel == "." {
+			return err
+		}
+
+		err = root.Lchown(rel, ou.UID, ou.GID)
 		if err != nil {
 			logger.Warn(i18n.T("logger.platform.warn.failed_to_chown_file"),
 				"path", walkPath,
