@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -43,6 +44,7 @@ var (
 
 // PackageDecoratedWriter decorates output with package name prefixes.
 type PackageDecoratedWriter struct {
+	mu          sync.Mutex
 	writer      io.Writer
 	packageName string
 	buffer      []byte
@@ -76,6 +78,9 @@ func NewGitProgressWriter(writer io.Writer, packageName string) *GitProgressWrit
 }
 
 func (pdw *PackageDecoratedWriter) Write(p []byte) (int, error) {
+	pdw.mu.Lock()
+	defer pdw.mu.Unlock()
+
 	originalLen := len(p)
 	pdw.buffer = append(pdw.buffer, p...)
 
@@ -98,6 +103,9 @@ func (pdw *PackageDecoratedWriter) Write(p []byte) (int, error) {
 
 // Close returns the buffer to the pool and should be called when done with the writer.
 func (pdw *PackageDecoratedWriter) Close() error {
+	pdw.mu.Lock()
+	defer pdw.mu.Unlock()
+
 	if pdw.buffer != nil {
 		// Reset buffer to original capacity before returning to pool
 		if cap(pdw.buffer) >= minBufferPoolSize {
@@ -450,9 +458,8 @@ func RunScriptWithPackage(ctx context.Context, cmds, packageName string, extraEn
 	// error message when the script fails. mvdan/sh routes both stdout and
 	// stderr of the script through the writers passed to StdIO; capturing
 	// both gives us the most complete failure context.
-	var outputBuf bytes.Buffer
-
-	teeWriter := io.MultiWriter(writer, &outputBuf)
+	outBuf := newScriptOutput(writer)
+	teeWriter := outBuf
 
 	// Build the effective environment: start with the inherited process env, then
 	// overlay any per-package overrides supplied by the caller.  Using a map-then-slice
@@ -495,7 +502,7 @@ func RunScriptWithPackage(ctx context.Context, cmds, packageName string, extraEn
 	err = runner.Run(ctx, script)
 	duration := time.Since(start)
 
-	return logScriptResult(err, packageName, duration, &outputBuf, "RunScriptWithPackage")
+	return logScriptResult(err, packageName, duration, outBuf, "RunScriptWithPackage")
 }
 
 // fakerootExecHandler returns an interp.ExecHandlerFunc middleware that applies Linux
@@ -661,9 +668,8 @@ func RunScriptInFakeroot(ctx context.Context, cmds, packageName string, extraEnv
 		writer = decoratedWriter
 	}
 
-	var outputBuf bytes.Buffer
-
-	teeWriter := io.MultiWriter(writer, &outputBuf)
+	outBuf := newScriptOutput(writer)
+	teeWriter := outBuf
 
 	envMap := make(map[string]string)
 
@@ -702,7 +708,7 @@ func RunScriptInFakeroot(ctx context.Context, cmds, packageName string, extraEnv
 	err = runner.Run(ctx, script)
 	duration := time.Since(start)
 
-	return logScriptResult(err, packageName, duration, &outputBuf, "RunScriptInFakeroot")
+	return logScriptResult(err, packageName, duration, outBuf, "RunScriptInFakeroot")
 }
 
 // extractErrorLines filters a captured script output buffer down to lines that
@@ -766,7 +772,9 @@ func extractErrorLines(raw, fallback string) string {
 
 // logScriptResult logs the outcome of a script run and returns a wrapped error on failure.
 // Extracted to eliminate duplication between RunScriptWithPackage and RunScriptInFakeroot.
-func logScriptResult(err error, packageName string, duration time.Duration, outputBuf *bytes.Buffer, op string) error {
+func logScriptResult(
+	err error, packageName string, duration time.Duration, outputBuf fmt.Stringer, op string,
+) error {
 	if err != nil {
 		scriptErr := extractErrorLines(outputBuf.String(), err.Error())
 
