@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	stderrors "errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -80,7 +81,7 @@ func Open(ctx context.Context, path string) (*DB, error) {
 	}
 
 	// Open or create the SQLite database.
-	sqlDB, err := sql.Open("sqlite", path)
+	sqlDB, err := sql.Open("sqlite", buildDSN(path))
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to open yapdb").
 			WithOperation("Open").
@@ -109,6 +110,16 @@ func Open(ctx context.Context, path string) (*DB, error) {
 	}
 
 	return d, nil
+}
+
+// buildDSN returns a modernc.org/sqlite DSN for path that enables foreign key
+// enforcement (required for ON DELETE CASCADE) and a busy timeout on every
+// pooled connection. The path is URI-escaped so '?' or '#' in it are safe.
+func buildDSN(path string) string {
+	u := url.URL{Path: path}
+
+	return "file:" + u.EscapedPath() +
+		"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
 }
 
 // DefaultPath returns the canonical state DB path for a given rootDir.
