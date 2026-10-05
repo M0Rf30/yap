@@ -373,6 +373,73 @@ func TestRemove(t *testing.T) {
 	}
 }
 
+func countRows(t *testing.T, d *DB, table string) int {
+	t.Helper()
+
+	var n int
+
+	row := d.sqlDB.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM "+table)
+	if err := row.Scan(&n); err != nil {
+		t.Fatalf("count %s: %v", table, err)
+	}
+
+	return n
+}
+
+func TestCascadeDeletesChildRows(t *testing.T) {
+	d := setupTestDB(t)
+	defer func() { _ = d.Close() }()
+
+	ctx := context.Background()
+	pkg := Package{
+		Name: "casc", Version: "1", Release: "1", Arch: "x86_64", Format: "rpm",
+		InstallTime: time.Now(),
+		Files:       []File{{Path: "/usr/bin/a", Mode: 0o755}},
+		Caps:        []Capability{{Kind: "provide", Name: "casc"}},
+	}
+
+	if err := d.Insert(ctx, &pkg); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	// Reinsert must replace, not accumulate, child rows.
+	if err := d.Insert(ctx, &pkg); err != nil {
+		t.Fatalf("re-Insert: %v", err)
+	}
+
+	if got := countRows(t, d, "files"); got != 1 {
+		t.Errorf("files after reinsert = %d, want 1", got)
+	}
+
+	if err := d.Remove(ctx, "casc", "x86_64"); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+
+	for _, table := range []string{"files", "caps", "packages"} {
+		if got := countRows(t, d, table); got != 0 {
+			t.Errorf("%s rows after remove = %d, want 0", table, got)
+		}
+	}
+}
+
+func TestBuildDSNEscapesPath(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "we?ird#name.db")
+
+	d, err := Open(context.Background(), dbPath)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	defer func() { _ = d.Close() }()
+
+	var fk int
+
+	row := d.sqlDB.QueryRowContext(context.Background(), "PRAGMA foreign_keys")
+	if err := row.Scan(&fk); err != nil || fk != 1 {
+		t.Fatalf("foreign_keys = %d, err=%v; want 1", fk, err)
+	}
+}
+
 func TestConcurrentOpenClose(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
