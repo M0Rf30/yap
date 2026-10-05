@@ -99,6 +99,10 @@ func setupOne(pm string, r *Repo, distro, release string, idx int) error {
 		return err
 	}
 
+	if err := validateRepo(&resolved); err != nil {
+		return err
+	}
+
 	r = &resolved
 
 	format := r.Format
