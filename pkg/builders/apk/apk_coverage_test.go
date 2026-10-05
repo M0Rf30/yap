@@ -99,7 +99,7 @@ func TestPrepareFakerootGetDirSizeError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestPrepareFakerootInstallScriptError exercises the createInstallScript error path.
+// TestPrepareFakerootInstallScriptError exercises the createScriptlets error path.
 // We set hooks but make PackageDir read-only so the script write fails.
 func TestPrepareFakerootInstallScriptError(t *testing.T) {
 	if os.Getuid() == 0 {
@@ -116,8 +116,8 @@ func TestPrepareFakerootInstallScriptError(t *testing.T) {
 
 	builder.PKGBUILD.PackageDir = pkgDir
 
-	// PrepareFakeroot will call createPkgInfo (writes .PKGINFO) then createInstallScript.
-	// Make pkgDir read-only after .PKGINFO is written to cause createInstallScript to fail.
+	// PrepareFakeroot will call createPkgInfo (writes .PKGINFO) then createScriptlets.
+	// Make pkgDir read-only after .PKGINFO is written to cause createScriptlets to fail.
 	// We do this by making the dir read-only before calling PrepareFakeroot.
 	require.NoError(t, os.Chmod(pkgDir, 0o555))
 

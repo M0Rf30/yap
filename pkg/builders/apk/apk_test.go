@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
@@ -142,10 +143,16 @@ func TestPrepareFakerootWithScripts(t *testing.T) {
 		t.Errorf("PrepareFakeroot with scripts failed: %v", err)
 	}
 
-	// Check that install script was created
-	installPath := filepath.Join(pkgDir, ".install")
-	if _, err := os.Stat(installPath); os.IsNotExist(err) {
-		t.Error(".install file was not created")
+	// apk-tools only honours separate .pre-*/.post-* members; a single
+	// .install file is never executed.
+	for _, name := range []string{".pre-install", ".pre-upgrade", ".post-install", ".post-upgrade"} {
+		if _, err := os.Stat(filepath.Join(pkgDir, name)); os.IsNotExist(err) {
+			t.Errorf("%s was not created", name)
+		}
+	}
+
+	if _, err := os.Stat(filepath.Join(pkgDir, ".install")); err == nil {
+		t.Error("legacy .install file must not be created")
 	}
 }
 
@@ -316,49 +323,56 @@ func containsInner(s, substr string) bool {
 	return false
 }
 
-func TestCreateInstallScript(t *testing.T) {
+func TestCreateScriptlets(t *testing.T) {
 	pkgBuild := createTestPKGBUILD()
 	pkgBuild.PreInst = "echo 'pre-install'"
 	pkgBuild.PostInst = "echo 'post-install'"
+	pkgBuild.PreRm = "echo 'pre-rm'"
 	builder := NewBuilder(pkgBuild)
+	builder.PKGBUILD.PackageDir = t.TempDir()
 
-	tempDir, err := os.MkdirTemp("", "apk-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
+	if err := builder.createScriptlets(); err != nil {
+		t.Fatalf("createScriptlets failed: %v", err)
 	}
 
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	builder.PKGBUILD.PackageDir = tempDir
-
-	err = builder.createInstallScript()
-	if err != nil {
-		t.Errorf("createInstallScript failed: %v", err)
+	want := map[string]string{
+		".pre-install":    "echo 'pre-install'",
+		".pre-upgrade":    "echo 'pre-install'",
+		".post-install":   "echo 'post-install'",
+		".post-upgrade":   "echo 'post-install'",
+		".pre-deinstall":  "echo 'pre-rm'",
+		".post-deinstall": "",
 	}
 
-	// Check that .install was created
-	installPath := filepath.Join(tempDir, ".install")
-	if _, err := os.Stat(installPath); os.IsNotExist(err) {
-		t.Error(".install file was not created")
-	}
+	for name, body := range want {
+		path := filepath.Join(builder.PKGBUILD.PackageDir, name)
 
-	// Read and verify content
-	content, err := os.ReadFile(installPath)
-	if err != nil {
-		t.Fatalf("Failed to read .install: %v", err)
-	}
+		info, err := os.Stat(path)
+		if body == "" {
+			if err == nil {
+				t.Errorf("%s should not exist without a PostRm hook", name)
+			}
 
-	contentStr := string(content)
-	if !contains(contentStr, "#!/bin/sh") {
-		t.Error(".install missing shebang")
-	}
+			continue
+		}
 
-	if !contains(contentStr, "pre_install()") {
-		t.Error(".install missing pre_install function")
-	}
+		if err != nil {
+			t.Fatalf("%s was not created: %v", name, err)
+		}
 
-	if !contains(contentStr, "post_install()") {
-		t.Error(".install missing post_install function")
+		if info.Mode().Perm() != 0o755 {
+			t.Errorf("%s mode = %v, want 0755", name, info.Mode().Perm())
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading %s: %v", name, err)
+		}
+
+		if !strings.HasPrefix(string(content), "#!/bin/sh\n") ||
+			!strings.Contains(string(content), body) {
+			t.Errorf("%s has unexpected content: %q", name, content)
+		}
 	}
 }
 
@@ -888,4 +902,49 @@ func TestWriteFileWithChecksumSymlink(t *testing.T) {
 	}
 
 	_ = tw.Close()
+}
+
+func TestPrepareFakerootAppliesOptions(t *testing.T) {
+	pkgBuild := createTestPKGBUILD()
+	pkgBuild.DocsEnabled = false
+	pkgBuild.LibtoolEnabled = false
+	pkgBuild.EmptyDirsEnabled = true
+	pkgBuild.StaticEnabled = true
+	builder := NewBuilder(pkgBuild)
+
+	tempDir := t.TempDir()
+	pkgDir := filepath.Join(tempDir, "pkg")
+	docDir := filepath.Join(pkgDir, "usr", "share", "doc", "test-package")
+	libDir := filepath.Join(pkgDir, "usr", "lib")
+
+	if err := os.MkdirAll(docDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.MkdirAll(libDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(docDir, "README"), []byte("docs"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	laFile := filepath.Join(libDir, "libfoo.la")
+	if err := os.WriteFile(laFile, []byte("la"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	builder.PKGBUILD.PackageDir = pkgDir
+
+	if err := builder.PrepareFakeroot(context.Background(), tempDir, ""); err != nil {
+		t.Fatalf("PrepareFakeroot failed: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(docDir, "README")); !os.IsNotExist(err) {
+		t.Error("docs should be removed when !docs is set")
+	}
+
+	if _, err := os.Stat(laFile); !os.IsNotExist(err) {
+		t.Error(".la file should be removed when !libtool is set")
+	}
 }
