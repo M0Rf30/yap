@@ -23,7 +23,7 @@ package shell
 // Supported command forms:
 //
 //	unzip [-o] [-q] [-d <destdir>] <archive> [files/globs...]
-//	unrar x [-o+] <archive> [destdir]
+//	unrar x [-o+] [-y] <archive> [destdir/]
 //	7z x [-o<destdir>] <archive>
 //	7za x [-o<destdir>] <archive>
 //	jar xf <archive>
@@ -76,13 +76,13 @@ func archiveExecHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 		case "unzip":
 			return handleUnzip(ctx, args, next)
 		case "unrar":
-			return handleUnrar(ctx, args)
+			return handleUnrar(ctx, args, next)
 		case "7z", "7za":
 			return handle7z(ctx, args)
 		case cmdJar:
 			return handleJar(ctx, args)
 		case cmdGunzip, "gzip":
-			return handleGzip(ctx, args)
+			return handleGzip(ctx, args, next)
 		case "dpkg-deb":
 			return handleDpkgDeb(ctx, args, next)
 		case "rpm2cpio":
@@ -185,7 +185,11 @@ type gzipArgs struct {
 	toStdout   bool
 	keepOrig   bool
 	decompress bool
+	force      bool
 	level      int
+	// unsupported is set when the command line uses options or operands the
+	// in-process implementation cannot reproduce exactly.
+	unsupported bool
 }
 
 // parseGzipArgs parses gzip/gunzip arguments. Decompression is the default for
@@ -204,19 +208,23 @@ func parseGzipArgs(args []string) gzipArgs {
 			opts.keepOrig = true
 		case arg == "-d", arg == "--decompress", arg == "--uncompress":
 			opts.decompress = true
+		case arg == "-f", arg == "--force":
+			opts.force = true
 		case arg == "--fast":
 			opts.level = gzip.BestSpeed
 		case arg == "--best":
 			opts.level = gzip.BestCompression
-		case arg == "-f", arg == "--force", arg == "-q", arg == "--quiet",
-			arg == "-n", arg == "--no-name", arg == "-N", arg == "--name":
+		case arg == "-q", arg == "--quiet", arg == "-n", arg == "--no-name":
 			// accepted for compatibility; no effect on the in-process implementation
+		case strings.HasPrefix(arg, "--"), arg == "-":
+			opts.unsupported = true
 		case strings.HasPrefix(arg, "-") && len(arg) > 1:
 			opts.parseShortFlags(arg)
+		case opts.inputPath == "":
+			opts.inputPath = arg
 		default:
-			if opts.inputPath == "" {
-				opts.inputPath = arg
-			}
+			// multiple operands: real tool processes each; defer to it.
+			opts.unsupported = true
 		}
 	}
 
@@ -233,10 +241,55 @@ func (o *gzipArgs) parseShortFlags(arg string) {
 			o.keepOrig = true
 		case 'd':
 			o.decompress = true
+		case 'f':
+			o.force = true
+		case 'q', 'n':
+			// no effect in-process
 		case '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			o.level = int(flag - '0')
+		default:
+			o.unsupported = true
 		}
 	}
+}
+
+// gzipNeedsRealTool reports whether the invocation must be handled by the
+// real binary: unsupported options, gunzip filtering stdin, unknown suffix, or
+// an output file that exists without --force (real gzip refuses to clobber).
+func gzipNeedsRealTool(opts gzipArgs, dir string) bool {
+	if opts.unsupported {
+		return true
+	}
+
+	if opts.decompress && opts.inputPath == "" {
+		return true
+	}
+
+	if opts.inputPath == "" || opts.toStdout || opts.force {
+		return false
+	}
+
+	in := resolvePath(dir, opts.inputPath)
+
+	var out string
+
+	if opts.decompress {
+		if !strings.HasSuffix(in, ".gz") {
+			return true
+		}
+
+		out = strings.TrimSuffix(in, ".gz")
+	} else {
+		if strings.HasSuffix(in, ".gz") {
+			return true
+		}
+
+		out = in + ".gz"
+	}
+
+	_, err := os.Lstat(out)
+
+	return err == nil
 }
 
 // handleGzip handles both compression and decompression:
@@ -246,8 +299,12 @@ func (o *gzipArgs) parseShortFlags(arg string) {
 //
 // With -c the result goes to hc.Stdout so shell redirections like
 // `gzip -c page.8 > page.8.gz` work correctly.
-func handleGzip(ctx context.Context, args []string) error {
+func handleGzip(ctx context.Context, args []string, next interp.ExecHandlerFunc) error {
 	opts := parseGzipArgs(args)
+	if gzipNeedsRealTool(opts, interp.HandlerCtx(ctx).Dir) {
+		return next(ctx, args)
+	}
+
 	if opts.decompress {
 		return gunzipPath(ctx, opts)
 	}
@@ -410,31 +467,33 @@ func gunzipPath(ctx context.Context, opts gzipArgs) error {
 	return nil
 }
 
-// handleUnrar handles: unrar x [-o+] <archive> [destdir]
-func handleUnrar(ctx context.Context, args []string) error {
+// handleUnrar handles: unrar x [-o+] [-y] <archive> [destdir/]
+// As in the real tool, a second operand is a destination only when it ends
+// with a path separator; otherwise it is a file filter. Everything the
+// in-process extractor cannot reproduce (other sub-commands, `e`, filters,
+// unknown switches) is passed to the real binary.
+func handleUnrar(ctx context.Context, args []string, next interp.ExecHandlerFunc) error {
 	hc := interp.HandlerCtx(ctx)
 
-	// args[1] should be the sub-command; we only handle "x" (extract with full paths)
-	if len(args) < 3 || (args[1] != "x" && args[1] != "e") {
-		return errors.New(errors.ErrTypeBuild, "unrar: unsupported sub-command or missing archive").
-			WithOperation("handleUnrar")
+	if len(args) < 2 || args[1] != "x" {
+		return next(ctx, args)
 	}
 
 	archivePath := ""
 	destDir := hc.Dir
 
-	for i := 2; i < len(args); i++ {
-		arg := args[i]
-
+	for _, arg := range args[2:] {
 		switch {
+		case arg == "-o+" || arg == "-y" || arg == "-idq" || arg == "-inul":
+			// overwrite/quiet switches: no effect on in-process extraction
 		case strings.HasPrefix(arg, "-"):
-			// flags like -o+ — skip
+			return next(ctx, args)
+		case archivePath == "":
+			archivePath = arg
+		case destDir == hc.Dir && strings.HasSuffix(arg, "/"):
+			destDir = arg
 		default:
-			if archivePath == "" {
-				archivePath = arg
-			} else {
-				destDir = arg
-			}
+			return next(ctx, args)
 		}
 	}
 
@@ -444,13 +503,8 @@ func handleUnrar(ctx context.Context, args []string) error {
 	}
 
 	// Resolve relative paths against the script's working directory.
-	if !filepath.IsAbs(archivePath) {
-		archivePath = filepath.Join(hc.Dir, archivePath)
-	}
-
-	if !filepath.IsAbs(destDir) {
-		destDir = filepath.Join(hc.Dir, destDir)
-	}
+	archivePath = resolvePath(hc.Dir, archivePath)
+	destDir = resolvePath(hc.Dir, destDir)
 
 	logger.Info(i18n.T("logger.shell.info.archive_handler_unrar"), "archive", archivePath, "dest", destDir)
 
