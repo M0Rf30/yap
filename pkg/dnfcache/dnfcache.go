@@ -199,7 +199,7 @@ func (c *Cache) ResolveVirtual(name string) string {
 	}
 
 	if providers, ok := c.providers[name]; ok && len(providers) > 0 {
-		return providers[0].Name
+		return pickProvider(providers).Name
 	}
 
 	return name
