@@ -17,6 +17,7 @@ import (
 	stderrors "errors"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -135,9 +136,9 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		return 0, nil
 	}
 
-	jobCh := make(chan job, len(jobs))
-	for _, j := range jobs {
-		jobCh <- j
+	jobCh := make(chan int, len(jobs))
+	for i := range jobs {
+		jobCh <- i
 	}
 
 	close(jobCh)
@@ -149,7 +150,9 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		err  error
 	}
 
-	resCh := make(chan result, len(jobs))
+	// Results are stored by job index so the aggregated error below is
+	// deterministic regardless of goroutine completion order.
+	results := make([]result, len(jobs))
 
 	var wg sync.WaitGroup
 
@@ -161,36 +164,35 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 		go func() {
 			defer wg.Done()
 
-			for j := range jobCh {
+			for idx := range jobCh {
+				j := jobs[idx]
+
 				logger.Debug(i18n.T("logger.aptrepo.debug.fetching_source"), "url", j.src.URL,
 					"suite", j.src.Suite,
 					"components", j.src.Components,
 					"arch", j.arch)
 
 				n, err := updateSource(ctx, j.src, j.arch, opts, relCache)
-				resCh <- result{src: j.src, arch: j.arch, n: n, err: err}
+				results[idx] = result{src: j.src, arch: j.arch, n: n, err: err}
 			}
 		}()
 	}
 
 	wg.Wait()
-	close(resCh)
 
 	var (
-		firstErr    error
+		errs        []error
 		succeeded64 int64
 	)
 
-	for res := range resCh {
+	for _, res := range results {
 		succeeded64 += int64(res.n)
 
 		if res.err != nil {
 			logger.Warn(i18n.T("logger.aptrepo.warn.source_fetch_failed"),
 				"url", res.src.URL, "suite", res.src.Suite, "arch", res.arch, "error", res.err)
 
-			if firstErr == nil {
-				firstErr = res.err
-			}
+			errs = append(errs, res.err)
 		} else {
 			logger.Info(i18n.T("logger.aptrepo.info.source_fetched"),
 				"url", res.src.URL, "suite", res.src.Suite, "arch", res.arch, "components", res.n)
@@ -211,7 +213,7 @@ func UpdateWithOptions(ctx context.Context, opts Options) (succeeded int, err er
 			"capabilities", c.CapabilityCount())
 	}
 
-	return succeeded, firstErr
+	return succeeded, stderrors.Join(errs...)
 }
 
 // IsVerificationError reports whether err is solely a signature verification
@@ -223,10 +225,19 @@ func IsVerificationError(err error) bool {
 		return false
 	}
 
-	msg := err.Error()
+	// Update aggregates per-source failures with errors.Join. "Solely" a
+	// verification failure means every aggregated leaf is one: a real network
+	// error next to a trust error must not be downgraded to a warning.
+	var multi interface{ Unwrap() []error }
+	if stderrors.As(err, &multi) {
+		children := multi.Unwrap()
 
-	return strings.Contains(msg, ErrUnknownSigner.Error()) ||
-		strings.Contains(msg, ErrNoTrustAnchor.Error())
+		return len(children) > 0 && slices.IndexFunc(children, func(e error) bool {
+			return !IsVerificationError(e)
+		}) < 0
+	}
+
+	return stderrors.Is(err, ErrUnknownSigner) || stderrors.Is(err, ErrNoTrustAnchor)
 }
 
 // releaseCache deduplicates fetchRelease calls within a single Update run.

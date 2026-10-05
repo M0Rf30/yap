@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 
@@ -23,6 +24,10 @@ import (
 type Release struct {
 	Codename string
 	Suite    string
+	// ValidUntil is the Release's Valid-Until timestamp; zero when absent
+	// or unparsable. apt refuses a Release past this instant to stop replay
+	// of a stale (but validly signed) manifest.
+	ValidUntil time.Time
 	// SHA256 maps filename → (hash, size)
 	SHA256 map[string]hashEntry
 }
@@ -63,7 +68,7 @@ func fetchRelease(
 			return nil, verr
 		}
 
-		return parseReleaseBody(body)
+		return parseAndCheckRelease(body, baseURL, suite)
 	}
 
 	// Fall back to Release + Release.gpg (legacy format still used by
@@ -83,7 +88,52 @@ func fetchRelease(
 		return nil, err
 	}
 
-	return parseReleaseBody(body)
+	return parseAndCheckRelease(body, baseURL, suite)
+}
+
+// ErrReleaseExpired is returned when a Release's Valid-Until timestamp is in
+// the past. A stale manifest could pin outdated (vulnerable) package
+// versions, so it is rejected like apt does (Acquire::Check-Valid-Until).
+var ErrReleaseExpired = errors.New("aptrepo: release file is expired (Valid-Until in the past)")
+
+// parseAndCheckRelease parses a verified Release body and enforces Valid-Until.
+func parseAndCheckRelease(body []byte, baseURL, suite string) (*Release, error) {
+	rel, err := parseReleaseBody(body)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := checkValidUntil(rel, time.Now()); err != nil {
+		return nil, yaperrors.Wrap(err, yaperrors.ErrTypeValidation, "release file expired").
+			WithOperation("fetchRelease").
+			WithContext("url", baseURL).
+			WithContext("suite", suite).
+			WithContext("valid_until", rel.ValidUntil.Format(time.RFC1123))
+	}
+
+	return rel, nil
+}
+
+// checkValidUntil returns ErrReleaseExpired when rel carries a Valid-Until
+// that is before now. A Release without Valid-Until never expires.
+func checkValidUntil(rel *Release, now time.Time) error {
+	if !rel.ValidUntil.IsZero() && now.After(rel.ValidUntil) {
+		return ErrReleaseExpired
+	}
+
+	return nil
+}
+
+// parseReleaseTime parses the date formats apt emits for Date / Valid-Until
+// (RFC 5322 with a "UTC"/"GMT" zone name or a numeric offset).
+func parseReleaseTime(v string) (time.Time, bool) {
+	for _, layout := range []string{time.RFC1123, time.RFC1123Z, "Mon, 2 Jan 2006 15:04:05 MST"} {
+		if t, err := time.Parse(layout, v); err == nil {
+			return t, true
+		}
+	}
+
+	return time.Time{}, false
 }
 
 // verifyInReleaseOrFallback resolves the trust decision for a fetched
@@ -254,6 +304,10 @@ func parseReleaseBody(body []byte) (*Release, error) {
 				rel.Codename = v
 			case "Suite":
 				rel.Suite = v
+			case "Valid-Until":
+				if t, ok := parseReleaseTime(v); ok {
+					rel.ValidUntil = t
+				}
 			case "SHA256":
 				inSHA256 = true
 			}

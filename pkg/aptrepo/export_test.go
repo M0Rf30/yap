@@ -4,6 +4,7 @@ package aptrepo
 
 import (
 	"context"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 )
@@ -68,4 +69,14 @@ func HTTPFetchWithFetcherForTesting(
 	ctx context.Context, fetchURL string, fetchOnce func(context.Context, string) ([]byte, error),
 ) ([]byte, error) {
 	return httpFetchWithFetcher(ctx, fetchURL, fetchOnce)
+}
+
+// CheckValidUntilForTesting exposes checkValidUntil for unit tests.
+func CheckValidUntilForTesting(rel *Release, now time.Time) error {
+	return checkValidUntil(rel, now)
+}
+
+// ParseAndCheckReleaseForTesting exposes parseAndCheckRelease for unit tests.
+func ParseAndCheckReleaseForTesting(body []byte, baseURL, suite string) (*Release, error) {
+	return parseAndCheckRelease(body, baseURL, suite)
 }
