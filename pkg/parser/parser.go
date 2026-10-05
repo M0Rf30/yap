@@ -8,6 +8,7 @@ import (
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 
+	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -124,11 +125,7 @@ func parseSyntaxFile(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) e
 }
 
 func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) error {
-	var (
-		err       error
-		arrayDecl []string
-		varDecl   string
-	)
+	var firstErr error
 
 	// localVars tracks PKGBUILD scalar variables as they are parsed so that
 	// later assignments (e.g. source=("git+${url}")) can expand them correctly.
@@ -145,18 +142,28 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 	}
 
 	handleAssign := func(nodeType *syntax.Assign) error {
+		name := nodeType.Name.Value
+
 		if nodeType.Array != nil {
 			// StringifyArray accumulates output across elements (shared builder),
 			// so only the last element contains the full expanded array.
 			// Use shell.Fields on the last element only to get all values.
 			lines := set.StringifyArray(nodeType)
-			arrayDecl = nil
+
+			var arrayDecl []string
 
 			if len(lines) > 0 {
-				arrayDecl, _ = shell.Fields(lines[len(lines)-1], expandFunc)
+				var fieldsErr error
+
+				arrayDecl, fieldsErr = shell.Fields(lines[len(lines)-1], expandFunc)
+				if fieldsErr != nil {
+					return errors.Wrap(fieldsErr, errors.ErrTypeParser, "failed to expand array").
+						WithContext("variable", name).
+						WithOperation("collectVariablesAndArrays")
+				}
 			}
 
-			return pkgBuild.AddItem(nodeType.Name.Value, arrayDecl)
+			return pkgBuild.AddItem(name, arrayDecl)
 		}
 
 		strVal, strErr := set.StringifyAssign(nodeType)
@@ -164,13 +171,24 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 			return strErr
 		}
 
-		varDecl, _ = shell.Expand(strVal, expandFunc)
-		localVars[nodeType.Name.Value] = varDecl
+		varDecl, expandErr := shell.Expand(strVal, expandFunc)
+		if expandErr != nil {
+			return errors.Wrap(expandErr, errors.ErrTypeParser, "failed to expand variable").
+				WithContext("variable", name).
+				WithOperation("collectVariablesAndArrays")
+		}
 
-		return pkgBuild.AddItem(nodeType.Name.Value, varDecl)
+		localVars[name] = varDecl
+
+		return pkgBuild.AddItem(name, varDecl)
 	}
 
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
+		// Stop walking once an error has been recorded; the first error wins.
+		if firstErr != nil {
+			return false
+		}
+
 		// Do NOT recurse into function bodies — assignments inside functions are
 		// local and must not be treated as top-level PKGBUILD variables.
 		if _, ok := node.(*syntax.FuncDecl); ok {
@@ -178,19 +196,27 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 		}
 
 		if nodeType, ok := node.(*syntax.Assign); ok {
-			err = handleAssign(nodeType)
+			if err := handleAssign(nodeType); err != nil {
+				firstErr = err
+
+				return false
+			}
 		}
 
 		return true
 	})
 
-	return err
+	return firstErr
 }
 
 func processFunctions(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) error {
-	var err error
+	var firstErr error
 
 	syntax.Walk(pkgbuildSyntax, func(node syntax.Node) bool {
+		if firstErr != nil {
+			return false
+		}
+
 		if nodeType, ok := node.(*syntax.FuncDecl); ok {
 			// Store the raw function body wrapped in pkgbuild.FuncBody so that
 			// mapFunctions can distinguish it from plain string variables.
@@ -199,11 +225,14 @@ func processFunctions(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) 
 			// BuildEnvironmentSlice().
 			funcDecl, funcErr := set.StringifyFuncDecl(nodeType)
 			if funcErr != nil {
-				err = funcErr
+				firstErr = funcErr
+
 				return false
 			}
 
-			err = pkgBuild.AddItem(nodeType.Name.Value, pkgbuild.FuncBody(funcDecl))
+			if addErr := pkgBuild.AddItem(nodeType.Name.Value, pkgbuild.FuncBody(funcDecl)); addErr != nil {
+				firstErr = addErr
+			}
 
 			// Do not recurse into nested function declarations.
 			return false
@@ -212,5 +241,5 @@ func processFunctions(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) 
 		return true
 	})
 
-	return err
+	return firstErr
 }
