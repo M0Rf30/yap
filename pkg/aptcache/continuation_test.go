@@ -1,9 +1,6 @@
 // continuation_test.go covers the deb822 repo-stanza parsing helpers and
 // other internal functions that had 0% coverage:
 //
-//   - handleDebReposLineContinuation  (line 709)
-//   - handleDebReposLineField         (line 724)
-//   - handleDebReposLine              (line 743)
 //   - flushDeb822RepoStanza           (line 791)
 //   - isPackagesIndexName             (line 928)
 //   - mergeEntryFields                (line 969)
@@ -23,183 +20,6 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/aptcache"
 )
-
-// ---------------------------------------------------------------------------
-// handleDebReposLineContinuation
-// ---------------------------------------------------------------------------
-
-func TestHandleDebReposLineContinuation_URIs(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{CurURIs: "https://archive.ubuntu.com/ubuntu/"}
-	got := aptcache.HandleDebReposLineContinuationForTesting(" https://ports.ubuntu.com/ubuntu-ports/", &snap)
-	assert.Equal(t, "https://archive.ubuntu.com/ubuntu/ https://ports.ubuntu.com/ubuntu-ports/", got.CurURIs)
-}
-
-func TestHandleDebReposLineContinuation_Suites(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{CurSuites: "noble"}
-	got := aptcache.HandleDebReposLineContinuationForTesting(" noble-updates", &snap)
-	assert.Equal(t, "noble noble-updates", got.CurSuites)
-}
-
-func TestHandleDebReposLineContinuation_Components(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{CurComponents: "main"}
-	got := aptcache.HandleDebReposLineContinuationForTesting(" restricted universe", &snap)
-	assert.Equal(t, "main restricted universe", got.CurComponents)
-}
-
-func TestHandleDebReposLineContinuation_Archs(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{CurArchs: "amd64"}
-	got := aptcache.HandleDebReposLineContinuationForTesting(" arm64", &snap)
-	assert.Equal(t, "amd64 arm64", got.CurArchs)
-}
-
-func TestHandleDebReposLineContinuation_NoMatchWhenEmpty(t *testing.T) {
-	// All fields empty — continuation line should be a no-op.
-	snap := aptcache.DebReposStateSnapshot{}
-	got := aptcache.HandleDebReposLineContinuationForTesting(" something", &snap)
-	assert.Equal(t, aptcache.DebReposStateSnapshot{}, got)
-}
-
-func TestHandleDebReposLineContinuation_TabPrefixNotAppended(t *testing.T) {
-	// Tab-prefixed lines: handleDebReposLineContinuation checks strings.HasPrefix(line, " ")
-	// (space), so a tab prefix does NOT trigger the append.
-	snap := aptcache.DebReposStateSnapshot{CurURIs: "https://example.com/"}
-	got := aptcache.HandleDebReposLineContinuationForTesting("\thttps://other.com/", &snap)
-	assert.Equal(t, "https://example.com/", got.CurURIs)
-}
-
-func TestHandleDebReposLineContinuation_TrimsWhitespace(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{CurURIs: "https://a.com/"}
-	got := aptcache.HandleDebReposLineContinuationForTesting("   https://b.com/   ", &snap)
-	assert.Equal(t, "https://a.com/ https://b.com/", got.CurURIs)
-}
-
-// URIs field takes priority over Suites when both are set (first matching case wins).
-func TestHandleDebReposLineContinuation_URIsPriorityOverSuites(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{
-		CurURIs:   "https://a.com/",
-		CurSuites: "noble",
-	}
-	got := aptcache.HandleDebReposLineContinuationForTesting(" noble-updates", &snap)
-	// URIs case matches first in the switch.
-	assert.Equal(t, "https://a.com/ noble-updates", got.CurURIs)
-	assert.Equal(t, "noble", got.CurSuites, "Suites should be unchanged")
-}
-
-// ---------------------------------------------------------------------------
-// handleDebReposLineField
-// ---------------------------------------------------------------------------
-
-func TestHandleDebReposLineField_AllFields(t *testing.T) {
-	cases := []struct {
-		field    string
-		value    string
-		checkFn  func(snap aptcache.DebReposStateSnapshot) string
-		expected string
-	}{
-		{"Types", "deb", func(s aptcache.DebReposStateSnapshot) string { return s.CurTypes }, "deb"},
-		{"URIs", "https://example.com/", func(s aptcache.DebReposStateSnapshot) string { return s.CurURIs }, "https://example.com/"},
-		{"Suites", "noble", func(s aptcache.DebReposStateSnapshot) string { return s.CurSuites }, "noble"},
-		{"Components", "main restricted", func(s aptcache.DebReposStateSnapshot) string { return s.CurComponents }, "main restricted"},
-		{"Architectures", "amd64 arm64", func(s aptcache.DebReposStateSnapshot) string { return s.CurArchs }, "amd64 arm64"},
-		{"Signed-By", "/usr/share/keyrings/ubuntu.gpg", func(s aptcache.DebReposStateSnapshot) string { return s.CurSignedBy }, "/usr/share/keyrings/ubuntu.gpg"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.field, func(t *testing.T) {
-			got := aptcache.HandleDebReposLineFieldForTesting(tc.field, tc.value, &aptcache.DebReposStateSnapshot{})
-			assert.Equal(t, tc.expected, tc.checkFn(got))
-		})
-	}
-}
-
-func TestHandleDebReposLineField_UnknownField(t *testing.T) {
-	got := aptcache.HandleDebReposLineFieldForTesting("X-Custom-Field", "value", &aptcache.DebReposStateSnapshot{})
-	// Unknown fields are silently ignored.
-	assert.Equal(t, aptcache.DebReposStateSnapshot{}, got)
-}
-
-// ---------------------------------------------------------------------------
-// handleDebReposLine
-// ---------------------------------------------------------------------------
-
-func TestHandleDebReposLine_BlankLineFlushesStanza(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{
-		CurTypes:      "deb",
-		CurURIs:       "https://archive.ubuntu.com/ubuntu/",
-		CurSuites:     "noble",
-		CurComponents: "main",
-	}
-
-	var entries []aptcache.SourceEntry
-
-	got := aptcache.HandleDebReposLineForTesting("", &snap, &entries)
-
-	// State should be reset.
-	assert.Equal(t, aptcache.DebReposStateSnapshot{}, got)
-	// One entry should have been flushed.
-	require.Len(t, entries, 1)
-	assert.Equal(t, "https://archive.ubuntu.com/ubuntu/", entries[0].URL)
-	assert.Equal(t, "noble", entries[0].Suite)
-	assert.Equal(t, []string{"main"}, entries[0].Components)
-}
-
-func TestHandleDebReposLine_ContinuationLine(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{CurSuites: "noble"}
-
-	var entries []aptcache.SourceEntry
-
-	got := aptcache.HandleDebReposLineForTesting(" noble-updates", &snap, &entries)
-
-	assert.Equal(t, "noble noble-updates", got.CurSuites)
-	assert.Empty(t, entries)
-}
-
-func TestHandleDebReposLine_FieldLine(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{}
-
-	var entries []aptcache.SourceEntry
-
-	got := aptcache.HandleDebReposLineForTesting("Types: deb", &snap, &entries)
-
-	assert.Equal(t, "deb", got.CurTypes)
-	assert.Empty(t, entries)
-}
-
-func TestHandleDebReposLine_MalformedLineIgnored(t *testing.T) {
-	snap := aptcache.DebReposStateSnapshot{}
-
-	var entries []aptcache.SourceEntry
-
-	got := aptcache.HandleDebReposLineForTesting("no-colon-here", &snap, &entries)
-
-	assert.Equal(t, aptcache.DebReposStateSnapshot{}, got)
-	assert.Empty(t, entries)
-}
-
-func TestHandleDebReposLine_TabContinuationDispatched(t *testing.T) {
-	// Tab-prefixed lines are dispatched to handleDebReposLineContinuation,
-	// but that function only appends when strings.HasPrefix(line, " ").
-	// So the tab line is dispatched but not appended.
-	snap := aptcache.DebReposStateSnapshot{CurComponents: "main"}
-
-	var entries []aptcache.SourceEntry
-
-	got := aptcache.HandleDebReposLineForTesting("\trestricted", &snap, &entries)
-
-	assert.Equal(t, "main", got.CurComponents)
-	assert.Empty(t, entries)
-}
-
-func TestHandleDebReposLine_FieldWithLeadingSpaceInValue(t *testing.T) {
-	// "URIs:  https://..." — value is trimmed.
-	snap := aptcache.DebReposStateSnapshot{}
-
-	var entries []aptcache.SourceEntry
-
-	got := aptcache.HandleDebReposLineForTesting("URIs:  https://archive.ubuntu.com/ubuntu/", &snap, &entries)
-
-	assert.Equal(t, "https://archive.ubuntu.com/ubuntu/", got.CurURIs)
-}
 
 // ---------------------------------------------------------------------------
 // flushDeb822RepoStanza
@@ -731,14 +551,7 @@ Components: main`
 }
 
 func TestParseDeb822SourcesListForRepo_ContinuationLines(t *testing.T) {
-	// NOTE: The continuation switch in handleDebReposLineContinuation matches
-	// the first non-empty field. When URIs is already set, a space-prefixed
-	// continuation line is appended to URIs (not Suites). To get multi-suite
-	// continuation working, Suites must be listed before URIs in the stanza,
-	// or URIs must be empty when the continuation line is processed.
-	//
-	// This test exercises the real behaviour: Suites continuation works when
-	// URIs has not yet been set (i.e. Suites field appears before URIs).
+	// Continuation lines extend the preceding field regardless of field order.
 	content := `Types: deb
 Suites: noble
  noble-updates
@@ -807,4 +620,42 @@ func TestMergeFrom_BareNameIndexNoDuplicates(t *testing.T) {
 		assert.ElementsMatch(t, srcKeys, keys, "no duplicated or missing keys")
 		assert.True(t, slices.IsSorted(keys), "keys must be deterministic: %v", keys)
 	}
+}
+
+// TestParseDeb822SourcesListForRepo_SkipsNonBinaryAndDisabled: deb-src-only
+// and "Enabled: no" stanzas must not yield binary repo entries.
+func TestParseDeb822SourcesListForRepo_SkipsNonBinaryAndDisabled(t *testing.T) {
+	content := `Types: deb-src
+URIs: https://archive.ubuntu.com/ubuntu/
+Suites: noble
+Components: main
+
+Types: deb
+Enabled: no
+URIs: https://disabled.example.com/ubuntu/
+Suites: noble
+Components: main
+
+Types: deb deb-src
+Enabled: yes
+URIs: https://both.example.com/ubuntu/
+Suites: noble
+Components: main
+
+Types: deb
+URIs: https://default-enabled.example.com/ubuntu/
+Suites: noble
+Components: main
+`
+	entries := aptcache.ParseDeb822SourcesListForRepoTesting(content)
+
+	urls := make([]string, 0, len(entries))
+	for _, e := range entries {
+		urls = append(urls, e.URL)
+	}
+
+	assert.Equal(t, []string{
+		"https://both.example.com/ubuntu/",
+		"https://default-enabled.example.com/ubuntu/",
+	}, urls)
 }
