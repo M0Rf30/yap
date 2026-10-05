@@ -68,8 +68,9 @@ func (d *Package) BuildPackage(ctx context.Context, artifactsPath string, target
 		}
 	}()
 
-	controlArchive := filepath.Join(debTemp, controlFilename)
-	dataArchive := filepath.Join(debTemp, dataFilename)
+	controlName, dataName := memberNames(d.compression)
+	controlArchive := filepath.Join(debTemp, controlName)
+	dataArchive := filepath.Join(debTemp, dataName)
 
 	// Create control archive
 	err = archive.CreateTarCompressed(ctx, d.debDir, controlArchive,
@@ -116,12 +117,15 @@ func (d *Package) PrepareFakeroot(ctx context.Context, _ string, targetArch stri
 		return err
 	}
 
-	err = d.createDebResources()
+	// Apply PKGBUILD options (strip, docs, libtool, static, zipman, emptydirs)
+	// before computing Installed-Size and md5sums so both describe the final
+	// payload rather than the pre-option tree.
+	err = d.ApplyOptionsWithEnv(d.CrossStripEnvMap(targetArch))
 	if err != nil {
 		return err
 	}
 
-	return d.ApplyOptionsWithEnv(d.CrossStripEnvMap(targetArch))
+	return d.createDebResources()
 }
 
 // addArFile adds a file to an archive writer with the specified name, body,
@@ -396,12 +400,14 @@ func (d *Package) createDeb(artifactPath, control, data string) (string, error) 
 		return "", err
 	}
 
-	err = addArFileFromPath(writer, controlFilename, control, modtime)
+	controlName, dataName := memberNames(d.compression)
+
+	err = addArFileFromPath(writer, controlName, control, modtime)
 	if err != nil {
 		return "", err
 	}
 
-	err = addArFileFromPath(writer, dataFilename, data, modtime)
+	err = addArFileFromPath(writer, dataName, data, modtime)
 	if err != nil {
 		return "", err
 	}

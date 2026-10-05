@@ -72,8 +72,8 @@ func TestDEBConstants(t *testing.T) {
 	}{
 		{"binary content", binaryContent, "2.0\n"},
 		{"binary filename", binaryFilename, "debian-binary"},
-		{"control filename", controlFilename, "control.tar.zst"},
-		{"data filename", dataFilename, "data.tar.zst"},
+		{"control basename", controlBasename, "control.tar"},
+		{"data basename", dataBasename, "data.tar"},
 	}
 
 	for _, tt := range tests {
@@ -86,25 +86,39 @@ func TestDEBConstants(t *testing.T) {
 }
 
 func TestDEBFilenames(t *testing.T) {
-	filenames := []string{binaryFilename, controlFilename, dataFilename}
+	for _, compression := range []string{"", "zstd", "gzip", "xz"} {
+		control, data := memberNames(compression)
+		filenames := []string{binaryFilename, control, data}
 
-	for _, filename := range filenames {
-		if filename == "" {
-			t.Error("DEB filename constant is empty")
-		}
+		for _, filename := range filenames {
+			if filename == "" {
+				t.Error("DEB filename is empty")
+			}
 
-		if strings.ContainsAny(filename, "/\\") {
-			t.Errorf("DEB filename %q should not contain path separators", filename)
+			if strings.ContainsAny(filename, "/\\") {
+				t.Errorf("DEB filename %q should not contain path separators", filename)
+			}
 		}
 	}
 }
 
-func TestDEBFileExtensions(t *testing.T) {
-	if !strings.HasSuffix(controlFilename, ".tar.zst") {
-		t.Errorf("controlFilename should end with .tar.zst, got %s", controlFilename)
+func TestDEBMemberNames(t *testing.T) {
+	tests := []struct {
+		compression string
+		control     string
+		data        string
+	}{
+		{"", "control.tar.zst", "data.tar.zst"},
+		{"zstd", "control.tar.zst", "data.tar.zst"},
+		{"gzip", "control.tar.gz", "data.tar.gz"},
+		{"xz", "control.tar.xz", "data.tar.xz"},
 	}
 
-	if !strings.HasSuffix(dataFilename, ".tar.zst") {
-		t.Errorf("dataFilename should end with .tar.zst, got %s", dataFilename)
+	for _, tt := range tests {
+		control, data := memberNames(tt.compression)
+		if control != tt.control || data != tt.data {
+			t.Errorf("memberNames(%q) = %q, %q; want %q, %q",
+				tt.compression, control, data, tt.control, tt.data)
+		}
 	}
 }
