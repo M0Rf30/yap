@@ -105,8 +105,10 @@ worrying about argv leakage.
   the directory containing either. All three resolve to the project root.
 - **Distro dispatch**: omit the `distro` arg to build natively on the host.
   Provide a distro tag (e.g. `ubuntu-jammy`) to dispatch the build into a
-  matching container image. Cross-arch builds usually need a distro arg so
-  the right cross-toolchain is available.
+  matching container image (requires a container runtime; without one the
+  build fails instead of silently building natively for the wrong distro,
+  and inside a container it always builds natively). Cross-arch builds
+  usually need a distro arg so the right cross-toolchain is available.
 - **Formats & package managers**: 15 distros across 5 package managers —
   `apt` (Debian/Ubuntu/Mint/Pop → `.deb`), `yum` and `zypper`
   (Fedora/RHEL/Rocky/Alma/Amazon/Oracle/CentOS **and** openSUSE Leap/Tumbleweed
