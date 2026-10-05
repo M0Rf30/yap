@@ -222,7 +222,7 @@ func (mpc *MultipleProject) BuildAll(ctx context.Context) error {
 // source directories if the CleanBuild flag is set. It takes no parameters. It
 // returns an error if there was a problem removing the directories.
 func (mpc *MultipleProject) Clean() error {
-	for _, proj := range mpc.Projects {
+	for _, proj := range mpc.getProjectsInRange() {
 		if mpc.Opts.CleanBuild {
 			err := os.RemoveAll(proj.Builder.PKGBUILD.SourceDir)
 			if err != nil {
@@ -755,11 +755,12 @@ func (mpc *MultipleProject) cleanSingleProjectArtifacts(proj *Project) error {
 	return mpc.removeBuildArtifacts(proj.Builder.PKGBUILD.StartDir)
 }
 
-// removeBuildArtifacts removes common build artifacts from the specified directory
+// removeBuildArtifacts removes yap-generated package artifacts from the
+// specified directory. Tarballs, logs and detached signatures are deliberately
+// NOT removed: next to a PKGBUILD they are legitimate local source=() entries.
 func (mpc *MultipleProject) removeBuildArtifacts(dir string) error {
 	buildArtifacts := []string{
-		"*.tar.xz", "*.tar.gz", "*.tar.bz2", "*.deb", "*.rpm", "*.pkg.tar.*",
-		"*.log", "*.sig",
+		"*.deb", "*.rpm", "*.pkg.tar.*",
 	}
 
 	for _, pattern := range buildArtifacts {
