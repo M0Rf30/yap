@@ -2,10 +2,10 @@ package command
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/container"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -15,6 +15,13 @@ const (
 	alpineDistro = "alpine"
 	archDistro   = "arch"
 )
+
+// isRollingDistro reports whether a distro family publishes a single,
+// unqualified builder image (rolling release) so no codename is required.
+func isRollingDistro(distro string) bool {
+	return distro == alpineDistro || distro == archDistro ||
+		distro == constants.DistroOpenSUSETumbleweed
+}
 
 // pullCmd represents the pull command.
 var pullCmd = &cobra.Command{
@@ -27,9 +34,9 @@ var pullCmd = &cobra.Command{
 	Args:    createValidateDistroArgs(1),
 	PreRun:  PreRunValidation,
 	RunE: func(_ *cobra.Command, args []string) error {
-		split := strings.Split(args[0], "-")
+		distro, release := parseDistroAndRelease(args[0])
 
-		if len(split) == 1 && split[0] != alpineDistro && split[0] != archDistro {
+		if release == "" && !isRollingDistro(distro) {
 			return errors.New(i18n.T("logger.pull.specify_codename"))
 		}
 

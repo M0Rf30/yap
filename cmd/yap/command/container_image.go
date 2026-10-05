@@ -35,7 +35,7 @@ func resolveContainerImage(distro, release string, host platform.OSRelease) (str
 		return distro + "-" + release, nil
 	}
 
-	if distro == alpineDistro || distro == archDistro {
+	if isRollingDistro(distro) {
 		return distro, nil
 	}
 
