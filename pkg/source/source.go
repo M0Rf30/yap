@@ -100,6 +100,10 @@ type Source struct {
 	// SkipHashCheck disables sha256/sha512 integrity verification for this
 	// source item. Equivalent to setting the checksum to SKIP in the PKGBUILD.
 	SkipHashCheck bool
+	// HashAlgo names the checksum array that supplied Hash (sha256sums,
+	// sha512sums, b2sums, …). When empty, the algorithm is inferred from the
+	// digest length (a 128-hex digest then tries sha512 and blake2b-512).
+	HashAlgo string
 }
 
 // Get retrieves the source file from the specified URI.
@@ -384,7 +388,7 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return nil
 	}
 
-	candidates, err := hashCandidates(len(src.Hash))
+	candidates, err := hashCandidatesFor(src.HashAlgo, len(src.Hash))
 	if err != nil {
 		return err
 	}
@@ -459,6 +463,46 @@ func hashCandidates(hexLen int) ([]hash.Hash, error) {
 			WithOperation("validateSource").
 			WithContext("hash_length", hexLen)
 	}
+}
+
+// hashCandidatesFor returns the digest to verify with. A known algo (the
+// checksum array name) selects exactly one algorithm; an empty or unknown
+// algo falls back to length-based inference via hashCandidates.
+func hashCandidatesFor(algo string, hexLen int) ([]hash.Hash, error) {
+	var (
+		h    hash.Hash
+		want int
+	)
+
+	switch algo {
+	case "sha224sums":
+		h, want = sha256.New224(), 56
+	case "sha256sums":
+		h, want = sha256.New(), 64
+	case "sha384sums":
+		h, want = sha512.New384(), 96
+	case "sha512sums":
+		h, want = sha512.New(), 128
+	case "b2sums":
+		b2, err := blake2b.New512(nil)
+		if err != nil {
+			return nil, err
+		}
+
+		h, want = b2, 128
+	default:
+		return hashCandidates(hexLen)
+	}
+
+	if hexLen != want {
+		return nil, errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf(i18n.T("errors.source.unsupported_hash_length"), hexLen)).
+			WithOperation("validateSource").
+			WithContext("hash_length", hexLen).
+			WithContext("hash_algo", algo)
+	}
+
+	return []hash.Hash{h}, nil
 }
 
 // shouldSkipExtract reports whether this source file should be skipped during
