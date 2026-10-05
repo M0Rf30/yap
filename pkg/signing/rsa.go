@@ -311,6 +311,10 @@ func extractFirstGzipStream(data []byte) (offset int, err error) {
 			WithOperation("extractFirstGzipStream")
 	}
 
+	// Stop at the end of the first member; the default multistream mode
+	// would consume control.tar.gz and data.tar.gz alike.
+	gz.Multistream(false)
+
 	if _, err = io.Copy(io.Discard, gz); err != nil {
 		_ = gz.Close()
 
