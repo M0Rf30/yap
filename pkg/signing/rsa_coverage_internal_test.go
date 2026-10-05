@@ -68,7 +68,6 @@ func TestExtractFirstGzipStreamConcatenated(t *testing.T) {
 
 	offset, err := extractFirstGzipStream(combined)
 	require.NoError(t, err)
-	// Offset must be positive and at most the total length.
-	require.Greater(t, offset, 0)
-	require.LessOrEqual(t, offset, len(combined))
+	// The offset must be exactly the end of the first member.
+	require.Equal(t, buf1.Len(), offset)
 }

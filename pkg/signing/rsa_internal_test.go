@@ -182,7 +182,7 @@ func TestRSASignerSignatureValidation(t *testing.T) {
 	}
 
 	// Create fake APK
-	apkData, _, _ := createFakeAPK(t)
+	apkData, controlData, _ := createFakeAPK(t)
 	if err := os.WriteFile(apkPath, apkData, 0o644); err != nil {
 		t.Fatalf("Failed to write APK file: %v", err)
 	}
@@ -194,6 +194,11 @@ func TestRSASignerSignatureValidation(t *testing.T) {
 	}
 
 	controlTarGzCompressed := apkData[:dataStart]
+	// The signed region must be exactly control.tar.gz, not the whole file.
+	if !bytes.Equal(controlTarGzCompressed, controlData) {
+		t.Fatalf("signed region is %d bytes, want control.tar.gz (%d bytes)",
+			len(controlTarGzCompressed), len(controlData))
+	}
 
 	// Sign the APK
 	cfg := Config{
