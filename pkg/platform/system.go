@@ -243,16 +243,29 @@ func GOSetupContext(ctx context.Context) error {
 	return nil
 }
 
+// goChecksumBaseURL hosts the plain-text .sha256 sidecars. go.dev/dl/<file>.sha256
+// serves an HTML page, so the sidecar must be fetched from the CDN directly.
+const goChecksumBaseURL = "https://dl.google.com/go/"
+
+// goChecksumURL returns the .sha256 sidecar URL for a Go archive URL.
+func goChecksumURL(archiveURL string) string {
+	name := archiveURL[strings.LastIndex(archiveURL, "/")+1:]
+
+	return goChecksumBaseURL + name + ".sha256"
+}
+
 // verifyGoArchive checks the downloaded archive against the SHA-256 published
-// at <archiveURL>.sha256.
+// by the Go download CDN for the same file name.
 func verifyGoArchive(ctx context.Context, archivePath, archiveURL string) error {
-	body, err := httpclient.FetchBytes(ctx, archiveURL+".sha256", goChecksumMaxBytes)
+	sumURL := goChecksumURL(archiveURL)
+
+	body, err := httpclient.FetchBytes(ctx, sumURL, goChecksumMaxBytes)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeNetwork,
 			i18n.T("errors.platform.download_go_archive_failed")).
 			WithOperation("GOSetup").
 			WithContext("reason", "fetching SHA-256 checksum failed").
-			WithContext("url", archiveURL+".sha256")
+			WithContext("url", sumURL)
 	}
 
 	expected, err := parseSHA256Sidecar(body)
