@@ -2,6 +2,7 @@ package pacmandb
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -69,7 +70,7 @@ func parseConfigWithIncludes(
 		key = strings.TrimSpace(key)
 		val = strings.TrimSpace(val)
 
-		if err := handleConfigKeyValue(cfg, curRepo, key, val, seenIncludes); err != nil {
+		if err := handleConfigKeyValue(cfg, curRepo, key, val); err != nil {
 			return nil, err
 		}
 	}
@@ -91,25 +92,34 @@ func handleSectionHeader(cfg *Config, line string) *Repo {
 }
 
 // handleConfigKeyValue processes a key=value line in the config.
-// Handles Architecture, Server, and Include directives.
-func handleConfigKeyValue(cfg *Config, curRepo *Repo, key, val string, seenIncludes map[string]bool) error {
+// Handles Architecture, Server, and Include directives. Include targets are
+// mirrorlists (glob patterns are expanded, as pacman does).
+func handleConfigKeyValue(cfg *Config, curRepo *Repo, key, val string) error {
 	switch {
 	case curRepo == nil && key == "Architecture":
 		cfg.Architecture = val
 	case curRepo != nil && key == "Server":
 		curRepo.Servers = append(curRepo.Servers, val)
 	case curRepo != nil && key == "Include":
-		servers, err := parseMirrorlist(val)
-		if err != nil {
-			// Try as a full pacman.conf include (rare but possible).
-			sub, err2 := parseConfigWithIncludes(val, seenIncludes)
-			if err2 != nil {
-				// Propagate circular include or other errors
-				return err2
+		paths := []string{val}
+
+		if strings.ContainsAny(val, "*?[") {
+			matches, err := filepath.Glob(val)
+			if err != nil {
+				return errors.Wrap(err, errors.ErrTypeConfiguration, "invalid Include pattern").
+					WithOperation("handleConfigKeyValue").
+					WithContext("pattern", val)
 			}
-			// Merge sub.Repos? Not typical. Just skip if not a mirrorlist.
-			_ = sub
-		} else {
+
+			paths = matches
+		}
+
+		for _, path := range paths {
+			servers, err := parseMirrorlist(path)
+			if err != nil {
+				return err
+			}
+
 			curRepo.Servers = append(curRepo.Servers, servers...)
 		}
 	}
