@@ -83,8 +83,8 @@ func ReadBuildID(path string) string {
 		}
 
 		// ELF note format: namesz(4) + descsz(4) + type(4) + name + desc
-		nameSize := file.ByteOrder.Uint32(data[0:4])
-		descSize := file.ByteOrder.Uint32(data[4:8])
+		nameSize := uint64(file.ByteOrder.Uint32(data[0:4]))
+		descSize := uint64(file.ByteOrder.Uint32(data[4:8]))
 
 		nameEnd := 12 + nameSize
 		if nameEnd%4 != 0 {
@@ -92,7 +92,7 @@ func ReadBuildID(path string) string {
 		}
 
 		descEnd := nameEnd + descSize
-		if int(descEnd) > len(data) {
+		if descEnd > uint64(len(data)) {
 			return ""
 		}
 
