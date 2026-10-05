@@ -311,9 +311,18 @@ func downloadAndHash(rawURI, uri, tmpDir, pkgbuildDir string) (string, error) {
 		destName = "source"
 	}
 
-	destPath := filepath.Join(tmpDir, destName)
+	// Each source gets its own directory: sources from different locations can
+	// share a basename (e.g. .../a/archive/v1.0.tar.gz and .../b/archive/v1.0.tar.gz).
+	srcDir, err := os.MkdirTemp(tmpDir, "src-*")
+	if err != nil {
+		return "", errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create source temp dir").
+			WithOperation("downloadAndHash").
+			WithContext("uri", uri)
+	}
 
-	_, err := shell.MultiPrinter.Start()
+	destPath := filepath.Join(srcDir, destName)
+
+	_, err = shell.MultiPrinter.Start()
 	if err != nil {
 		return "", errors.Wrap(err, errors.ErrTypeBuild, "failed to start printer").
 			WithOperation("downloadAndHash")
