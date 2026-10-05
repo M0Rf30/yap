@@ -2,6 +2,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -30,6 +31,15 @@ import (
 // - referenceName: the reference name for the clone operation.
 // - commitHash: if non-empty, checkout this specific commit after cloning.
 func Clone(dloadFilePath, sourceItemURI, sshPassword string,
+	referenceName plumbing.ReferenceName, commitHash string,
+) error {
+	return CloneContext(context.Background(), dloadFilePath, sourceItemURI, sshPassword,
+		referenceName, commitHash)
+}
+
+// CloneContext is like Clone but aborts the network operation when ctx is
+// cancelled.
+func CloneContext(ctx context.Context, dloadFilePath, sourceItemURI, sshPassword string,
 	referenceName plumbing.ReferenceName, commitHash string,
 ) error {
 	if dloadFilePath == "" {
@@ -72,7 +82,7 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 		return handleExistingRepo(dloadFilePath, referenceName, plainOpenOptions)
 	}
 
-	repo, err := ggit.PlainClone(dloadFilePath, false, cloneOptions)
+	repo, err := ggit.PlainCloneContext(ctx, dloadFilePath, false, cloneOptions)
 	if err != nil && strings.Contains(err.Error(), "authentication required") {
 		sourceURL, _ := url.Parse(sourceItemURI)
 		sshKeyPath := os.Getenv("HOME") + "/.ssh/id_rsa"
@@ -90,7 +100,7 @@ func Clone(dloadFilePath, sourceItemURI, sshPassword string,
 		cloneOptions.Auth = publicKey
 		cloneOptions.URL = sshURL
 
-		repo, err = ggit.PlainClone(dloadFilePath, false, cloneOptions)
+		repo, err = ggit.PlainCloneContext(ctx, dloadFilePath, false, cloneOptions)
 		if err != nil {
 			return err
 		}

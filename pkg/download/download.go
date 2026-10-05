@@ -108,59 +108,11 @@ func parseMaxRetriesEnv(raw string) (int, bool) {
 	return value, true
 }
 
-// Download downloads a file from the given URL and saves it to the specified destination.
-// Uses a simple writer for output.
-//
-// Parameters:
-// - destination: the path where the downloaded file will be saved.
-// - url: the URL of the file to download.
-// - writer: writer for progress output (can be nil)
-func Download(destination, uri string, writer io.Writer) error {
-	// create client
-	client := grab.NewClient()
-
-	req, err := grab.NewRequest(destination, uri)
-	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeNetwork, i18n.T("errors.download.download_failed")).
-			WithOperation("Download").
-			WithContext("uri", uri)
-	}
-
-	resp := client.Do(req)
-	if resp.HTTPResponse == nil {
-		return errors.New(errors.ErrTypeNetwork, i18n.T("errors.download.download_failed_no_response")).
-			WithOperation("Download").
-			WithContext("uri", uri).
-			WithContext("error", resp.Err())
-	}
-
-	// start download
-	logger.Info(i18n.T("logger.download.info.downloading"), "url", req.URL())
-	logger.Info(i18n.T("logger.download.info.response_status"), "status", resp.HTTPResponse.Status)
-
-	// Create enhanced progress bar using the progress helper
-	progressBar := createProgressBar(resp, "yap", "", uri, writer)
-
-	return monitorDownload(resp, progressBar, destination)
-}
-
-// WithResume downloads a file with resume capability and retry logic.
-// It extends the basic Download function with the ability to resume interrupted downloads.
+// WithContext downloads a file with resume capability, retry logic and
+// context-aware progress reporting. Cancelling ctx aborts the in-flight
+// transfer and any pending retry backoff.
 //
 //   - ctx: context for cancellation.
-//   - destination: the path where the downloaded file will be saved.
-//   - uri: the URL of the file to download.
-//   - maxRetries: retries after the first attempt; 0 = no retries; pass
-//     MaxRetries() for the configured budget.
-//   - writer: writer for progress output (can be nil)
-func WithResume(ctx context.Context, destination, uri string, maxRetries int, writer io.Writer) error {
-	return retryDownload(ctx, destination, uri, maxRetries, "", "", writer,
-		"WithResume", "logger.download.info.retrying_download")
-}
-
-// WithResumeContext downloads a file with context information for enhanced
-// progress reporting.
-//
 //   - destination: local file path where the downloaded content will be saved.
 //   - uri: source URL to download from.
 //   - maxRetries: retries after the first attempt; 0 = no retries; pass
@@ -168,25 +120,35 @@ func WithResume(ctx context.Context, destination, uri string, maxRetries int, wr
 //   - packageName: package name for progress reporting (if empty, uses logger component or "yap").
 //   - sourceName: source name for progress reporting (if empty, uses filename from URI).
 //   - writer: writer for progress output (can be nil)
+func WithContext(
+	ctx context.Context,
+	destination, uri string,
+	maxRetries int,
+	packageName, sourceName string,
+	writer io.Writer,
+) error {
+	return retryDownload(ctx, destination, uri, maxRetries,
+		packageName, sourceName, writer, "WithContext")
+}
+
+// WithResumeContext is WithContext with context.Background().
 func WithResumeContext(
 	destination, uri string,
 	maxRetries int,
 	packageName, sourceName string,
 	writer io.Writer,
 ) error {
-	return retryDownload(context.Background(), destination, uri, maxRetries,
-		packageName, sourceName, writer,
-		"WithResumeContext", "logger.download.info.retrying_download_2")
+	return WithContext(context.Background(), destination, uri, maxRetries,
+		packageName, sourceName, writer)
 }
 
-// retryDownload is the attempt loop shared by WithResume and
-// WithResumeContext: exponential backoff between attempts, retry only on
-// transient errors, and partial-file cleanup when the partial cannot be
-// resumed (length mismatch).
+// retryDownload is the attempt loop shared by the public entry points:
+// exponential backoff between attempts, retry only on transient errors, and
+// partial-file cleanup when the partial cannot be resumed (length mismatch).
 func retryDownload(
 	ctx context.Context, destination, uri string, maxRetries int,
 	packageName, sourceName string, writer io.Writer,
-	op, retryMsgID string,
+	op string,
 ) error {
 	if maxRetries < 0 {
 		maxRetries = 0
@@ -196,7 +158,7 @@ func retryDownload(
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			logger.Info(i18n.T(retryMsgID),
+			logger.Info(i18n.T("logger.download.info.retrying_download_2"),
 				"attempt", attempt+1,
 				"max_retries", maxRetries+1,
 				"url", uri)
@@ -254,7 +216,18 @@ func downloadWithResumeInternal(
 
 	resp := client.Do(req)
 	if resp.HTTPResponse == nil {
-		return errors.New(errors.ErrTypeNetwork, i18n.T("errors.download.download_failed_no_response")).
+		// Transport failure before response headers (DNS, refused, reset,
+		// TLS timeout): keep the cause so retry classification can see it.
+		cause := resp.Err()
+		if cause == nil {
+			return errors.New(errors.ErrTypeNetwork,
+				i18n.T("errors.download.download_failed_no_response")).
+				WithOperation("downloadWithResumeInternal").
+				WithContext("uri", uri)
+		}
+
+		return errors.Wrap(cause, errors.ErrTypeNetwork,
+			i18n.T("errors.download.download_failed_no_response")).
 			WithOperation("downloadWithResumeInternal").
 			WithContext("uri", uri)
 	}
@@ -285,12 +258,11 @@ func prepareDownloadRequest(
 	return client, req, nil
 }
 
-// configureResumeIfPossible checks for partial files and enables resume.
-func configureResumeIfPossible(req *grab.Request, destination, uri string) {
+// configureResumeIfPossible logs when an existing partial file will be
+// resumed. grab resumes by default (NoResume=false), so nothing to configure.
+func configureResumeIfPossible(_ *grab.Request, destination, uri string) {
 	info, err := os.Stat(destination)
 	if err == nil && info.Size() > 0 {
-		req.NoResume = false // Enable resume
-
 		logger.Info(i18n.T("logger.download.info.resuming_download"),
 			"url", uri,
 			"existing_size", formatBytes(info.Size()))
@@ -362,12 +334,16 @@ func monitorDownload(
 	for {
 		select {
 		case <-resp.Done:
-			if progressBar != nil {
-				progressBar.Finish()
+			if err := resp.Err(); err != nil {
+				if progressBar != nil {
+					progressBar.Abort(resp.BytesComplete())
+				}
+
+				return err
 			}
 
-			if resp.Err() != nil {
-				return resp.Err()
+			if progressBar != nil {
+				progressBar.Finish()
 			}
 
 			logger.Info(i18n.T("logger.download.info.download_completed"), "path", destination)

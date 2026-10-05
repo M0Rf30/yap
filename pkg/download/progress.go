@@ -3,8 +3,8 @@ package download
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/M0Rf30/yap/v2/pkg/color"
@@ -19,7 +19,11 @@ const (
 	updateEvery = 500 * time.Millisecond
 )
 
-// ProgressBar renders a single-line in-place progress bar to stderr.
+// writeMu serializes whole-frame writes so concurrent bars never interleave
+// partial frames on a shared writer.
+var writeMu sync.Mutex
+
+// ProgressBar renders a single-line in-place progress bar to its writer.
 // It uses only stdlib — no external dependencies.
 type ProgressBar struct {
 	writer      io.Writer
@@ -71,8 +75,7 @@ func (pb *ProgressBar) Update(current int64) {
 func (pb *ProgressBar) Finish() {
 	pb.current = pb.total
 	pb.render(pb.total)
-
-	fmt.Fprintln(os.Stderr) //nolint:errcheck // best-effort newline after bar
+	pb.newline()
 
 	duration := time.Since(pb.startTime)
 
@@ -81,8 +84,31 @@ func (pb *ProgressBar) Finish() {
 		"duration", duration)
 }
 
-// render writes one bar frame to stderr using \r to overwrite the previous one.
+// Abort ends the bar after a failed or cancelled download: it renders the
+// bytes actually transferred (never 100%) and does not log completion.
+func (pb *ProgressBar) Abort(current int64) {
+	pb.current = current
+	pb.render(current)
+	pb.newline()
+}
+
+func (pb *ProgressBar) newline() {
+	if pb.writer == nil {
+		return
+	}
+
+	writeMu.Lock()
+	defer writeMu.Unlock()
+
+	fmt.Fprintln(pb.writer) //nolint:errcheck // best-effort newline after bar
+}
+
+// render writes one bar frame to the writer using \r to overwrite the previous one.
 func (pb *ProgressBar) render(current int64) {
+	if pb.writer == nil {
+		return
+	}
+
 	pct := pb.percent(current)
 	filled := barWidth * pct / 100
 	bar := strings.Repeat(barFull, filled) + strings.Repeat(barEmpty, barWidth-filled)
@@ -99,7 +125,10 @@ func (pb *ProgressBar) render(current int64) {
 	line := fmt.Sprintf("\r%s %s %3d%% [%s]%s [%s]",
 		prefix, pb.title, pct, bar, speed, fmtDuration(elapsed))
 
-	fmt.Fprint(os.Stderr, line) //nolint:errcheck // best-effort progress output
+	writeMu.Lock()
+	defer writeMu.Unlock()
+
+	fmt.Fprint(pb.writer, line) //nolint:errcheck // best-effort progress output
 }
 
 func (pb *ProgressBar) percent(current int64) int {
