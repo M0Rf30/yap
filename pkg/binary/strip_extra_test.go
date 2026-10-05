@@ -206,6 +206,44 @@ func TestReadBuildID_ELFWithLongerBuildID(t *testing.T) {
 	}
 }
 
+// TestReadBuildID_MalformedNoteSizes ensures attacker-controlled note sizes
+// that would wrap a uint32 offset do not panic.
+func TestReadBuildID_MalformedNoteSizes(t *testing.T) {
+	cases := []struct {
+		name     string
+		nameSize uint32
+		descSize uint32
+	}{
+		{"descsize wraps uint32", 0, 0xFFFFFFFC},
+		{"namesize wraps uint32", 0xFFFFFFFC, 4},
+		{"descsize beyond data", 4, 1 << 20},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := filepath.Join(t.TempDir(), "malformed.elf")
+			writeELFWithBuildID(t, f, []byte{0xde, 0xad, 0xbe, 0xef})
+
+			data, err := os.ReadFile(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// The note payload starts right after the 64-byte ELF header.
+			enc.LittleEndian.PutUint32(data[64:], tc.nameSize)
+			enc.LittleEndian.PutUint32(data[68:], tc.descSize)
+
+			if err := os.WriteFile(f, data, 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			if got := binary.ReadBuildID(f); got != "" {
+				t.Errorf("expected empty build-id for malformed note, got %q", got)
+			}
+		})
+	}
+}
+
 func TestReadBuildID_EmptyFile(t *testing.T) {
 	tmp := t.TempDir()
 	f := filepath.Join(tmp, "empty")
