@@ -155,9 +155,9 @@ func TestExtract_RejectsTraversal(t *testing.T) {
 // dpkg/rpm/apk accept them.
 //
 // The traversal-through-symlink attack (link foo -> /etc + write foo/passwd)
-// is blocked by safeJoin on every entry's *own write path*, not the symlink
-// target. Creating the link itself is harmless: no follow-up write happens
-// inside the extraction loop that resolves through the link.
+// is blocked by resolving every entry's parent path inside the root, so a
+// follow-up write through the link lands inside the extraction root (see
+// TestExtract_SymlinkDoesNotEscapeRoot).
 func TestExtract_AllowsAbsoluteSymlinkTarget(t *testing.T) {
 	tmp := t.TempDir()
 	tarPath := filepath.Join(tmp, "abs-sym.tar.gz")
@@ -246,5 +246,107 @@ func TestExtract_AllowsLegitimateArchive(t *testing.T) {
 
 	if string(got) != "ok" {
 		t.Fatalf("content mismatch: %q", string(got))
+	}
+}
+
+func tarBytes(t *testing.T, hdrs []tar.Header, bodies []string) string {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	tw := tar.NewWriter(&buf)
+
+	for i := range hdrs {
+		hdrs[i].Size = int64(len(bodies[i]))
+		if err := tw.WriteHeader(&hdrs[i]); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := tw.Write([]byte(bodies[i])); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_ = tw.Close()
+
+	p := filepath.Join(t.TempDir(), "a.tar")
+	if err := os.WriteFile(p, buf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	return p
+}
+
+func TestExtract_SymlinkDoesNotEscapeRoot(t *testing.T) {
+	for _, target := range []string{"__OUT__", "../.."} {
+		tmp := t.TempDir()
+		dest := filepath.Join(tmp, "dest")
+		outside := filepath.Join(tmp, "outside")
+
+		for _, d := range []string{dest, outside} {
+			if err := os.MkdirAll(d, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if target == "__OUT__" {
+			target = outside
+		}
+
+		p := tarBytes(t, []tar.Header{
+			{Name: "link", Typeflag: tar.TypeSymlink, Linkname: target, Mode: 0o777},
+			{Name: "link/x", Typeflag: tar.TypeReg, Mode: 0o644},
+		}, []string{"", "pwned"})
+
+		_ = archive.Extract(context.Background(), p, dest)
+
+		for _, bad := range []string{
+			filepath.Join(outside, "x"), filepath.Join(tmp, "x"),
+			filepath.Join(filepath.Dir(tmp), "x"),
+		} {
+			if _, err := os.Lstat(bad); err == nil {
+				t.Fatalf("target %q: wrote outside root at %s", target, bad)
+			}
+		}
+	}
+}
+
+func TestExtract_HardlinkAndPaxGlobal(t *testing.T) {
+	dest := t.TempDir()
+	p := tarBytes(t, []tar.Header{
+		{Name: "pax_global_header", Typeflag: tar.TypeXGlobalHeader},
+		{Name: "a", Typeflag: tar.TypeReg, Mode: 0o644},
+		{Name: "b", Typeflag: tar.TypeLink, Linkname: "a", Mode: 0o644},
+	}, []string{"", "hello", ""})
+
+	if err := archive.Extract(context.Background(), p, dest); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Lstat(filepath.Join(dest, "pax_global_header")); err == nil {
+		t.Fatal("pax_global_header must not be extracted")
+	}
+
+	got, err := os.ReadFile(filepath.Join(dest, "b"))
+	if err != nil || string(got) != "hello" {
+		t.Fatalf("hardlink content = %q, %v", got, err)
+	}
+}
+
+func TestExtract_OverwritesSameSizeFile(t *testing.T) {
+	dest := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dest, "a"), []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	p := tarBytes(t, []tar.Header{{Name: "a", Typeflag: tar.TypeReg, Mode: 0o644}},
+		[]string{"new"})
+	if err := archive.Extract(context.Background(), p, dest); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := os.ReadFile(filepath.Join(dest, "a"))
+	if string(got) != "new" {
+		t.Fatalf("stale content %q", got)
 	}
 }

@@ -12,6 +12,8 @@ type archiveEntry struct {
 	Mode       fs.FileMode                   // File mode (permissions + type bits)
 	IsDir      bool                          // True if this is a directory
 	IsSymlink  bool                          // True if this is a symlink
+	IsHardlink bool                          // True if this is a hardlink (LinkTarget = archive path)
+	Skip       bool                          // True for metadata/special entries to ignore
 	LinkTarget string                        // Symlink target (only valid if IsSymlink)
 	Size       int64                         // File size in bytes
 	ModTime    time.Time                     // Modification time

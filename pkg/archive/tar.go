@@ -565,15 +565,6 @@ func (tic *tarIteratorWithCloser) Close() error {
 	return nil
 }
 
-// ensureParent creates the parent directory of path if not already seen.
-func ensureParent(path string, dirMap map[string]bool) {
-	parent := filepath.Dir(path)
-	if _, seen := dirMap[parent]; !seen {
-		dirMap[parent] = true
-		_ = os.MkdirAll(parent, 0o755)
-	}
-}
-
 // extractFromReaderAt resets f and dispatches to an iterator built from a
 // ReaderAt-style archive (zip, 7z). The shared shape is hoisted here so each
 // concrete extractor reduces to a single buildIter call.

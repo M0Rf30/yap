@@ -4,10 +4,12 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/M0Rf30/yap/v2/pkg/buffers"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // extractWithIterator is the shared extraction loop that works with any entryIterator.
@@ -23,8 +25,6 @@ func extractWithIterator(
 ) error {
 	defer func() { _ = it.Close() }()
 
-	dirMap := make(map[string]bool)
-
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -39,7 +39,7 @@ func extractWithIterator(
 			return err
 		}
 
-		if !matchesAny(patterns, entry.Name) {
+		if entry.Skip || !matchesAny(patterns, entry.Name) {
 			continue
 		}
 
@@ -53,8 +53,12 @@ func extractWithIterator(
 
 		switch {
 		case entry.IsDir:
-			dirMap[cleanPath] = true
-			if err := os.MkdirAll(cleanPath, 0o755); err != nil {
+			dirPath, err := resolveWithin(destination, cleanPath, true)
+			if err != nil {
+				return err
+			}
+
+			if err := os.MkdirAll(dirPath, 0o755); err != nil {
 				return err
 			}
 
@@ -86,18 +90,30 @@ func extractWithIterator(
 				return err
 			}
 
-			ensureParent(cleanPath, dirMap)
-			_ = os.Remove(cleanPath)
+			linkPath, err := prepareTarget(destination, cleanPath)
+			if err != nil {
+				return err
+			}
 
-			if err := os.Symlink(target, cleanPath); err != nil {
+			_ = os.Remove(linkPath)
+
+			if err := os.Symlink(target, linkPath); err != nil {
+				return err
+			}
+
+		case entry.IsHardlink:
+			if err := extractHardlink(destination, cleanPath, entry.LinkTarget); err != nil {
 				return err
 			}
 
 		default:
 			// Regular file
-			ensureParent(cleanPath, dirMap)
+			filePath, err := prepareTarget(destination, cleanPath)
+			if err != nil {
+				return err
+			}
 
-			if err := writeFileFromEntry(cleanPath, &entry); err != nil {
+			if err := writeFileFromEntry(filePath, &entry); err != nil {
 				return err
 			}
 		}
@@ -107,13 +123,6 @@ func extractWithIterator(
 // writeFileFromEntry creates path with the mode from entry and streams the entry body
 // from entry.Open().
 func writeFileFromEntry(path string, entry *archiveEntry) error {
-	// Skip rewriting identical files to support resumed extractions.
-	if existing, err := os.Stat(path); err == nil && existing.Size() == entry.Size {
-		logger.Debug(i18n.T("logger.archive.debug.skip_exists"), "path", path)
-
-		return nil
-	}
-
 	out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, entry.Mode.Perm()) //nolint:gosec
 	if err != nil {
 		return err
@@ -144,4 +153,72 @@ func writeFileFromEntry(path string, entry *archiveEntry) error {
 	buffers.DefaultBufferPool.Put(copyBuf)   //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
 
 	return err
+}
+
+// resolveWithin maps cleanPath (lexically inside destination) to a host path that is
+// guaranteed to stay inside destination even when earlier entries planted symlinks.
+// When full is false the final path component is not resolved, so an existing symlink
+// there can be replaced instead of followed. destination "/" keeps lexical behaviour.
+func resolveWithin(destination, cleanPath string, full bool) (string, error) {
+	root := filepath.Clean(destination)
+	if root == string(filepath.Separator) {
+		return cleanPath, nil
+	}
+
+	rel, err := filepath.Rel(root, cleanPath)
+	if err != nil {
+		return "", err
+	}
+
+	if full || rel == "." {
+		return safepath.ResolveInRoot(root, rel)
+	}
+
+	parent, err := safepath.ResolveInRoot(root, filepath.Dir(rel))
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(parent, filepath.Base(rel)), nil
+}
+
+// prepareTarget resolves the entry path, creates its parent directory inside the
+// root and removes a pre-existing symlink at the final component.
+func prepareTarget(destination, cleanPath string) (string, error) {
+	p, err := resolveWithin(destination, cleanPath, false)
+	if err != nil {
+		return "", err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return "", err
+	}
+
+	if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		_ = os.Remove(p)
+	}
+
+	return p, nil
+}
+
+// extractHardlink creates path as a hardlink to an already-extracted archive member.
+func extractHardlink(destination, cleanPath, linkName string) error {
+	srcClean, err := safeJoin(destination, linkName)
+	if err != nil {
+		return err
+	}
+
+	src, err := resolveWithin(destination, srcClean, false)
+	if err != nil {
+		return err
+	}
+
+	dst, err := prepareTarget(destination, cleanPath)
+	if err != nil {
+		return err
+	}
+
+	_ = os.Remove(dst)
+
+	return os.Link(src, dst)
 }
