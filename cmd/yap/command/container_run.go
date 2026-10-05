@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,6 +131,16 @@ func RunCommandInContainer(image, workDir string, subArgs []string) bool {
 func RunPipelineInContainer(
 	image, workDir string, buildArgs, prepareArgs []string, skipPrepare bool,
 ) bool {
+	return RunPipelineInContainerEnv(image, workDir, buildArgs, prepareArgs, skipPrepare, nil)
+}
+
+// RunPipelineInContainerEnv is RunPipelineInContainer with extra environment
+// variables injected into the container (used for secrets such as the signing
+// passphrase, which must not travel on the command line).
+func RunPipelineInContainerEnv(
+	image, workDir string, buildArgs, prepareArgs []string, skipPrepare bool,
+	env map[string]string,
+) bool {
 	if IsInsideContainer() {
 		return false
 	}
@@ -160,7 +171,14 @@ func RunPipelineInContainer(
 		shellCmd = "yap " + shellJoinArgs(prepareArgs) + " && " + buildCmd
 	}
 
-	if err := rt.RunShell(image, workDir, shellCmd); err != nil {
+	var runErr error
+	if len(env) > 0 {
+		runErr = rt.RunShellCapture(context.Background(), image, workDir, shellCmd, env, nil)
+	} else {
+		runErr = rt.RunShell(image, workDir, shellCmd)
+	}
+
+	if err := runErr; err != nil {
 		logger.Error(i18n.T("logger.command.error.container_pipeline_failed"), "error", err)
 		os.Exit(1)
 	}

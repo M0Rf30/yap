@@ -85,7 +85,7 @@ func printOrganizedFlags(cmd *cobra.Command) {
 			"pkgver", "pkgrel",
 		},
 		"Source Access": {
-			"ssh-password",
+			flagSSHPassword,
 		},
 		"Build Range Control": {
 			flagFrom, "to",
