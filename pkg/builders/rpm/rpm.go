@@ -31,6 +31,12 @@ const rootOwner = "root"
 type RPM struct {
 	*common.BaseBuilder
 	compression string
+	// originalSection/mappedSection remember the PKGBUILD section as written and
+	// its RPM group, so repeated PrepareFakeroot calls (split packages) do not
+	// map an already-mapped group a second time.
+	originalSection string
+	mappedSection   string
+	sectionMapped   bool
 }
 
 // NewBuilder creates a new RPM package builder with optional compression setting.
@@ -51,11 +57,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string) *RPM {
 func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch string) (string, error) {
 	r.SetTargetArchitecture(targetArch)
 
-	pkgName := fmt.Sprintf("%s-%s-%s.%s.rpm",
-		r.PKGBUILD.PkgName,
-		r.PKGBUILD.PkgVer,
-		r.PKGBUILD.PkgRel,
-		r.PKGBUILD.ArchComputed)
+	pkgName := r.packageFileName()
 
 	epoch, _ := strconv.ParseUint(r.PKGBUILD.Epoch, 10, 32)
 	if epoch == 0 {
@@ -144,6 +146,16 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 	r.LogPackageCreated(cleanFilePath)
 
 	return cleanFilePath, nil
+}
+
+// packageFileName returns the RPM artifact file name. RPM file names never
+// carry the epoch; it lives only in the package metadata.
+func (r *RPM) packageFileName() string {
+	return fmt.Sprintf("%s-%s-%s.%s.rpm",
+		r.PKGBUILD.PkgName,
+		r.PKGBUILD.PkgVer,
+		r.PKGBUILD.PkgRel,
+		r.PKGBUILD.ArchComputed)
 }
 
 // PrepareFakeroot sets up the environment for building an RPM package in a fakeroot context.
@@ -302,7 +314,7 @@ func asRPMDirectory(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	return &rpmpack.RPMFile{
 		Name: entry.Destination, // Set the destination name.
 		// Set the mode to indicate it's a directory.
-		Mode:  uint(fileInfo.Mode()) | files.TagDirectory,
+		Mode:  posixMode(fileInfo.Mode()) | files.TagDirectory,
 		MTime: mTime,     // Set the modification time.
 		Owner: rootOwner, // Set the owner to "root".
 		Group: rootOwner, // Set the group to "root".
@@ -337,13 +349,13 @@ func asRPMFile(
 
 	// Create and return an RPMFile object for the regular file.
 	return &rpmpack.RPMFile{
-		Name:  entry.Destination,     // Set the destination name.
-		Body:  data,                  // Set the file data.
-		Mode:  uint(fileInfo.Mode()), // Set the file mode.
-		MTime: mTime,                 // Set the modification time.
-		Owner: rootOwner,             // Set the owner to "root".
-		Group: rootOwner,             // Set the group to "root".
-		Type:  fileType,              // Set the file type.
+		Name:  entry.Destination,          // Set the destination name.
+		Body:  data,                       // Set the file data.
+		Mode:  posixMode(fileInfo.Mode()), // Set the POSIX file mode.
+		MTime: mTime,                      // Set the modification time.
+		Owner: rootOwner,                  // Set the owner to "root".
+		Group: rootOwner,                  // Set the group to "root".
+		Type:  fileType,                   // Set the file type.
 	}, nil
 }
 
@@ -410,7 +422,35 @@ func createRPMFile(entry *files.Entry) (*rpmpack.RPMFile, error) {
 // No parameters.
 // No return types.
 func (r *RPM) getGroup() {
-	r.PKGBUILD.Section = RPMGroups[r.PKGBUILD.Section]
+	if !r.sectionMapped || r.PKGBUILD.Section != r.mappedSection {
+		// Section is untouched by us (first call or externally changed).
+		r.originalSection = r.PKGBUILD.Section
+	}
+
+	r.mappedSection = RPMGroups[r.originalSection]
+	r.sectionMapped = true
+	r.PKGBUILD.Section = r.mappedSection
+}
+
+// posixMode converts a Go os.FileMode into a POSIX st_mode permission value,
+// preserving the setuid, setgid and sticky bits (which Go encodes in high
+// bits) while dropping Go-only type flags.
+func posixMode(mode os.FileMode) uint {
+	perm := uint(mode.Perm())
+
+	if mode&os.ModeSetuid != 0 {
+		perm |= 0o4000
+	}
+
+	if mode&os.ModeSetgid != 0 {
+		perm |= 0o2000
+	}
+
+	if mode&os.ModeSticky != 0 {
+		perm |= 0o1000
+	}
+
+	return perm
 }
 
 // extractFileModTimeUint32 retrieves the modification time of a file and converts it to uint32.
