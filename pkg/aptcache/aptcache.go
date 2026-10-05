@@ -13,6 +13,7 @@ package aptcache
 
 import (
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -194,7 +195,7 @@ func (c *Cache) addToBareName(name, key string) {
 	// Only add to secondary index if the key is different from the bare name
 	// (i.e., it has an arch qualifier). Bare names and arch:all entries are
 	// stored directly under the bare name, so they don't need indexing.
-	if key != name {
+	if key != name && !slices.Contains(c.byBareName[name], key) {
 		c.byBareName[name] = append(c.byBareName[name], key)
 	}
 }
