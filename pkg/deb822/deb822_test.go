@@ -376,3 +376,22 @@ Description: A package
 	assert.Equal(t, "libc6", stanzas[0]["Depends"])
 	assert.Equal(t, "A package", stanzas[0]["Description"])
 }
+
+// TestParse_ScannerErrorDoesNotFlushTruncatedStanza guards against handing a
+// half-read trailing stanza to the callback when the scanner fails (here a
+// line longer than the scanner buffer).
+func TestParse_ScannerErrorDoesNotFlushTruncatedStanza(t *testing.T) {
+	input := "Package: good\nVersion: 1.0\n\n" +
+		"Package: bad\nDescription: " + strings.Repeat("x", 300*1024) + "\n"
+
+	var stanzas []deb822.Stanza
+
+	err := deb822.Parse(strings.NewReader(input), func(s deb822.Stanza) error {
+		stanzas = append(stanzas, s)
+		return nil
+	})
+
+	require.Error(t, err)
+	require.Len(t, stanzas, 1, "only the complete stanza must be delivered")
+	assert.Equal(t, "good", stanzas[0]["Package"])
+}
