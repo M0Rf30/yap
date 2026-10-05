@@ -10,15 +10,23 @@ on:
         type: string
         default: "1.27.0"
       upload-sarif:
-        description: "Upload SARIF to GitHub Security"
+        description: "Keep the SAST SARIF report as a build artifact"
         required: false
         type: boolean
         default: true
+      run-sast:
+        description: "Run gosec static analysis (fails on findings)"
+        required: false
+        type: boolean
+        default: false
       run-vulncheck:
-        description: "Run govulncheck vulnerability scanner"
+        description: "Run govulncheck vulnerability scanner (fails on findings)"
         required: false
         type: boolean
         default: true
+
+permissions:
+  contents: read
 
 jobs:
   security-scan:
@@ -28,12 +36,13 @@ jobs:
 
     steps:
       - name: 📂 Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 🐹 Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ inputs.go-version }}
           cache: true
@@ -41,28 +50,43 @@ jobs:
       - name: 📥 Download dependencies
         run: go mod download
 
+      # SAST: gosec runs through golangci-lint so the repository's
+      # .golangci.yml gosec settings and //nolint:gosec annotations apply.
+      - name: 🔍 Run gosec (SAST)
+        if: ${{ inputs.run-sast }}
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.14.0
+          args: --enable-only=gosec --output.sarif.path=gosec.sarif ./...
+
+      - name: 📤 Upload SAST results
+        if: ${{ always() && inputs.run-sast && inputs.upload-sarif }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: sast-scan-results
+          path: gosec.sarif
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: 🛡️ Install govulncheck
         if: ${{ inputs.run-vulncheck }}
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
 
+      # govulncheck -json always exits 0, so the machine-readable report is
+      # recorded separately and the text run below is the gate.
       - name: 🔍 Run vulnerability check
         if: ${{ inputs.run-vulncheck }}
-        id: vulncheck
         run: |
+          govulncheck -json ./... > vulncheck.json || true
           echo "🔍 Running vulnerability scan..."
-
-          if govulncheck -json ./... > vulncheck.json 2>&1; then
-            echo "result=success" >> "$GITHUB_OUTPUT"
-            echo "✅ No vulnerabilities found"
-          else
-            echo "result=vulnerabilities_found" >> "$GITHUB_OUTPUT"
-            echo "⚠️ Vulnerabilities detected"
-          fi
+          govulncheck ./...
+          echo "✅ No vulnerabilities found"
 
       - name: 📤 Upload vulnerability scan results
-        if: ${{ inputs.run-vulncheck }}
-        uses: actions/upload-artifact@v7
+        if: ${{ always() && inputs.run-vulncheck }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: vulnerability-scan-results
           path: vulncheck.json
+          if-no-files-found: ignore
           retention-days: 30
