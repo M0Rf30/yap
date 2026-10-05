@@ -237,15 +237,8 @@ func TestCreateFileWalker(t *testing.T) {
 		}
 
 		// Test format-specific options
-		switch format {
-		case "pacman":
-			if !walker.Options.SkipDotFiles {
-				t.Fatalf("Format %s: should skip dot files", format)
-			}
-		case "apk":
-			if len(walker.Options.SkipPatterns) == 0 {
-				t.Fatalf("Format %s: should have skip patterns", format)
-			}
+		if format == "apk" && len(walker.Options.SkipPatterns) == 0 {
+			t.Fatalf("Format %s: should have skip patterns", format)
 		}
 	}
 }

@@ -220,11 +220,7 @@ func (bb *BaseBuilder) CreateFileWalker() *files.Walker {
 	}
 
 	// Configure format-specific options
-	switch bb.Format {
-	case formatPacman:
-		// Pacman skips dot files
-		walkOpts.SkipDotFiles = true
-	case formatApk:
+	if bb.Format == formatApk {
 		// APK skips control files starting with '.'
 		walkOpts.SkipPatterns = []string{".*"}
 	}
