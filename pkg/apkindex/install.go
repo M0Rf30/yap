@@ -4,6 +4,9 @@ import (
 	"archive/tar"
 	"bufio"
 	"context"
+	"crypto/sha1" //nolint:gosec // apk C: is SHA1
+	"encoding/base64"
+	"hash"
 	"io"
 	"os"
 	"path/filepath"
@@ -181,21 +184,14 @@ func extractAndRegister(apkPath string, pkg *Package) error {
 
 	// Use bufio.Reader so each gzip.NewReader inherits the buffered
 	// position state correctly across stream boundaries.
-	br := bufio.NewReader(f)
+	hr := &hashingReader{br: bufio.NewReader(f), h: sha1.New()} //nolint:gosec // apk C: is SHA1
 
-	// Try to read .PKGINFO from the first stream (control).
-	pkgInfo, err := tryReadPkgInfoFromNextStream(br)
+	pkgInfo, err := readControlVerified(hr, pkg)
 	if err != nil {
 		return err
 	}
 
-	// If first stream was signature (no .PKGINFO), try the next one (control).
-	if pkgInfo == "" {
-		pkgInfo, err = tryReadPkgInfoFromNextStream(br)
-		if err != nil {
-			return err
-		}
-	}
+	br := hr.br
 
 	// Now br is positioned at the data.tar.gz stream.
 	if err := extractAPKData(br); err != nil {
@@ -212,11 +208,75 @@ func extractAndRegister(apkPath string, pkg *Package) error {
 	return nil
 }
 
+// byteReader is the reader shape gzip needs to avoid read-ahead buffering.
+type byteReader interface {
+	io.Reader
+	io.ByteReader
+}
+
+// hashingReader hashes every byte consumed through it. Because it implements
+// io.ByteReader, gzip reads exactly the bytes of each member (no read-ahead).
+type hashingReader struct {
+	br *bufio.Reader
+	h  hash.Hash
+}
+
+func (r *hashingReader) Read(p []byte) (int, error) {
+	n, err := r.br.Read(p)
+	_, _ = r.h.Write(p[:n])
+
+	return n, err
+}
+
+func (r *hashingReader) ReadByte() (byte, error) {
+	b, err := r.br.ReadByte()
+	if err == nil {
+		_, _ = r.h.Write([]byte{b})
+	}
+
+	return b, err
+}
+
+// readControlVerified reads the optional signature stream and the control
+// stream, returning .PKGINFO. The SHA1 of the compressed control segment
+// (the stream holding .PKGINFO) must equal the index C: field (Q1+base64),
+// as in apk-tools.
+func readControlVerified(hr *hashingReader, pkg *Package) (string, error) {
+	for range 2 {
+		hr.h.Reset()
+
+		pkgInfo, err := tryReadPkgInfoFromNextStream(hr)
+		if err != nil {
+			return "", err
+		}
+
+		if pkgInfo == "" {
+			continue // signature stream
+		}
+
+		got := "Q1" + base64.StdEncoding.EncodeToString(hr.h.Sum(nil))
+		if pkg.Checksum == "" || got != pkg.Checksum {
+			return "", errors.New(errors.ErrTypeValidation,
+				"APK control checksum does not match repository index").
+				WithOperation("readControlVerified").
+				WithContext("package", pkg.Name).
+				WithContext("expected", pkg.Checksum).
+				WithContext("actual", got)
+		}
+
+		return pkgInfo, nil
+	}
+
+	return "", errors.New(errors.ErrTypeParser, "APK control stream with .PKGINFO not found").
+		WithOperation("readControlVerified").
+		WithContext("package", pkg.Name)
+}
+
 // tryReadPkgInfoFromNextStream reads the next gzip stream from br, looking for
 // .PKGINFO in the tar archive. Returns empty string if .PKGINFO is not found
 // (e.g., signature stream). Drains the stream so br is positioned at the next
 // member's magic bytes.
-func tryReadPkgInfoFromNextStream(br *bufio.Reader) (string, error) {
+func tryReadPkgInfoFromNextStream(br byteReader) (string, error) {
 	gz, err := gzip.NewReader(br)
 	if err != nil {
 		return "", errors.Wrap(err, errors.ErrTypeParser, "failed to create gzip reader").
