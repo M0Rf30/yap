@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
@@ -56,21 +57,17 @@ func NewGPGSigner(cfg Config, format Format) (*GPGSigner, error) {
 
 	entity := keyRing[0]
 
-	// Decrypt the key if it's encrypted
-	if entity.PrivateKey != nil && entity.PrivateKey.Encrypted {
-		err := entity.PrivateKey.Decrypt([]byte(cfg.Passphrase))
-		if err != nil {
-			return nil, errors.Wrap(err, errors.ErrTypeConfiguration,
-				"failed to decrypt GPG key with passphrase").
-				WithOperation("NewGPGSigner").
-				WithContext("key_path", cfg.KeyPath)
-		}
-	}
-
 	// Verify we have a usable private key
 	if entity.PrivateKey == nil {
 		return nil, errors.New(errors.ErrTypeConfiguration,
 			"GPG key does not contain a private key").
+			WithOperation("NewGPGSigner").
+			WithContext("key_path", cfg.KeyPath)
+	}
+
+	if err := decryptEntity(entity, []byte(cfg.Passphrase)); err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeConfiguration,
+			"failed to decrypt GPG key with passphrase").
 			WithOperation("NewGPGSigner").
 			WithContext("key_path", cfg.KeyPath)
 	}
@@ -83,6 +80,43 @@ func NewGPGSigner(cfg Config, format Format) (*GPGSigner, error) {
 		format: format,
 		entity: entity,
 	}, nil
+}
+
+// decryptEntity decrypts the primary key and every encrypted subkey with the
+// passphrase. go-crypto prefers a signing-capable subkey over the primary
+// key, so subkeys must be unlocked too. A subkey that cannot be decrypted is
+// tolerated unless it is the key that would actually sign.
+func decryptEntity(entity *openpgp.Entity, passphrase []byte) error {
+	if entity.PrivateKey.Encrypted {
+		if err := entity.PrivateKey.Decrypt(passphrase); err != nil {
+			return err //nolint:wrapcheck // wrapped by caller
+		}
+	}
+
+	var subkeyErr error
+
+	for i := range entity.Subkeys {
+		priv := entity.Subkeys[i].PrivateKey
+		if priv == nil || priv.Dummy() || !priv.Encrypted {
+			continue
+		}
+
+		if err := priv.Decrypt(passphrase); err != nil && subkeyErr == nil {
+			subkeyErr = err
+		}
+	}
+
+	if subkeyErr == nil {
+		return nil
+	}
+
+	// Only fail if the key selected for signing is still locked.
+	if key, ok := entity.SigningKey(time.Now()); ok && key.PrivateKey != nil &&
+		key.PrivateKey.Encrypted {
+		return subkeyErr //nolint:wrapcheck // wrapped by caller
+	}
+
+	return nil
 }
 
 // writeSignatureSidecar writes a signature sidecar file with the given extension.
