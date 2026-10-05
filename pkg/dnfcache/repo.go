@@ -763,30 +763,48 @@ func downloadVerifiedOnce(ctx context.Context, url, destFile, expectedSHA256 str
 
 	h := sha256.New()
 
-	if err := httpclient.AtomicWrite(destFile, func(w io.Writer) error {
-		mw := io.MultiWriter(w, h)
-		_, err := io.Copy(mw, io.LimitReader(resp.Body, 512<<20))
+	// Verify inside the AtomicWrite callback so a bad body never replaces
+	// (or momentarily appears at) the final path.
+	err = httpclient.AtomicWrite(destFile, func(w io.Writer) error {
+		written, err := io.Copy(io.MultiWriter(w, h), io.LimitReader(resp.Body, maxDownloadBytes+1))
+		if err != nil {
+			return err
+		}
 
-		return err
-	}); err != nil {
-		return err
-	}
+		if written > maxDownloadBytes {
+			return apperrors.New(apperrors.ErrTypeNetwork, "download exceeds size limit").
+				WithOperation("downloadVerified").
+				WithContext("url", url)
+		}
 
-	if expectedSHA256 != "" {
+		if expectedSHA256 == "" {
+			return nil
+		}
+
 		got := hex.EncodeToString(h.Sum(nil))
-		if got != expectedSHA256 {
-			_ = os.Remove(destFile)
-
+		if !strings.EqualFold(got, expectedSHA256) {
 			return apperrors.New(apperrors.ErrTypePackaging, "SHA256 mismatch").
 				WithOperation("downloadVerified").
 				WithContext("url", url).
 				WithContext("got", got).
 				WithContext("want", expectedSHA256)
 		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if expectedSHA256 == "" {
+		logger.Warn(i18n.T("logger.dnfcache.warn.unverified_download"), "url", url)
 	}
 
 	return nil
 }
+
+// maxDownloadBytes caps a single metadata or package download.
+const maxDownloadBytes int64 = 512 << 20
 
 // fileMatchesSHA256 returns true if path exists and its SHA256 matches expected.
 func fileMatchesSHA256(path, expected string) (bool, error) {
@@ -802,7 +820,7 @@ func fileMatchesSHA256(path, expected string) (bool, error) {
 		return false, err
 	}
 
-	return hex.EncodeToString(h.Sum(nil)) == expected, nil
+	return strings.EqualFold(hex.EncodeToString(h.Sum(nil)), expected), nil
 }
 
 // loadFromDisk scans the DNF cache directory for primary.xml* files and
