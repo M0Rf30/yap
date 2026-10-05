@@ -23,6 +23,10 @@ const (
 // setupRPM writes a yum/dnf .repo file under /etc/yum.repos.d/ and imports the
 // signing key with rpm --import when KeyURL is set.
 func setupRPM(r *Repo) error {
+	return setupRPMContext(context.Background(), r)
+}
+
+func setupRPMContext(ctx context.Context, r *Repo) error {
 	// /etc/yum.repos.d is a documented system directory and must remain
 	// traversable for unprivileged dnf/yum operations.
 	if err := os.MkdirAll(rpmRepoDir, 0o755); err != nil {
@@ -33,7 +37,7 @@ func setupRPM(r *Repo) error {
 
 	if r.KeyURL != "" {
 		gpgKey = filepath.Join(rpmGPGKeyDir, "RPM-GPG-KEY-yap-"+r.Name)
-		if err := fetchKey(r.KeyURL, gpgKey); err != nil {
+		if err := fetchKeyContext(ctx, r.KeyURL, gpgKey); err != nil {
 			return err
 		}
 

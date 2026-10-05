@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,6 +21,10 @@ const (
 // places the signing key under /etc/apt/keyrings/. The active apt is expected
 // to support the deb822 Signed-By directive (Ubuntu Focal+, Debian Bullseye+).
 func setupDeb(r *Repo) error {
+	return setupDebContext(context.Background(), r)
+}
+
+func setupDebContext(ctx context.Context, r *Repo) error {
 	if r.Suite == "" {
 		return errors.New(errors.ErrTypeValidation,
 			fmt.Sprintf("repo %q: suite is required for deb format", r.Name)).
@@ -35,7 +40,7 @@ func setupDeb(r *Repo) error {
 
 	if r.KeyURL != "" {
 		keyPath := filepath.Join(debKeyringsDir, "yap-"+r.Name+".asc")
-		if err := fetchKey(r.KeyURL, keyPath); err != nil {
+		if err := fetchKeyContext(ctx, r.KeyURL, keyPath); err != nil {
 			return err
 		}
 

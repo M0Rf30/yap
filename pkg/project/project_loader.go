@@ -2,6 +2,7 @@
 package project
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -395,7 +396,7 @@ func (mpc *MultipleProject) applyJSONDefaults() error {
 // before any package manager update so subsequent installs can resolve the new
 // sources. release is the codename/version (e.g. "jammy", "9") so that
 // per-release filtering in the Distros field works.
-func (mpc *MultipleProject) setupExtraRepos(distro, release string) error {
+func (mpc *MultipleProject) setupExtraRepos(ctx context.Context, distro, release string) error {
 	cliRepos, err := repo.ParseFlags(mpc.Opts.ExtraRepos)
 	if err != nil {
 		return err
@@ -404,7 +405,7 @@ func (mpc *MultipleProject) setupExtraRepos(distro, release string) error {
 	merged := append([]repo.Repo{}, mpc.Repos...)
 	merged = append(merged, cliRepos...)
 
-	return repo.Setup(distro, release, merged)
+	return repo.SetupContext(ctx, distro, release, merged)
 }
 
 // resolveOutputPath converts the output path to an absolute path.
