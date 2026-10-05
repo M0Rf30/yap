@@ -4,6 +4,7 @@ package render
 import (
 	"encoding/xml"
 	"fmt"
+	"html"
 	"math"
 	"os"
 	"path/filepath"
@@ -410,7 +411,7 @@ func addEdges(content *strings.Builder, graphData *graph.Data, showExternal bool
     <title>%s → %s (%s dependency)</title>
   </path>`,
 				fromX, fromY, controlX, controlY, toX, toY, class, strokeWidth,
-				fromNode.Name, toNode.Name, edge.Type)
+				esc(fromNode.Name), esc(toNode.Name), esc(edge.Type))
 		} else {
 			// Fallback for zero distance (shouldn't happen but safety first)
 			fmt.Fprintf(content, `
@@ -418,7 +419,7 @@ func addEdges(content *strings.Builder, graphData *graph.Data, showExternal bool
     <title>%s → %s (%s dependency)</title>
   </line>`,
 				fromX, fromY, toX, toY, class, strokeWidth,
-				fromNode.Name, toNode.Name, edge.Type)
+				esc(fromNode.Name), esc(toNode.Name), esc(edge.Type))
 		}
 	}
 }
@@ -529,14 +530,14 @@ Type: %s</title>
     </rect>
     <text x="%.1f" y="%.1f" class="node-text">%s</text>`,
 			rectX, rectY, rectWidth, rectHeight, class,
-			displayName, node.PkgName, node.Version, node.Release, node.Level, nodeType,
-			node.X, node.Y-5, displayName)
+			esc(displayName), esc(node.PkgName), esc(node.Version), esc(node.Release),
+			node.Level, nodeType, node.X, node.Y-5, esc(displayName))
 
 		// Version text for internal nodes
 		if !node.IsExternal && node.Version != "" {
 			fmt.Fprintf(content, `
     <text x="%.1f" y="%.1f" class="version-text">v%s</text>`,
-				node.X, node.Y+12, node.Version)
+				node.X, node.Y+12, esc(node.Version))
 		}
 
 		// Level badge for internal nodes
@@ -552,6 +553,12 @@ Type: %s</title>
 		content.WriteString(`
   </g>`)
 	}
+}
+
+// esc escapes text for safe interpolation into SVG/XML element content.
+// Names and versions originate from PKGBUILD files and must never be trusted.
+func esc(s string) string {
+	return html.EscapeString(s)
 }
 
 // addLegend adds the legend to the SVG content.
