@@ -16,6 +16,16 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/yapdb"
 )
 
+// rooted returns p re-rooted under rootDir. An empty rootDir or "/" leaves
+// p unchanged so the live host layout is preserved.
+func rooted(rootDir, p string) string {
+	if rootDir == "" || rootDir == "/" {
+		return p
+	}
+
+	return filepath.Join(rootDir, p)
+}
+
 const (
 	dpkgStatusPath = "/var/lib/dpkg/status"
 	dpkgLockPath   = "/var/lib/dpkg/lock"
@@ -102,17 +112,18 @@ func flushDpkgStatusEntry(st *dpkgParseState, entries map[string]*dpkgStatusEntr
 }
 
 // readDpkgStatus reads and parses /var/lib/dpkg/status.
-func readDpkgStatus() (map[string]*dpkgStatusEntry, error) {
+func readDpkgStatus(rootDir string) (map[string]*dpkgStatusEntry, error) {
 	entries := make(map[string]*dpkgStatusEntry)
+	statusPath := rooted(rootDir, dpkgStatusPath)
 
-	data, err := os.ReadFile(dpkgStatusPath)
+	data, err := os.ReadFile(statusPath) //nolint:gosec // rooted constant path
 	if err != nil {
 		if os.IsNotExist(err) {
 			return entries, nil // File doesn't exist yet; that's OK.
 		}
 
 		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "read dpkg status").
-			WithOperation("readDpkgStatus").WithContext("path", dpkgStatusPath)
+			WithOperation("readDpkgStatus").WithContext("path", statusPath)
 	}
 
 	if err := deb822.Parse(strings.NewReader(string(data)), func(stanzaMap deb822.Stanza) error {
@@ -136,7 +147,7 @@ func readDpkgStatus() (map[string]*dpkgStatusEntry, error) {
 		return nil
 	}); err != nil {
 		return nil, errors.Wrap(err, errors.ErrTypeParser, "parse dpkg status").
-			WithOperation("readDpkgStatus").WithContext("path", dpkgStatusPath)
+			WithOperation("readDpkgStatus").WithContext("path", statusPath)
 	}
 
 	return entries, nil
@@ -154,10 +165,11 @@ func readDpkgStatus() (map[string]*dpkgStatusEntry, error) {
 // otherwise leave the system with no status database at all, and the next
 // installer invocation would happily write a one-entry file, permanently
 // forgetting every previously-installed package.
-func writeDpkgStatus(entries map[string]*dpkgStatusEntry) error {
-	tmpPath := dpkgStatusPath + ".dpkg-tmp"
+func writeDpkgStatus(rootDir string, entries map[string]*dpkgStatusEntry) error {
+	statusPath := rooted(rootDir, dpkgStatusPath)
+	tmpPath := statusPath + ".dpkg-tmp"
 
-	f, err := os.OpenFile(tmpPath,
+	f, err := os.OpenFile(tmpPath, //nolint:gosec // rooted constant path
 		os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "create temp status file").
@@ -188,7 +200,7 @@ func writeDpkgStatus(entries map[string]*dpkgStatusEntry) error {
 
 	// Atomic clobber. On POSIX, rename(2) replaces the destination
 	// atomically — no window where dpkgStatusPath is missing.
-	if err := os.Rename(tmpPath, dpkgStatusPath); err != nil {
+	if err := os.Rename(tmpPath, statusPath); err != nil {
 		_ = os.Remove(tmpPath)
 
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "rename status file").
@@ -430,7 +442,7 @@ func updateDpkgStatusForPackage(
 	opts Options,
 	files []string,
 ) error {
-	entries, err := readDpkgStatus()
+	entries, err := readDpkgStatus(rootDir)
 	if err != nil {
 		return err
 	}
@@ -472,7 +484,7 @@ func updateDpkgStatusForPackage(
 
 	// Optionally write to dpkg status file.
 	if opts.WriteDpkgStatus {
-		if err := writeDpkgStatus(entries); err != nil {
+		if err := writeDpkgStatus(rootDir, entries); err != nil {
 			return err
 		}
 	}
@@ -481,7 +493,7 @@ func updateDpkgStatusForPackage(
 }
 
 // ensureDpkgDirs creates /var/lib/dpkg and /var/lib/dpkg/info if they don't exist.
-func ensureDpkgDirs() error {
+func ensureDpkgDirs(rootDir string) error {
 	dirs := []string{
 		"/var/lib/dpkg",
 		"/var/lib/dpkg/info",
@@ -489,6 +501,7 @@ func ensureDpkgDirs() error {
 	}
 
 	for _, dir := range dirs {
+		dir = rooted(rootDir, dir)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return errors.Wrap(err, errors.ErrTypeFileSystem, "mkdir").
 				WithOperation("ensureDpkgDirs").WithContext("path", dir)
@@ -512,10 +525,11 @@ type dpkgLockFile struct {
 //
 // Only permission errors (e.g. non-root on a developer workstation) yield a
 // no-op lock; every other failure, including a held lock, is returned.
-func acquireDpkgLock() (*dpkgLockFile, error) {
+func acquireDpkgLock(rootDir string) (*dpkgLockFile, error) {
 	l := &dpkgLockFile{}
 
-	for _, path := range []string{dpkgLockFrontendPath, dpkgLockPath} {
+	for _, lp := range []string{dpkgLockFrontendPath, dpkgLockPath} {
+		path := rooted(rootDir, lp)
 		// nolint:gosec // G304: constant path
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o640)
 		if err != nil {
@@ -561,14 +575,14 @@ func (l *dpkgLockFile) Release() {
 }
 
 // writeDpkgInfoFiles writes the /var/lib/dpkg/info/<pkg>.* files for an installed package.
-func writeDpkgInfoFiles(pkgName, arch string, contents *debContents) error {
+func writeDpkgInfoFiles(rootDir, pkgName, arch string, contents *debContents) error {
 	// Determine the base name (with arch qualifier if Multi-Arch: same).
 	baseName := pkgName
 	if arch != "" && strings.Contains(contents.Control, "Multi-Arch: same") {
 		baseName = pkgName + ":" + arch
 	}
 
-	infoDir := "/var/lib/dpkg/info"
+	infoDir := rooted(rootDir, dpkgInfoDir)
 
 	// Write .list file (file paths).
 	listPath := filepath.Join(infoDir, baseName+".list")

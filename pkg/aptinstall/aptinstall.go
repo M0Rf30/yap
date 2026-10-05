@@ -36,9 +36,9 @@ import (
 
 // Options controls Install's runtime behaviour.
 //
-// RootDir is the filesystem root the installation writes into. Only "/"
-// (or empty) is currently supported by InstallWithOptions: dpkg state and
-// maintainer scripts are host-global, so other values are rejected.
+// RootDir is the filesystem root the installation writes into. dpkg state
+// (status, info/, locks, yapdb) is re-rooted under it; maintainer scripts and
+// ldconfig run chrooted into it when privileged and are skipped otherwise.
 //
 //   - "" / "/" → install into the live system root. Refused unless
 //     AllowRootInstall is true: the typical caller is yap running inside a
@@ -89,18 +89,8 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 		return err
 	}
 
-	// dpkg state files, maintainer scripts and the lock are only handled
-	// on the live host root; a non-"/" RootDir would silently mutate the
-	// host, so refuse it instead of half-honouring it.
-	if filepath.Clean(rootDir) != "/" {
-		return errors.New(errors.ErrTypeConfiguration,
-			"aptinstall: Options.RootDir other than \"/\" is not supported "+
-				"(dpkg state and maintainer scripts operate on the host)").
-			WithOperation("Install").WithContext("root_dir", rootDir)
-	}
-
 	// Ensure dpkg directories exist before locking inside them.
-	if err := ensureDpkgDirs(); err != nil {
+	if err := ensureDpkgDirs(rootDir); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "ensure dpkg dirs").
 			WithOperation("Install")
 	}
@@ -108,7 +98,7 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 	// Take the dpkg lock for the duration of the transaction so concurrent
 	// dpkg/apt processes (or accidental re-entry) can't race the status
 	// file read-modify-write cycle.
-	lock, err := acquireDpkgLock()
+	lock, err := acquireDpkgLock(rootDir)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "acquire dpkg lock").
 			WithOperation("Install")
@@ -143,7 +133,7 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 	// Refresh dynamic linker cache exactly once per transaction (vs once
 	// per package), iff requested.
 	if opts.RunLDConfig {
-		RefreshLDCache()
+		refreshLDCacheAt(rootDir)
 	}
 
 	logger.Info(i18n.T("logger.aptinstall.info.installation_complete"), "count", len(pkgs))
@@ -271,12 +261,12 @@ func resolveAndPrepare(
 // The OLD version must come from /var/lib/dpkg/status, NOT from the
 // newly-downloaded .deb's control file (which carries the NEW version
 // we're about to install).
-func currentInstalledVersion(pkg *aptcache.PackageInfo) string {
+func currentInstalledVersion(rootDir string, pkg *aptcache.PackageInfo) string {
 	if !pkg.Installed {
 		return ""
 	}
 
-	entries, err := readDpkgStatus()
+	entries, err := readDpkgStatus(rootDir)
 	if err != nil {
 		return ""
 	}
@@ -310,7 +300,7 @@ func installPackage(
 
 	logger.Debug(i18n.T("logger.aptinstall.debug.installing"), "package", pkgName, "arch", arch)
 
-	oldVersion := currentInstalledVersion(pkg)
+	oldVersion := currentInstalledVersion(rootDir, pkg)
 
 	// Sequence mirrors dpkg's own unpack flow:
 	//
@@ -330,14 +320,14 @@ func installPackage(
 	// script blew up with "exec of postinst configure failed: No such
 	// file or directory" because $0 didn't refer to any real file.
 
-	if err := writeDpkgInfoFiles(pkgName, arch, contents); err != nil {
+	if err := writeDpkgInfoFiles(rootDir, pkgName, arch, contents); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "write dpkg info files").
 			WithContext("package", pkgName).
 			WithOperation("installPackage")
 	}
 
 	if err := runMaintainerScript(
-		ctx, "preinst", pkgName, arch, contents, oldVersion,
+		ctx, rootDir, "preinst", pkgName, arch, contents, oldVersion,
 	); err != nil {
 		return err
 	}
@@ -369,7 +359,7 @@ func installPackage(
 	// debconf-driven scripts that hit unconfigured tty, packages that
 	// shell out to systemctl in a container without systemd.
 	postinstErr := runMaintainerScript(
-		ctx, "postinst", pkgName, arch, contents, oldVersion,
+		ctx, rootDir, "postinst", pkgName, arch, contents, oldVersion,
 	)
 
 	finalState := "install ok installed"
@@ -403,7 +393,7 @@ func installPackage(
 // when the package ships no script for the given phase.
 func runMaintainerScript(
 	ctx context.Context,
-	phase, pkgName, arch string,
+	rootDir, phase, pkgName, arch string,
 	contents *debContents,
 	oldVersion string,
 ) error {
@@ -435,8 +425,15 @@ func runMaintainerScript(
 			WithOperation("runMaintainerScript").WithContext("phase", phase)
 	}
 
+	if !canRunScripts(rootDir) {
+		logger.Warn("skipping maintainer script: chroot into RootDir requires root",
+			"package", pkgName, "script", phase, "root_dir", rootDir)
+
+		return nil
+	}
+
 	scriptPath := scriptletPathForPackage(pkgName, arch, contents.Control, phase)
-	if err := runScriptlet(ctx, scriptPath, phase, pkgName, action, args...); err != nil {
+	if err := runScriptlet(ctx, rootDir, scriptPath, phase, pkgName, action, args...); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, phase+" failed").
 			WithContext("package", pkgName).
 			WithOperation("installPackage")
@@ -480,9 +477,22 @@ func filterForeignArchPackages(pkgs []*aptcache.PackageInfo) []*aptcache.Package
 	return filtered
 }
 
+// canRunScripts reports whether maintainer scripts may run for rootDir:
+// always for the host root, and for other roots only when privileged
+// (chroot(2) requires root).
+func canRunScripts(rootDir string) bool {
+	return rootDir == "" || filepath.Clean(rootDir) == "/" || os.Geteuid() == 0
+}
+
 // RefreshLDCache runs ldconfig to refresh the dynamic linker cache.
 // Non-fatal: if ldconfig is not found or fails, we log a warning but continue.
 func RefreshLDCache() {
+	refreshLDCacheAt("/")
+}
+
+// refreshLDCacheAt runs ldconfig against rootDir (ldconfig -r for non-host
+// roots; skipped with a warning when unprivileged).
+func refreshLDCacheAt(rootDir string) {
 	bin, err := exec.LookPath("ldconfig")
 	if err != nil {
 		logger.Debug(i18n.T("logger.aptinstall.debug.ldconfig_not_found_skipping"))
@@ -490,8 +500,20 @@ func RefreshLDCache() {
 		return
 	}
 
+	var args []string
+
+	if rootDir != "" && filepath.Clean(rootDir) != "/" {
+		if !canRunScripts(rootDir) {
+			logger.Warn("skipping ldconfig: -r RootDir requires root", "root_dir", rootDir)
+
+			return
+		}
+
+		args = []string{"-r", rootDir}
+	}
+
 	// nolint:noctx // ldconfig is a system utility, not a network call
-	cmd := exec.Command(bin)
+	cmd := exec.Command(bin, args...)
 
 	if err := cmd.Run(); err != nil {
 		logger.Warn(i18n.T("logger.aptinstall.warn.ldconfig_failed"), "error", err)

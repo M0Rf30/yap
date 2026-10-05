@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -74,12 +75,12 @@ func hasEnvKey(env []string, key string) bool {
 // path, matching dpkg's own behaviour.
 func runScriptlet(
 	ctx context.Context,
-	scriptPath, scriptName, pkgName, action string,
+	rootDir, scriptPath, scriptName, pkgName, action string,
 	args ...string,
 ) error {
 	// Sanity: the file must exist or /bin/sh will fail with a confusing
 	// error message.
-	if _, err := os.Stat(scriptPath); err != nil {
+	if _, err := os.Stat(rooted(rootDir, scriptPath)); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "scriptlet not on disk").
 			WithOperation("runScriptlet").WithContext("scriptlet", scriptName).WithContext("path", scriptPath)
 	}
@@ -90,6 +91,14 @@ func runScriptlet(
 
 	cmdArgs := append([]string{scriptPath, action}, args...)
 	cmd := exec.CommandContext(ctx, "/bin/sh", cmdArgs...)
+
+	// For a non-host root, run the script chrooted into it so that
+	// scriptPath (an in-root path) and every file it touches resolve
+	// inside rootDir rather than on the host.
+	if rootDir != "" && rootDir != "/" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Chroot: rootDir}
+		cmd.Dir = "/"
+	}
 
 	cmd.Env = append(filterScriptletEnv(),
 		"DEBIAN_FRONTEND=noninteractive",
