@@ -3,6 +3,7 @@ package options
 import (
 	"compress/gzip"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,6 +32,8 @@ func ZipMan(packageDir string) error {
 			continue
 		}
 
+		var links []string
+
 		err := filepath.WalkDir(target, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err
@@ -40,7 +43,15 @@ func ZipMan(packageDir string) error {
 				return nil
 			}
 
-			// Skip already-compressed files and symlinks.
+			// Never follow symlinks: the target may already have been
+			// compressed (dangling link) or live on the build host.
+			if d.Type()&fs.ModeSymlink != 0 {
+				links = append(links, path)
+
+				return nil
+			}
+
+			// Skip already-compressed files.
 			if strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".bz2") ||
 				strings.HasSuffix(path, ".xz") || strings.HasSuffix(path, ".zst") {
 				return nil
@@ -51,9 +62,42 @@ func ZipMan(packageDir string) error {
 		if err != nil {
 			return err
 		}
+
+		for _, link := range links {
+			if err := retargetManSymlink(link); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
+}
+
+// retargetManSymlink re-points a relative symlink at the gzipped copy of its
+// target (as makepkg does), renaming the link to carry the .gz suffix. Links
+// whose target was not compressed inside the package are left untouched.
+func retargetManSymlink(link string) error {
+	dest, err := os.Readlink(link)
+	if err != nil {
+		return err
+	}
+
+	if filepath.IsAbs(dest) || strings.HasSuffix(dest, ".gz") {
+		return nil
+	}
+
+	resolved := filepath.Join(filepath.Dir(link), dest) + ".gz"
+
+	info, err := os.Lstat(resolved)
+	if err != nil || !info.Mode().IsRegular() {
+		return nil //nolint:nilerr // target was not compressed; leave link alone
+	}
+
+	if err := os.Symlink(dest+".gz", link+".gz"); err != nil {
+		return err
+	}
+
+	return os.Remove(link)
 }
 
 // gzipFile compresses a single file in-place, replacing it with a .gz version.

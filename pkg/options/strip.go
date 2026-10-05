@@ -64,6 +64,12 @@ func processFileWithEnv(binary string, dirEntry fs.DirEntry, err error, env map[
 		return nil
 	}
 
+	// Never follow symlinks: stat/chmod/strip would act on the link target,
+	// which may be a host file outside the package tree.
+	if dirEntry.Type()&fs.ModeSymlink != 0 {
+		return nil
+	}
+
 	// Always try to ensure the file is writable before stripping
 	logger.Debug(i18n.T("logger.options.debug.ensuring_file_writable_before"), "file", binary)
 
