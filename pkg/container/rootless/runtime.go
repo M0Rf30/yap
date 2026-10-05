@@ -52,11 +52,12 @@ func (r *Runtime) RunShell(distro, workDir, shellCmd string) error {
 // We log a warning and fall through to RunShell — callers still get a
 // correct success/failure signal, just no captured stream.
 //
-// env is forwarded to the child via os.Setenv/Unsetenv around the
-// rootlesskit invocation; values therefore never appear in the shell
-// argv (no `ps`/`/proc/<pid>/cmdline` leak) — the same invariant the CLI
-// backend honours via `-e KEY=VAL`. We restore any pre-existing values
-// so concurrent callers in the same process don't observe stale state.
+// env is forwarded to the command inside the rootfs via the process
+// environment for the duration of the (serialised) run; values therefore
+// never appear in the shell argv (no `ps`/`/proc/<pid>/cmdline` leak) — the
+// same invariant the CLI backend honours via `-e KEY=VAL`. Previous values
+// are restored on return and concurrent runs are serialised, so callers
+// never observe each other's variables.
 //
 // ctx is accepted for interface compatibility but is not propagated into
 // rootlesskit's parent loop; cancellation is observed only at the next
@@ -66,10 +67,7 @@ func (r *Runtime) RunShellCapture(_ context.Context, distro, workDir, shellCmd s
 ) error {
 	logger.Warn(i18n.T("logger.rootless.warn.rootless_runtime_does_not"))
 
-	restore := setEnvOnce(env)
-	defer restore()
-
-	return r.RunShell(distro, workDir, shellCmd)
+	return RunInRootlessEnv(distro, workDir, []string{"/bin/sh", "-c", shellCmd}, env)
 }
 
 // setEnvOnce sets each entry from env via os.Setenv and returns a function
