@@ -426,7 +426,7 @@ func runMaintainerScript(
 	}
 
 	if !canRunScripts(rootDir) {
-		logger.Warn("skipping maintainer script: chroot into RootDir requires root",
+		logger.Warn(i18n.T("logger.aptinstall.warn.skipping_maintainer_script_requires_root"),
 			"package", pkgName, "script", phase, "root_dir", rootDir)
 
 		return nil
@@ -504,7 +504,8 @@ func refreshLDCacheAt(rootDir string) {
 
 	if rootDir != "" && filepath.Clean(rootDir) != "/" {
 		if !canRunScripts(rootDir) {
-			logger.Warn("skipping ldconfig: -r RootDir requires root", "root_dir", rootDir)
+			logger.Warn(i18n.T("logger.aptinstall.warn.skipping_ldconfig_requires_root"),
+				"root_dir", rootDir)
 
 			return
 		}

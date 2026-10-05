@@ -550,8 +550,6 @@
   translation: "No distribution specified, using system default"
 
 # Logger messages - Archive
-- id: logger.archive.debug.skip_exists
-  translation: "Skipping, file already exists"
 - id: logger.archive.warn.close_failed
   translation: "Failed to close archive"
 - id: logger.archive.warn.path_traversal_rejected
@@ -690,8 +688,6 @@
   translation: "Circular dependency detected"
 
 # Logger messages - Download
-- id: logger.download.info.response_status
-  translation: "Response status"
 
 # Logger messages - Exec with context
 - id: logger.shell.debug.command_execution_completed
@@ -948,8 +944,6 @@
 # Logger messages - With resume
 - id: logger.download.info.retrying_download_2
   translation: "Retrying download with resume support"
-- id: logger.download.info.retrying_download
-  translation: "Retrying download"
 
 # Logger messages - Zap
 - id: logger.zap.cleaning_for_distribution
@@ -1064,6 +1058,10 @@
   translation: "Ldconfig failed"
 - id: logger.aptinstall.warn.postinst_failed_leaving_package
   translation: "Postinst failed; leaving package unpacked but not configured"
+- id: logger.aptinstall.warn.skipping_ldconfig_requires_root
+  translation: "Skipping ldconfig: -r RootDir requires root"
+- id: logger.aptinstall.warn.skipping_maintainer_script_requires_root
+  translation: "Skipping maintainer script: chroot into RootDir requires root"
 - id: logger.aptinstall.warn.skipping_path_traversal_attempt
   translation: "Skipping path traversal attempt"
 - id: logger.aptinstall.warn.skipping_unsafe_symlink
@@ -1124,6 +1122,8 @@
   translation: "Dispatching pipeline to container"
 - id: logger.command.info.using_container_runtime
   translation: "Using container runtime"
+- id: logger.command.warn.ssh_password_not_forwarded
+  translation: "--ssh-password is not forwarded into the container; use ssh-agent or a key without a passphrase"
 - id: logger.common.debug.cross_compilation_toolchain_validation
   translation: "Cross-compilation toolchain validation passed"
 - id: logger.common.debug.cross_strip_env_configured
@@ -1234,6 +1234,8 @@
   translation: "Mirror failed, trying next"
 - id: logger.dnfcache.warn.mirrorlist_fallback_failed
   translation: "Mirrorlist fallback failed, proceeding with primary mirror only"
+- id: logger.dnfcache.warn.plain_http_mirrors_only
+  translation: "Only plain-http mirrors available; relying on checksum verification"
 - id: logger.dnfcache.warn.unresolvable_dependency
   translation: "Unresolvable dependency"
 - id: logger.dnfcache.warn.unverified_download
@@ -1360,6 +1362,8 @@
   translation: "Repo sync failed"
 - id: logger.parser.warn.failed_close_pkgbuild_file
   translation: "Failed to close PKGBUILD file"
+- id: logger.parser.warn.variable_expansion_failed
+  translation: "PKGBUILD variable could not be expanded; using empty value"
 - id: logger.pkgbuild.debug.legacy_bdb_host_falling
   translation: "Legacy BDB host, falling back to subprocess"
 - id: logger.pkgbuild.info.delegating_package_install_subprocess
@@ -1384,6 +1388,8 @@
   translation: "Open failed, falling back to subprocess"
 - id: logger.platform.debug.skipping_recursive_ownership_preservation
   translation: "Skipping recursive ownership preservation in container"
+- id: logger.platform.debug.not_replacing_existing_file
+  translation: "Not replacing existing non-symlink file"
 - id: logger.project.debug.treating_filtered_package_as
   translation: "Treating filtered package as internal (local artifact found)"
 - id: logger.project.debug.treating_filtered_package_as_external
@@ -1438,8 +1444,6 @@
   translation: "Failed to remove rootlesskit state dir"
 - id: logger.rootless.warn.failed_unmount_old_root
   translation: "Failed to unmount old root"
-- id: logger.rootless.warn.pipe_writer_close_error
-  translation: "Pipe writer close error"
 - id: logger.rootless.warn.restore_env_failed
   translation: "Restore env failed"
 - id: logger.rootless.warn.rootless_runtime_does_not
@@ -1538,6 +1542,8 @@
   translation: "Yap-mcp stopped"
 - id: logger.yap-mcp.warn.prctl_pr_set_pdeathsig
   translation: "Prctl PR_SET_PDEATHSIG failed"
+- id: logger.yap-mcp.warn.shutdown_deadline_exceeded
+  translation: "In-flight builds did not stop before the shutdown deadline"
 - id: logger.apkindex.warn.installing_without_verification
   translation: "Installing APK packages without signature verification (set InstallOptions.AllowUnverifiedPackages=false to refuse)"
 - id: logger.dnfinstall.debug.rpm_signature_verified

@@ -246,6 +246,6 @@ func warnExpansion(name string, err error) {
 		return
 	}
 
-	logger.Warn("PKGBUILD variable could not be expanded; using empty value",
+	logger.Warn(i18n.T("logger.parser.warn.variable_expansion_failed"),
 		"variable", name, "error", err)
 }

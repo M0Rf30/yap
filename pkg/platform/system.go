@@ -317,7 +317,7 @@ func ensureSymlink(target, link string) error {
 
 	switch {
 	case err == nil && info.Mode()&os.ModeSymlink == 0:
-		logger.Debug("not replacing existing non-symlink file", "path", link)
+		logger.Debug(i18n.T("logger.platform.debug.not_replacing_existing_file"), "path", link)
 
 		return nil
 	case err == nil:

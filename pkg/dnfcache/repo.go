@@ -626,7 +626,7 @@ func preferHTTPS(secure, plain []string, source string) []string {
 	}
 
 	if len(plain) > 0 {
-		logger.Warn("only plain-http mirrors available; relying on checksum verification",
+		logger.Warn(i18n.T("logger.dnfcache.warn.plain_http_mirrors_only"),
 			"source", source, "count", len(plain))
 	}
 

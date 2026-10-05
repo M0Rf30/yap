@@ -139,8 +139,7 @@ var buildCmd = &cobra.Command{
 			// trust opt-in (-U) and the cross arch (--target-arch) are lost on
 			// dispatch, so vendor packages fail to resolve inside the builder.
 			if sshPassword != "" {
-				logger.Warn("--ssh-password is not forwarded into the container; " +
-					"use ssh-agent or a key without a passphrase")
+				logger.Warn(i18n.T("logger.command.warn.ssh_password_not_forwarded"))
 			}
 
 			buildArgs := append([]string{buildCommand, distroTag, containerProjectMount},
