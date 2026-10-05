@@ -1,6 +1,7 @@
 package set
 
 import (
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -432,4 +433,54 @@ func TestExistsVariable(t *testing.T) {
 	_ = exists
 
 	t.Log("exists variable is accessible")
+}
+
+func TestStringifyArrayElemsPerElement(t *testing.T) {
+	file, err := syntax.NewParser().Parse(strings.NewReader(`a=(one "two" three)`), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var assign *syntax.Assign
+
+	syntax.Walk(file, func(node syntax.Node) bool {
+		if a, ok := node.(*syntax.Assign); ok && a.Array != nil {
+			assign = a
+
+			return false
+		}
+
+		return true
+	})
+
+	elems := StringifyArrayElems(assign)
+	want := []string{"one", `"two"`, "three"}
+
+	if !slices.Equal(elems, want) {
+		t.Errorf("StringifyArrayElems = %q, want %q", elems, want)
+	}
+
+	joined := StringifyArray(assign)
+	if len(joined) != 1 || joined[0] != `one "two" three ` {
+		t.Errorf("StringifyArray = %q", joined)
+	}
+}
+
+func TestSetIterEarlyBreakDoesNotLeak(t *testing.T) {
+	s := NewSet()
+	for _, v := range []string{"a", "b", "c"} {
+		s.Add(v)
+	}
+
+	before := runtime.NumGoroutine()
+
+	for range 100 {
+		for range s.Iter() {
+			break
+		}
+	}
+
+	if after := runtime.NumGoroutine(); after > before+2 {
+		t.Errorf("goroutines leaked: before=%d after=%d", before, after)
+	}
 }
