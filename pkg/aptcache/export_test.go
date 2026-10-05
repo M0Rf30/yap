@@ -203,3 +203,12 @@ func ParseDeb822SourcesListForTesting(content string) map[string]string {
 
 	return result
 }
+
+// BareNameKeysForTesting returns a copy of the byBareName secondary-index
+// keys recorded for name.
+func (c *Cache) BareNameKeysForTesting(name string) []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return append([]string(nil), c.byBareName[name]...)
+}

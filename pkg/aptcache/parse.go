@@ -6,9 +6,11 @@ import (
 	"bufio"
 	"compress/bzip2"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -163,16 +165,19 @@ func (c *Cache) mergeFrom(other *Cache) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	for name, info := range other.entries {
+	// Sorted iteration keeps byBareName ordering (and therefore the
+	// any-arch fallback chosen by scanEntryByName) deterministic.
+	for _, name := range slices.Sorted(maps.Keys(other.entries)) {
+		info := other.entries[name]
+
 		existing, ok := c.entries[name]
 		if !ok {
 			// Copy the pointer; partial cache won't be touched after
 			// this point.
 			c.entries[name] = info
-			// Also merge the secondary index entry for this key.
-			if keys, ok := other.byBareName[info.Name]; ok {
-				c.byBareName[info.Name] = append(c.byBareName[info.Name], keys...)
-			}
+			// Index only this entry's key; appending every key of the bare
+			// name here would duplicate them once per arch.
+			c.addToBareName(info.Name, name)
 
 			continue
 		}

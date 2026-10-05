@@ -14,6 +14,7 @@
 package aptcache_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -782,4 +783,28 @@ Components: main
 	entries := aptcache.ParseDeb822SourcesListForRepoTesting(content)
 	require.Len(t, entries, 1)
 	assert.Equal(t, "http://archive.ubuntu.com/ubuntu/", entries[0].URL)
+}
+
+// TestMergeFrom_BareNameIndexNoDuplicates guards the byBareName secondary
+// index: a name present for several arches must be indexed once per entry
+// key, in a deterministic (sorted) order, after merging.
+func TestMergeFrom_BareNameIndexNoDuplicates(t *testing.T) {
+	const index = "Package: libfoo\nArchitecture: arm64\nVersion: 1\nMulti-Arch: same\n\n" +
+		"Package: libfoo\nArchitecture: amd64\nVersion: 1\nMulti-Arch: same\n\n" +
+		"Package: libfoo\nArchitecture: armhf\nVersion: 1\nMulti-Arch: same\n\n"
+
+	src := aptcache.NewCacheForTesting()
+	require.NoError(t, src.ParseDeb822ForTesting(strings.NewReader(index), false))
+
+	srcKeys := src.BareNameKeysForTesting("libfoo")
+	require.NotEmpty(t, srcKeys)
+
+	for range 20 {
+		dst := aptcache.NewCacheForTesting()
+		dst.MergeFromForTesting(src)
+
+		keys := dst.BareNameKeysForTesting("libfoo")
+		assert.ElementsMatch(t, srcKeys, keys, "no duplicated or missing keys")
+		assert.True(t, slices.IsSorted(keys), "keys must be deterministic: %v", keys)
+	}
 }
