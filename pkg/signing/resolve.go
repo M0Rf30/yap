@@ -22,7 +22,7 @@ func resolveAndValidateKeyPath(rawPath, source, sourceLabel string) (string, err
 			WithContext("key_path", rawPath)
 	}
 
-	if _, err := os.Stat(absPath); err != nil {
+	if _, err := os.Stat(absPath); err != nil { // #nosec G703 -- user-supplied key path by design
 		return "", errors.Wrap(err, errors.ErrTypeFileSystem,
 			"key file not found").
 			WithOperation("resolveAndValidateKeyPath").

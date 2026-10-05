@@ -339,8 +339,7 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 		case constants.FormatRPM:
 			// RPM: "pkgname.arch" — skip if already has a dot-arch suffix
 			// (heuristic: last token after final '.' is a known arch string).
-			if idx := strings.LastIndex(dep, "."); idx != -1 {
-				suffix := dep[idx+1:]
+			if _, suffix, found := strings.CutLast(dep, "."); found {
 				if suffix == constants.ArchX86_64 || suffix == constants.ArchAarch64 ||
 					suffix == constants.ArchI686 || suffix == constants.ArchArmv7hl ||
 					suffix == constants.ArchNoarch || suffix == constants.ArchPpc64le ||

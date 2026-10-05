@@ -656,8 +656,8 @@ func (pkgBuild *PKGBUILD) applyOverrideAssign(node syntax.Node) {
 	if !hasDistro {
 		// No __ separator — try single _ for arch suffix (e.g. depends_x86_64).
 		// Use the last underscore as the split point.
-		if idx := strings.LastIndex(name, "_"); idx != -1 {
-			baseKey = name[:idx]
+		if before, _, found := strings.CutLast(name, "_"); found {
+			baseKey = before
 		} else {
 			baseKey = name
 		}
