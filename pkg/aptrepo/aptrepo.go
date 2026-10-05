@@ -14,6 +14,7 @@ package aptrepo
 
 import (
 	"context"
+	stderrors "errors"
 	"os"
 	"runtime"
 	"strings"
@@ -291,6 +292,15 @@ func (c *releaseCache) fetch(
 func updateSource(
 	ctx context.Context, src *aptcache.SourceEntry, arch string, opts Options, rc *releaseCache,
 ) (int, error) {
+	return updateSourceIn(ctx, aptListsDir, src, arch, opts, rc)
+}
+
+// updateSourceIn is updateSource with an explicit lists directory so tests
+// can exercise the full fetch path without touching /var/lib/apt/lists.
+func updateSourceIn(
+	ctx context.Context, listsDir string, src *aptcache.SourceEntry, arch string,
+	opts Options, rc *releaseCache,
+) (int, error) {
 	// Fetch + verify InRelease (or fall back to Release+Release.gpg).
 	// verifyInRelease / verifyDetachedRelease are called inside
 	// fetchRelease against the keyring referenced by src.SignedBy (or the
@@ -308,42 +318,47 @@ func updateSource(
 	// what actually caps parallelism. Going from serial to fan-out roughly
 	// halves the per-source wall time on ubuntu (main + universe +
 	// multiverse + restricted).
-	type compResult struct {
-		comp string
-		err  error
-	}
-
-	resCh := make(chan compResult, len(src.Components))
+	// Results are stored by component index so the joined error is
+	// deterministic regardless of goroutine completion order.
+	compErrs := make([]error, len(src.Components))
 
 	var wg sync.WaitGroup
 
-	for _, comp := range src.Components {
+	for i, comp := range src.Components {
 		wg.Add(1)
 
-		go func(comp string) {
+		go func(i int, comp string) {
 			defer wg.Done()
 
-			resCh <- compResult{comp: comp, err: fetchComponentIndex(ctx, src, comp, arch, rel)}
-		}(comp)
+			compErrs[i] = fetchComponentIndex(ctx, listsDir, src, comp, arch, rel)
+		}(i, comp)
 	}
 
 	wg.Wait()
-	close(resCh)
 
 	n := 0
 
-	for res := range resCh {
-		if res.err != nil {
-			logger.Warn(i18n.T("logger.aptrepo.warn.apt_component_fetch_failed"),
-				"url", src.URL, "component", res.comp, "arch", arch, "error", res.err)
+	var failures []error
+
+	for i, cerr := range compErrs {
+		if cerr == nil {
+			n++
 
 			continue
 		}
 
-		n++
+		logger.Warn(i18n.T("logger.aptrepo.warn.apt_component_fetch_failed"),
+			"url", src.URL, "component", src.Components[i], "arch", arch, "error", cerr)
+
+		// A component/arch the Release does not list is "nothing to fetch"
+		// (apt skips it too); every other failure (network, size/hash
+		// mismatch, disk) must surface to the caller.
+		if !stderrors.Is(cerr, errNoPackagesVariant) {
+			failures = append(failures, cerr)
+		}
 	}
 
-	return n, nil
+	return n, stderrors.Join(failures...)
 }
 
 // detectHostDebArch returns the Debian architecture for the current host.
