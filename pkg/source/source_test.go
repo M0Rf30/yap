@@ -63,6 +63,18 @@ func TestSource_parseURI(t *testing.T) {
 			expectedRefKey:   "branch",
 			expectedRefValue: "develop",
 		},
+		{
+			name:          "Fragment without equals is ignored",
+			sourceItemURI: "https://example.com/file.tar.gz#anchor",
+			expectedPath:  "file.tar.gz",
+			expectedURI:   "https://example.com/file.tar.gz",
+		},
+		{
+			name:          "Empty fragment is ignored",
+			sourceItemURI: "https://example.com/file.tar.gz#",
+			expectedPath:  "file.tar.gz",
+			expectedURI:   "https://example.com/file.tar.gz",
+		},
 	}
 
 	for _, testCase := range tests {

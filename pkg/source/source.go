@@ -14,8 +14,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/go-git/go-git/v5/plumbing"
+	"golang.org/x/crypto/blake2b"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
@@ -37,21 +39,33 @@ const (
 	skipValue    = "SKIP"
 )
 
+// partSuffix marks in-progress downloads; the final path only appears once a
+// download has fully completed.
+const partSuffix = ".part"
+
 // Global variables for source handling
 var (
-	// sshPassword contains the SSH password for authentication.
-	sshPassword string
+	// sshPassword contains the SSH password for authentication; guarded by
+	// sshPasswordMu.
+	sshPassword   string
+	sshPasswordMu sync.RWMutex
 	// downloadGroup deduplicates concurrent downloads of the same file.
 	downloadGroup singleflight.Group
 )
 
 // SetSSHPassword sets the SSH password used for authenticated git clone operations.
 func SetSSHPassword(password string) {
+	sshPasswordMu.Lock()
+	defer sshPasswordMu.Unlock()
+
 	sshPassword = password
 }
 
 // GetSSHPassword returns the SSH password used for authenticated git clone operations.
 func GetSSHPassword() string {
+	sshPasswordMu.RLock()
+	defer sshPasswordMu.RUnlock()
+
 	return sshPassword
 }
 
@@ -67,9 +81,6 @@ type Source struct {
 	// RefValue is the reference value for a VCS fragment declared in the URI. i.e:
 	// myfile::git+https://example.com/example.git#branch=refvalue
 	RefValue string
-	// SSHPassword is used to store the password for SSH authentication.
-	// SSHPassword contains the SSH password for authentication.
-	SSHPassword string
 	// SourceItemPath is the absolute path to a source item (folder or file)
 	SourceItemPath string
 	// SourceItemURI it the full source item URI. i.e:
@@ -93,13 +104,26 @@ type Source struct {
 
 // Get retrieves the source file from the specified URI.
 //
+// It is GetContext with context.Background().
+func (src *Source) Get() error {
+	return src.GetContext(context.Background())
+}
+
+// GetContext retrieves the source file from the specified URI, honouring
+// cancellation of ctx while cloning or downloading.
+//
 // It parses the URI and determines the source file path and type.
 // If the source file does not exist, it retrieves it from the specified URI.
 // It validates the source file and symlinks any additional source files.
 // Finally, it extracts the source file if necessary.
 //
-// Returns an error if any step fails.
-func (src *Source) Get() error {
+// Returns an error if any step fails, including ctx.Err() (wrapped) when the
+// context is cancelled before or during the fetch.
+func (src *Source) GetContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return cancelledError(err, src.SourceItemURI)
+	}
+
 	src.parseURI()
 	sourceFilePath := filepath.Join(src.StartDir, src.SourceItemPath)
 	sourceType := src.getProtocol()
@@ -123,18 +147,8 @@ func (src *Source) Get() error {
 			_ = os.RemoveAll(filepath.Join(src.SrcDir, filepath.Base(sourceFilePath)))
 		}
 
-		// Use singleflight to prevent duplicate downloads of the same file
 		if !files.Exists(sourceFilePath) {
-			_, err, _ := downloadGroup.Do(sourceFilePath, func() (any, error) {
-				// Double-check after acquiring the group slot
-				if files.Exists(sourceFilePath) {
-					//nolint:nilnil // Returning (nil, nil) is valid when file exists
-					return nil, nil
-				}
-
-				return nil, src.getURL(sourceType, sourceFilePath, sshPassword)
-			})
-			if err != nil {
+			if err := src.fetch(ctx, sourceType, sourceFilePath); err != nil {
 				return err
 			}
 		}
@@ -162,6 +176,36 @@ func (src *Source) Get() error {
 	}
 
 	return nil
+}
+
+// fetch downloads or clones the source at sourceFilePath. Concurrent fetches
+// of the same path are deduplicated with singleflight (the work runs under
+// the first caller's context); every caller stops waiting when its own ctx is
+// cancelled.
+func (src *Source) fetch(ctx context.Context, sourceType, sourceFilePath string) error {
+	ch := downloadGroup.DoChan(sourceFilePath, func() (any, error) {
+		// Double-check after acquiring the group slot
+		if files.Exists(sourceFilePath) {
+			//nolint:nilnil // Returning (nil, nil) is valid when file exists
+			return nil, nil
+		}
+
+		return nil, src.getURL(ctx, sourceType, sourceFilePath)
+	})
+
+	select {
+	case res := <-ch:
+		return res.Err
+	case <-ctx.Done():
+		return cancelledError(ctx.Err(), src.SourceItemURI)
+	}
+}
+
+// cancelledError wraps a context error raised while fetching a source.
+func cancelledError(err error, uri string) error {
+	return errors.Wrap(err, errors.ErrTypeNetwork, i18n.T("errors.download.download_failed")).
+		WithOperation("GetContext").
+		WithContext("source_uri", uri)
 }
 
 // getReferenceType returns the reference type for the given source.
@@ -197,13 +241,16 @@ func (src *Source) getProtocol() string {
 	}
 }
 
-// getURL is a function that retrieves a URL based on the provided protocol and
-// download file path.
+// getURL retrieves a URL based on the provided protocol and download file
+// path. HTTP(S)/FTP downloads are written to "<dloadFilePath>.part" and only
+// renamed into place once complete, so an interrupted or failed download is
+// never mistaken for a finished source on the next run.
 //
 // Parameters:
+// - ctx: cancels the in-flight clone or download.
 // - protocol: a string representing the protocol for the URL.
 // - dloadFilePath: a string representing the file path for the downloaded file.
-func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
+func (src *Source) getURL(ctx context.Context, protocol, dloadFilePath string) error {
 	normalizedURI := strings.TrimPrefix(src.SourceItemURI, constants.Git+"+")
 
 	switch protocol {
@@ -215,7 +262,8 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 			commitHash = src.RefValue
 		}
 
-		return git.Clone(dloadFilePath, normalizedURI, sshPassword, referenceName, commitHash)
+		return git.CloneContext(ctx, dloadFilePath, normalizedURI, GetSSHPassword(),
+			referenceName, commitHash)
 	default:
 		// Use enhanced download with resume capability and the configured
 		// retry budget, with context information
@@ -224,13 +272,21 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 			return err
 		}
 
-		return download.WithResumeContext(
-			dloadFilePath,
+		partPath := dloadFilePath + partSuffix
+
+		err = download.WithContext(
+			ctx,
+			partPath,
 			normalizedURI,
 			download.MaxRetries(),
 			src.PkgName,
 			src.SourceItemPath,
 			shell.MultiPrinter.Writer)
+		if err != nil {
+			return err
+		}
+
+		return os.Rename(partPath, dloadFilePath)
 	}
 }
 
@@ -242,22 +298,24 @@ func (src *Source) getURL(protocol, dloadFilePath, sshPassword string) error {
 func (src *Source) parseURI() {
 	src.SourceItemPath = filepath.Base(src.SourceItemURI)
 
-	if strings.Contains(src.SourceItemURI, "::") {
-		split := strings.SplitN(src.SourceItemURI, "::", 2)
-		src.SourceItemPath = split[0]
-		src.SourceItemURI = split[1]
+	if before, after, found := strings.Cut(src.SourceItemURI, "::"); found {
+		src.SourceItemPath = before
+		src.SourceItemURI = after
 	}
 
-	if strings.Contains(src.SourceItemURI, "#") {
-		split := strings.SplitN(src.SourceItemURI, "#", 2)
-		src.SourceItemURI = split[0]
-		fragment := split[1]
-		splitFragment := strings.SplitN(fragment, "=", 2)
-		src.RefKey = splitFragment[0]
-		src.RefValue = splitFragment[1]
+	if base, fragment, found := strings.Cut(src.SourceItemURI, "#"); found {
+		originalURI := src.SourceItemURI
+		src.SourceItemURI = base
+
+		// A fragment that is not key=value (e.g. a plain "#anchor") carries no
+		// VCS reference; it is stripped and ignored.
+		if key, value, ok := strings.Cut(fragment, "="); ok {
+			src.RefKey = key
+			src.RefValue = value
+		}
 
 		// Update SourceItemPath to remove the fragment only if no custom name was used
-		if src.SourceItemPath == filepath.Base(split[0]+"#"+fragment) {
+		if src.SourceItemPath == filepath.Base(originalURI) {
 			src.SourceItemPath = filepath.Base(src.SourceItemURI)
 		}
 	}
@@ -326,18 +384,9 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		return nil
 	}
 
-	var hashSum hash.Hash
-
-	switch len(src.Hash) {
-	case 64:
-		hashSum = sha256.New()
-	case 128:
-		hashSum = sha512.New()
-	default:
-		return errors.New(errors.ErrTypeValidation,
-			fmt.Sprintf(i18n.T("errors.source.unsupported_hash_length"), len(src.Hash))).
-			WithOperation("validateSource").
-			WithContext("hash_length", len(src.Hash))
+	candidates, err := hashCandidates(len(src.Hash))
+	if err != nil {
+		return err
 	}
 
 	file, err := files.Open(filepath.Clean(sourceFilePath))
@@ -353,28 +402,63 @@ func (src *Source) validateSource(sourceFilePath string) error {
 		}
 	}()
 
-	_, err = io.Copy(hashSum, file)
+	writers := make([]io.Writer, len(candidates))
+	for i, cand := range candidates {
+		writers[i] = cand
+	}
+
+	_, err = io.Copy(io.MultiWriter(writers...), file)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, i18n.T("errors.source.failed_to_copy_file")).
 			WithOperation("validateSource").
 			WithContext("path", sourceFilePath)
 	}
 
-	sum := hashSum.Sum(nil)
-	hexSum := hex.EncodeToString(sum)
+	// The digest algorithm is not carried with the checksum, so it is inferred
+	// from the digest length. A 128-hex digest is ambiguous (sha512sums or
+	// b2sums), so every candidate of that length is tried. Hex comparison is
+	// case-insensitive.
+	hexSum := hex.EncodeToString(candidates[0].Sum(nil))
 
-	if hexSum != src.Hash {
-		return errors.New(errors.ErrTypeValidation, i18n.T("errors.source.hash_verification_failed")).
-			WithOperation("validateSource").
-			WithContext("source_path", src.SourceItemPath).
-			WithContext("expected_hash", src.Hash).
-			WithContext("actual_hash", hexSum)
+	for _, cand := range candidates {
+		if strings.EqualFold(hex.EncodeToString(cand.Sum(nil)), src.Hash) {
+			logger.Info(i18n.T("logger.integrity_check_for"),
+				"source", src.SourceItemURI)
+
+			return nil
+		}
 	}
 
-	logger.Info(i18n.T("logger.integrity_check_for"),
-		"source", src.SourceItemURI)
+	return errors.New(errors.ErrTypeValidation, i18n.T("errors.source.hash_verification_failed")).
+		WithOperation("validateSource").
+		WithContext("source_path", src.SourceItemPath).
+		WithContext("expected_hash", src.Hash).
+		WithContext("actual_hash", hexSum)
+}
 
-	return nil
+// hashCandidates returns the digest algorithms whose hex output has the given
+// length: sha224 (56), sha256 (64), sha384 (96), sha512 or blake2b-512 (128).
+func hashCandidates(hexLen int) ([]hash.Hash, error) {
+	switch hexLen {
+	case 56:
+		return []hash.Hash{sha256.New224()}, nil
+	case 64:
+		return []hash.Hash{sha256.New()}, nil
+	case 96:
+		return []hash.Hash{sha512.New384()}, nil
+	case 128:
+		b2, err := blake2b.New512(nil)
+		if err != nil {
+			return nil, err
+		}
+
+		return []hash.Hash{sha512.New(), b2}, nil
+	default:
+		return nil, errors.New(errors.ErrTypeValidation,
+			fmt.Sprintf(i18n.T("errors.source.unsupported_hash_length"), hexLen)).
+			WithOperation("validateSource").
+			WithContext("hash_length", hexLen)
+	}
 }
 
 // shouldSkipExtract reports whether this source file should be skipped during

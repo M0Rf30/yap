@@ -28,22 +28,12 @@ func FuzzParseURI(f *testing.F) {
 	f.Add("file.tar.gz")
 	f.Add("path/to/file.tar.gz")
 	f.Add("custom::https://example.com/file.tar.gz#branch=develop")
+	f.Add("https://example.com/y.tar.gz#anchor")
+	f.Add("https://example.com/y.tar.gz#")
 	f.Add("::https://example.com/file.tar.gz")
 	f.Add("a" + strings.Repeat("b", 10000) + "::https://example.com/file.tar.gz")
 
 	f.Fuzz(func(t *testing.T, uri string) {
-		// Skip URIs with "#" but no "=" in the fragment, as they trigger a panic
-		// in the current implementation (index out of range on line 254)
-		if strings.Contains(uri, "#") {
-			// Check if there's an "=" after the "#"
-			hashIdx := strings.Index(uri, "#")
-
-			afterHash := uri[hashIdx+1:]
-			if !strings.Contains(afterHash, "=") {
-				t.Skip("Skipping malformed fragment (no '=' after '#')")
-			}
-		}
-
 		src := &source.Source{
 			SourceItemURI: uri,
 		}
@@ -126,24 +116,13 @@ func FuzzSourceItemPathValidation(f *testing.F) {
 	f.Add("https://example.com/file.tar.gz")
 	f.Add("custom::https://example.com/archive.zip")
 	f.Add("git+https://github.com/user/repo.git#branch=main")
+	f.Add("https://example.com/file.tar.gz#anchor")
 	f.Add("")
 	f.Add("file.tar.gz")
 	f.Add("path/to/file.tar.gz")
 	f.Add("https://example.com/path/with/many/segments/file.tar.gz")
 
 	f.Fuzz(func(t *testing.T, uri string) {
-		// Skip URIs with "#" but no "=" in the fragment, as they trigger a panic
-		// in the current implementation (index out of range on line 254)
-		if strings.Contains(uri, "#") {
-			// Check if there's an "=" after the "#"
-			hashIdx := strings.Index(uri, "#")
-
-			afterHash := uri[hashIdx+1:]
-			if !strings.Contains(afterHash, "=") {
-				t.Skip("Skipping malformed fragment (no '=' after '#')")
-			}
-		}
-
 		src := &source.Source{
 			SourceItemURI: uri,
 		}
@@ -164,8 +143,7 @@ func FuzzSourceItemPathValidation(f *testing.F) {
 
 // FuzzRefKeyAndValue tests that RefKey and RefValue are properly extracted.
 // Must never panic, RefKey should be one of: "branch", "tag", "commit", or "".
-// Note: URIs with "#" but no "=" in the fragment are not well-formed and may panic
-// in the current implementation, so we avoid them in the fuzz corpus.
+// URIs with "#" but no "=" in the fragment must be tolerated (no ref).
 func FuzzRefKeyAndValue(f *testing.F) {
 	f.Add("https://example.com/file.tar.gz#branch=main")
 	f.Add("git+https://github.com/user/repo.git#tag=v1.0")
@@ -180,18 +158,6 @@ func FuzzRefKeyAndValue(f *testing.F) {
 	f.Add("https://example.com/file.tar.gz#commit=def456")
 
 	f.Fuzz(func(t *testing.T, uri string) {
-		// Skip URIs with "#" but no "=" in the fragment, as they trigger a panic
-		// in the current implementation (index out of range on line 254)
-		if strings.Contains(uri, "#") {
-			// Check if there's an "=" after the "#"
-			hashIdx := strings.Index(uri, "#")
-
-			afterHash := uri[hashIdx+1:]
-			if !strings.Contains(afterHash, "=") {
-				t.Skip("Skipping malformed fragment (no '=' after '#')")
-			}
-		}
-
 		src := &source.Source{
 			SourceItemURI: uri,
 		}
