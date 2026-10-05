@@ -1430,8 +1430,8 @@ func TestParseMetalinkURLsHTTPFallback(t *testing.T) {
 	}
 }
 
-// TestParseMetalinkURLsHTTPSPreferred tests that https:// mirrors are
-// ordered before http:// mirrors regardless of document order.
+// TestParseMetalinkURLsHTTPSPreferred tests that plain http:// mirrors are
+// dropped when https:// mirrors are available.
 func TestParseMetalinkURLsHTTPSPreferred(t *testing.T) {
 	body := `<url>http://plain.example.com/repodata/repomd.xml</url>
 <url>https://secure.example.com/repodata/repomd.xml</url>`
@@ -1441,7 +1441,7 @@ func TestParseMetalinkURLsHTTPSPreferred(t *testing.T) {
 		t.Fatalf("parseMetalinkURLs failed: %v", err)
 	}
 
-	if len(got) != 2 || got[0] != "https://secure.example.com/" || got[1] != "http://plain.example.com/" {
+	if len(got) != 1 || got[0] != "https://secure.example.com/" {
 		t.Errorf("unexpected mirror order: %v", got)
 	}
 }

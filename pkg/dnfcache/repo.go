@@ -586,8 +586,8 @@ func resolveMirrors(ctx context.Context, mirrorListURL string) ([]string, error)
 		return parseMetalinkURLs(body, mirrorListURL)
 	}
 
-	// Plain mirrorlist: one URL per non-comment, non-empty line.
-	var mirrors []string
+	// Plain mirrorlist: only https mirrors are kept when any exist.
+	var httpsMirrors, httpMirrors []string
 
 	for line := range strings.SplitSeq(body, "\n") {
 		line = strings.TrimSpace(line)
@@ -595,11 +595,17 @@ func resolveMirrors(ctx context.Context, mirrorListURL string) ([]string, error)
 			continue
 		}
 
-		mirrors = append(mirrors, normalizeURL(line))
-
-		if len(mirrors) == maxMirrors {
-			break
+		line = normalizeURL(line)
+		if strings.HasPrefix(line, "http://") {
+			httpMirrors = append(httpMirrors, line)
+		} else {
+			httpsMirrors = append(httpsMirrors, line)
 		}
+	}
+
+	mirrors := preferHTTPS(httpsMirrors, httpMirrors, mirrorListURL)
+	if len(mirrors) > maxMirrors {
+		mirrors = mirrors[:maxMirrors]
 	}
 
 	if len(mirrors) == 0 {
@@ -609,6 +615,22 @@ func resolveMirrors(ctx context.Context, mirrorListURL string) ([]string, error)
 	}
 
 	return mirrors, nil
+}
+
+// preferHTTPS returns only the secure mirrors when any exist. When only
+// plain-http mirrors are available they are kept with a warning; packages
+// remain sha256-verified against primary.xml.
+func preferHTTPS(secure, plain []string, source string) []string {
+	if len(secure) > 0 {
+		return secure
+	}
+
+	if len(plain) > 0 {
+		logger.Warn("only plain-http mirrors available; relying on checksum verification",
+			"source", source, "count", len(plain))
+	}
+
+	return plain
 }
 
 // retryMajorVersion retries a mirrorlist fetch replacing "X.Y" releasever
@@ -656,7 +678,7 @@ func parseMetalinkURLs(body, sourceURL string) ([]string, error) {
 		}
 	}
 
-	mirrors := append(httpsMirrors, httpMirrors...) //nolint:gocritic
+	mirrors := preferHTTPS(httpsMirrors, httpMirrors, sourceURL)
 	if len(mirrors) == 0 {
 		return nil, apperrors.New(apperrors.ErrTypeNetwork, "no usable mirror in metalink").
 			WithOperation("parseMetalinkURLs").
