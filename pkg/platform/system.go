@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package platform provides system and platform detection utilities.
 package platform
 

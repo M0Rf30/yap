@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package aptrepo_test — extra coverage for aptrepo.go, release.go (fallback
 // paths), and verify.go helpers that were not reached by the existing test
 // files.

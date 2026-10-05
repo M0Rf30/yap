@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package repo_test provides black-box tests for the repo package.
 // Tests that exercise unexported helpers (setupOne, fetchKey, closeQuiet) are
 // placed in the internal test file (repo_test.go); this file covers the same

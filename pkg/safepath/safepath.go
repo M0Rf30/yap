@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package safepath centralises the path-containment checks used by every
 // archive/package extractor in YAP (deb data.tar, RPM CPIO payloads, APK
 // tarballs, container rootfs layers, source archives). It defends against

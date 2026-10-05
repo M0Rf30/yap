@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package archive_test covers the zip and rar extraction paths, the exported
 // SafeJoin / SafeSymlinkTarget wrappers, and the writeSymlinkFromOpener helper
 // (exercised indirectly through zip symlink extraction).

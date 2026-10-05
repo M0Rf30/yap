@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // filter_installed.go: host package-database probes used to skip already-
 // installed makedepends. Backed by the per-format readers (aptcache, apk
 // installed DB, pacman local DB, rpmdb SQLite/BDB); subprocess fallbacks

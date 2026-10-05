@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package runtimetype defines the RuntimeType enum shared between the
 // container package and its sub-packages to avoid import cycles.
 package runtimetype

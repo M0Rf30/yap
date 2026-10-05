@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package gensum downloads PKGBUILD sources and rewrites the checksum arrays
 // in-place, matching the behaviour of makepkg's updpkgsums utility.
 //

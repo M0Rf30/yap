@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package repo registers extra distribution repositories (apt sources or
 // dnf/yum repos) on the build host before any package manager operation. It
 // supports configuration via yap.json (top-level "repos" array) and via the

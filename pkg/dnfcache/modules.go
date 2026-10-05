@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package dnfcache module-stream support for RHEL/Rocky AppStream.
 //
 // RHEL 8 and derivatives ship multiple incompatible versions of the same

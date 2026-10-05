@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package dnfinstall replaces "dnf install" and "rpm --install" subprocesses.
 //
 // It resolves transitive package dependencies via dnfcache, downloads RPM

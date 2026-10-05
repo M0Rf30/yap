@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package sbom provides Software Bill of Materials (SBOM) generation
 // for YAP packages in CycloneDX and SPDX formats.
 package sbom

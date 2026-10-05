@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // status_fs_test.go covers the filesystem-touching functions in status.go:
 //   - readDpkgStatus (via ReadDpkgStatusFromPathForTesting)
 //   - writeDpkgStatus (via WriteDpkgStatusToPathForTesting)

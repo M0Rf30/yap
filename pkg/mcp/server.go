@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package mcp wires the yap functionality onto a Model Context Protocol
 // server. The package is transport-agnostic; cmd/yap-mcp picks the transport
 // (stdio by default).

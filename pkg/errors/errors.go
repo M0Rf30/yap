@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package errors provides custom error types and error handling utilities for YAP.
 //
 //nolint:revive // Intentional wrapper around stdlib errors with structured error handling

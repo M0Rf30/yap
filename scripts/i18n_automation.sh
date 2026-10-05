@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+# SPDX-License-Identifier: GPL-3.0-only
 
 # YAP i18n Logger Message Automation Script
 # This script helps automate the process of finding and converting hardcoded logger messages to use i18n

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 package aptinstall_test
 
 // aptinstall_extra_test.go covers functions that were at 0% coverage:

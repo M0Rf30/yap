@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 package sbom //nolint:testpackage // white-box tests require access to unexported functions
 
 // sbom_coverage_test.go — internal white-box tests targeting uncovered branches

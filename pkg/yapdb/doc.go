@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package yapdb provides a state tracker for packages installed by YAP.
 //
 // It maintains a SQLite database of installed packages, their files, and

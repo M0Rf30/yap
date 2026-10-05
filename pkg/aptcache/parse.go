@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // parse.go: on-disk index loading and deb822 Packages/status parsing.
 
 package aptcache

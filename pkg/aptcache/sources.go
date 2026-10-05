@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // sources.go: sources.list / deb822 sources parsing (legacy and modern formats).
 
 package aptcache

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package crypto provides cryptographic operations for package building.
 //
 //nolint:revive // Intentional wrapper around stdlib crypto for package-specific hashing

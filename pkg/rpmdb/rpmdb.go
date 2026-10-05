@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package rpmdb reads the RPM SQLite database used by Fedora 33+, RHEL
 // 9+, Rocky 9+, AlmaLinux 9+, and openSUSE 15.5+.
 //

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package color provides minimal ANSI terminal color helpers.
 // It has zero external dependencies and respects the NO_COLOR env var
 // and a runtime disable flag (set by --no-color).

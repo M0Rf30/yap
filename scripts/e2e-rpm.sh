@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+# SPDX-License-Identifier: GPL-3.0-only
+
 set -euo pipefail
 
 echo "==> E2E: RPM install on $(. /etc/os-release && echo "$PRETTY_NAME")"

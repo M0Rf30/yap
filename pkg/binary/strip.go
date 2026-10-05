@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package binary provides binary file manipulation utilities.
 package binary //nolint:revive // intentional name; conflicts with stdlib encoding/binary but scope is unambiguous
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package deb822 provides a streaming parser for RFC-822-style multi-stanza
 // key/value format used by Debian package metadata (apt Packages files, dpkg status, etc.).
 package deb822

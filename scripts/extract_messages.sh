@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+# SPDX-License-Identifier: GPL-3.0-only
 
 # extract_messages.sh - Extract i18n messages from source code
 

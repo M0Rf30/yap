@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package mcp — logging middleware.
 //
 // The MCP stdio transport reserves stdout for JSON-RPC frames; anything

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package pacmandb refreshes Arch repository sync databases.
 //
 // It parses /etc/pacman.conf (with Include + mirrorlist expansion),

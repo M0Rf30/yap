@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package yap provides a powerful, container-based package building system
 // that creates packages for multiple GNU/Linux distributions from a single
 // PKGBUILD-like specification format.

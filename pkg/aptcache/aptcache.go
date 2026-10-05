@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package aptcache is an in-memory index of apt + dpkg metadata.
 //
 // It parses /var/lib/apt/lists/*_Packages and /var/lib/dpkg/status (deb822

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // export_test.go exposes internal helpers for white-box testing.
 // This file is only compiled when running tests.
 package aptcache

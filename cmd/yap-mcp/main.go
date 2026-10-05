@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package main is the entrypoint for the yap-mcp binary — an MCP (Model
 // Context Protocol) server that exposes yap's package-build capabilities to
 // MCP-compatible clients (Claude Desktop, IDE agents, etc.).

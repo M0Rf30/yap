@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+# SPDX-License-Identifier: GPL-3.0-only
+
 # generate.sh — regenerate all per-distro Dockerfiles from templates.
 # Usage: bash build/deploy/generate.sh
 # Requires: bash 4+, no external deps.

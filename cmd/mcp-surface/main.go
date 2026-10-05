@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Command mcp-surface introspects the live yap-mcp server and writes an
 // authoritative inventory of its tools, prompts, and resources to
 // docs/mcp-surface.md. It is the source of truth for the SKILL card and the

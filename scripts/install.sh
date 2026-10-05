@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+# SPDX-License-Identifier: GPL-3.0-only
+
 # yap install script — fetch the latest release binary for the current
 # OS/architecture from GitHub and drop it in $YAP_INSTALL_DIR (default
 # /usr/local/bin, or $HOME/.local/bin when the prefix is not writable).

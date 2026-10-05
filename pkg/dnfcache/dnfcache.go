@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package dnfcache is an in-memory index of DNF/YUM repository metadata.
 //
 // It parses /etc/yum.repos.d/*.repo files, fetches repomd.xml from each

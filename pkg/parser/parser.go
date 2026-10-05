@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package parser provides PKGBUILD parsing and processing functionality.
 package parser //nolint:revive // intentional name; conflicts with stdlib go/parser but scope is unambiguous
 

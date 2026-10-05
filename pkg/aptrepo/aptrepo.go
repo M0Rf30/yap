@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package aptrepo refreshes apt repository indexes.
 //
 // It parses /etc/apt/sources.list and /etc/apt/sources.list.d/, fetches
