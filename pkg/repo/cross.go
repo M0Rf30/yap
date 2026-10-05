@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -39,8 +40,9 @@ type CrossAptOptions struct {
 //  2. restricts the pre-installed sources to the build-host architecture so
 //     apt does not fetch foreign-arch indexes from archive.ubuntu.com (which
 //     only carries amd64/i386);
-//  3. registers the matching ports.ubuntu.com / deb.debian.org repository for
-//     the target arch through the standard repo.Setup pipeline; and
+//  3. registers the archive that actually carries the target arch (the main
+//     archive for ubuntu amd64/i386 and official Debian arches, otherwise
+//     ports.ubuntu.com / debian-ports) through the repo.Setup pipeline; and
 //  4. refreshes the apt indexes so subsequent dependency installs resolve
 //     packages from the new repo.
 //
@@ -57,7 +59,7 @@ func SetupCrossAPT(opts CrossAptOptions) error {
 		return err
 	}
 
-	portsURI := portsURIFor(distro)
+	portsURI := crossURIFor(distro, targetDebArch)
 	if portsURI == "" {
 		logger.Info(i18n.T("logger.repo.info.cross_apt_setup_skipped"), "distro", distro)
 
@@ -137,15 +139,15 @@ func configureCrossArchAndSources(
 	r := Repo{
 		Name:       "cross-" + targetDebArch,
 		URL:        portsURI,
-		Suite:      codename,
-		Components: []string{componentMain, "restricted", "universe", "multiverse"},
+		Suite:      crossSuitesFor(distro, codename, targetDebArch),
+		Components: crossComponentsFor(distro),
 	}
 
 	if err := validateRepo(&r); err != nil {
 		return err
 	}
 
-	keyring := archiveKeyringFor(distro)
+	keyring := crossKeyringFor(distro, targetDebArch)
 	if keyring != "" {
 		return writeCrossSource(&r, targetDebArch, codename, distro, keyring)
 	}
@@ -185,8 +187,12 @@ func refreshCrossAptIndexes() error {
 }
 
 const (
-	ubuntuPortsURI = "http://ports.ubuntu.com/ubuntu-ports/"
-	debianPortsURI = "http://deb.debian.org/debian-ports/"
+	ubuntuPortsURI     = "http://ports.ubuntu.com/ubuntu-ports/"
+	debianPortsURI     = "http://deb.debian.org/debian-ports/"
+	ubuntuPrimaryURI   = "http://archive.ubuntu.com/ubuntu/"
+	debianPrimaryURI   = "http://deb.debian.org/debian/"
+	debianPortsKeyring = "/usr/share/keyrings/debian-ports-archive-keyring.gpg"
+	debianPortsSuite   = "unstable"
 )
 
 // portsURIFor returns the per-distro ports archive URI used for non-primary
@@ -215,6 +221,76 @@ func archiveKeyringFor(distro string) string {
 	return ""
 }
 
+// debianOfficialArches lists the architectures served by the main Debian
+// archive (deb.debian.org/debian); every other arch is ports-only.
+var debianOfficialArches = []string{
+	"amd64", "arm64", "armhf", "armel", "i386", "mips64el", "ppc64el", "riscv64", "s390x",
+}
+
+// ubuntuPrimaryArches lists the architectures served by archive.ubuntu.com;
+// every other arch lives on ports.ubuntu.com.
+var ubuntuPrimaryArches = []string{"amd64", "i386"}
+
+// isPortsArch reports whether targetDebArch is only available from the
+// distro's ports archive rather than its primary archive.
+func isPortsArch(distro, targetDebArch string) bool {
+	switch distro {
+	case constants.DistroUbuntu:
+		return !slices.Contains(ubuntuPrimaryArches, targetDebArch)
+	case constants.DistroDebian:
+		return !slices.Contains(debianOfficialArches, targetDebArch)
+	}
+
+	return false
+}
+
+// crossURIFor selects the archive URI that actually carries targetDebArch.
+func crossURIFor(distro, targetDebArch string) string {
+	if !isPortsArch(distro, targetDebArch) {
+		switch distro {
+		case constants.DistroUbuntu:
+			return ubuntuPrimaryURI
+		case constants.DistroDebian:
+			return debianPrimaryURI
+		}
+	}
+
+	return portsURIFor(distro)
+}
+
+// crossKeyringFor selects the keyring that signs the archive chosen by
+// crossURIFor.
+func crossKeyringFor(distro, targetDebArch string) string {
+	if distro == constants.DistroDebian && isPortsArch(distro, targetDebArch) {
+		return debianPortsKeyring
+	}
+
+	return archiveKeyringFor(distro)
+}
+
+// crossSuitesFor returns the deb822 Suites value for the cross source.
+// debian-ports only publishes the rolling "unstable" suite.
+func crossSuitesFor(distro, codename, targetDebArch string) string {
+	switch {
+	case distro == constants.DistroUbuntu:
+		return fmt.Sprintf("%s %s-updates %s-security", codename, codename, codename)
+	case distro == constants.DistroDebian && isPortsArch(distro, targetDebArch):
+		return debianPortsSuite
+	}
+
+	return codename
+}
+
+// crossComponentsFor returns the components available for the distro.
+// Debian has no restricted/universe/multiverse components.
+func crossComponentsFor(distro string) []string {
+	if distro == constants.DistroDebian {
+		return []string{componentMain}
+	}
+
+	return []string{componentMain, "restricted", "universe", "multiverse"}
+}
+
 // writeCrossSource emits a deb822 .sources file restricted to the target arch
 // and signed by the local archive keyring. The standard setupDeb path is not
 // reused because it cannot constrain Architectures or point at a pre-installed
@@ -225,11 +301,7 @@ func writeCrossSource(r *Repo, targetDebArch, codename, distro, keyring string) 
 		return err
 	}
 
-	suites := codename
-
-	if distro == constants.DistroUbuntu {
-		suites = fmt.Sprintf("%s %s-updates %s-security", codename, codename, codename)
-	}
+	suites := crossSuitesFor(distro, codename, targetDebArch)
 
 	body := fmt.Sprintf(
 		"Types: deb\nURIs: %s\nSuites: %s\nComponents: %s\nArchitectures: %s\nSigned-By: %s\n",
