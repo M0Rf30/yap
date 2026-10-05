@@ -3,6 +3,7 @@ package files
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -401,5 +402,73 @@ func TestCalculateDataHashNonExistent(t *testing.T) {
 	_, err := CalculateDataHash("/non/existent/directory", []string{})
 	if err == nil {
 		t.Fatal("Expected error for non-existent directory, got nil")
+	}
+}
+
+func TestWalkerSkipsContentsOfSkippedDirectories(t *testing.T) {
+	tempDir := t.TempDir()
+
+	for _, p := range []string{".hidden/inner.txt", "keep/a.txt", "skipme/deep/b.txt"} {
+		full := filepath.Join(tempDir, p)
+
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := os.WriteFile(full, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	walker := NewWalker(tempDir, WalkOptions{SkipDotFiles: true, SkipPatterns: []string{"skipme"}})
+
+	entries, err := walker.Walk()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]bool{}
+	for _, e := range entries {
+		got[e.Destination] = true
+	}
+
+	for dest := range got {
+		if strings.Contains(dest, ".hidden") || strings.Contains(dest, "skipme") {
+			t.Errorf("entry %q should have been pruned with its parent directory", dest)
+		}
+	}
+
+	if len(got) == 0 {
+		t.Fatal("expected keep/ entries to be returned")
+	}
+}
+
+func TestCalculateDataHashSkipsDirectoryContents(t *testing.T) {
+	tempDir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(tempDir, "skip"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(tempDir, "skip", "f"), []byte("1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	hashA, err := CalculateDataHash(tempDir, []string{"skip"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(tempDir, "skip", "f"), []byte("2"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	hashB, err := CalculateDataHash(tempDir, []string{"skip"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if hashA != hashB {
+		t.Error("contents of a skipped directory must not affect the hash")
 	}
 }
