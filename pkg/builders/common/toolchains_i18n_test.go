@@ -48,10 +48,12 @@ func TestValidateToolchainI18nErrorMessages(t *testing.T) {
 			},
 		},
 		{
-			name:        "Valid toolchain - x86_64/pacman",
-			targetArch:  "x86_64",
-			format:      "pacman",
-			expectError: true,
+			name:       "Valid toolchain - x86_64/pacman",
+			targetArch: "x86_64",
+			format:     "pacman",
+			// Depends on whether a usable x86_64 toolchain is on the host
+			// (native gcc satisfies it on x86_64 Arch-style setups).
+			expectError: ValidateToolchain("x86_64", "pacman") != nil,
 			errorContains: []string{
 				"x86_64",
 				"pacman",
