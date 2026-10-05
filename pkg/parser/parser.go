@@ -8,7 +8,6 @@ import (
 	"mvdan.cc/sh/v3/shell"
 	"mvdan.cc/sh/v3/syntax"
 
-	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -156,11 +155,7 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 				var fieldsErr error
 
 				arrayDecl, fieldsErr = shell.Fields(lines[len(lines)-1], expandFunc)
-				if fieldsErr != nil {
-					return errors.Wrap(fieldsErr, errors.ErrTypeParser, "failed to expand array").
-						WithContext("variable", name).
-						WithOperation("collectVariablesAndArrays")
-				}
+				warnExpansion(name, fieldsErr)
 			}
 
 			return pkgBuild.AddItem(name, arrayDecl)
@@ -171,12 +166,12 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 			return strErr
 		}
 
+		// Expansion failures (typically command substitution, which yap does
+		// not execute at parse time) are surfaced as warnings rather than
+		// hard errors: such PKGBUILDs have always parsed with an empty value
+		// and failing them now would break existing builds.
 		varDecl, expandErr := shell.Expand(strVal, expandFunc)
-		if expandErr != nil {
-			return errors.Wrap(expandErr, errors.ErrTypeParser, "failed to expand variable").
-				WithContext("variable", name).
-				WithOperation("collectVariablesAndArrays")
-		}
+		warnExpansion(name, expandErr)
 
 		localVars[name] = varDecl
 
@@ -242,4 +237,15 @@ func processFunctions(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.PKGBUILD) 
 	})
 
 	return firstErr
+}
+
+// warnExpansion logs a non-fatal shell expansion failure for a top-level
+// PKGBUILD assignment.
+func warnExpansion(name string, err error) {
+	if err == nil {
+		return
+	}
+
+	logger.Warn("PKGBUILD variable could not be expanded; using empty value",
+		"variable", name, "error", err)
 }
