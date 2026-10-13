@@ -8,7 +8,7 @@ require (
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/cyphar/filepath-securejoin v0.7.0
-	github.com/github/go-spdx/v2 v2.7.0
+	github.com/github/go-spdx/v2 v2.7.1
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/go-playground/validator/v10 v10.30.5
 	github.com/google/go-containerregistry v0.22.1
@@ -18,7 +18,7 @@ require (
 	github.com/m0rf30/ar v1.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
-	github.com/nwaples/rardecode/v2 v2.4.1
+	github.com/nwaples/rardecode/v2 v2.4.2
 	github.com/otiai10/copy v1.14.1
 	github.com/pierrec/lz4/v4 v4.1.33
 	github.com/rootless-containers/rootlesskit/v2 v2.3.6
