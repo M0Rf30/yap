@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.27.0"
+  GO_VERSION: "1.27.2"
 
 jobs:
   # ===================================
@@ -29,7 +29,7 @@ jobs:
     name: 🔍 Static Analysis
     uses: ./.github/workflows/_reusable-security-scan.yml
     with:
-      go-version: "1.27.0"
+      go-version: "1.27.2"
       upload-sarif: true
       run-sast: true
       run-vulncheck: false
@@ -41,7 +41,7 @@ jobs:
     name: 🛡️ Vulnerability Scan
     uses: ./.github/workflows/_reusable-security-scan.yml
     with:
-      go-version: "1.27.0"
+      go-version: "1.27.2"
       upload-sarif: false
       run-vulncheck: true
 
