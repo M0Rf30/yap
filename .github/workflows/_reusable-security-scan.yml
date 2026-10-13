@@ -61,7 +61,7 @@ jobs:
 
       - name: 📤 Upload SAST results
         if: ${{ always() && inputs.run-sast && inputs.upload-sarif }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: sast-scan-results
           path: gosec.sarif
@@ -84,7 +84,7 @@ jobs:
 
       - name: 📤 Upload vulnerability scan results
         if: ${{ always() && inputs.run-vulncheck }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: vulnerability-scan-results
           path: vulncheck.json
