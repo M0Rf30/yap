@@ -32,6 +32,12 @@ var ErrUnsignedRPM = errors.New("dnfinstall: RPM has no signature")
 // AllowUnverifiedRPMs opt-in: the RPM hasn't been trusted yet.
 var ErrUnknownSigner = errors.New("dnfinstall: signature made by unknown entity")
 
+// ErrUnsupportedSignature is returned when the RPM carries a signature the
+// OpenPGP implementation cannot parse (e.g. version-3 signature packets used
+// by EL8-era EPEL). It could not be checked at all, so like ErrUnknownSigner it
+// is tolerated under AllowUnverifiedRPMs and fatal in strict mode.
+var ErrUnsupportedSignature = errors.New("dnfinstall: unsupported signature format")
+
 // ErrInvalidSignature is returned when a signature is present and
 // well-formed but cryptographically invalid (corrupted data, wrong key material).
 var ErrInvalidSignature = errors.New("dnfinstall: invalid signature")
@@ -267,6 +273,12 @@ func wrapRPMSignatureError(err error) error {
 		return ErrInvalidSignature
 	case errors.Is(err, pgperrors.ErrKeyRevoked):
 		return ErrInvalidSignature
+	}
+
+	// The signature exists but could not be parsed by go-crypto (notably v3
+	// signature packets); it was never checked, so it is not "invalid".
+	if _, ok := errors.AsType[pgperrors.UnsupportedError](err); ok {
+		return ErrUnsupportedSignature
 	}
 
 	// go-rpmutils reports a signing key absent from the keyring with its own

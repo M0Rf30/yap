@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
 	"github.com/sassoftware/go-rpmutils"
 )
 
@@ -287,6 +288,11 @@ func TestWrapRPMSignatureError(t *testing.T) {
 			name:     "go-rpmutils no PGP signature",
 			err:      fmt.Errorf("verify: %w", rpmutils.ErrNoPGPSignature),
 			expected: ErrUnsignedRPM,
+		},
+		{
+			name:     "go-crypto unsupported v3 signature packet",
+			err:      pgperrors.UnsupportedError("signature packet version 3"),
+			expected: ErrUnsupportedSignature,
 		},
 		{
 			name:     "generic error",
