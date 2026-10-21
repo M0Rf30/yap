@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.27.2"
+  GO_VERSION: "1.27.3"
 
 jobs:
   # ===================================
@@ -78,7 +78,7 @@ jobs:
     name: 🔒 Security Scan
     uses: ./.github/workflows/_reusable-security-scan.yml
     with:
-      go-version: "1.27.2"
+      go-version: "1.27.3"
       upload-sarif: true
       run-sast: true
       run-vulncheck: false
@@ -96,7 +96,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         # os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ["1.27.2"]
+        go-version: ["1.27.3"]
 
     steps:
       - name: 📂 Checkout code

@@ -14,7 +14,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 builder_stage() {
   cat <<'BUILDER'
 # syntax=docker/dockerfile:1
-ARG GO_VERSION=1.27.2
+ARG GO_VERSION=1.27.3
 
 # Build stage
 FROM golang:${GO_VERSION}-alpine AS builder
@@ -82,7 +82,7 @@ FROM ${base_image}
 # Build arguments for runtime stage
 ARG VERSION=dev
 ARG TARGETARCH=amd64
-ARG GO_VERSION=1.27.2
+ARG GO_VERSION=1.27.3
 
 # Metadata labels
 LABEL org.opencontainers.image.title="${title}"
