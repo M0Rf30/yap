@@ -6,11 +6,13 @@ package dnfinstall //nolint:testpackage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	"github.com/sassoftware/go-rpmutils"
 )
 
 // TestVerifyRPMSignatureUnsignedWithBypass tests that an unsigned RPM
@@ -274,6 +276,16 @@ func TestWrapRPMSignatureError(t *testing.T) {
 		{
 			name:     "no signature message",
 			err:      errors.New("no signature found"),
+			expected: ErrUnsignedRPM,
+		},
+		{
+			name:     "go-rpmutils key not found",
+			err:      fmt.Errorf("verify: %w", rpmutils.KeyNotFoundError{KeyID: 0xdeadbeef}),
+			expected: ErrUnknownSigner,
+		},
+		{
+			name:     "go-rpmutils no PGP signature",
+			err:      fmt.Errorf("verify: %w", rpmutils.ErrNoPGPSignature),
 			expected: ErrUnsignedRPM,
 		},
 		{

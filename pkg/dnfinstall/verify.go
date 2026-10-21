@@ -269,6 +269,16 @@ func wrapRPMSignatureError(err error) error {
 		return ErrInvalidSignature
 	}
 
+	// go-rpmutils reports a signing key absent from the keyring with its own
+	// type, and an RPM without a PGP signature packet with a sentinel.
+	if _, ok := errors.AsType[rpmutils.KeyNotFoundError](err); ok {
+		return ErrUnknownSigner
+	}
+
+	if errors.Is(err, rpmutils.ErrNoPGPSignature) {
+		return ErrUnsignedRPM
+	}
+
 	// Type-assert SignatureError (string type) for "actual bad signature".
 	if _, ok := errors.AsType[pgperrors.SignatureError](err); ok {
 		return ErrInvalidSignature
