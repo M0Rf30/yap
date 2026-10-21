@@ -83,16 +83,14 @@ func TestProcessDependenciesComplexOperators(t *testing.T) {
 	}{
 		{"package<=1.0.0", "package (<= 1.0.0)"},
 		{"package=1.0.0", "package (= 1.0.0)"},
-		{"package>1.0.0", "package (> 1.0.0)"},
-		{"package<1.0.0", "package (< 1.0.0)"},
+		{"package>1.0.0", "package (>> 1.0.0)"},
+		{"package<1.0.0", "package (<< 1.0.0)"},
 	}
 
 	for _, test := range tests {
 		result := builder.ProcessDependencies([]string{test.input})
-		// Note: The actual regex might not split all operators correctly
-		// This test verifies the function executes without errors
-		if len(result) != 1 {
-			t.Fatalf("Expected 1 result, got %d", len(result))
+		if len(result) != 1 || result[0] != test.expected {
+			t.Errorf("ProcessDependencies(%q) = %q, want %q", test.input, result, test.expected)
 		}
 	}
 }

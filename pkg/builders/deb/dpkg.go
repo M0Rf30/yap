@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/m0rf30/ar"
-	"github.com/otiai10/copy"
+	cp "github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
@@ -306,7 +306,7 @@ func (d *Package) createDebconfFile(name, variable string) error {
 	assetPath := filepath.Join(d.PKGBUILD.Home, variable)
 	destPath := filepath.Join(d.debDir, name)
 
-	return copy.Copy(assetPath, destPath)
+	return cp.Copy(assetPath, destPath)
 }
 
 // createChangelogFile creates the changelog file for the Debian package.

@@ -161,6 +161,10 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 				warnExpansion(name, fieldsErr)
 			}
 
+			if nodeType.Append {
+				return pkgBuild.AppendItem(name, arrayDecl)
+			}
+
 			return pkgBuild.AddItem(name, arrayDecl)
 		}
 
@@ -175,6 +179,12 @@ func collectVariablesAndArrays(pkgbuildSyntax *syntax.File, pkgBuild *pkgbuild.P
 		// and failing them now would break existing builds.
 		varDecl, expandErr := shell.Expand(strVal, expandFunc)
 		warnExpansion(name, expandErr)
+
+		if nodeType.Append {
+			localVars[name] += varDecl
+
+			return pkgBuild.AppendItem(name, varDecl)
+		}
 
 		localVars[name] = varDecl
 

@@ -88,6 +88,15 @@ func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
 
 			switch bb.Format {
 			case formatDeb:
+				// Debian's bare ">" and "<" are deprecated aliases for ">=" and
+				// "<="; strict comparisons are spelled ">>" and "<<".
+				switch operator {
+				case ">":
+					operator = ">>"
+				case "<":
+					operator = "<<"
+				}
+
 				processed[index] = fmt.Sprintf("%s (%s %s)", name, operator, version)
 			case constants.FormatRPM:
 				processed[index] = fmt.Sprintf("%s %s %s", name, operator, version)

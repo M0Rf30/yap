@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -62,6 +63,13 @@ const (
 	pkgrelKey         = "pkgrel"
 	pkgverKey         = "pkgver"
 	makedependsKey    = "makedepends"
+	urlKey            = "url"
+	optdependsKey     = "optdepends"
+	providesKey       = "provides"
+	conflictsKey      = "conflicts"
+	replacesKey       = "replaces"
+	backupKey         = "backup"
+	optionsKey        = "options"
 	noextractKey      = "noextract"
 	sourceKey         = "source"
 	b2sumsKey         = "b2sums"
@@ -178,10 +186,11 @@ type PKGBUILD struct {
 	PreTrans          string
 	PreUpgrade        string
 	priorities        map[string]int
-	archSourceURI     []string  // arch-specific source_<arch> entries, merged into SourceURI at Finalize
-	archHashSums      []string  // arch-specific sha*sums_<arch> entries, merged into HashSums at Finalize
-	archHashAlgos     []string  // checksum array name per archHashSums entry
-	topLevelSnap      *PKGBUILD // snapshot of overrideable fields before any package_<name>() runs
+	assigned          map[string]any // last value per raw variable name, for `+=`
+	archSourceURI     []string       // arch-specific source_<arch> entries, merged into SourceURI at Finalize
+	archHashSums      []string       // arch-specific sha*sums_<arch> entries, merged into HashSums at Finalize
+	archHashAlgos     []string       // checksum array name per archHashSums entry
+	topLevelSnap      *PKGBUILD      // snapshot of overrideable fields before any package_<name>() runs
 	Priority          string
 	Provides          []string
 	Replaces          []string
@@ -207,6 +216,8 @@ type PKGBUILD struct {
 // It takes a key string and data of any type as parameters.
 // It returns an error.
 func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
+	pkgBuild.recordAssigned(key, data)
+
 	key, priority, err := pkgBuild.parseDirective(key)
 	if err != nil || priority == -1 {
 		return err
@@ -242,6 +253,98 @@ func (pkgBuild *PKGBUILD) AddItem(key string, data any) error {
 	}
 
 	return nil
+}
+
+// recordAssigned remembers the last value assigned to the raw (suffixed)
+// variable name so that a later `name+=` assignment can extend it.
+func (pkgBuild *PKGBUILD) recordAssigned(rawKey string, data any) {
+	switch v := data.(type) {
+	case string:
+		pkgBuild.setAssigned(rawKey, v)
+	case []string:
+		pkgBuild.setAssigned(rawKey, slices.Clone(v))
+	}
+}
+
+func (pkgBuild *PKGBUILD) setAssigned(rawKey string, v any) {
+	if pkgBuild.assigned == nil {
+		pkgBuild.assigned = make(map[string]any)
+	}
+
+	pkgBuild.assigned[rawKey] = v
+}
+
+// currentOverrideValue returns the current struct value of a split-overrideable
+// base key, used as the starting point of `key+=` when the key has not been
+// assigned in the current scope (e.g. depends+=() inside package_foo()).
+func (pkgBuild *PKGBUILD) currentOverrideValue(key string) any {
+	switch key {
+	case pkgdescKey:
+		return pkgBuild.PkgDesc
+	case urlKey:
+		return pkgBuild.URL
+	case licenseKey:
+		return pkgBuild.License
+	case dependsKey:
+		return pkgBuild.Depends
+	case optdependsKey:
+		return pkgBuild.OptDepends
+	case providesKey:
+		return pkgBuild.Provides
+	case conflictsKey:
+		return pkgBuild.Conflicts
+	case replacesKey:
+		return pkgBuild.Replaces
+	case backupKey:
+		return pkgBuild.Backup
+	case optionsKey:
+		return pkgBuild.Options
+	default:
+		return nil
+	}
+}
+
+// AppendItem implements the shell `key+=value` assignment: array values are
+// appended to the previously assigned items, scalar values are concatenated to
+// the previous string. Without a previous assignment it behaves like AddItem.
+// Suffixed variants (depends__ubuntu, source_x86_64) extend their own previous
+// assignment.
+func (pkgBuild *PKGBUILD) AppendItem(key string, data any) error {
+	canon, priority, err := pkgBuild.parseDirective(key)
+	if err != nil || priority == -1 {
+		return err
+	}
+
+	prior, ok := pkgBuild.assigned[key]
+	if !ok && key == canon {
+		prior = pkgBuild.currentOverrideValue(canon)
+	}
+
+	switch v := data.(type) {
+	case []string:
+		prev, _ := prior.([]string)
+		combined := append(slices.Clone(prev), v...)
+
+		send := combined
+		if isAccumulatingKey(canon) && priority > priorityBase {
+			// Arch-specific source/checksums accumulate inside AddItem.
+			send = v
+		}
+
+		if err := pkgBuild.AddItem(key, send); err != nil {
+			return err
+		}
+
+		pkgBuild.setAssigned(key, combined)
+
+		return nil
+	case string:
+		prev, _ := prior.(string)
+
+		return pkgBuild.AddItem(key, prev+v)
+	default:
+		return pkgBuild.AddItem(key, data)
+	}
 }
 
 // isAccumulatingKey reports whether key is a source or checksum array, whose
@@ -571,9 +674,9 @@ func (pkgBuild *PKGBUILD) Finalize() {
 // may override, matching makepkg's pkgbuild_schema_package_overrides.
 // The __distro and _arch suffix variants are handled automatically by AddItem/parseDirective.
 var splitOverrideKeys = map[string]struct{}{
-	pkgdescKey: {}, archDistro: {}, "url": {}, licenseKey: {}, "groups": {},
-	dependsKey: {}, "optdepends": {}, "provides": {}, "conflicts": {}, "replaces": {},
-	"backup": {}, "options": {}, "install": {}, "changelog": {},
+	pkgdescKey: {}, archDistro: {}, urlKey: {}, licenseKey: {}, "groups": {},
+	dependsKey: {}, optdependsKey: {}, providesKey: {}, conflictsKey: {}, replacesKey: {},
+	backupKey: {}, optionsKey: {}, "install": {}, "changelog": {},
 }
 
 // copySplitOverrideFields copies the scalar and slice fields that
@@ -591,6 +694,10 @@ func copySplitOverrideFields(dst, src *PKGBUILD) {
 	dst.Replaces = append([]string(nil), src.Replaces...)
 	dst.Backup = append([]string(nil), src.Backup...)
 	dst.Options = append([]string(nil), src.Options...)
+
+	// `+=` inside a package_<name>() must extend the restored top-level value,
+	// not what a previous sub-package assigned.
+	dst.assigned = nil
 
 	// Restore the priority entries for overrideable keys so that AddItem
 	// will accept the next sub-package's overrides rather than treating
@@ -754,6 +861,10 @@ func (pkgBuild *PKGBUILD) applyOverrideAssign(node syntax.Node) error {
 			}
 		}
 
+		if assign.Append {
+			return pkgBuild.AppendItem(name, arrVal)
+		}
+
 		return pkgBuild.AddItem(name, arrVal)
 	}
 
@@ -767,6 +878,10 @@ func (pkgBuild *PKGBUILD) applyOverrideAssign(node syntax.Node) error {
 		return errors.Wrap(expandErr, errors.ErrTypeParser, "failed to expand split package override").
 			WithContext("variable", name).
 			WithOperation("applyOverrideAssign")
+	}
+
+	if assign.Append {
+		return pkgBuild.AppendItem(name, varVal)
 	}
 
 	return pkgBuild.AddItem(name, varVal)

@@ -239,8 +239,22 @@ func Exec(ctx context.Context, excludeStdout bool, dir, name string, args ...str
 // no extra dependencies.
 func ExecCapture(ctx context.Context, out io.Writer, dir, name string, args ...string,
 ) error {
+	return ExecCaptureEnv(ctx, nil, out, dir, name, args...)
+}
+
+// ExecCaptureEnv is ExecCapture with extra KEY=VALUE entries appended to the
+// child's inherited environment. Use it to pass secrets without exposing them
+// in argv.
+func ExecCaptureEnv(
+	ctx context.Context, env []string, out io.Writer, dir, name string, args ...string,
+) error {
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // internal build system cmd
 	cmd.Stdout = out
+
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
+
 	cmd.Stderr = out
 
 	if dir != "" {
@@ -262,7 +276,20 @@ func ExecCapture(ctx context.Context, out io.Writer, dir, name string, args ...s
 func ExecWithContext(
 	ctx context.Context, excludeStdout bool, dir, name string, args ...string,
 ) error {
+	return ExecWithEnv(ctx, nil, excludeStdout, dir, name, args...)
+}
+
+// ExecWithEnv is ExecWithContext with extra KEY=VALUE entries appended to the
+// child's inherited environment. Use it to pass secrets without exposing them
+// in argv.
+func ExecWithEnv(
+	ctx context.Context, env []string, excludeStdout bool, dir, name string, args ...string,
+) error {
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // internal build system cmd
+
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 
 	if !excludeStdout {
 		_, err := MultiPrinter.Start()

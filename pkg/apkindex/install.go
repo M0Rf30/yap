@@ -410,11 +410,6 @@ func safeAPKSymlinkTarget(linkPath, target string) error {
 	return safepath.SymlinkTarget("/", linkPath, target)
 }
 
-// extractAPKEntry extracts a single tar entry to the filesystem root.
-func extractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
-	return extractAPKEntryAt(tr, hdr, "/")
-}
-
 // extractAPKEntryAt extracts a single tar entry below root.
 // Handles regular files, directories, and symlinks with proper sanitization.
 func extractAPKEntryAt(tr *tar.Reader, hdr *tar.Header, root string) error {

@@ -60,8 +60,8 @@ func TestExtractCapabilitiesWithRealRPM(t *testing.T) {
 
 	// Check that we have provides, requires, conflicts, and obsoletes.
 	kinds := make(map[string]int)
-	for _, cap := range caps {
-		kinds[cap.Kind]++
+	for _, capability := range caps {
+		kinds[capability.Kind]++
 	}
 
 	assert.Greater(t, kinds["provide"], 0, "should have at least one provide")
@@ -92,9 +92,9 @@ func TestExtractCapabilitiesProvides(t *testing.T) {
 	// Find provides.
 	var provides []string
 
-	for _, cap := range caps {
-		if cap.Kind == "provide" {
-			provides = append(provides, cap.Name)
+	for _, capability := range caps {
+		if capability.Kind == "provide" {
+			provides = append(provides, capability.Name)
 		}
 	}
 
@@ -118,9 +118,9 @@ func TestExtractCapabilitiesRequires(t *testing.T) {
 	// Find requires.
 	var requires []string
 
-	for _, cap := range caps {
-		if cap.Kind == "require" {
-			requires = append(requires, cap.Name)
+	for _, capability := range caps {
+		if capability.Kind == "require" {
+			requires = append(requires, capability.Name)
 		}
 	}
 
@@ -143,9 +143,9 @@ func TestExtractCapabilitiesConflicts(t *testing.T) {
 	// Find conflicts.
 	var conflicts []string
 
-	for _, cap := range caps {
-		if cap.Kind == "conflict" {
-			conflicts = append(conflicts, cap.Name)
+	for _, capability := range caps {
+		if capability.Kind == "conflict" {
+			conflicts = append(conflicts, capability.Name)
 		}
 	}
 
@@ -168,9 +168,9 @@ func TestExtractCapabilitiesObsoletes(t *testing.T) {
 	// Find obsoletes.
 	var obsoletes []string
 
-	for _, cap := range caps {
-		if cap.Kind == "obsolete" {
-			obsoletes = append(obsoletes, cap.Name)
+	for _, capability := range caps {
+		if capability.Kind == "obsolete" {
+			obsoletes = append(obsoletes, capability.Name)
 		}
 	}
 

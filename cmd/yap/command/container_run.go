@@ -114,7 +114,7 @@ func RunCommandInContainer(image, workDir string, subArgs []string) bool {
 	return true
 }
 
-// RunPipelineInContainer runs prepare then build in a single container
+// RunPipelineInContainerEnv runs prepare then build in a single container
 // invocation using a shell chain. This ensures makedeps installed by prepare
 // are available to build without requiring a persistent container.
 //
@@ -129,17 +129,11 @@ func RunCommandInContainer(image, workDir string, subArgs []string) bool {
 //     environment matches the build — repos added on the build side are not
 //     visible to prepare unless forwarded here; empty to skip prepare
 //   - skipPrepare: if true, skip the prepare step (user passed -s or -d)
+//   - env: extra environment variables injected into the container (used for
+//     secrets such as the signing passphrase, which must not travel on the
+//     command line)
 //
 // Returns true if dispatched, false if caller should proceed natively.
-func RunPipelineInContainer(
-	image, workDir string, buildArgs, prepareArgs []string, skipPrepare bool,
-) bool {
-	return RunPipelineInContainerEnv(image, workDir, buildArgs, prepareArgs, skipPrepare, nil)
-}
-
-// RunPipelineInContainerEnv is RunPipelineInContainer with extra environment
-// variables injected into the container (used for secrets such as the signing
-// passphrase, which must not travel on the command line).
 func RunPipelineInContainerEnv(
 	image, workDir string, buildArgs, prepareArgs []string, skipPrepare bool,
 	env map[string]string,

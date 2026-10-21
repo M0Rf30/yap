@@ -4,6 +4,7 @@
 package sbom
 
 import (
+	"encoding/json"
 	"regexp"
 	"testing"
 
@@ -113,6 +114,12 @@ func TestGenerateCycloneDX(t *testing.T) {
 	assert.Equal(t, bom.Metadata.Component.BOMRef, bom.Dependencies[0].Ref)
 	assert.Contains(t, bom.Dependencies[0].Depends, "pkg:generic/gcc")
 	assert.Contains(t, bom.Dependencies[0].Depends, "pkg:generic/make")
+
+	// CycloneDX 1.5 names the edge list "dependsOn"; any other key is
+	// dropped by consumers and rejected by schema validation.
+	raw, err := json.Marshal(bom.Dependencies[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"dependsOn":`)
 }
 
 func TestGenerateSPDX(t *testing.T) {

@@ -177,7 +177,9 @@ func exportToDir(img v1.Image, destDir string) error {
 		// Unblock the export goroutine's pending write, then wait for it.
 		_ = pr.CloseWithError(err)
 
-		<-exportErr
+		// The extraction error is the root cause; the export goroutine's error
+		// is just the resulting broken pipe.
+		<-exportErr //nolint:errcheck // superseded by the extraction error
 
 		return err
 	}
@@ -381,24 +383,4 @@ func extractHardLink(hdr *tar.Header, target, destDir string) error {
 	_ = os.Remove(target)
 
 	return os.Link(linkTarget, target)
-}
-
-// RootfsExists returns true if a rootfs has already been extracted for distro.
-func RootfsExists(distro string) (bool, error) {
-	rootfs, err := rootfsPath(distro)
-	if err != nil {
-		return false, err
-	}
-
-	_, err = os.Stat(rootfs)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-
-	return err == nil, err
-}
-
-// RootfsDir returns the path to the extracted rootfs for distro.
-func RootfsDir(distro string) (string, error) {
-	return rootfsPath(distro)
 }

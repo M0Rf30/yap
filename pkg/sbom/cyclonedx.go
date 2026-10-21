@@ -71,7 +71,7 @@ type CycloneDXExtRef struct {
 // CycloneDXDependency represents a dependency in CycloneDX BOM.
 type CycloneDXDependency struct {
 	Ref     string   `json:"ref"`
-	Depends []string `json:"depends,omitempty"`
+	Depends []string `json:"dependsOn,omitempty"`
 }
 
 // generateCycloneDX generates a CycloneDX 1.5 SBOM for the given package.

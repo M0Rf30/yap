@@ -22,7 +22,8 @@ func TestRunShellCaptureNilOutForwardsEnv(t *testing.T) {
 
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "args")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n"
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile +
+		"\nprintf '%s' \"$YAP_SECRET\" > " + argsFile + ".env\n"
 	bin := filepath.Join(dir, "fakecli")
 
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil { //nolint:gosec
@@ -42,8 +43,31 @@ func TestRunShellCaptureNilOutForwardsEnv(t *testing.T) {
 		t.Fatalf("read args: %v", err)
 	}
 
-	if !strings.Contains(string(got), "YAP_SECRET=s3cret") {
-		t.Errorf("env not forwarded with nil out; args:\n%s", got)
+	if strings.Contains(string(got), "s3cret") {
+		t.Errorf("secret value leaked into argv:\n%s", got)
+	}
+
+	if !strings.Contains(string(got), "-e\nYAP_SECRET\n") {
+		t.Errorf("value-less -e flag missing; args:\n%s", got)
+	}
+
+	gotEnv, err := os.ReadFile(argsFile + ".env")
+	if err != nil {
+		t.Fatalf("read env: %v", err)
+	}
+
+	if string(gotEnv) != "s3cret" {
+		t.Errorf("env not set on child process; got %q", gotEnv)
+	}
+}
+
+// TestEnvFlagsOmitsValues verifies envFlags never emits values.
+func TestEnvFlagsOmitsValues(t *testing.T) {
+	got := envFlags(map[string]string{"B": "two", "A": "one=x"})
+	want := []string{"-e", "A", "-e", "B"}
+
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("envFlags = %v, want %v", got, want)
 	}
 }
 

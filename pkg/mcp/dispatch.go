@@ -35,7 +35,7 @@ func validateContainerTag(label, v string) error {
 		WithContext(label, v)
 }
 
-// dispatchBuildInContainer mirrors the CLI's RunPipelineInContainer flow for
+// dispatchBuildInContainer mirrors the CLI's RunPipelineInContainerEnv flow for
 // the MCP build tool. It runs the build asynchronously (so the tool call
 // returns immediately with a buildID) inside a yap container image,
 // forwarding every flag the user passed via the MCP args.
@@ -87,7 +87,8 @@ func dispatchBuildInContainer(args *buildArgs, abs, distro, release string,
 	shellCmd := containerShellCmd(args, distroTag, skipPrepare)
 
 	// Secrets (passphrase) travel via env, never as CLI args — argv is
-	// visible to other processes on the host via `ps`.
+	// visible to other processes on the host via `ps`. The container CLI
+	// receives only value-less `-e KEY` flags and reads values from its env.
 	envVars := buildEnvFromArgs(args)
 
 	sess, ctx := defaultRegistry.Register(context.Background(), distro, release, abs)

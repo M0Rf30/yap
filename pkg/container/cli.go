@@ -55,8 +55,9 @@ func (r *cliRuntime) RunShell(distro, workDir, shellCmd string) error {
 // RunShellCapture implements Runtime by tee-ing podman/docker stdout+stderr
 // into out. When out is nil the output is streamed to the default sinks, but
 // env and ctx are still honoured. env is
-// forwarded via `-e KEY=VALUE` flags so secrets do not appear in the shell
-// argv (and therefore not in `ps`).
+// forwarded via value-less `-e KEY` flags, with the values set in the
+// container CLI's own environment, so secrets do not appear in argv (and
+// therefore not in `ps`).
 func (r *cliRuntime) RunShellCapture(ctx context.Context, distro, workDir, shellCmd string,
 	env map[string]string, out io.Writer,
 ) error {
@@ -74,18 +75,42 @@ func (r *cliRuntime) RunShellCapture(ctx context.Context, distro, workDir, shell
 		"-c", shellCmd,
 	)
 
+	childEnv := envPairs(env)
+
 	if out == nil {
-		return shell.Exec(ctx, false, "", r.bin, runArgs...)
+		return shell.ExecWithEnv(ctx, childEnv, false, "", r.bin, runArgs...)
 	}
 
-	return shell.ExecCapture(ctx, out, "", r.bin, runArgs...)
+	return shell.ExecCaptureEnv(ctx, childEnv, out, "", r.bin, runArgs...)
 }
 
-// envFlags renders an env map into a sorted slice of `-e KEY=VALUE` argv
-// fragments. Sorting makes the output stable for tests; values are passed
-// verbatim — callers MUST NOT trust them to escape shell metacharacters
-// because the env value never goes through the shell, only the container
-// runtime CLI.
+// envPairs renders an env map into sorted KEY=VALUE entries for the child
+// process environment, from which docker/podman read the values of the
+// value-less `-e KEY` flags.
+func envPairs(env map[string]string) []string {
+	if len(env) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, k+"="+env[k])
+	}
+
+	return out
+}
+
+// envFlags renders an env map into a sorted slice of value-less `-e KEY`
+// argv fragments. The values never appear in argv (so not in `ps` or
+// /proc/<pid>/cmdline); the container CLI reads them from its own
+// environment, which RunShellCapture populates via envPairs.
 func envFlags(env map[string]string) []string {
 	if len(env) == 0 {
 		return nil
@@ -100,7 +125,7 @@ func envFlags(env map[string]string) []string {
 
 	out := make([]string, 0, 2*len(keys))
 	for _, k := range keys {
-		out = append(out, "-e", k+"="+env[k])
+		out = append(out, "-e", k)
 	}
 
 	return out

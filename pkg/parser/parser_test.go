@@ -4,6 +4,9 @@
 package parser_test
 
 import (
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -465,5 +468,55 @@ func TestParseFile_SplitPackage(t *testing.T) {
 
 	if !strings.Contains(pkgBuild.Build, "echo \"building\"") {
 		t.Errorf("Build should contain 'echo \"building\"', got %q", pkgBuild.Build)
+	}
+}
+
+func TestParseFile_AppendAssignments(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	content := `pkgname=app
+pkgver=1.0
+pkgrel=1
+pkgdesc="Base"
+pkgdesc+=" extended"
+arch=('x86_64')
+depends=('a')
+depends+=('b')
+makedepends=('m1')
+makedepends+=('m2' 'm3')
+depends__ubuntu=('u1')
+depends__ubuntu+=('u2')
+`
+
+	if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	pkgBuild, err := parser.ParseFile("ubuntu", "focal", dir, dir, "")
+	if err != nil {
+		t.Fatalf("ParseFile() error: %v", err)
+	}
+
+	if want := []string{"u1", "u2"}; !slices.Equal(pkgBuild.Depends, want) {
+		t.Errorf("Depends = %v, want %v", pkgBuild.Depends, want)
+	}
+
+	if want := []string{"m1", "m2", "m3"}; !slices.Equal(pkgBuild.MakeDepends, want) {
+		t.Errorf("MakeDepends = %v, want %v", pkgBuild.MakeDepends, want)
+	}
+
+	if want := "Base extended"; pkgBuild.PkgDesc != want {
+		t.Errorf("PkgDesc = %q, want %q", pkgBuild.PkgDesc, want)
+	}
+
+	// Base-only appends (no distro override) on a second distro.
+	pkgBuild, err = parser.ParseFile("fedora", "40", dir, dir, "")
+	if err != nil {
+		t.Fatalf("ParseFile() error: %v", err)
+	}
+
+	if want := []string{"a", "b"}; !slices.Equal(pkgBuild.Depends, want) {
+		t.Errorf("Depends = %v, want %v", pkgBuild.Depends, want)
 	}
 }

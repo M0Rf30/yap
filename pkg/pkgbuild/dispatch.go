@@ -53,7 +53,7 @@ var scalarHandlers = map[string]scalarHandler{
 	"priority": {
 		apply: func(p *PKGBUILD, v string) { p.Priority = v },
 	},
-	"url": {
+	urlKey: {
 		apply: func(p *PKGBUILD, v string) { p.URL = v },
 	},
 	"origin": {
@@ -113,20 +113,20 @@ var arrayHandlers = map[string]arrayHandler{
 	dependsKey: func(p *PKGBUILD, v []string, _ int) {
 		p.Depends = v
 	},
-	"options": func(p *PKGBUILD, v []string, _ int) {
+	optionsKey: func(p *PKGBUILD, v []string, _ int) {
 		p.Options = v
 		p.processOptions()
 	},
-	"optdepends": func(p *PKGBUILD, v []string, _ int) {
+	optdependsKey: func(p *PKGBUILD, v []string, _ int) {
 		p.OptDepends = v
 	},
 	makedependsKey: func(p *PKGBUILD, v []string, _ int) {
 		p.MakeDepends = v
 	},
-	"provides": func(p *PKGBUILD, v []string, _ int) {
+	providesKey: func(p *PKGBUILD, v []string, _ int) {
 		p.Provides = v
 	},
-	"conflicts": func(p *PKGBUILD, v []string, _ int) {
+	conflictsKey: func(p *PKGBUILD, v []string, _ int) {
 		p.Conflicts = v
 	},
 	"enhances": func(p *PKGBUILD, v []string, _ int) {
@@ -135,7 +135,7 @@ var arrayHandlers = map[string]arrayHandler{
 	"supplements": func(p *PKGBUILD, v []string, _ int) {
 		p.Supplements = v
 	},
-	"replaces": func(p *PKGBUILD, v []string, _ int) {
+	replacesKey: func(p *PKGBUILD, v []string, _ int) {
 		p.Replaces = v
 	},
 	"breaks": func(p *PKGBUILD, v []string, _ int) {
@@ -161,7 +161,7 @@ var arrayHandlers = map[string]arrayHandler{
 	noextractKey: func(p *PKGBUILD, v []string, _ int) {
 		p.NoExtract = v
 	},
-	"backup": func(p *PKGBUILD, v []string, _ int) {
+	backupKey: func(p *PKGBUILD, v []string, _ int) {
 		p.Backup = v
 	},
 	pkgnameKey: func(p *PKGBUILD, v []string, _ int) {

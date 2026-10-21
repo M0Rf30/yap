@@ -45,18 +45,6 @@ func OpenLegacy() (*LegacyDB, error) {
 	return nil, ErrNoBDB
 }
 
-// OpenLegacyAt returns a LegacyDB reading the BerkeleyDB Packages database
-// at an explicit path. Used by tests and tooling; production code goes
-// through OpenLegacy's path discovery.
-func OpenLegacyAt(path string) (*LegacyDB, error) {
-	fi, err := os.Stat(path)
-	if err != nil || !fi.Mode().IsRegular() {
-		return nil, ErrNoBDB
-	}
-
-	return &LegacyDB{path: path}, nil
-}
-
 // eachHeader scans every header image in the BDB Packages database and
 // calls fn for each successfully parsed header. Malformed individual
 // blobs are skipped (the BDB also stores non-header bookkeeping values);

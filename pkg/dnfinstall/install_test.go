@@ -269,9 +269,9 @@ func TestYapdbInsertWithCapabilities(t *testing.T) {
 	kinds := make(map[string]bool)
 	names := make(map[string]bool)
 
-	for _, cap := range retrieved.Caps {
-		kinds[cap.Kind] = true
-		names[cap.Name] = true
+	for _, capability := range retrieved.Caps {
+		kinds[capability.Kind] = true
+		names[capability.Name] = true
 	}
 
 	assert.True(t, kinds["provide"])
@@ -318,9 +318,9 @@ func TestYapdbInsertMultipleCapabilities(t *testing.T) {
 	// Verify all provides were stored.
 	assert.Len(t, retrieved.Caps, 3)
 
-	for i, cap := range retrieved.Caps {
-		assert.Equal(t, "provide", cap.Kind)
-		assert.Equal(t, "lib"+string(rune('1'+i)), cap.Name)
+	for i, capability := range retrieved.Caps {
+		assert.Equal(t, "provide", capability.Kind)
+		assert.Equal(t, "lib"+string(rune('1'+i)), capability.Name)
 	}
 }
 

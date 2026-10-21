@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/otiai10/copy"
+	cp "github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
@@ -273,7 +273,7 @@ func (mpc *MultipleProject) copyProjects() error {
 		// Only copy if StartDir and Home differ (multi-project builds use a
 		// separate build dir; single-project builds use Home as StartDir directly).
 		if proj.Builder.PKGBUILD.StartDir != proj.Builder.PKGBUILD.Home {
-			err := copy.Copy(proj.Builder.PKGBUILD.Home, proj.Builder.PKGBUILD.StartDir, copyOpt)
+			err := cp.Copy(proj.Builder.PKGBUILD.Home, proj.Builder.PKGBUILD.StartDir, copyOpt)
 			if err != nil {
 				return err
 			}
@@ -317,13 +317,13 @@ func shouldSkipFile(info os.FileInfo, src, dest string) (bool, error) {
 }
 
 // setupCopyOptions creates the copy options for the copyProjects function.
-func setupCopyOptions() copy.Options {
-	return copy.Options{
-		OnSymlink: func(_ string) copy.SymlinkAction {
-			return copy.Skip
+func setupCopyOptions() cp.Options {
+	return cp.Options{
+		OnSymlink: func(_ string) cp.SymlinkAction {
+			return cp.Skip
 		},
-		OnDirExists: func(src, dest string) copy.DirExistsAction {
-			return copy.Merge
+		OnDirExists: func(src, dest string) cp.DirExistsAction {
+			return cp.Merge
 		},
 		Sync:          false, // Don't delete extra files in destination
 		PreserveTimes: false, // Don't preserve modification times for better performance

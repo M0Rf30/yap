@@ -4,7 +4,6 @@
 package apkindex
 
 import (
-	"archive/tar"
 	"bufio"
 	"context"
 	"crypto/sha1" //nolint:gosec
@@ -36,11 +35,6 @@ func ExportSafeAPKPath(entryName string) (string, bool) {
 // ExportSafeAPKSymlinkTarget exposes safeAPKSymlinkTarget for testing.
 func ExportSafeAPKSymlinkTarget(linkPath, target string) error {
 	return safeAPKSymlinkTarget(linkPath, target)
-}
-
-// ExportExtractAPKEntry exposes extractAPKEntry for testing.
-func ExportExtractAPKEntry(tr *tar.Reader, hdr *tar.Header) error {
-	return extractAPKEntry(tr, hdr)
 }
 
 // ExportExtractAPKData exposes extractAPKData for testing.

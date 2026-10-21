@@ -290,7 +290,7 @@ func TestProcessDepends(t *testing.T) {
 	}{
 		{
 			input:    []string{"package>=1.0", "other<2.0"},
-			expected: []string{"package (>= 1.0)", "other (< 2.0)"},
+			expected: []string{"package (>= 1.0)", "other (<< 2.0)"},
 		},
 		{
 			input:    []string{"simple"},
