@@ -44,15 +44,6 @@ builds:
       - amd64
       - arm64
 
-upx:
-  - enabled: true
-    compress: best
-    lzma: true
-    # Scope UPX to Linux only — macOS Gatekeeper rejects upx-packed Mach-O
-    # binaries, and upx support for darwin/arm64 is unreliable.
-    goos:
-      - linux
-
 checksum:
   # install.sh fetches the file at this exact name; keep it stable.
   name_template: "checksums.txt"

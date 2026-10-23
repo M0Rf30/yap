@@ -11,7 +11,7 @@ ARG BUILD_TIME=unknown
 ARG TARGETARCH=amd64
 
 # Install build dependencies
-RUN apk add --no-cache upx git
+RUN apk add --no-cache git
 
 # Set up build environment
 WORKDIR /build
@@ -27,8 +27,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     -buildvcs=false \
     -ldflags "-w -s -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Version=${VERSION} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.Commit=${COMMIT} -X github.com/M0Rf30/yap/v2/pkg/buildinfo.BuildTime=${BUILD_TIME}" \
     -o /usr/bin/yap \
-    ./cmd/yap && \
-    upx --best --lzma /usr/bin/yap
+    ./cmd/yap
 
 # Generate bash completion (do this in build stage where we can execute the binary)
 RUN if [ "${TARGETARCH}" = "$(go env GOARCH)" ]; then \
