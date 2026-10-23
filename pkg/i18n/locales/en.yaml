@@ -215,6 +215,86 @@
 - id: errors.gensum.failed
   translation: "Failed to update checksums"
 
+# Publish command
+- id: commands.publish.short
+  translation: "Upload built packages to an OpenArtifact repository"
+- id: commands.publish.long
+  translation: |
+    Upload built packages to a hosted OpenArtifact repository
+    (https://github.com/openartifact/openartifact).
+
+    DEB and RPM packages use OpenArtifact's upload APIs; its apt and dnf
+    indexes are regenerated server-side. APK and Pacman packages (and the
+    .sig/.asc sidecars next to them) are stored in a hosted raw repository.
+
+    Each argument is a package file or a directory (its package files are
+    published). Without arguments the "output" directory of yap.json is used.
+    Directory entries whose format has no repository configured are skipped.
+
+    Settings are read from the "publish" object of yap.json, then overridden
+    by YAP_OA_* environment variables, then by flags:
+    YAP_OA_URL, YAP_OA_DEB_REPO, YAP_OA_RPM_REPO, YAP_OA_APK_REPO,
+    YAP_OA_PACMAN_REPO, YAP_OA_DISTRIBUTION, YAP_OA_COMPONENT,
+    YAP_OA_APK_PATH, YAP_OA_PACMAN_PATH.
+
+    The API token is never read from yap.json or from a flag value: use
+    YAP_OA_TOKEN, or YAP_OA_TOKEN_FILE / --token-file. It is sent as a Bearer
+    token and never logged.
+
+    Every upload is verified against the SHA-256 reported by the server and
+    retried with exponential backoff on transient errors. Publishing the same
+    bytes again is a no-op; the same DEB/RPM name and version with different
+    bytes fails because hosted packages are immutable.
+- id: commands.publish.examples
+  translation: |
+    # Publish every .deb and .rpm in the build output
+    export YAP_OA_URL=https://oa.example.com YAP_OA_TOKEN_FILE=~/.oa-token
+    export YAP_OA_DEB_REPO=debs YAP_OA_RPM_REPO=rpms
+    yap publish ./dist
+
+    # One file, explicit distribution and component
+    yap publish --url https://oa.example.com --token-file ~/.oa-token \
+      --deb-repo debs --distribution jammy --component main hello_1.0_amd64.deb
+
+    # Show what would be uploaded
+    yap publish --dry-run --deb-repo debs ./dist
+- id: errors.publish.no_artifacts
+  translation: "No artifact given and yap.json has no output directory"
+- id: errors.publish.no_packages_found
+  translation: "No package files found"
+- id: errors.publish.failed
+  translation: "Some packages could not be published"
+- id: flags.publish.config
+  translation: "yap.json file (or its directory) holding the \"publish\" settings (default ./yap.json)"
+- id: flags.publish.url
+  translation: "OpenArtifact base URL (env YAP_OA_URL)"
+- id: flags.publish.token_file
+  translation: "File containing the OpenArtifact API token (env YAP_OA_TOKEN_FILE)"
+- id: flags.publish.deb_repo
+  translation: "Hosted deb repository for .deb files (env YAP_OA_DEB_REPO)"
+- id: flags.publish.rpm_repo
+  translation: "Hosted rpm repository for .rpm files (env YAP_OA_RPM_REPO)"
+- id: flags.publish.apk_repo
+  translation: "Hosted raw repository for .apk files (env YAP_OA_APK_REPO)"
+- id: flags.publish.pacman_repo
+  translation: "Hosted raw repository for .pkg.tar.* files (env YAP_OA_PACMAN_REPO)"
+- id: flags.publish.distribution
+  translation: "apt distribution for .deb uploads, default stable (env YAP_OA_DISTRIBUTION)"
+- id: flags.publish.component
+  translation: "apt component for .deb uploads, default main (env YAP_OA_COMPONENT)"
+- id: flags.publish.apk_path
+  translation: "Path prefix inside the apk raw repository (env YAP_OA_APK_PATH)"
+- id: flags.publish.pacman_path
+  translation: "Path prefix inside the pacman raw repository (env YAP_OA_PACMAN_PATH)"
+- id: flags.publish.insecure_http
+  translation: "Allow sending the token over plain http to a non-loopback host"
+- id: flags.publish.dry_run
+  translation: "List what would be uploaded without contacting the server"
+- id: flags.publish.retries
+  translation: "Attempts per request on transient failures (exponential backoff)"
+- id: flags.publish.timeout
+  translation: "Timeout of a single HTTP request, including the upload"
+
 # Build flags
 - id: flags.build.cleanbuild
   translation: "Remove source directory before building"
@@ -1310,6 +1390,18 @@
   translation: "Skipping VCS source"
 - id: logger.gensum.info.updated_checksums
   translation: "Updated checksums"
+- id: logger.publish.error.failed
+  translation: "Publish failed"
+- id: logger.publish.info.dry_run
+  translation: "Would publish"
+- id: logger.publish.info.summary
+  translation: "Publish finished"
+- id: logger.publish.info.unchanged
+  translation: "Already published, identical bytes"
+- id: logger.publish.info.uploaded
+  translation: "Published"
+- id: logger.publish.warn.skipped_no_repo
+  translation: "Skipping package, no repository configured for its format"
 - id: logger.git.info.cloning
   translation: "Cloning"
 - id: logger.git.info.creating_working_copy_bare

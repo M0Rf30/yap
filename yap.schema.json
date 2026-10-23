@@ -170,6 +170,51 @@
       "description": "SBOM format(s) to emit when sbom is enabled.",
       "enum": ["cyclonedx", "spdx", "both"],
       "default": "both"
+    },
+    "publish": {
+      "type": "object",
+      "description": "Defaults for `yap publish` (upload to an OpenArtifact repository). Overridden by YAP_OA_* environment variables and flags. The API token is never read from this file: use YAP_OA_TOKEN, YAP_OA_TOKEN_FILE or --token-file.",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "OpenArtifact base URL (e.g. \"https://oa.example.com\")."
+        },
+        "debRepo": {
+          "type": "string",
+          "description": "Hosted deb repository receiving .deb files."
+        },
+        "rpmRepo": {
+          "type": "string",
+          "description": "Hosted rpm repository receiving .rpm files."
+        },
+        "apkRepo": {
+          "type": "string",
+          "description": "Hosted raw repository receiving .apk files."
+        },
+        "pacmanRepo": {
+          "type": "string",
+          "description": "Hosted raw repository receiving .pkg.tar.* files."
+        },
+        "distribution": {
+          "type": "string",
+          "description": "apt distribution (suite) for .deb uploads.",
+          "default": "stable"
+        },
+        "component": {
+          "type": "string",
+          "description": "apt component for .deb uploads.",
+          "default": "main"
+        },
+        "apkPath": {
+          "type": "string",
+          "description": "Path prefix inside apkRepo (e.g. \"v3.20/main/x86_64\")."
+        },
+        "pacmanPath": {
+          "type": "string",
+          "description": "Path prefix inside pacmanRepo (e.g. \"x86_64\")."
+        }
+      }
     }
   }
 }

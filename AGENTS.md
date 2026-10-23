@@ -32,6 +32,7 @@
 | `pkg/safepath/` | Canonical zip-slip / symlink-escape containment checks for all extractors |
 | `pkg/signing/` | APK RSA + DEB/RPM/Pacman GPG signing |
 | `pkg/sbom/` | CycloneDX 1.5 + SPDX 2.3 generation |
+| `pkg/publish/` | `yap publish`: upload deb/rpm (native APIs) and apk/pacman (raw repo) to OpenArtifact; Bearer token, retries, sha256 verification, idempotent on 409 |
 | `pkg/color/` | Zero-dependency ANSI color helpers |
 | `pkg/logger/` | slog-based structured logger with tree rendering |
 | `pkg/buildinfo/` | Build-time metadata (Version, Commit, BuildTime) via ldflags |
@@ -97,6 +98,7 @@ yap zap [distro] <path>
 yap prepare [distro[-release]]
 yap pull <distro>
 yap install <artifact-file>
+yap publish [artifact-or-dir]...       # upload to OpenArtifact (YAP_OA_URL/YAP_OA_TOKEN/...)
 yap list-distros
 yap status
 yap graph <path>
