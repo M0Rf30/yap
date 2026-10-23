@@ -217,6 +217,87 @@
 - id: errors.gensum.failed
   translation: "Aggiornamento dei checksum fallito"
 
+# Comando publish
+- id: commands.publish.short
+  translation: "Carica i pacchetti compilati su un repository OpenArtifact"
+- id: commands.publish.long
+  translation: |
+    Carica i pacchetti compilati su un repository OpenArtifact ospitato
+    (https://github.com/openartifact/openartifact).
+
+    I pacchetti DEB e RPM usano le API di upload di OpenArtifact; gli indici
+    apt e dnf vengono rigenerati lato server. I pacchetti APK e Pacman (e i
+    file .sig/.asc accanto) vengono salvati in un repository raw ospitato.
+
+    Ogni argomento è un file pacchetto o una directory (ne vengono pubblicati
+    i pacchetti). Senza argomenti si usa la directory "output" di yap.json.
+    Le voci di una directory il cui formato non ha un repository configurato
+    vengono saltate.
+
+    Le impostazioni si leggono dall'oggetto "publish" di yap.json, poi dalle
+    variabili d'ambiente YAP_OA_*, poi dai flag:
+    YAP_OA_URL, YAP_OA_DEB_REPO, YAP_OA_RPM_REPO, YAP_OA_APK_REPO,
+    YAP_OA_PACMAN_REPO, YAP_OA_DISTRIBUTION, YAP_OA_COMPONENT,
+    YAP_OA_APK_PATH, YAP_OA_PACMAN_PATH.
+
+    Il token API non viene mai letto da yap.json né da un valore di flag:
+    usare YAP_OA_TOKEN, oppure YAP_OA_TOKEN_FILE / --token-file. Viene
+    inviato come Bearer e mai scritto nei log.
+
+    Ogni upload è verificato con lo SHA-256 riportato dal server e ripetuto
+    con backoff esponenziale sugli errori transitori. Ripubblicare gli stessi
+    byte non ha effetto; lo stesso nome e versione DEB/RPM con byte diversi
+    fallisce perché i pacchetti ospitati sono immutabili.
+- id: commands.publish.examples
+  translation: |
+    # Pubblica ogni .deb e .rpm dell'output di build
+    export YAP_OA_URL=https://oa.example.com YAP_OA_TOKEN_FILE=~/.oa-token
+    export YAP_OA_DEB_REPO=debs YAP_OA_RPM_REPO=rpms
+    yap publish ./dist
+
+    # Un solo file, con distribuzione e componente espliciti
+    yap publish --url https://oa.example.com --token-file ~/.oa-token \
+      --deb-repo debs --distribution jammy --component main hello_1.0_amd64.deb
+
+    # Mostra cosa verrebbe caricato
+    yap publish --dry-run --deb-repo debs ./dist
+- id: errors.publish.no_artifacts
+  translation: "Nessun artefatto indicato e yap.json non ha una directory output"
+- id: errors.publish.no_packages_found
+  translation: "Nessun file pacchetto trovato"
+- id: errors.publish.failed
+  translation: "Alcuni pacchetti non sono stati pubblicati"
+- id: flags.publish.config
+  translation: "File yap.json (o la sua directory) con le impostazioni \"publish\" (predefinito ./yap.json)"
+- id: flags.publish.url
+  translation: "URL base di OpenArtifact (env YAP_OA_URL)"
+- id: flags.publish.token_file
+  translation: "File con il token API di OpenArtifact (env YAP_OA_TOKEN_FILE)"
+- id: flags.publish.deb_repo
+  translation: "Repository deb ospitato per i file .deb (env YAP_OA_DEB_REPO)"
+- id: flags.publish.rpm_repo
+  translation: "Repository rpm ospitato per i file .rpm (env YAP_OA_RPM_REPO)"
+- id: flags.publish.apk_repo
+  translation: "Repository raw ospitato per i file .apk (env YAP_OA_APK_REPO)"
+- id: flags.publish.pacman_repo
+  translation: "Repository raw ospitato per i file .pkg.tar.* (env YAP_OA_PACMAN_REPO)"
+- id: flags.publish.distribution
+  translation: "Distribuzione apt per i .deb, predefinita stable (env YAP_OA_DISTRIBUTION)"
+- id: flags.publish.component
+  translation: "Componente apt per i .deb, predefinito main (env YAP_OA_COMPONENT)"
+- id: flags.publish.apk_path
+  translation: "Prefisso del percorso nel repository raw apk (env YAP_OA_APK_PATH)"
+- id: flags.publish.pacman_path
+  translation: "Prefisso del percorso nel repository raw pacman (env YAP_OA_PACMAN_PATH)"
+- id: flags.publish.insecure_http
+  translation: "Consenti l'invio del token via http semplice a un host non loopback"
+- id: flags.publish.dry_run
+  translation: "Elenca cosa verrebbe caricato senza contattare il server"
+- id: flags.publish.retries
+  translation: "Tentativi per richiesta sugli errori transitori (backoff esponenziale)"
+- id: flags.publish.timeout
+  translation: "Timeout di una singola richiesta HTTP, upload incluso"
+
 # Flag build
 - id: flags.build.cleanbuild
   translation: "Rimuove la directory sorgente prima della compilazione"
@@ -1318,6 +1399,18 @@
   translation: "Sorgente VCS ignorata"
 - id: logger.gensum.info.updated_checksums
   translation: "Checksum aggiornati"
+- id: logger.publish.error.failed
+  translation: "Pubblicazione fallita"
+- id: logger.publish.info.dry_run
+  translation: "Verrebbe pubblicato"
+- id: logger.publish.info.summary
+  translation: "Pubblicazione terminata"
+- id: logger.publish.info.unchanged
+  translation: "Già pubblicato, byte identici"
+- id: logger.publish.info.uploaded
+  translation: "Pubblicato"
+- id: logger.publish.warn.skipped_no_repo
+  translation: "Pacchetto saltato, nessun repository configurato per il suo formato"
 - id: logger.git.info.cloning
   translation: "Clonazione in corso"
 - id: logger.git.info.creating_working_copy_bare

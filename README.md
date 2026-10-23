@@ -24,6 +24,7 @@ YAP builds native packages for multiple GNU/Linux distributions from a single PK
 - **Dependency-aware builds**: sequential by default; opt-in parallel topo-sort via `--parallel`
 - **Package signing**: APK RSA + DEB/RPM/Pacman GPG (no `gpg` binary required)
 - **SBOM generation**: CycloneDX 1.5 and SPDX 2.3 sidecars
+- **Publishing**: `yap publish` uploads DEB/RPM (and APK/Pacman as raw files) to an [OpenArtifact](https://github.com/openartifact/openartifact) repository
 - **Per-format compression**: `zstd`/`gzip`/`xz` for DEB and RPM
 - **Changelog support**: `changelog` PKGBUILD field renders to native format per distro
 - **Pacman scriptlets**: full 6-hook lifecycle (pre/post install/upgrade/remove)
@@ -172,6 +173,7 @@ artifacts/
 | `parallel` | no | `false` | Build independent packages in parallel (topo-sort) |
 | `sbom` | no | `false` | Generate SBOM sidecars |
 | `sbomFormat` | no | `both` | `cyclonedx`/`spdx`/`both` |
+| `publish` | no | — | Defaults for `yap publish` (see [Publishing](#publishing-to-openartifact)); never holds the token |
 
 Build ordering between packages comes from the `install` flag and each
 PKGBUILD's `depends`/`makedepends` — there is no `yap.json`-level `depends`
@@ -364,6 +366,7 @@ yap zap [distro] <path>               # Clean build environment
 yap prepare [distro[-release]]        # Prepare host build environment
 yap pull <distro>                     # Pull pre-built container images
 yap install <artifact-file>           # Install a built artifact
+yap publish [artifact-or-dir]...      # Upload built packages to an OpenArtifact repository
 yap graph [path]                      # Show dependency graph
 yap list-distros                      # List supported distributions
 yap status                            # Show host status and runtime detection
@@ -488,6 +491,89 @@ rpm -K my-package-1.0.0-1.x86_64.rpm
 # Pacman
 pacman-key --verify my-package-1.0.0-1-x86_64.pkg.tar.zst.sig
 ```
+
+## Publishing to OpenArtifact
+
+`yap publish` uploads built packages to a hosted
+[OpenArtifact](https://github.com/openartifact/openartifact) repository, which
+serves the apt/dnf indexes (`Release`, `Packages`, `repomd.xml`) itself.
+
+| Format | Route used | Notes |
+|--------|-----------|-------|
+| DEB | `POST {url}/api/v1/repositories/{deb-repo}/debs` | multipart `file`, `distribution`, `component` |
+| RPM | `POST {url}/api/v1/repositories/{rpm-repo}/packages` | multipart `file` |
+| APK | `PUT {url}/repos/raw/{apk-repo}/{apk-path}/{file}` | hosted *raw* repository; OpenArtifact has no apk index yet |
+| Pacman | `PUT {url}/repos/raw/{pacman-repo}/{pacman-path}/{file}` | raw repository; the `.sig`/`.asc` sidecars next to a package are uploaded too |
+
+```bash
+export YAP_OA_URL=https://oa.example.com
+export YAP_OA_TOKEN_FILE=~/.config/yap/oa-token        # or YAP_OA_TOKEN
+export YAP_OA_DEB_REPO=debs YAP_OA_RPM_REPO=rpms
+
+yap build ubuntu-jammy .
+yap publish --distribution jammy --component main ./dist   # or a single file
+yap publish --dry-run ./dist                               # list only, no network
+```
+
+Settings resolve in this order (later wins): the `publish` object of
+`yap.json`, the `YAP_OA_*` environment, command-line flags.
+
+```json
+{
+  "output": "dist",
+  "publish": {
+    "url": "https://oa.example.com",
+    "debRepo": "debs",
+    "rpmRepo": "rpms",
+    "distribution": "jammy",
+    "component": "main"
+  }
+}
+```
+
+| Setting | yap.json | Environment | Flag |
+|---------|----------|-------------|------|
+| Server URL | `url` | `YAP_OA_URL` | `--url` |
+| API token | — | `YAP_OA_TOKEN`, `YAP_OA_TOKEN_FILE` | `--token-file` |
+| DEB repo | `debRepo` | `YAP_OA_DEB_REPO` | `--deb-repo` |
+| RPM repo | `rpmRepo` | `YAP_OA_RPM_REPO` | `--rpm-repo` |
+| APK raw repo / path | `apkRepo` / `apkPath` | `YAP_OA_APK_REPO` / `YAP_OA_APK_PATH` | `--apk-repo` / `--apk-path` |
+| Pacman raw repo / path | `pacmanRepo` / `pacmanPath` | `YAP_OA_PACMAN_REPO` / `YAP_OA_PACMAN_PATH` | `--pacman-repo` / `--pacman-path` |
+| apt distribution / component | `distribution` / `component` | `YAP_OA_DISTRIBUTION` / `YAP_OA_COMPONENT` | `--distribution` / `--component` |
+
+Other flags: `--config <yap.json|dir>` (default `./yap.json`), `--retries <n>`
+(attempts per request, default 3), `--timeout <duration>` (per request, default
+30m), `--insecure-http`, `--dry-run`.
+
+Behaviour:
+
+- **Token**: an OpenArtifact API token with write permission on the target
+  repositories (a `deploy` token, `oa_dep_…`, is enough). It is sent as
+  `Authorization: Bearer …`, is never accepted from `yap.json` or a flag value
+  (so it stays out of the process list), and is redacted from logs and errors.
+  The token is only sent over `https`, or `http` to a loopback host unless you
+  pass `--insecure-http`.
+- **Arguments**: package files and/or directories. Without arguments the
+  `output` directory of `yap.json` is published. Packages found while scanning
+  a directory whose format has no repository configured are skipped with a
+  warning; an explicitly named file in that situation is an error.
+- **Verification**: the SHA-256 returned by the server (or `X-Checksum-Sha256`
+  for raw files) must equal the local file's, otherwise the publish fails.
+- **Retries**: connection errors and HTTP 408/429/5xx are retried with
+  exponential backoff and jitter; other 4xx answers (bad token, wrong
+  repository, invalid package) fail immediately.
+- **Idempotent**: DEB/RPM packages are immutable on the server, which answers
+  `409`. yap then looks the SHA-256 up in the repository listing: identical
+  bytes count as success ("unchanged"), different bytes under the same name
+  and version fail. Raw files are skipped when `X-Checksum-Sha256` already
+  matches and replaced otherwise (unless the repository enforces immutable
+  releases, which fails the publish).
+- **Signatures**: OpenArtifact signs repository *indexes*; yap's per-package
+  `.asc` files are not uploaded for DEB/RPM. For APK/Pacman raw repositories
+  the `.sig`/`.asc` sidecars are uploaded next to the package.
+
+Exit status is non-zero if any package failed; the remaining packages are still
+attempted.
 
 ## SBOM generation
 

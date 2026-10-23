@@ -140,6 +140,9 @@ func InitializeLocalizedDescriptions() {
 	// Update gensum command descriptions
 	InitializeGensumDescriptions()
 
+	// Update publish command descriptions
+	InitializePublishDescriptions()
+
 	// Update other command descriptions
 	updateOtherCommandDescriptions()
 }
