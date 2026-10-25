@@ -85,16 +85,8 @@ type Publisher struct {
 	client *http.Client
 }
 
-// Option customises a [Publisher].
-type Option func(*Publisher)
-
-// WithHTTPClient replaces the HTTP client (tests, custom TLS roots).
-func WithHTTPClient(c *http.Client) Option {
-	return func(p *Publisher) { p.client = c }
-}
-
 // New validates cfg and returns a Publisher.
-func New(c *Config, opts ...Option) (*Publisher, error) {
+func New(c *Config) (*Publisher, error) {
 	cfg := *c
 
 	base, err := cfg.validate()
@@ -116,15 +108,9 @@ func New(c *Config, opts ...Option) (*Publisher, error) {
 
 	p := &Publisher{cfg: cfg, base: base}
 
-	for _, opt := range opts {
-		opt(p)
-	}
-
-	if p.client == nil {
-		p.client = &http.Client{
-			Transport: httpclient.Client().Transport,
-			Timeout:   cfg.Timeout,
-		}
+	p.client = &http.Client{
+		Transport: httpclient.Client().Transport,
+		Timeout:   cfg.Timeout,
 	}
 
 	return p, nil

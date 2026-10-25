@@ -13,11 +13,6 @@ import (
 
 // This file exports internal functions and variables for testing purposes.
 
-// NewIndexForTesting creates a new Index for testing.
-func NewIndexForTesting() *Index {
-	return NewIndex()
-}
-
 // ParseReposContent exposes the internal parseReposContent function for testing.
 var ParseReposContent = parseReposContent
 
@@ -35,11 +30,6 @@ func ExportSafeAPKPath(entryName string) (string, bool) {
 // ExportSafeAPKSymlinkTarget exposes safeAPKSymlinkTarget for testing.
 func ExportSafeAPKSymlinkTarget(linkPath, target string) error {
 	return safeAPKSymlinkTarget(linkPath, target)
-}
-
-// ExportExtractAPKData exposes extractAPKData for testing.
-func ExportExtractAPKData(r io.Reader) error {
-	return extractAPKData(r)
 }
 
 // ExportSha1Hex exposes sha1Hex for testing.
@@ -72,12 +62,6 @@ func ExportReadInstalledStanzas() map[string]string {
 // ExportWriteInstalledStanzas exposes writeInstalledStanzasAt for testing with a custom path.
 func ExportWriteInstalledStanzas(dbPath string, stanzas map[string]string) error {
 	return writeInstalledStanzasAt(dbPath, stanzas)
-}
-
-// ExportTryReadPkgInfoFromNextStream exposes tryReadPkgInfoFromNextStream for testing.
-func ExportTryReadPkgInfoFromNextStream(br *bufio.Reader) string {
-	pkgInfo, _ := tryReadPkgInfoFromNextStream(br)
-	return pkgInfo
 }
 
 // ExportRegisterInstalled exposes registerInstalledAt for testing. The dbPath
