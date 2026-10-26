@@ -8,12 +8,12 @@ require (
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/cyphar/filepath-securejoin v0.7.0
-	github.com/github/go-spdx/v2 v2.7.1
+	github.com/github/go-spdx/v2 v2.8.0
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/go-playground/validator/v10 v10.30.5
 	github.com/google/go-containerregistry v0.22.1
 	github.com/klauspost/compress v1.20.3
-	github.com/klauspost/pgzip v1.2.7
+	github.com/klauspost/pgzip v1.3.0
 	github.com/knqyf263/go-rpmdb v0.1.1
 	github.com/m0rf30/ar v1.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
@@ -33,7 +33,7 @@ require (
 	golang.org/x/term v0.47.0
 	golang.org/x/text v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.60.1
+	modernc.org/sqlite v1.61.0
 	mvdan.cc/sh/v3 v3.14.1
 )
 
