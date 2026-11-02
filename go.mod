@@ -17,7 +17,7 @@ require (
 	github.com/knqyf263/go-rpmdb v0.1.1
 	github.com/m0rf30/ar v1.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/nicksnyder/go-i18n/v2 v2.6.1
+	github.com/nicksnyder/go-i18n/v2 v2.7.0
 	github.com/nwaples/rardecode/v2 v2.4.5
 	github.com/otiai10/copy v1.14.1
 	github.com/pierrec/lz4/v4 v4.1.33
