@@ -407,6 +407,32 @@ func (pkgBuild *PKGBUILD) CreateSpec(filePath string, tmpl *template.Template) e
 	return tmpl.Execute(file, pkgBuild)
 }
 
+// InstallNames reduces dependency specs to the names the in-tree resolvers
+// look up: "foo>=1.2", "foo >= 1.2", "foo (>= 1.2)" and "foo:arm64 (>= 1.2)"
+// become "foo" and "foo:arm64"; "libfoo(x86-64) >= 1" becomes
+// "libfoo(x86-64)". The build-time install takes the newest candidate; the
+// constraint itself is written to the built package's metadata. RPM rich
+// dependencies (starting with "(") are kept as-is.
+func InstallNames(deps []string) []string {
+	names := make([]string, 0, len(deps))
+
+	for _, dep := range deps {
+		dep = strings.TrimSpace(dep)
+		if !strings.HasPrefix(dep, "(") {
+			if idx := strings.IndexAny(dep, "<>=!"); idx > 0 {
+				dep = strings.TrimSpace(dep[:idx])
+				dep = strings.TrimSpace(strings.TrimSuffix(dep, "("))
+			}
+		}
+
+		if dep != "" {
+			names = append(names, dep)
+		}
+	}
+
+	return names
+}
+
 // GetDepends reads the package manager name, its arguments and all the
 // dependencies required to build the package. It returns any error if
 // encountered.
@@ -416,6 +442,13 @@ func (pkgBuild *PKGBUILD) GetDepends(
 	args,
 	makeDepends []string,
 ) error {
+	// The in-tree resolvers key on bare names; pacman and zypper parse
+	// constraints themselves and keep them.
+	switch packageManager {
+	case aptGetPM, aptPM, apkPM, dnfPM, yumPM:
+		makeDepends = InstallNames(makeDepends)
+	}
+
 	if len(makeDepends) == 0 {
 		return nil
 	}

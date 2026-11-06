@@ -51,6 +51,11 @@ func TestProcessDependencies(t *testing.T) {
 			expected: []string{"package >= 1.0.0", "simple-package"},
 		},
 		{
+			format:   "rpm",
+			input:    []string{"libfoo(x86-64)>=1.2", "(a or b)"},
+			expected: []string{"libfoo(x86-64) >= 1.2", "(a or b)"},
+		},
+		{
 			format:   "apk",
 			input:    []string{"package>=1.0.0", "simple-package"},
 			expected: []string{"package>=1.0.0", "simple-package"},
@@ -85,6 +90,8 @@ func TestProcessDependenciesComplexOperators(t *testing.T) {
 		{"package=1.0.0", "package (= 1.0.0)"},
 		{"package>1.0.0", "package (>> 1.0.0)"},
 		{"package<1.0.0", "package (<< 1.0.0)"},
+		// Already formatted: must not be wrapped twice.
+		{"package (>= 1.0.0)", "package (>= 1.0.0)"},
 	}
 
 	for _, test := range tests {

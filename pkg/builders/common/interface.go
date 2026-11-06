@@ -80,6 +80,14 @@ func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
 	processed := make([]string, len(depends))
 
 	for index, depend := range depends {
+		// Already in deb "name (op ver)" form, or an RPM rich dependency.
+		// Capabilities like "libfoo(x86-64)>=1" still need formatting.
+		if strings.HasPrefix(depend, "(") || strings.Contains(depend, " (") {
+			processed[index] = depend
+
+			continue
+		}
+
 		result := depVersionRegex.Split(depend, -1)
 		if len(result) == 2 {
 			name := result[0]
@@ -566,6 +574,7 @@ func (bb *BaseBuilder) Update(ctx context.Context) error {
 // installRPMDeps installs RPM dependencies using the dnfinstall package.
 // This is called by Prepare and cross-compilation paths when the format is RPM.
 func (bb *BaseBuilder) installRPMDeps(ctx context.Context, deps []string) error {
+	deps = pkgbuild.InstallNames(deps)
 	if len(deps) == 0 {
 		return nil
 	}

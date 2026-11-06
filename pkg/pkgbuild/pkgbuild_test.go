@@ -2762,3 +2762,30 @@ func TestFilterInstalledPacman(t *testing.T) {
 		}
 	})
 }
+
+func TestInstallNames(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in   string
+		want []string
+	}{
+		{"carbonio-bdb>=6.2.32", []string{"carbonio-bdb"}},
+		{"glibc >= 2.17", []string{"glibc"}},
+		{"libssl-dev (>= 1.0)", []string{"libssl-dev"}},
+		{"libssl-dev:arm64 (>= 1:3.0)", []string{"libssl-dev:arm64"}},
+		{"foo!=1.0", []string{"foo"}},
+		{"libfoo(x86-64)", []string{"libfoo(x86-64)"}},
+		{"libfoo(x86-64) >= 1", []string{"libfoo(x86-64)"}},
+		{"(a >= 1 or b)", []string{"(a >= 1 or b)"}},
+		{"plain", []string{"plain"}},
+		{"  ", []string{}},
+	}
+
+	for _, tt := range tests {
+		got := InstallNames([]string{tt.in})
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("InstallNames(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
