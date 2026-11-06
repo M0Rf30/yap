@@ -454,8 +454,13 @@ func (d *Package) createDebResources() error {
 
 	d.PKGBUILD.InstalledSize = size / 1024
 	d.PKGBUILD.Depends = d.ProcessDependencies(d.PKGBUILD.Depends)
+	d.PKGBUILD.PreDepends = d.ProcessDependencies(d.PKGBUILD.PreDepends)
 	d.PKGBUILD.MakeDepends = d.ProcessDependencies(d.PKGBUILD.MakeDepends)
 	d.PKGBUILD.OptDepends = d.ProcessDependencies(d.PKGBUILD.OptDepends)
+	d.PKGBUILD.Conflicts = d.ProcessDependencies(d.PKGBUILD.Conflicts)
+	d.PKGBUILD.Breaks = d.ProcessDependencies(d.PKGBUILD.Breaks)
+	d.PKGBUILD.Replaces = d.ProcessDependencies(d.PKGBUILD.Replaces)
+	d.PKGBUILD.Provides = d.ProcessDependencies(d.PKGBUILD.Provides)
 
 	tmpl := d.PKGBUILD.RenderSpec(specFile)
 
