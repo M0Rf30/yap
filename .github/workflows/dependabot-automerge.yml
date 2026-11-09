@@ -1,0 +1,30 @@
+---
+name: 🤖 Dependabot Auto-merge
+
+# Enables GitHub native auto-merge on Dependabot PRs. The merge itself only
+# happens once every required status check of the `main` ruleset passes
+# (CI, Coverage, Security, Docker), so failing bumps stay open for review.
+#
+# pull_request_target is safe here: the PR code is never checked out.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    name: 🤖 Enable auto-merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    steps:
+      - name: 🔀 Enable squash auto-merge
+        env:
+          # Merges performed with GITHUB_TOKEN do not trigger push workflows on
+          # main; a PAT stored as the Dependabot secret AUTOMERGE_TOKEN does.
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
