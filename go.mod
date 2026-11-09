@@ -24,7 +24,7 @@ require (
 	github.com/rootless-containers/rootlesskit/v2 v2.3.6
 	github.com/sassoftware/go-rpmutils v0.4.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/stretchr/testify v1.12.1
 	github.com/ulikunitz/xz v0.5.17
 	golang.org/x/crypto v0.58.0
