@@ -70,11 +70,6 @@ test-coverage:
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
-# A local "replace ... => ../dir" in go.mod points outside the mounted tree, so
-# the container gets that directory too (empty once the module is tagged).
-LOCAL_REPLACE_DIR := $(shell awk '/^replace .*=> \.\.\//{print $$NF}' go.mod)
-LOCAL_REPLACE_MOUNT := $(foreach d,$(LOCAL_REPLACE_DIR),-v $(abspath $(d)):/$(notdir $(d)):ro,Z)
-
 # Run E2E test for RPM install on Rocky Linux 8
 test-e2e-rpm:
 	@echo "Running RPM install E2E test on rockylinux:8..."
@@ -86,7 +81,6 @@ test-e2e-rpm:
 	fi; \
 	$$CONTAINER_RUNTIME run --rm \
 	  -v $(PWD):/yap:Z \
-	  $(LOCAL_REPLACE_MOUNT) \
 	  -w /yap \
 	  rockylinux:8 \
 	  bash -c 'dnf -y install --setopt=install_weak_deps=False make sqlite curl tar gzip >/tmp/setup.log 2>&1 || (cat /tmp/setup.log; exit 1); GO_VERSION=1.27.3; if ! go version 2>/dev/null | grep -q "go$${GO_VERSION}"; then echo "==> Installing Go $${GO_VERSION}..."; curl -fsSL "https://go.dev/dl/go$${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz; export PATH="/usr/local/go/bin:$$PATH"; fi; go version; make build && ./scripts/e2e-rpm.sh'
