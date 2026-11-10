@@ -3,7 +3,7 @@ module github.com/M0Rf30/yap/v2
 go 1.27.3
 
 require (
-	github.com/M0Rf30/pkgformat v0.1.0
+	github.com/M0Rf30/pkgformat v0.2.0
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/github/go-spdx/v2 v2.8.0
@@ -89,5 +89,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
-
-replace github.com/M0Rf30/pkgformat => ../pkgformat-rpmdb
