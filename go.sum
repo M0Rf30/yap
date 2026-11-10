@@ -4,10 +4,10 @@ github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/DataDog/zstd v1.5.7 h1:ybO8RBeh29qrxIhCA9E8gKY6xfONU9T6G6aP9DTKfLE=
 github.com/DataDog/zstd v1.5.7/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
-github.com/M0Rf30/go-rpmutils v0.4.1-0.20261110112324-44e724bf8427 h1:8w0UvfvdiaWiuce3bKsqc3wRMlDLb/Y5yrIsYloqEnw=
-github.com/M0Rf30/go-rpmutils v0.4.1-0.20261110112324-44e724bf8427/go.mod h1:RXYtVN0sxFqZqVUwhAvv9N8Eze3tlaleuTvU/1LhT0c=
-github.com/M0Rf30/rpmpack v0.0.0-20261110112529-d7d22d01bb74 h1:0+m+NwhxDD/bFDhW/rfYB3velXZodQgsXWXSGg53qMI=
-github.com/M0Rf30/rpmpack v0.0.0-20261110112529-d7d22d01bb74/go.mod h1:uIoExT+UZSP8e/LAUM2GVDhaECuuSPIVN/02J1/HT34=
+github.com/M0Rf30/go-rpmutils v0.4.1-0.20261110113231-16fc9074e80c h1:4gqnK/edlhIjBE7Vlqwo0lx4Ir+3kGyX3Yee0iKAj2U=
+github.com/M0Rf30/go-rpmutils v0.4.1-0.20261110113231-16fc9074e80c/go.mod h1:RXYtVN0sxFqZqVUwhAvv9N8Eze3tlaleuTvU/1LhT0c=
+github.com/M0Rf30/rpmpack v0.0.0-20261110113317-0cfcd264ff4f h1:SFTRrQVSWi71+ow3DUkYQbkl6XoKfYLhDg9y3mZzy8w=
+github.com/M0Rf30/rpmpack v0.0.0-20261110113317-0cfcd264ff4f/go.mod h1:uIoExT+UZSP8e/LAUM2GVDhaECuuSPIVN/02J1/HT34=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
 github.com/Microsoft/go-winio v0.5.2/go.mod h1:WpS1mjBmmwHBEWmogvA2mj8546UReBk4v8QkMxJ6pZY=

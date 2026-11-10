@@ -3,8 +3,8 @@ module github.com/M0Rf30/yap/v2
 go 1.27.3
 
 require (
-	github.com/M0Rf30/go-rpmutils v0.4.1-0.20261110112324-44e724bf8427
-	github.com/M0Rf30/rpmpack v0.0.0-20261110112529-d7d22d01bb74
+	github.com/M0Rf30/go-rpmutils v0.4.1-0.20261110113231-16fc9074e80c
+	github.com/M0Rf30/rpmpack v0.0.0-20261110113317-0cfcd264ff4f
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/cavaliergopher/grab/v3 v3.0.1
