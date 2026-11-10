@@ -24,7 +24,7 @@
 | `pkg/aptinstall/` | `apt-get install` (transitive dep resolution, scriptlets) |
 | `pkg/apkindex/` | `apk update` + `apk add`; app-side adapter over `pkgformat/apk` (`Client`, `Index`) with the trust decision |
 | `pkg/pacmandb/` | `pacman -Sy`; thin adapter over `pkgformat/pacman` (`ParseConfigFile`, `Client.Sync`) |
-| `pkg/rpmdb/` | RPM SQLite reader + optional writer (Fedora 33+, RHEL 9+) + native BDB reader (RHEL 8 and earlier) |
+| `pkg/rpmdb/` | Host RPM database queries (ListInstalled / ListInstalledProvides / FilterInstalled) via `pkgformat/rpm/rpmdb` (SQLite, ndb, BerkeleyDB) + optional SQLite writer (Fedora 33+, RHEL 9+) |
 | `pkg/dnfinstall/` | RPM install (GPG verify → CPIO extract → scriptlets → yapdb); host adapter over `pkgformat/rpm/dnf` (`host.go`) and the `rpm --install` path (`rpmcli.go`) |
 | `pkg/yapdb/` | YAP-internal SQLite state DB for installed packages (cross-format) |
 | `pkg/signing/` | APK RSA (`APKSigner`, over `pkgformat/apk`) + DEB/RPM/Pacman GPG signing |
@@ -260,7 +260,7 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - `apt-get install` — `pkg/aptinstall` (transitive deps, scriptlets, yapdb state by default)
 - `apk update` + `apk add` — `pkg/apkindex` over `pkgformat/apk`; indexes are verified against `/etc/apk/keys`; with no matching key a privileged host installs unverified with a warning, an unprivileged one refuses. `epoch:` is ignored with a warning (Alpine has none)
 - `pacman -Sy` — `pkg/pacmandb` over `pkgformat/pacman`
-- RPM database reader — `pkg/rpmdb`: SQLite natively (Fedora 33+, RHEL 9+) and legacy BerkeleyDB natively via `go-rpmdb/pkg/bdb` + in-house header-image parser (`LegacyDB`: ListInstalled / ListInstalledProvides / FilterInstalled); batched `rpm -q` / `rpm -qa` subprocess remains only as last-resort fallback
+- RPM database reader — `pkg/rpmdb`: wraps `github.com/M0Rf30/pkgformat/rpm/rpmdb` (`Find("/")` + `Open`), one code path for SQLite (Fedora 33+, RHEL 9+, Arch), ndb (openSUSE/SLE `Packages.db`) and BerkeleyDB (RHEL 8 and earlier); `ErrNoDatabase` when the host has none, and only then the batched `rpm -q` / `rpm -qa` subprocess fallback
 - RPM install — `pkg/dnfinstall` (GPG verify → CPIO extract → scriptlets → yapdb); replaces `dnf install` for both `yap install <pkg.rpm>` and build-time makedepends on RPM distros
 - YAP-internal package state — `pkg/yapdb` (cross-format SQLite registry at `<rootDir>/var/lib/yap/installed.db`); decouples YAP from system dpkg/rpm DBs (ephemeral build container friendly)
 - DNF metadata + install resolution — `pkgformat/rpm/dnf` (repomd/primary parsing, module filtering, transitive dep resolution, checksum-verified resumable downloads, mirror failover with metadata and primary from the same mirror); yap wires it in `pkg/dnfinstall/host.go`. Packages without a SHA-256/512 checksum are refused

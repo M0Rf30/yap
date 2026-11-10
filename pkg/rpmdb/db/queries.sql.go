@@ -9,29 +9,6 @@ import (
 	"context"
 )
 
-const countByName = `-- name: CountByName :one
-SELECT COUNT(*) FROM Name WHERE name = ?
-`
-
-// Read queries
-func (q *Queries) CountByName(ctx context.Context, name string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countByName, name)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countPackages = `-- name: CountPackages :one
-SELECT COUNT(*) FROM Packages
-`
-
-func (q *Queries) CountPackages(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countPackages)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const getMaxHnum = `-- name: GetMaxHnum :one
 SELECT COALESCE(MAX(hnum), 0) FROM Packages
 `
@@ -235,58 +212,4 @@ type InsertTriggernameParams struct {
 func (q *Queries) InsertTriggername(ctx context.Context, arg InsertTriggernameParams) error {
 	_, err := q.db.ExecContext(ctx, insertTriggername, arg.Key, arg.Hnum, arg.Idx)
 	return err
-}
-
-const listInstalledNames = `-- name: ListInstalledNames :many
-SELECT DISTINCT name FROM Name ORDER BY name
-`
-
-func (q *Queries) ListInstalledNames(ctx context.Context) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listInstalledNames)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []string{}
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		items = append(items, name)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listInstalledProvides = `-- name: ListInstalledProvides :many
-SELECT DISTINCT key FROM Providename ORDER BY key
-`
-
-func (q *Queries) ListInstalledProvides(ctx context.Context) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listInstalledProvides)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []string{}
-	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
-			return nil, err
-		}
-		items = append(items, key)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }

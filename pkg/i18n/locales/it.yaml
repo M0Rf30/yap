@@ -1192,8 +1192,8 @@
   translation: "Nessun podman/docker utilizzabile trovato, uso del runner rootless integrato"
 - id: logger.container.warn.container_cli_installed_but
   translation: "CLI del container installata ma non raggiungibile, provo il backend successivo"
-- id: logger.dnfinstall.debug.legacy_bdb_rpmdb_falling
-  translation: "Rpmdb BDB legacy, ripiego su rpm -qa"
+- id: logger.dnfinstall.debug.no_rpmdb_falling
+  translation: "Nessun database RPM sull'host, ripiego su rpm -qa"
 - id: logger.dnfinstall.info.downloading_packages
   translation: "Scaricamento pacchetti"
 - id: logger.dnfinstall.info.installing_rpm_packages
@@ -1330,8 +1330,8 @@
   translation: "Chiusura del file PKGBUILD non riuscita"
 - id: logger.parser.warn.variable_expansion_failed
   translation: "Impossibile espandere la variabile del PKGBUILD; viene usato un valore vuoto"
-- id: logger.pkgbuild.debug.legacy_bdb_host_falling
-  translation: "Host BDB legacy, ripiego sul sottoprocesso"
+- id: logger.pkgbuild.debug.no_rpmdb_host_falling
+  translation: "Nessun database RPM sull'host, ripiego sul sottoprocesso"
 - id: logger.pkgbuild.info.delegating_package_install_subprocess
   translation: "Delega dell'installazione del pacchetto al sottoprocesso"
 - id: logger.pkgbuild.info.delegating_package_manager_update

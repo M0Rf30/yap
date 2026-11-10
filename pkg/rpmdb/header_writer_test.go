@@ -15,6 +15,10 @@ import (
 	rpmtag "github.com/M0Rf30/pkgformat/rpm/tag"
 )
 
+// entrySize is the size of one header index entry: tag, type, offset and
+// count, four big-endian words.
+const entrySize = 16
+
 // buildTestRPM builds a real RPM in memory with provides and returns it
 // parsed by pkgformat/rpm.
 func buildTestRPM(t *testing.T) *pkgrpm.Rpm {
@@ -111,7 +115,7 @@ func indexBlob(t *testing.T, blob []byte) (entries map[int32]parsedEntry, data [
 }
 
 // TestSerializeHeaderRoundTrip verifies the blob has no file-header
-// preamble and is accepted by parseHeaderBlob (the rpmdb Packages format).
+// preamble and is accepted by the pkgformat reader (the rpmdb Packages format).
 func TestSerializeHeaderRoundTrip(t *testing.T) {
 	rpm := buildTestRPM(t)
 
@@ -131,17 +135,26 @@ func TestSerializeHeaderRoundTrip(t *testing.T) {
 		t.Fatal("rpmdb header blob must not carry the file-header magic")
 	}
 
-	info, err := parseHeaderBlob(blob)
+	hdr, err := pkgrpm.ReadHeaderBlob(blob, pkgrpm.HeaderLimits{})
 	if err != nil {
-		t.Fatalf("parseHeaderBlob rejected serialized header: %v", err)
+		t.Fatalf("ReadHeaderBlob rejected serialized header: %v", err)
+	}
+
+	info, err := hdr.InstalledPackage(pkgrpm.PackageLimits{})
+	if err != nil {
+		t.Fatalf("InstalledPackage rejected serialized header: %v", err)
 	}
 
 	if info.Name != "test-pkg" {
 		t.Errorf("Name = %q, want test-pkg", info.Name)
 	}
 
-	if len(info.Provides) == 0 || info.Provides[0] != "test-pkg-lib" {
+	if len(info.Provides) == 0 || info.Provides[0].Name != "test-pkg-lib" {
 		t.Errorf("Provides = %v, want [test-pkg-lib ...]", info.Provides)
+	}
+
+	if len(info.Files) != 3 {
+		t.Errorf("Files = %d, want 3", len(info.Files))
 	}
 
 	entries, data := indexBlob(t, blob)
