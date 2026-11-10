@@ -9,7 +9,7 @@ import (
 
 // NewSigner constructs the appropriate concrete Signer for the format.
 //
-// For FormatAPK, returns an RSASigner (PKCS#1 v1.5 SHA1).
+// For FormatAPK, returns an APKSigner (PKCS#1 v1.5 SHA1).
 // For FormatDEB, FormatRPM, FormatPacman, returns a GPGSigner (OpenPGP).
 //
 // The config is first adapted with ForFormat so that format-specific
@@ -42,7 +42,7 @@ func NewSigner(format Format, cfg Config) (Signer, error) {
 
 	// APK RSA signing (PKCS#1 v1.5 SHA1)
 	if format == FormatAPK {
-		return NewRSASigner(cfg)
+		return NewAPKSigner(cfg)
 	}
 
 	// DEB/RPM/Pacman GPG signing (OpenPGP)

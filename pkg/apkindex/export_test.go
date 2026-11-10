@@ -4,22 +4,18 @@
 package apkindex
 
 import (
-	"bufio"
-	"context"
-	"crypto/sha1" //nolint:gosec
 	"io"
 	"path/filepath"
+
+	pkgapk "github.com/M0Rf30/pkgformat/apk"
 )
 
 // This file exports internal functions and variables for testing purposes.
 
-// ParseReposContent exposes the internal parseReposContent function for testing.
-var ParseReposContent = parseReposContent
-
-// SetGlobalIndex sets the global index cache for testing purposes.
+// SetGlobalRepos sets the global repository cache for testing purposes.
 // Call with nil to reset the cache.
-func SetGlobalIndex(idx *Index) {
-	globalIndex.Store(idx)
+func SetGlobalRepos(r *Repos) {
+	globalRepos.Store(r)
 }
 
 // ExportSafeAPKPath exposes safeAPKPath for testing.
@@ -32,18 +28,6 @@ func ExportSafeAPKSymlinkTarget(linkPath, target string) error {
 	return safeAPKSymlinkTarget(linkPath, target)
 }
 
-// ExportSha1Hex exposes sha1Hex for testing.
-func ExportSha1Hex(s string) string {
-	return sha1Hex(s)
-}
-
-// ExportBuildAPKDownloadRequests exposes buildAPKDownloadRequests for testing.
-func ExportBuildAPKDownloadRequests(
-	_ context.Context, idx *Index, destDir string, names []string,
-) ([]apkDownload, map[string]string, error) {
-	return idx.buildAPKDownloadRequests(destDir, names)
-}
-
 // ExportExtractAPKDataTo exposes extractAPKDataTo for testing.
 func ExportExtractAPKDataTo(r io.Reader, root string) error {
 	return extractAPKDataTo(r, root)
@@ -54,11 +38,6 @@ func ExportReadInstalledDB() map[string]bool {
 	return readInstalledDB()
 }
 
-// ExportReadInstalledStanzas exposes readInstalledStanzas for testing.
-func ExportReadInstalledStanzas() map[string]string {
-	return readInstalledStanzas()
-}
-
 // ExportWriteInstalledStanzas exposes writeInstalledStanzasAt for testing with a custom path.
 func ExportWriteInstalledStanzas(dbPath string, stanzas map[string]string) error {
 	return writeInstalledStanzasAt(dbPath, stanzas)
@@ -67,14 +46,12 @@ func ExportWriteInstalledStanzas(dbPath string, stanzas map[string]string) error
 // ExportRegisterInstalled exposes registerInstalledAt for testing. The dbPath
 // mirrors the on-disk layout (<tmpDir>/lib/apk/db/installed) used by the
 // production constant so existing test expectations still hold.
-func ExportRegisterInstalled(tmpDir string, pkg *Package, pkgInfo string) error {
+func ExportRegisterInstalled(tmpDir string, pkg *pkgapk.RepoPackage) error {
 	dbPath := filepath.Join(tmpDir, "lib", "apk", "db", "installed")
-	return registerInstalledAt(dbPath, pkg, pkgInfo)
+	return registerInstalledAt(dbPath, pkg)
 }
 
-// ExportReadControlVerified exposes readControlVerified for testing.
-func ExportReadControlVerified(r io.Reader, pkg *Package) (string, error) {
-	hr := &hashingReader{br: bufio.NewReader(r), h: sha1.New()} //nolint:gosec
-
-	return readControlVerified(hr, pkg)
+// ExportBuildInstalledStanza exposes buildInstalledStanza for testing.
+func ExportBuildInstalledStanza(pkg *pkgapk.RepoPackage) string {
+	return buildInstalledStanza(pkg)
 }

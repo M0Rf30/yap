@@ -39,7 +39,7 @@ func TestNewSignerEnabledEmptyKeyPath(t *testing.T) {
 	assert.Contains(t, err.Error(), "no key path")
 }
 
-// TestNewSignerAPKFormat verifies that FormatAPK routes to an RSASigner.
+// TestNewSignerAPKFormat verifies that FormatAPK routes to an APKSigner.
 func TestNewSignerAPKFormat(t *testing.T) {
 	tmpDir := t.TempDir()
 	keyPath := filepath.Join(tmpDir, "test.key")

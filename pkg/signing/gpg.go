@@ -21,7 +21,7 @@ import (
 
 // GPGSigner produces detached OpenPGP signatures for DEB, RPM, and Pacman formats.
 // - DEB: writes <package>.deb.asc (ASCII-armored detached signature)
-// - RPM: provides signing function for rpmpack.SetPGPSigner (binary signature)
+// - RPM: provides signing function for pack.RPM.SetPGPSigner (binary signature)
 // - Pacman: writes <package>.pkg.tar.zst.sig (binary detached signature)
 type GPGSigner struct {
 	cfg    Config
@@ -143,7 +143,7 @@ func (s *GPGSigner) writeSignatureSidecar(
 // Output convention by format:
 //
 //	FormatDEB    -> <artifactPath>.asc (ASCII-armored)
-//	FormatRPM    -> returns a signing function for rpmpack.SetPGPSigner
+//	FormatRPM    -> returns a signing function for pack.RPM.SetPGPSigner
 //	FormatPacman -> <artifactPath>.sig (binary, NOT armored)
 func (s *GPGSigner) Sign(ctx context.Context, artifactPath string) error {
 	if err := ctx.Err(); err != nil {
@@ -198,7 +198,7 @@ func (s *GPGSigner) Sign(ctx context.Context, artifactPath string) error {
 			"signature_path", artifactPath+".sig")
 
 	case FormatRPM:
-		// RPM: binary detached signature (used by rpmpack.SetPGPSigner)
+		// RPM: binary detached signature (used by pack.RPM.SetPGPSigner)
 		err = s.createBinaryDetachedSignature(artifactData, signatureBuf)
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypePackaging,
@@ -253,7 +253,7 @@ func (s *GPGSigner) createArmoredDetachedSignature(
 }
 
 // DetachSignBinary returns a binary (non-armored) OpenPGP detached signature
-// over data. Its signature matches rpmpack.RPM.SetPGPSigner, which embeds the
+// over data. Its signature matches pack.RPM.SetPGPSigner, which embeds the
 // result in the RPM signature header (RSA/PGP tags for v4, OPENPGP for v6).
 func (s *GPGSigner) DetachSignBinary(data []byte) ([]byte, error) {
 	var buf bytes.Buffer

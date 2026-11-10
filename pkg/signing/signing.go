@@ -87,7 +87,7 @@ func (c *Config) Clear() {
 //   - APK: rebuilds the package with a third concatenated gzip stream
 //     containing .SIGN.RSA.<keyname>.rsa.pub
 //   - DEB: appends _gpgorigin to the ar archive (dpkg-sig style)
-//   - RPM: writes signature into the RPM lead/header (delegated to rpmpack)
+//   - RPM: writes signature into the RPM lead/header (delegated to pkgformat/rpm/pack)
 //   - Pacman: writes detached <artifactPath>.sig
 type Signer interface {
 	// Sign signs the artifact at artifactPath.

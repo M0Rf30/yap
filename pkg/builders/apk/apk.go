@@ -5,20 +5,13 @@
 package apk
 
 import (
-	"archive/tar"
 	"context"
-	"crypto/sha1" //nolint:gosec
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/klauspost/compress/gzip"
+	pkgapk "github.com/M0Rf30/pkgformat/apk"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -29,84 +22,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
-
-// apkFile is a tiny replacement for archives.FileInfo, carrying only the
-// fields writeFileWithChecksum needs. It avoids pulling in mholt/archives just
-// for a directory walker.
-type apkFile struct {
-	fs.FileInfo
-
-	diskPath      string // absolute path on disk (empty for synthetic entries)
-	nameInArchive string // canonicalised name (forward slashes, no leading sep)
-	linkTarget    string // populated for symlinks
-}
-
-func (a apkFile) NameInArchive() string { return a.nameInArchive }
-func (a apkFile) LinkTarget() string    { return a.linkTarget }
-
-// Open returns a reader for the file's contents. Symlinks and directories
-// have no body and return an empty reader.
-func (a apkFile) Open() (io.ReadCloser, error) {
-	if !a.Mode().IsRegular() {
-		return io.NopCloser(strings.NewReader("")), nil
-	}
-
-	return os.Open(filepath.Clean(a.diskPath))
-}
-
-// walkAPKFiles walks sourceDir and emits an apkFile for each entry with names
-// relative to sourceDir. Mirrors archives.FilesFromDisk(FollowSymlinks: false).
-func walkAPKFiles(sourceDir string) ([]apkFile, error) {
-	sourceDir = filepath.Clean(sourceDir)
-
-	var result []apkFile
-
-	err := filepath.WalkDir(sourceDir, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-
-		if path == sourceDir {
-			return nil
-		}
-
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-
-		rel, err := filepath.Rel(sourceDir, path)
-		if err != nil {
-			return err
-		}
-
-		name := filepath.ToSlash(rel)
-
-		entry := apkFile{
-			FileInfo:      info,
-			diskPath:      path,
-			nameInArchive: name,
-		}
-
-		if info.Mode()&os.ModeSymlink != 0 {
-			t, err := os.Readlink(path)
-			if err != nil {
-				return err
-			}
-
-			entry.linkTarget = t
-		}
-
-		result = append(result, entry)
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
 
 // Apk represents the APK package builder.
 // It embeds the common.BaseBuilder to inherit shared functionality.
@@ -121,17 +36,16 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Apk {
 	}
 }
 
-// BuildPackage creates an APK package without external dependencies.
-// The package is created as a gzip-compressed tar archive containing the package
-// files and metadata (.PKGINFO and optional .pre-*/.post-* lifecycle scripts).
-// Returns the path to the created APK file.
+// BuildPackage creates an APK package without external dependencies: the
+// staged package tree and the PKGBUILD metadata are written as an abuild-style
+// .apk (control segment with .PKGINFO and install scripts, data segment with
+// per-file SHA-1 records). Returns the path to the created APK file.
 func (a *Apk) BuildPackage(ctx context.Context, artifactsPath string, targetArch string) (string, error) {
 	a.SetTargetArchitecture(targetArch)
 
-	pkgName := a.BuildPackageName(".apk")
-	pkgFilePath := filepath.Join(artifactsPath, pkgName)
+	pkgFilePath := filepath.Join(artifactsPath, a.BuildPackageName(".apk"))
 
-	err := a.createTarGzWithChecksums(ctx, a.PKGBUILD.PackageDir, pkgFilePath)
+	err := a.writePackage(ctx, pkgFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -141,8 +55,9 @@ func (a *Apk) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 	return pkgFilePath, nil
 }
 
-// PrepareFakeroot sets up the APK package metadata.
-// It generates the .PKGINFO file and optional install scripts for lifecycle hooks.
+// PrepareFakeroot sets up the APK package metadata: it applies the PKGBUILD
+// options to the staged tree and records the installed size, build date and
+// origin that BuildPackage writes into .PKGINFO.
 func (a *Apk) PrepareFakeroot(ctx context.Context, artifactsPath string, targetArch string) error {
 	// Resolve the cross strip env before ArchComputed is overwritten:
 	// BuildCrossStripEnvSlice is a no-op when targetArch == ArchComputed.
@@ -175,406 +90,112 @@ func (a *Apk) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 		a.PKGBUILD.Commit = git.GetCommitHash(a.PKGBUILD.StartDir)
 	}
 
-	err = a.createPkgInfo()
-	if err != nil {
-		return err
-	}
-
-	err = a.createScriptlets()
-	if err != nil {
-		return err
-	}
-
 	// Note: APK format does not have a native changelog convention.
 	// Changelog support is skipped for APK packages.
 
 	return nil
 }
 
-// createPkgInfo generates the .PKGINFO metadata file for APK packages.
-// This file contains package information like name, version, dependencies, etc.
-func (a *Apk) createPkgInfo() error {
-	tmpl := a.PKGBUILD.RenderSpec(dotPkginfo)
+// spec maps the PKGBUILD onto the library's package description: the .PKGINFO
+// fields, the install scripts and the staged files.
+func (a *Apk) spec() (*pkgapk.Spec, error) {
+	pb := a.PKGBUILD
 
-	pkginfoPath := filepath.Join(a.PKGBUILD.PackageDir, pkginfoFileName)
-
-	return a.PKGBUILD.CreateSpec(pkginfoPath, tmpl)
-}
-
-// scriptlet maps a PKGBUILD lifecycle hook to the control member names that
-// apk-tools recognises.
-type scriptlet struct {
-	body  string
-	names []string
-}
-
-// createScriptlets writes one executable shell script per lifecycle hook,
-// named as apk-tools expects (.pre-install, .post-upgrade, ...). The install
-// hooks double as upgrade hooks, matching the other builders.
-func (a *Apk) createScriptlets() error {
-	hooks := []scriptlet{
-		{a.PKGBUILD.PreInst, []string{".pre-install", ".pre-upgrade"}},
-		{a.PKGBUILD.PostInst, []string{".post-install", ".post-upgrade"}},
-		{a.PKGBUILD.PreRm, []string{".pre-deinstall"}},
-		{a.PKGBUILD.PostRm, []string{".post-deinstall"}},
+	if pb.Epoch != "" {
+		// Alpine versions have no epoch; the library refuses one.
+		logger.Warn(i18n.T("logger.apk.warn.epoch_ignored"),
+			"package", pb.PkgName, "epoch", pb.Epoch)
 	}
 
-	for _, hook := range hooks {
-		if hook.body == "" {
-			continue
+	staged, err := pkgapk.FilesFromDir(pb.PackageDir)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to list package files").
+			WithOperation("spec").
+			WithContext("package_dir", pb.PackageDir)
+	}
+
+	return &pkgapk.Spec{
+		Info: pkgapk.Info{
+			Generator:     "yap " + pb.YAPVersion,
+			Name:          pb.PkgName,
+			Version:       pb.PkgVer + "-r" + pb.PkgRel,
+			Arch:          pb.ArchComputed,
+			Description:   pb.PkgDesc,
+			URL:           pb.URL,
+			License:       strings.Join(pb.License, " "),
+			Origin:        pb.Origin,
+			Packager:      pb.Maintainer,
+			Commit:        pb.Commit,
+			BuildDate:     time.Unix(pb.BuildDate, 0),
+			InstalledSize: pb.InstalledSize,
+			Depends:       pb.Depends,
+			Provides:      pb.Provides,
+			Replaces:      pb.Replaces,
+		},
+		Scripts: a.scripts(),
+		Files:   staged,
+	}, nil
+}
+
+// scripts renders one shell script per lifecycle hook. The install hooks double
+// as upgrade hooks, matching the other builders.
+func (a *Apk) scripts() pkgapk.Scripts {
+	script := func(body string) string {
+		if body == "" {
+			return ""
 		}
 
-		content := "#!/bin/sh\n" + a.PrepareScriptletWithHelpers(hook.body)
+		content := "#!/bin/sh\n" + a.PrepareScriptletWithHelpers(body)
 		if !strings.HasSuffix(content, "\n") {
 			content += "\n"
 		}
 
-		for _, name := range hook.names {
-			path := filepath.Join(a.PKGBUILD.PackageDir, name)
-
-			err := files.CreateWrite(path, content)
-			if err != nil {
-				return err
-			}
-
-			err = files.Chmod(path, 0o755)
-			if err != nil {
-				return err
-			}
-		}
+		return content
 	}
 
-	return nil
+	pre := script(a.PKGBUILD.PreInst)
+	post := script(a.PKGBUILD.PostInst)
+
+	return pkgapk.Scripts{
+		PreInstall:    pre,
+		PreUpgrade:    pre,
+		PostInstall:   post,
+		PostUpgrade:   post,
+		PreDeinstall:  script(a.PKGBUILD.PreRm),
+		PostDeinstall: script(a.PKGBUILD.PostRm),
+	}
 }
 
-// pkginfoFileName is the canonical archive name for the APK metadata file.
-const pkginfoFileName = ".PKGINFO"
-
-// isControlFile determines if a file is a control/metadata file.
-// Control files use USTAR format, data files use PAX with checksums.
-func isControlFile(name string) bool {
-	return strings.HasPrefix(name, ".PKGINFO") ||
-		strings.HasPrefix(name, ".SIGN") ||
-		strings.HasPrefix(name, ".pre-") ||
-		strings.HasPrefix(name, ".post-") ||
-		strings.HasPrefix(name, ".trigger")
-}
-
-// writeFilteredMembers writes tar members matching a predicate to the tar writer.
-// It's used to write either control or data files to their respective streams.
-func (a *Apk) writeFilteredMembers(
-	ctx context.Context,
-	tw *tar.Writer,
-	fileList []apkFile,
-	predicate func(apkFile) bool,
-) error {
-	for _, file := range fileList {
-		if !predicate(file) {
-			continue
-		}
-
-		if err := a.writeFileWithChecksum(ctx, tw, file); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// createTarGzWithChecksums creates an APK package following Alpine's format:
-// The APK is a concatenation of control.tar.gz and data.tar.gz.
-// The datahash in .PKGINFO is the SHA256 of data.tar.gz.
-//
-// This implements the Alpine APK format with APK-TOOLS.checksum.SHA1 headers.
-// Streams tar.gz archives directly to temp files to minimize memory usage.
-//
-//nolint:gocyclo,cyclop // dual-stream orchestration with two temp-file flushes is inherently sequential
-func (a *Apk) createTarGzWithChecksums(ctx context.Context, sourceDir, outputFile string) error {
-	// Walk source directory once
-	fileList, err := walkAPKFiles(sourceDir)
+// writePackage writes the .apk to outputFile, removing a partial file on error.
+func (a *Apk) writePackage(ctx context.Context, outputFile string) error {
+	err := ctx.Err()
 	if err != nil {
 		return err
 	}
 
-	// Pacman-style: append "/" to directory entry names.
-	for i := range fileList {
-		if fileList[i].IsDir() && !strings.HasSuffix(fileList[i].nameInArchive, "/") {
-			fileList[i].nameInArchive += "/"
-		}
-	}
-
-	// Create data.tar.gz with only non-control files, streaming to temp file
-	dataTempFile, err := os.CreateTemp("", "apk-data-*.tar.gz")
-	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to create temp file for data.tar.gz").
-			WithOperation("createTarGzWithChecksums").
-			WithContext("sourceDir", sourceDir)
-	}
-
-	dataTempPath := dataTempFile.Name()
-
-	defer func() {
-		_ = dataTempFile.Close()
-		_ = os.Remove(dataTempPath)
-	}()
-
-	dataHasher := sha256.New()
-	dataWriter := io.MultiWriter(dataTempFile, dataHasher)
-
-	gzData := gzip.NewWriter(dataWriter)
-	gzData.ModTime = time.Unix(0, 0)
-	twData := tar.NewWriter(gzData)
-
-	if err := a.writeFilteredMembers(ctx, twData, fileList,
-		func(f apkFile) bool { return !isControlFile(f.nameInArchive) }); err != nil {
-		_ = twData.Close()
-		_ = gzData.Close()
-
-		return err
-	}
-
-	if err := twData.Close(); err != nil {
-		return err
-	}
-
-	if err := gzData.Close(); err != nil {
-		return err
-	}
-
-	// Compute datahash = SHA256(data.tar.gz)
-	dataHash := hex.EncodeToString(dataHasher.Sum(nil))
-	a.PKGBUILD.DataHash = dataHash
-
-	// Regenerate .PKGINFO with datahash field
-	if err := a.createPkgInfo(); err != nil {
-		return err
-	}
-
-	// Update .PKGINFO entry in fileList with new stat info from disk
-	pkginfoPath := filepath.Join(sourceDir, pkginfoFileName)
-
-	pkginfoInfo, err := os.Stat(pkginfoPath)
-	if err == nil {
-		// Find and update the .PKGINFO entry in fileList
-		for i := range fileList {
-			if fileList[i].nameInArchive == pkginfoFileName {
-				fileList[i].FileInfo = pkginfoInfo
-				fileList[i].diskPath = pkginfoPath
-
-				break
-			}
-		}
-	}
-
-	// Create control.tar.gz with control files only, streaming to temp file
-	controlTempFile, err := os.CreateTemp("", "apk-control-*.tar.gz")
-	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to create temp file for control.tar.gz").
-			WithOperation("createTarGzWithChecksums").
-			WithContext("sourceDir", sourceDir)
-	}
-
-	controlTempPath := controlTempFile.Name()
-
-	defer func() {
-		_ = controlTempFile.Close()
-		_ = os.Remove(controlTempPath)
-	}()
-
-	gzControl := gzip.NewWriter(controlTempFile)
-	gzControl.ModTime = time.Unix(0, 0)
-	twControl := tar.NewWriter(gzControl)
-
-	if err := a.writeFilteredMembers(ctx, twControl, fileList,
-		func(f apkFile) bool { return isControlFile(f.nameInArchive) }); err != nil {
-		_ = twControl.Close()
-		_ = gzControl.Close()
-
-		return err
-	}
-
-	if err := twControl.Close(); err != nil {
-		return err
-	}
-
-	if err := gzControl.Close(); err != nil {
-		return err
-	}
-
-	// Write final APK = control.tar.gz + data.tar.gz
-	cleanFilePath := filepath.Clean(outputFile)
-
-	out, err := os.Create(cleanFilePath)
+	spec, err := a.spec()
 	if err != nil {
 		return err
 	}
 
-	defer func() {
-		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.apk.warn.failed_to_close_output"),
-				"path", cleanFilePath,
-				"error", closeErr)
-		}
-	}()
-
-	// Seek to beginning of control temp file and copy to output
-	if _, err := controlTempFile.Seek(0, 0); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to seek control temp file").
-			WithOperation("createTarGzWithChecksums").
-			WithContext("tempFile", controlTempPath)
-	}
-
-	if _, err := io.Copy(out, controlTempFile); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to write control.tar.gz to output").
-			WithOperation("createTarGzWithChecksums").
-			WithContext("outputFile", cleanFilePath)
-	}
-
-	// Seek to beginning of data temp file and copy to output
-	if _, err := dataTempFile.Seek(0, 0); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to seek data temp file").
-			WithOperation("createTarGzWithChecksums").
-			WithContext("tempFile", dataTempPath)
-	}
-
-	if _, err := io.Copy(out, dataTempFile); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem,
-			"failed to write data.tar.gz to output").
-			WithOperation("createTarGzWithChecksums").
-			WithContext("outputFile", cleanFilePath)
-	}
-
-	return nil
-}
-
-// writeFileWithChecksum writes a file to the tar archive with optional PAX checksum.
-// Control files use USTAR format, data files use PAX format with SHA1 checksums.
-//
-//nolint:gocyclo,nestif // writeFileWithChecksum handles multiple PAX/USTAR format branches inline
-func (a *Apk) writeFileWithChecksum(
-	ctx context.Context, tw *tar.Writer, file apkFile,
-) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	hdr, err := tar.FileInfoHeader(file.FileInfo, file.linkTarget)
+	out, err := os.Create(filepath.Clean(outputFile))
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypePackaging,
-			fmt.Sprintf("file %s: creating header", file.nameInArchive)).
-			WithOperation("writeFileWithChecksum").
-			WithContext("file", file.nameInArchive)
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create package file").
+			WithOperation("writePackage").
+			WithContext("output_file", outputFile)
 	}
 
-	hdr.Name = file.nameInArchive
-	if hdr.Name == "" {
-		hdr.Name = file.Name()
+	_, err = pkgapk.WritePackage(out, spec, pkgapk.WriteOptions{})
+	if closeErr := out.Close(); err == nil && closeErr != nil {
+		err = closeErr
 	}
 
-	hdr.Uid = 0
-	hdr.Gid = 0
-	hdr.Uname = "root"
-	hdr.Gname = "root"
-
-	hdr.ModTime = time.Unix(0, 0)
-	hdr.ChangeTime = time.Time{}
-	hdr.AccessTime = time.Time{}
-
-	// All files use PAX format to match Alpine's abuild-tar behavior
-	hdr.Format = tar.FormatPAX
-	hdr.PAXRecords = make(map[string]string)
-
-	// Add standard PAX records for reproducibility
-	hdr.PAXRecords["mtime"] = "0"
-	hdr.PAXRecords["atime"] = "0"
-	hdr.PAXRecords["ctime"] = "0"
-
-	// Data files (non-control) get SHA1 checksums
-	if !isControlFile(hdr.Name) && hdr.Typeflag == tar.TypeReg {
-		// Pass 1: compute SHA1 by streaming (no full buffer)
-		hasher := sha1.New() //nolint:gosec
-
-		f1, err := file.Open()
-		if err != nil {
-			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: opening for checksum", file.nameInArchive)).
-				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.nameInArchive)
-		}
-
-		if _, err := io.Copy(hasher, f1); err != nil {
-			_ = f1.Close()
-
-			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: computing checksum", file.nameInArchive)).
-				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.nameInArchive)
-		}
-
-		_ = f1.Close()
-
-		hdr.PAXRecords["APK-TOOLS.checksum.SHA1"] = hex.EncodeToString(hasher.Sum(nil))
-
-		if err := tw.WriteHeader(hdr); err != nil {
-			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: writing header", file.nameInArchive)).
-				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.nameInArchive)
-		}
-
-		// Pass 2: stream file data into tar writer
-		f2, err := file.Open()
-		if err != nil {
-			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: opening for write", file.nameInArchive)).
-				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.nameInArchive)
-		}
-		defer func() { _ = f2.Close() }()
-
-		if _, err := io.Copy(tw, f2); err != nil {
-			return errors.Wrap(err, errors.ErrTypePackaging,
-				fmt.Sprintf("file %s: writing data", file.nameInArchive)).
-				WithOperation("writeFileWithChecksum").
-				WithContext("file", file.nameInArchive)
-		}
-
-		return nil
-	}
-
-	if err := tw.WriteHeader(hdr); err != nil {
-		return errors.Wrap(err, errors.ErrTypePackaging,
-			fmt.Sprintf("file %s: writing header", file.nameInArchive)).
-			WithOperation("writeFileWithChecksum").
-			WithContext("file", file.nameInArchive)
-	}
-
-	if hdr.Typeflag != tar.TypeReg {
-		return nil
-	}
-
-	f, err := file.Open()
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypePackaging,
-			fmt.Sprintf("file %s: opening", file.nameInArchive)).
-			WithOperation("writeFileWithChecksum").
-			WithContext("file", file.nameInArchive)
-	}
+		_ = os.Remove(outputFile)
 
-	defer func() {
-		_ = f.Close()
-	}()
-
-	if _, err := io.Copy(tw, f); err != nil {
-		return errors.Wrap(err, errors.ErrTypePackaging,
-			fmt.Sprintf("file %s: writing data", file.nameInArchive)).
-			WithOperation("writeFileWithChecksum").
-			WithContext("file", file.nameInArchive)
+		return errors.Wrap(err, errors.ErrTypePackaging, "failed to write apk package").
+			WithOperation("writePackage").
+			WithContext("output_file", outputFile)
 	}
 
 	return nil
