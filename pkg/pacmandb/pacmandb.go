@@ -1,166 +1,77 @@
 // SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package pacmandb refreshes Arch repository sync databases.
+// Package pacmandb refreshes the host's Arch repository sync databases.
 //
-// It parses /etc/pacman.conf (with Include + mirrorlist expansion),
-// resolves $repo/$arch placeholders, fetches each <repo>.db file with
-// multi-mirror failover, and writes the result atomically to
-// /var/lib/pacman/sync/.
+// The pacman.conf and mirrorlist parsing, the multi-mirror failover and the
+// atomic <repo>.db / <repo>.db.sig writes are done by
+// github.com/M0Rf30/pkgformat/pacman; this package only supplies the host
+// paths (/etc/pacman.conf, /var/lib/pacman/sync) and yap's logging.
 package pacmandb
 
 import (
 	"context"
 	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"sync"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/M0Rf30/pkgformat/httpclient"
+	"github.com/M0Rf30/pkgformat/pacman"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
-const pacmanSyncDir = "/var/lib/pacman/sync"
+const (
+	pacmanConfPath = "/etc/pacman.conf"
+	pacmanSyncDir  = "/var/lib/pacman/sync"
+)
 
 // Sync downloads <repo>.db for every enabled repo in pacman.conf.
-// Returns the number of repos successfully synced and the first error.
+// Returns the number of repos successfully synced and the failures joined.
 func Sync(ctx context.Context) (succeeded int, err error) {
-	cfg, err := ParseConfig("/etc/pacman.conf")
+	return syncTo(ctx, pacmanConfPath, pacmanSyncDir, nil)
+}
+
+// syncTo is Sync with explicit paths and HTTP client (nil selects the default).
+func syncTo(
+	ctx context.Context, confPath, syncDir string, httpc *httpclient.Client,
+) (int, error) {
+	cfg, err := pacman.ParseConfigFile(confPath)
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, errors.ErrTypeConfiguration, "failed to parse pacman.conf").
+			WithOperation("Sync").
+			WithContext("path", confPath)
 	}
 
-	if err := os.MkdirAll(pacmanSyncDir, 0o755); err != nil {
-		return 0, err
+	if err := os.MkdirAll(syncDir, 0o755); err != nil { //nolint:gosec // pacman's sync dir is world-readable
+		return 0, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create sync directory").
+			WithOperation("Sync").
+			WithContext("dir", syncDir)
 	}
 
 	arch := cfg.Architecture
 	if arch == "" || arch == "auto" {
-		arch = detectArch()
+		arch = "" // the client maps the running GOARCH
 	}
 
-	logger.Info(i18n.T("logger.pacmandb.info.syncing_repos"), "repos", len(cfg.Repos),
-		"arch", arch)
-
-	// Repos are independent (separate .db destinations) — sync them in
-	// parallel, bounded like the other repo fetchers. Failures are
-	// per-repo warnings; the first error is reported to the caller.
-	var (
-		mu       sync.Mutex
-		firstErr error
-	)
-
-	g := new(errgroup.Group)
-	g.SetLimit(4)
-
-	for _, repo := range cfg.Repos {
-		g.Go(func() error {
-			if err := syncRepo(ctx, repo, arch); err != nil {
-				mu.Lock()
-				if firstErr == nil {
-					firstErr = err
-				}
-				mu.Unlock()
-
-				logger.Warn(i18n.T("logger.pacmandb.warn.repo_sync_failed"), "repo", repo.Name, "error", err)
-
-				return nil // best-effort: don't abort sibling repos
-			}
-
-			mu.Lock()
-			succeeded++
-			mu.Unlock()
-
-			return nil
-		})
+	client, err := pacman.NewClient(pacman.ClientOptions{HTTP: httpc, Arch: arch, Logger: logger.Slog()})
+	if err != nil {
+		return 0, errors.Wrap(err, errors.ErrTypeConfiguration, "failed to create pacman client").
+			WithOperation("Sync")
 	}
 
-	_ = g.Wait()
+	logger.Info(i18n.T("logger.pacmandb.info.syncing_repos"), "repos", len(cfg.Repos), "arch", arch)
 
-	logger.Info(i18n.T("logger.pacmandb.info.sync_complete"), "succeeded", succeeded,
-		"total", len(cfg.Repos))
+	succeeded, err := client.Sync(ctx, cfg.Repos, syncDir)
+	if err != nil {
+		// Per-repo failures are warnings; the others were still synced.
+		logger.Warn(i18n.T("logger.pacmandb.warn.repo_sync_failed"), "error", err)
 
-	return succeeded, firstErr
-}
-
-func syncRepo(ctx context.Context, repo Repo, arch string) error {
-	return syncRepoTo(ctx, pacmanSyncDir, repo, arch)
-}
-
-// syncRepoTo is syncRepo with an explicit destination directory.
-func syncRepoTo(ctx context.Context, syncDir string, repo Repo, arch string) error {
-	for _, server := range repo.Servers {
-		url := substituteVars(server, repo.Name, arch) + "/" + repo.Name + ".db"
-		dest := filepath.Join(syncDir, repo.Name+".db")
-
-		logger.Debug(i18n.T("logger.pacmandb.debug.trying_mirror"), "repo", repo.Name, "url", url)
-
-		err := downloadFile(ctx, url, dest)
-		if err != nil {
-			logger.Debug(i18n.T("logger.pacmandb.debug.mirror_failed"), "repo", repo.Name, "url", url, "error", err)
-
-			continue
-		}
-
-		// Also try to fetch the .sig (optional, used for signature checking).
-		// If it is unavailable, drop any previous .sig: it belongs to the old
-		// .db and would make libalpm reject the freshly downloaded database.
-		sigDest := dest + ".sig"
-		if sigErr := downloadFile(ctx, url+".sig", sigDest); sigErr != nil {
-			logger.Debug(i18n.T("logger.pacmandb.debug.mirror_failed"),
-				"repo", repo.Name, "url", url+".sig", "error", sigErr)
-
-			if rmErr := os.Remove(sigDest); rmErr != nil && !os.IsNotExist(rmErr) {
-				logger.Debug(i18n.T("logger.pacmandb.debug.mirror_failed"),
-					"repo", repo.Name, "url", sigDest, "error", rmErr)
-			}
-		}
-
-		var sizeBytes int64
-		if fi, statErr := os.Stat(dest); statErr == nil {
-			sizeBytes = fi.Size()
-		}
-
-		logger.Info(i18n.T("logger.pacmandb.info.repo_synced"), "repo", repo.Name, "url", url, "bytes", sizeBytes)
-
-		return nil
+		err = errors.Wrap(err, errors.ErrTypeNetwork, "failed to sync repositories").
+			WithOperation("Sync")
 	}
 
-	return errors.New(errors.ErrTypeNetwork, "all mirrors failed for repository").
-		WithOperation("syncRepo").
-		WithContext("repo", repo.Name)
-}
+	logger.Info(i18n.T("logger.pacmandb.info.sync_complete"), "succeeded", succeeded, "total", len(cfg.Repos))
 
-func substituteVars(server, repo, arch string) string {
-	s := strings.ReplaceAll(server, "$repo", repo)
-	s = strings.ReplaceAll(s, "$arch", arch)
-
-	return strings.TrimRight(s, "/")
-}
-
-const (
-	x86_64Arch  = "x86_64"
-	aarch64Arch = "aarch64"
-	armv7hArch  = "armv7h"
-	i686Arch    = "i686"
-)
-
-// detectArch maps runtime.GOARCH to Arch Linux pkg-arch name.
-func detectArch() string {
-	switch runtime.GOARCH {
-	case "amd64":
-		return x86_64Arch
-	case "arm64":
-		return aarch64Arch
-	case "arm":
-		return armv7hArch
-	case "386":
-		return i686Arch
-	default:
-		return runtime.GOARCH
-	}
+	return succeeded, err
 }
