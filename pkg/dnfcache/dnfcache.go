@@ -24,7 +24,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	rpmutils "github.com/sassoftware/go-rpmutils"
+	rpmutils "github.com/M0Rf30/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"

@@ -45,6 +45,9 @@ var compressionDeb string
 // compressionRpm is the local holder for the --compression-rpm flag value.
 var compressionRpm string
 
+// rpmFormat is the local holder for the --rpm-format flag value.
+var rpmFormat int
+
 // signKey is the local holder for the --sign-key flag value.
 var signKey string
 
@@ -177,6 +180,14 @@ var buildCmd = &cobra.Command{
 			}
 
 			mpc.CompressionRpm = compressionRpm
+		}
+
+		if rpmFormat != 0 {
+			if err := validateRPMFormat(rpmFormat); err != nil {
+				return err
+			}
+
+			mpc.RPMFormat = rpmFormat
 		}
 
 		err = mpc.MultiProjectContext(ctx, distro, release, fullJSONPath)
@@ -360,6 +371,20 @@ func validateCompression(compression string) error {
 		WithOperation("validateCompression")
 }
 
+// validateRPMFormat validates the RPM package format version against the
+// canonical set in pkg/constants shared with the MCP server.
+func validateRPMFormat(format int) error {
+	if constants.IsSupportedRPMFormat(format) {
+		return nil
+	}
+
+	return yapErrors.New(
+		yapErrors.ErrTypeConfiguration,
+		"unsupported RPM package format (want 4 or 6)",
+	).WithContext("rpm_format", format).
+		WithOperation("validateRPMFormat")
+}
+
 // resolveSigning resolves the signing configuration from CLI flags,
 // environment variables, and project config using the full priority chain.
 func resolveSigning(mpc *project.MultipleProject) (*signing.Config, error) {
@@ -463,6 +488,7 @@ func InitializeBuildDescriptions() {
 		"sbom-format":               "flags.build.sbom_format",
 		"compression-deb":           "flags.build.compression_deb",
 		"compression-rpm":           "flags.build.compression_rpm",
+		"rpm-format":                "flags.build.rpm_format",
 		"repo":                      "flags.build.repo",
 		"debug-dir":                 "flags.build.debug_dir",
 		"sign":                      "flags.build.sign",
@@ -567,6 +593,10 @@ func init() {
 		"compression-deb", "", "zstd", "")
 	buildCmd.Flags().StringVarP(&compressionRpm,
 		"compression-rpm", "", "zstd", "")
+
+	// RPM PACKAGE FORMAT
+	buildCmd.Flags().IntVarP(&rpmFormat,
+		"rpm-format", "", 0, "")
 
 	// SIGNING FLAGS
 	buildCmd.Flags().BoolVarP(&sign,

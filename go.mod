@@ -3,7 +3,8 @@ module github.com/M0Rf30/yap/v2
 go 1.27.3
 
 require (
-	github.com/M0Rf30/rpmpack v0.0.0-20260516153039-ce80a51ac79c
+	github.com/M0Rf30/go-rpmutils v0.4.1-0.20261110112324-44e724bf8427
+	github.com/M0Rf30/rpmpack v0.0.0-20261110112529-d7d22d01bb74
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/cavaliergopher/grab/v3 v3.0.1
@@ -22,7 +23,6 @@ require (
 	github.com/otiai10/copy v1.14.1
 	github.com/pierrec/lz4/v4 v4.1.33
 	github.com/rootless-containers/rootlesskit/v2 v2.3.6
-	github.com/sassoftware/go-rpmutils v0.4.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
 	github.com/stretchr/testify v1.12.1
@@ -82,7 +82,6 @@ require (
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/stangelandcl/ppmd v0.1.1 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
-	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org v0.0.0-20261019143151-5b882263cdaf // indirect

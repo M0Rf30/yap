@@ -10,7 +10,7 @@ import (
 	"os"
 	"slices"
 
-	rpmutils "github.com/sassoftware/go-rpmutils"
+	rpmutils "github.com/M0Rf30/go-rpmutils"
 )
 
 // POSIX file type bits (S_IFMT and friends) as stored in RPMTAG_FILEMODES.

@@ -18,7 +18,7 @@ package shell
 //   - unrar       → nwaples/rardecode/v2
 //   - 7z, 7za     → bodgit/sevenzip
 //   - dpkg-deb    → pkg/builders/common.ExtractDEB (ar + tar)
-//   - rpm2cpio    → github.com/sassoftware/go-rpmutils (raw cpio stream)
+//   - rpm2cpio    → github.com/M0Rf30/go-rpmutils (raw cpio stream)
 //
 // For any command not in the intercept list the handler falls through to the
 // next handler (which will invoke the OS binary as usual).
@@ -51,7 +51,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	rpmutils "github.com/sassoftware/go-rpmutils"
+	rpmutils "github.com/M0Rf30/go-rpmutils"
 	"mvdan.cc/sh/v3/interp"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"

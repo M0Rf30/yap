@@ -252,6 +252,18 @@ func (s *GPGSigner) createArmoredDetachedSignature(
 	return nil
 }
 
+// DetachSignBinary returns a binary (non-armored) OpenPGP detached signature
+// over data. Its signature matches rpmpack.RPM.SetPGPSigner, which embeds the
+// result in the RPM signature header (RSA/PGP tags for v4, OPENPGP for v6).
+func (s *GPGSigner) DetachSignBinary(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := s.createBinaryDetachedSignature(data, &buf); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
 // createBinaryDetachedSignature creates a binary detached signature.
 func (s *GPGSigner) createBinaryDetachedSignature(
 	data []byte,

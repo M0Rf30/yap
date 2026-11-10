@@ -54,18 +54,27 @@ type CrossDepsExtractor interface {
 	DownloadAndExtractCrossDeps(ctx context.Context, deps []string, targetArch string) error
 }
 
+// Options carries the per-format output settings applied by the builders.
+// Zero values select each builder's default.
+type Options struct {
+	// CompressionDeb is the DEB payload compression (default zstd).
+	CompressionDeb string
+	// CompressionRpm is the RPM payload compression (default zstd).
+	CompressionRpm string
+	// RPMFormat is the RPM package format version, 4 or 6 (default 4).
+	RPMFormat int
+}
+
 // GetPackageManager returns a Packer interface based on the given package build and distribution.
 //
 // pkgBuild: A pointer to a pkgbuild.PKGBUILD struct.
 // distro: A string representing the distribution.
-// compressionDeb: Compression algorithm for DEB packages (empty string uses default).
-// compressionRpm: Compression algorithm for RPM packages (empty string uses default).
+// opts: per-format output settings; the zero value uses the builder defaults.
 // Returns a Packer interface and an error if any issues occur.
 func GetPackageManager(
 	pkgBuild *pkgbuild.PKGBUILD,
 	distro string,
-	compressionDeb string,
-	compressionRpm string,
+	opts Options,
 ) (Packer, error) {
 	pkgManager := constants.DistroToPackageManager[distro]
 
@@ -82,11 +91,11 @@ func GetPackageManager(
 	case "apk":
 		return apk.NewBuilder(pkgBuild), nil
 	case "apt":
-		return deb.NewBuilder(pkgBuild, compressionDeb), nil
+		return deb.NewBuilder(pkgBuild, opts.CompressionDeb), nil
 	case "pacman":
 		return pacman.NewBuilder(pkgBuild), nil
 	case "yum", "zypper":
-		return rpm.NewBuilder(pkgBuild, compressionRpm), nil
+		return rpm.NewBuilder(pkgBuild, opts.CompressionRpm, opts.RPMFormat), nil
 	default:
 		return nil, errors.New(errors.ErrTypeConfiguration,
 			i18n.T("errors.packer.unsupported_linux_distro")).

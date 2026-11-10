@@ -155,8 +155,11 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
-		mpc.packageManager, err = packer.GetPackageManager(pkgbuildFile, distro,
-			mpc.CompressionDeb, mpc.CompressionRpm)
+		mpc.packageManager, err = packer.GetPackageManager(pkgbuildFile, distro, packer.Options{
+			CompressionDeb: mpc.CompressionDeb,
+			CompressionRpm: mpc.CompressionRpm,
+			RPMFormat:      mpc.RPMFormat,
+		})
 		if err != nil {
 			return err
 		}

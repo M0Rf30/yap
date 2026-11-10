@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	rpmutils "github.com/sassoftware/go-rpmutils"
+	rpmutils "github.com/M0Rf30/go-rpmutils"
 
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"

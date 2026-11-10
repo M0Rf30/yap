@@ -5,6 +5,7 @@ package mcp
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -72,7 +73,7 @@ func registerPrepare(srv *mcpsdk.Server) {
 	) (*mcpsdk.CallToolResult, prepareResult, error) {
 		distro, release := command.ResolveDistroRelease(args.Distro, args.Release, "")
 
-		pm, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
+		pm, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, packer.Options{})
 		if err != nil {
 			return nil, prepareResult{Distro: distro, Release: release, Error: err.Error()}, nil //nolint:nilerr
 		}
@@ -160,6 +161,7 @@ type buildArgs struct {
 	SBOMFormat              string   `json:"sbomFormat,omitempty" jsonschema:"sbom format: cyclonedx, spdx, or both"`
 	CompressionDeb          string   `json:"compressionDeb,omitempty" jsonschema:"deb compression: zstd, gzip, or xz"`
 	CompressionRpm          string   `json:"compressionRpm,omitempty" jsonschema:"rpm compression: zstd, gzip, or xz"`
+	RPMFormat               int      `json:"rpmFormat,omitempty" jsonschema:"rpm format: 4 (default) or 6 (rpm 6+)"`
 	Sign                    bool     `json:"sign,omitempty" jsonschema:"sign produced artifacts"`
 	SignKey                 string   `json:"signKey,omitempty" jsonschema:"signing key path"`
 	SignPassphrase          string   `json:"signPassphrase,omitempty" jsonschema:"passphrase for the signing key"`
@@ -203,6 +205,13 @@ func registerBuildAndStatus(srv *mcpsdk.Server) {
 			return nil, buildStartResult{}, err
 		}
 
+		if !constants.IsSupportedRPMFormat(args.RPMFormat) {
+			return nil, buildStartResult{}, errors.New(errors.ErrTypeValidation,
+				"unsupported rpmFormat "+strconv.Itoa(args.RPMFormat)+" (want 4 or 6)").
+				WithOperation(toolNameBuild).
+				WithContext("rpm_format", args.RPMFormat)
+		}
+
 		// Dispatch into the matching yap image only when the caller explicitly
 		// asked for a distro and we are on a host shell (the CLI's
 		// userProvidedDistro gate), unless noContainer forces a native build
@@ -223,6 +232,7 @@ func registerBuildAndStatus(srv *mcpsdk.Server) {
 			Opts:           opts,
 			CompressionDeb: args.CompressionDeb,
 			CompressionRpm: args.CompressionRpm,
+			RPMFormat:      args.RPMFormat,
 			SBOM:           args.SBOM,
 			SBOMFormat:     args.SBOMFormat,
 		}

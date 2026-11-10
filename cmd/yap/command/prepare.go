@@ -79,7 +79,7 @@ var (
 				}
 			}
 
-			packageManager, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
+			packageManager, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, packer.Options{})
 			if err != nil {
 				return err
 			}

@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/M0Rf30/go-rpmutils"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
-	"github.com/sassoftware/go-rpmutils"
 )
 
 // TestVerifyRPMSignatureUnsignedWithBypass tests that an unsigned RPM

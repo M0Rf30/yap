@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	rpmutils "github.com/sassoftware/go-rpmutils"
+	rpmutils "github.com/M0Rf30/go-rpmutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

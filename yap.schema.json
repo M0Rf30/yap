@@ -67,6 +67,11 @@
       "description": "Compression algorithm for .rpm artifacts.",
       "enum": ["zstd", "gzip", "xz"]
     },
+    "rpmFormat": {
+      "type": "integer",
+      "description": "RPM package format version for .rpm artifacts: 4 (default, installable by rpm 4.x and 6.x) or 6 (RPM v6 format, requires rpm 6.0+).",
+      "enum": [4, 6]
+    },
     "signing": {
       "type": "object",
       "description": "Package signing configuration. Note: keys are PascalCase (the struct has no JSON tags). Key/passphrase resolution can also be driven by CLI flags and environment variables; see docs.",

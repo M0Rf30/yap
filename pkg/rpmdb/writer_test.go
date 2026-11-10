@@ -13,7 +13,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	rpmutils "github.com/sassoftware/go-rpmutils"
+	rpmutils "github.com/M0Rf30/go-rpmutils"
 )
 
 // TestOpenWriterFresh tests opening a fresh database.

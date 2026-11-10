@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	rpmutils "github.com/M0Rf30/go-rpmutils"
 	"github.com/m0rf30/ar"
-	rpmutils "github.com/sassoftware/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -109,7 +109,7 @@ const (
 )
 
 // ExtractRPM extracts an RPM package payload (cpio.{gz,xz,zst,...}) to the
-// destination directory using github.com/sassoftware/go-rpmutils.
+// destination directory using github.com/M0Rf30/go-rpmutils.
 //
 // We iterate the cpio payload via PayloadReaderExtended rather than calling
 // ExpandPayload because the bundled cpio.Extract refuses entries whose names

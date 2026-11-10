@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	rpmutils "github.com/M0Rf30/go-rpmutils"
 	"github.com/M0Rf30/rpmpack"
-	rpmutils "github.com/sassoftware/go-rpmutils"
 )
 
 // buildTestRPM builds a real RPM in memory with provides and returns it

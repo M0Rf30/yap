@@ -350,6 +350,8 @@
   translation: "DEB compression algorithm: zstd|gzip|xz"
 - id: flags.build.compression_rpm
   translation: "RPM compression algorithm: zstd|gzip|xz"
+- id: flags.build.rpm_format
+  translation: "RPM package format version: 4 (default, rpm 4.x+) or 6 (rpm 6.0+)"
 - id: flags.build.repo
   translation: "Extra repository spec (repeatable): name=<n>,url=<u>,suite=<s>,components=<a+b>,keyURL=<u>,distros=<d1+d2>,format=<deb|rpm>,gpgCheck=<true|false>,country=<cc>"
 - id: flags.build.debug_dir

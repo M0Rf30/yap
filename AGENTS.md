@@ -107,6 +107,7 @@ yap graph <path>
 --skip-sync --cleanbuild --parallel --sign --sbom --nocheck
 --compression-deb zstd|gzip|xz
 --compression-rpm zstd|gzip|xz
+--rpm-format 4|6
 --target-arch <arch>
 --source-retries <n>
 ```
@@ -180,7 +181,7 @@ These reflect genuine format requirements, not duplication.
 |--------|-----------|--------|
 | APK | RSA PKCS#1 v1.5 SHA1 | `.SIGN.RSA.<keyname>.rsa.pub` prepended as third gzip stream |
 | DEB | OpenPGP | `<package>.deb.asc` ASCII-armored detached |
-| RPM | OpenPGP | `<package>.rpm.asc` + optional in-RPM via rpmpack |
+| RPM | OpenPGP | embedded via rpmpack `SetPGPSigner` (v4 RSA+PGP tags, v6 `OPENPGP` tag) + `<package>.rpm.asc` |
 | Pacman | OpenPGP | `<package>.pkg.tar.zst.sig` binary detached |
 
 Key resolution priority (highest first):
@@ -276,6 +277,8 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - Package signing — APK RSA + DEB/RPM/Pacman GPG
 - SBOM — CycloneDX 1.5 + SPDX 2.3
 - Per-format compression — DEB/RPM
+- RPM v6 package format — opt-in via `--rpm-format 6` / yap.json `rpmFormat` / MCP `rpmFormat` (default 4). Writer: `github.com/M0Rf30/rpmpack` (`RPMMetaData.Format`; SHA256+SHA3-256 header digests, SHA256/SHA512/SHA3-256 payload digests, 64-bit sizes, stripped `07070X` cpio, MIME dict, `OPENPGP` signature tag). Reader: `github.com/M0Rf30/go-rpmutils` fork (replaces `sassoftware/go-rpmutils`: stripped-cpio padding fix, v6 payload digests without `PAYLOADDIGESTALGO`, v6 `OPENPGP` signature verification) used by `pkg/dnfinstall` and `pkg/archive`. Validated against rpm 6.0.1 (`rpm -K`, `rpm -i`)
+- Embedded RPM signatures — with `--sign`, RPM artifacts carry the signature in the package header (`prepareEmbeddedSigning` → `rpm.RPM.SetPGPSigner`), required by rpm 6's default `%_pkgverify_level signature`
 - Pacman `.INSTALL` scriptlets — 6-hook parity
 - Changelog support — DEB (Lintian-compliant), RPM (native %changelog), Pacman
 - Builder interface unification — `BuildPackage` returns `(string, error)`

@@ -13,9 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/go-rpmutils"
 	"github.com/ProtonMail/go-crypto/openpgp"
 	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
-	"github.com/sassoftware/go-rpmutils"
 
 	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"

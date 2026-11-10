@@ -34,6 +34,12 @@ const rootOwner = "root"
 type RPM struct {
 	*common.BaseBuilder
 	compression string
+	// format is the RPM package format version (rpmpack.FormatV4 or
+	// rpmpack.FormatV6).
+	format int
+	// pgpSigner, when set, embeds an OpenPGP signature in the RPM signature
+	// header (see SetPGPSigner).
+	pgpSigner func([]byte) ([]byte, error)
 	// originalSection/mappedSection remember the PKGBUILD section as written and
 	// its RPM group, so repeated PrepareFakeroot calls (split packages) do not
 	// map an already-mapped group a second time.
@@ -42,16 +48,24 @@ type RPM struct {
 	sectionMapped   bool
 }
 
-// NewBuilder creates a new RPM package builder with optional compression setting.
-// If compression is empty, defaults to "zstd".
-func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string) *RPM {
+// NewBuilder creates a new RPM package builder with optional compression and
+// package format settings. An empty compression defaults to "zstd"; a zero
+// format defaults to the RPM v4 package format. Callers validate format
+// against constants.SupportedRPMFormats; rpmpack rejects anything else at
+// BuildPackage time.
+func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string, format int) *RPM {
 	if compression == "" {
 		compression = "zstd"
+	}
+
+	if format == 0 {
+		format = rpmpack.FormatV4
 	}
 
 	return &RPM{
 		BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm"),
 		compression: compression,
+		format:      format,
 	}
 }
 
@@ -89,6 +103,7 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 		Packager:    r.PKGBUILD.Maintainer,
 		Group:       r.PKGBUILD.Section,
 		Compressor:  r.compression,
+		Format:      r.format,
 		Licence:     license,
 		// BuildHost is fixed for reproducibility — rpmpack would otherwise
 		// embed the build machine's hostname, leaking build-infra detail
@@ -114,6 +129,10 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 	if err != nil {
 		return "", errors.Wrap(err, errors.ErrTypePackaging, "failed to create RPM metadata").
 			WithOperation("BuildPackage")
+	}
+
+	if r.pgpSigner != nil {
+		rpm.SetPGPSigner(r.pgpSigner)
 	}
 
 	err = r.createFilesInsideRPM(rpm)
@@ -149,6 +168,14 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 	r.LogPackageCreated(cleanFilePath)
 
 	return cleanFilePath, nil
+}
+
+// SetPGPSigner registers a function returning a binary OpenPGP detached
+// signature over its input. BuildPackage then embeds the signature in the
+// package's signature header so `rpm -K` / dnf verify it in place: header and
+// header+payload signatures for v4, OPENPGP header signatures for v6.
+func (r *RPM) SetPGPSigner(f func([]byte) ([]byte, error)) {
+	r.pgpSigner = f
 }
 
 // packageFileName returns the RPM artifact file name. RPM file names never

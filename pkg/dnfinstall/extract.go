@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sassoftware/go-rpmutils"
+	"github.com/M0Rf30/go-rpmutils"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
