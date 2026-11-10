@@ -7,40 +7,42 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	rpmutils "github.com/M0Rf30/go-rpmutils"
+	"github.com/M0Rf30/pkgformat/httpclient"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	"github.com/M0Rf30/pkgformat/rpm/dnf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
 	"github.com/M0Rf30/yap/v2/pkg/yapdb"
 )
 
 // TestWriteYapdbBasic tests writeYapdb with a minimal RPM entry.
 func TestWriteYapdbBasic(t *testing.T) {
-	// This test will fail because we can't easily mock rpmutils.Rpm.Header.
+	// This test will fail because we can't easily mock pkgrpm.Rpm.Header.
 	// For now, we'll skip it and focus on the capability extraction logic.
 	t.Skip("requires real RPM file or complex mocking")
 }
 
 // TestWriteYapdbWithCapabilities tests that writeYapdb correctly stores capabilities.
 func TestWriteYapdbWithCapabilities(t *testing.T) {
-	// This test requires mocking rpmutils.Rpm.Header, which is complex.
+	// This test requires mocking pkgrpm.Rpm.Header, which is complex.
 	// We'll skip it for now.
 	t.Skip("requires real RPM file or complex mocking")
 }
 
 // TestWriteYapdbEmptyFiles tests writeYapdb with no files.
 func TestWriteYapdbEmptyFiles(t *testing.T) {
-	// This test requires mocking rpmutils.Rpm.Header.
+	// This test requires mocking pkgrpm.Rpm.Header.
 	t.Skip("requires real RPM file or complex mocking")
 }
 
 // TestWriteYapdbContextCancellation tests writeYapdb with a cancelled context.
 func TestWriteYapdbContextCancellation(t *testing.T) {
-	// This test requires mocking rpmutils.Rpm.Header.
+	// This test requires mocking pkgrpm.Rpm.Header.
 	t.Skip("requires real RPM file or complex mocking")
 }
 
@@ -49,7 +51,7 @@ func TestWriteSystemRpmdbMissing(t *testing.T) {
 	ctx := context.Background()
 	rootDir := t.TempDir()
 
-	rpm := &rpmutils.Rpm{}
+	rpm := &pkgrpm.Rpm{}
 	entry := &rpmEntry{}
 
 	// Call writeSystemRpmdb with a rootDir that has no rpmdb.sqlite.
@@ -78,7 +80,7 @@ func TestWriteSystemRpmdbExists(t *testing.T) {
 	err = os.WriteFile(rpmdbPath, []byte("dummy"), 0o644)
 	require.NoError(t, err)
 
-	rpm := &rpmutils.Rpm{}
+	rpm := &pkgrpm.Rpm{}
 	entry := &rpmEntry{}
 
 	err = writeSystemRpmdb(ctx, rpm, entry, rootDir)
@@ -89,135 +91,115 @@ func TestWriteSystemRpmdbExists(t *testing.T) {
 }
 
 // TestInstallPackageHappyPath tests installPackage with a valid RPM.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils. This is a known limitation.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm. This is a known limitation.
 func TestInstallPackageHappyPath(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestInstallPackagePreinScriptletFailure tests installPackage when pre scriptlet fails.
 // According to the spec, %pre failure should abort the install.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestInstallPackagePreinScriptletFailure(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestInstallPackagePostinScriptletFailure tests installPackage when post scriptlet fails.
 // According to the spec, %post failure should warn but continue.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestInstallPackagePostinScriptletFailure(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestInstallPackageLockContention tests installPackage with lock contention.
 // This test verifies that the lock is properly acquired and released.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestInstallPackageLockContention(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestInstallPackageContextCancellation tests installPackage with a cancelled context.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestInstallPackageContextCancellation(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestInstallPackageSkipScriptlets tests installPackage with SkipScriptlets option.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestInstallPackageSkipScriptlets(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestInstallPackageWriteSystemRpmdbDisabled tests installPackage with WriteSystemRpmdb=false.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestInstallPackageWriteSystemRpmdbDisabled(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestInstallPackageWriteSystemRpmdbEnabled tests installPackage with WriteSystemRpmdb=true.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestInstallPackageWriteSystemRpmdbEnabled(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestDownloadAndInstallEmpty tests downloadAndInstall with an empty package list.
 func TestDownloadAndInstallEmpty(t *testing.T) {
-	ctx := context.Background()
-	rootDir := t.TempDir()
-	opts := Options{}
+	err := downloadAndInstall(context.Background(), dnf.New(dnf.Options{}), []*dnf.Package{}, t.TempDir(), Options{})
 
-	// Call downloadAndInstall with empty list.
-	err := downloadAndInstall(ctx, nil, []*dnfcache.PackageInfo{}, rootDir, opts)
-
-	// Should succeed with no packages to install.
 	assert.NoError(t, err)
+}
+
+// TestDownloadAndInstallRefusesUnverifiablePackage: a package whose metadata
+// carries no SHA-256/512 is never downloaded, so nothing reaches the install.
+func TestDownloadAndInstallRefusesUnverifiablePackage(t *testing.T) {
+	pkg := &dnf.Package{
+		Name:     "test-pkg",
+		BaseURL:  "http://127.0.0.1:1/",
+		Location: "test-pkg.rpm",
+	}
+
+	err := downloadAndInstall(context.Background(), dnf.New(dnf.Options{}), []*dnf.Package{pkg}, t.TempDir(), Options{})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, dnf.ErrUnverifiable)
+}
+
+// TestDownloadAndInstallUnreachableMirror surfaces network errors.
+func TestDownloadAndInstallUnreachableMirror(t *testing.T) {
+	pkg := &dnf.Package{
+		Name:         "test-pkg",
+		BaseURL:      "http://127.0.0.1:1/",
+		Location:     "test-pkg.rpm",
+		Checksum:     strings.Repeat("0", 64),
+		ChecksumType: "sha256",
+	}
+
+	client := dnf.New(dnf.Options{HTTP: httpclient.New(httpclient.Options{
+		Retry: httpclient.RetryPolicy{Attempts: 1, BaseDelay: -1},
+	})})
+
+	err := downloadAndInstall(context.Background(), client, []*dnf.Package{pkg}, t.TempDir(), Options{})
+
+	assert.Error(t, err)
 }
 
 // TestDownloadAndInstallContextCancellation tests downloadAndInstall with a cancelled context.
 func TestDownloadAndInstallContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately.
+	cancel()
 
-	rootDir := t.TempDir()
-	opts := Options{}
+	pkg := &dnf.Package{Name: "test-pkg", Location: "test-pkg.rpm"}
 
-	// Call downloadAndInstall with cancelled context and a package to install.
-	// This will trigger the context check in the loop.
-	pkg := &dnfcache.PackageInfo{Name: "test-pkg"}
-	err := downloadAndInstall(ctx, nil, []*dnfcache.PackageInfo{pkg}, rootDir, opts)
-
-	// Should return context cancelled error.
-	assert.Error(t, err)
-}
-
-// TestDownloadRPMNilPackage tests downloadRPM rejects a nil package.
-func TestDownloadRPMNilPackage(t *testing.T) {
-	ctx := context.Background()
-	tmpDir := t.TempDir()
-
-	path, err := downloadRPM(ctx, nil, nil, tmpDir)
+	err := downloadAndInstall(ctx, dnf.New(dnf.Options{}), []*dnf.Package{pkg}, t.TempDir(), Options{})
 
 	assert.Error(t, err)
-	assert.Empty(t, path)
-	assert.Contains(t, err.Error(), "nil package")
-}
-
-// TestDownloadRPMInvalidURL tests downloadRPM surfaces network errors from dnfcache.
-func TestDownloadRPMInvalidURL(t *testing.T) {
-	ctx := context.Background()
-	pkg := &dnfcache.PackageInfo{
-		Name:         "test-pkg",
-		BaseURL:      "http://127.0.0.1:1/",
-		LocationHref: "test-pkg.rpm",
-	}
-	tmpDir := t.TempDir()
-
-	path, err := downloadRPM(ctx, nil, pkg, tmpDir)
-
-	assert.Error(t, err)
-	assert.Empty(t, path)
-}
-
-// TestDownloadRPMContextCancellation tests downloadRPM with a cancelled context.
-func TestDownloadRPMContextCancellation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately.
-
-	pkg := &dnfcache.PackageInfo{Name: "test-pkg"}
-	tmpDir := t.TempDir()
-
-	path, err := downloadRPM(ctx, nil, pkg, tmpDir)
-
-	// Should return not implemented error.
-	assert.Error(t, err)
-	assert.Empty(t, path)
 }
 
 // TestExtractCapabilitiesFromRealRPM tests extractCapabilities with a real RPM.

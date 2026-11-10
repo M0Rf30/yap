@@ -4,24 +4,25 @@
 package dnfinstall
 
 import (
-	rpmutils "github.com/M0Rf30/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	rpmtag "github.com/M0Rf30/pkgformat/rpm/tag"
 
 	"github.com/M0Rf30/yap/v2/pkg/yapdb"
 )
 
 // extractCapabilities extracts Provides, Requires, Conflicts, and Obsoletes
 // from an RPM header and returns them as a slice of yapdb.Capability.
-func extractCapabilities(rpm *rpmutils.Rpm) []yapdb.Capability {
+func extractCapabilities(rpm *pkgrpm.Rpm) []yapdb.Capability {
 	var caps []yapdb.Capability
 
 	caps = append(caps, readCapList(rpm, "provide",
-		rpmutils.PROVIDENAME, rpmutils.PROVIDEFLAGS, rpmutils.PROVIDEVERSION)...)
+		rpmtag.PROVIDENAME, rpmtag.PROVIDEFLAGS, rpmtag.PROVIDEVERSION)...)
 	caps = append(caps, readCapList(rpm, "require",
-		rpmutils.REQUIRENAME, rpmutils.REQUIREFLAGS, rpmutils.REQUIREVERSION)...)
+		rpmtag.REQUIRENAME, rpmtag.REQUIREFLAGS, rpmtag.REQUIREVERSION)...)
 	caps = append(caps, readCapList(rpm, "conflict",
-		rpmutils.CONFLICTNAME, rpmutils.CONFLICTFLAGS, rpmutils.CONFLICTVERSION)...)
+		rpmtag.CONFLICTNAME, rpmtag.CONFLICTFLAGS, rpmtag.CONFLICTVERSION)...)
 	caps = append(caps, readCapList(rpm, "obsolete",
-		rpmutils.OBSOLETENAME, rpmutils.OBSOLETEFLAGS, rpmutils.OBSOLETEVERSION)...)
+		rpmtag.OBSOLETENAME, rpmtag.OBSOLETEFLAGS, rpmtag.OBSOLETEVERSION)...)
 
 	return caps
 }
@@ -29,7 +30,7 @@ func extractCapabilities(rpm *rpmutils.Rpm) []yapdb.Capability {
 // readCapList reads a capability list (names, flags, versions) from the RPM header
 // and returns them as a slice of yapdb.Capability with the given kind.
 // The three arrays are expected to be parallel (same length or shorter versions/flags).
-func readCapList(rpm *rpmutils.Rpm, kind string, nameTag, flagsTag, versionTag int) []yapdb.Capability {
+func readCapList(rpm *pkgrpm.Rpm, kind string, nameTag, flagsTag, versionTag int) []yapdb.Capability {
 	names, _ := rpm.Header.GetStrings(nameTag)
 	if len(names) == 0 {
 		return nil

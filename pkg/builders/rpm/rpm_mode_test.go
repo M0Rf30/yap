@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	rpmpack "github.com/M0Rf30/rpmpack"
+	"github.com/M0Rf30/pkgformat/rpm/pack"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -47,7 +47,7 @@ func TestAsRPMFilePreservesSetuid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f, err := asRPMFile(&files.Entry{Source: path, Destination: "/usr/bin/su"}, rpmpack.GenericFile)
+	f, err := asRPMFile(&files.Entry{Source: path, Destination: "/usr/bin/su"}, pack.GenericFile)
 	if err != nil {
 		t.Fatal(err)
 	}

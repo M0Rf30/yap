@@ -15,14 +15,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/M0Rf30/pkgformat/rpm/pack"
+
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
-
-	rpmpack "github.com/M0Rf30/rpmpack"
 )
 
 const rootOwner = "root"
@@ -34,8 +34,8 @@ const rootOwner = "root"
 type RPM struct {
 	*common.BaseBuilder
 	compression string
-	// format is the RPM package format version (rpmpack.FormatV4 or
-	// rpmpack.FormatV6).
+	// format is the RPM package format version (pack.FormatV4 or
+	// pack.FormatV6).
 	format int
 	// pgpSigner, when set, embeds an OpenPGP signature in the RPM signature
 	// header (see SetPGPSigner).
@@ -51,7 +51,7 @@ type RPM struct {
 // NewBuilder creates a new RPM package builder with optional compression and
 // package format settings. An empty compression defaults to "zstd"; a zero
 // format defaults to the RPM v4 package format. Callers validate format
-// against constants.SupportedRPMFormats; rpmpack rejects anything else at
+// against constants.SupportedRPMFormats; pkgformat/rpm/pack rejects anything else at
 // BuildPackage time.
 func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string, format int) *RPM {
 	if compression == "" {
@@ -59,7 +59,7 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD, compression string, format int) *RP
 	}
 
 	if format == 0 {
-		format = rpmpack.FormatV4
+		format = pack.FormatV4
 	}
 
 	return &RPM{
@@ -78,7 +78,7 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 
 	epoch, _ := strconv.ParseUint(r.PKGBUILD.Epoch, 10, 32)
 	if epoch == 0 {
-		epoch = uint64(rpmpack.NoEpoch)
+		epoch = uint64(pack.NoEpoch)
 	}
 
 	license := strings.Join(r.PKGBUILD.License, " ")
@@ -91,7 +91,7 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 		return "", err
 	}
 
-	rpm, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+	rpm, err := pack.NewRPM(pack.RPMMetaData{
 		Name:        r.PKGBUILD.PkgName,
 		Summary:     r.PKGBUILD.PkgDesc,
 		Description: r.PKGBUILD.PkgDesc,
@@ -105,7 +105,7 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 		Compressor:  r.compression,
 		Format:      r.format,
 		Licence:     license,
-		// BuildHost is fixed for reproducibility — rpmpack would otherwise
+		// BuildHost is fixed for reproducibility — pkgformat/rpm/pack would otherwise
 		// embed the build machine's hostname, leaking build-infra detail
 		// and breaking byte-identical rebuilds.
 		BuildHost: "yap",
@@ -207,7 +207,7 @@ func (r *RPM) PrepareFakeroot(ctx context.Context, _ string, targetArch string) 
 
 // createFilesInsideRPM prepares and adds files to the specified RPM object.
 // It retrieves backup files, walks through the package directory, and adds the contents to the RPM.
-func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
+func (r *RPM) createFilesInsideRPM(rpm *pack.RPM) error {
 	backupFiles := r.PrepareBackupFilePaths()
 
 	originalBackup := r.PKGBUILD.Backup
@@ -235,7 +235,7 @@ func (r *RPM) createFilesInsideRPM(rpm *rpmpack.RPM) error {
 // It creates RPMFile objects from the Entry and adds them to the RPM.
 // Intermediate directories (those that are ancestors of other entries) are
 // skipped to avoid polluting the RPM file list with implicit path components.
-func addContentsToRPM(contents []*files.Entry, rpm *rpmpack.RPM) error {
+func addContentsToRPM(contents []*files.Entry, rpm *pack.RPM) error {
 	// Build a set of all non-directory destinations for fast lookup.
 	// A directory is "intermediate" if any other entry's destination
 	// starts with that directory path + "/".
@@ -276,8 +276,8 @@ func addContentsToRPM(contents []*files.Entry, rpm *rpmpack.RPM) error {
 // addScriptlets adds pre-install, post-install, pre-remove and post-remove
 // scripts from the PKGBUILD to the RPM package if they are defined.
 //
-// It takes a pointer to the rpmpack.RPM instance as a parameter.
-func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
+// It takes a pointer to the pack.RPM instance as a parameter.
+func (r *RPM) addScriptlets(rpm *pack.RPM) {
 	// This string is appended to preun and postun directives
 	// to have a similar behaviour between deb and rpm.
 	onlyOnUninstall := "if [ $1 -ne 0 ]; then exit 0; fi\n"
@@ -310,7 +310,7 @@ func (r *RPM) addScriptlets(rpm *rpmpack.RPM) {
 // addChangelog adds changelog entries to the RPM package if a changelog is
 // specified in the PKGBUILD. It reads the changelog file, parses it into
 // ChangelogEntry objects, and sets them on the RPM metadata.
-func (r *RPM) addChangelog(rpm *rpmpack.RPM) {
+func (r *RPM) addChangelog(rpm *pack.RPM) {
 	changelogData, err := r.PKGBUILD.ReadChangelog()
 	if err != nil {
 		logger.Warn(i18n.T("logger.rpm.warn.failed_read_changelog_rpm"), "error", err)
@@ -328,7 +328,7 @@ func (r *RPM) addChangelog(rpm *rpmpack.RPM) {
 
 // asRPMDirectory creates an RPMFile object for a directory based on the provided Entry.
 // It retrieves the directory's modification time and sets the appropriate fields in the RPMFile.
-func asRPMDirectory(entry *files.Entry) (*rpmpack.RPMFile, error) {
+func asRPMDirectory(entry *files.Entry) (*pack.RPMFile, error) {
 	// Get file information for the directory specified in the entry.
 	fileInfo, err := os.Stat(filepath.Clean(entry.Source))
 	if err != nil {
@@ -344,7 +344,7 @@ func asRPMDirectory(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	}
 
 	// Create and return an RPMFile object for the directory.
-	return &rpmpack.RPMFile{
+	return &pack.RPMFile{
 		Name: entry.Destination, // Set the destination name.
 		// Set the mode to indicate it's a directory.
 		Mode:  posixMode(fileInfo.Mode()) | files.TagDirectory,
@@ -358,7 +358,7 @@ func asRPMDirectory(entry *files.Entry) (*rpmpack.RPMFile, error) {
 // It reads the file's data and retrieves its modification time.
 func asRPMFile(
 	entry *files.Entry,
-	fileType rpmpack.FileType) (*rpmpack.RPMFile, error) {
+	fileType pack.FileType) (*pack.RPMFile, error) {
 	// Read the file data from the source path.
 	data, err := os.ReadFile(entry.Source)
 	if err != nil {
@@ -381,7 +381,7 @@ func asRPMFile(
 	}
 
 	// Create and return an RPMFile object for the regular file.
-	return &rpmpack.RPMFile{
+	return &pack.RPMFile{
 		Name:  entry.Destination,          // Set the destination name.
 		Body:  data,                       // Set the file data.
 		Mode:  posixMode(fileInfo.Mode()), // Set the POSIX file mode.
@@ -394,7 +394,7 @@ func asRPMFile(
 
 // asRPMSymlink creates an RPMFile object for a symbolic link based on the provided Entry.
 // It retrieves the link's target and modification time.
-func asRPMSymlink(entry *files.Entry) (*rpmpack.RPMFile, error) {
+func asRPMSymlink(entry *files.Entry) (*pack.RPMFile, error) {
 	cleanFilePath := filepath.Clean(entry.Source)
 
 	fileInfo, err := os.Lstat(cleanFilePath) // Use Lstat to get information about the symlink.
@@ -418,7 +418,7 @@ func asRPMSymlink(entry *files.Entry) (*rpmpack.RPMFile, error) {
 	}
 
 	// Create and return an RPMFile object for the symlink.
-	return &rpmpack.RPMFile{
+	return &pack.RPMFile{
 		Name:  entry.Destination,   // Set the destination name.
 		Body:  []byte(body),        // Set the target of the symlink as the body.
 		Mode:  uint(files.TagLink), // Set the mode to indicate it's a symlink.
@@ -430,20 +430,20 @@ func asRPMSymlink(entry *files.Entry) (*rpmpack.RPMFile, error) {
 
 // createRPMFile converts an Entry object into an RPMFile object based on its type.
 // It returns the created RPMFile and any error encountered during the conversion.
-func createRPMFile(entry *files.Entry) (*rpmpack.RPMFile, error) {
-	var file *rpmpack.RPMFile
+func createRPMFile(entry *files.Entry) (*pack.RPMFile, error) {
+	var file *pack.RPMFile
 
 	var err error
 
 	switch entry.Type {
 	case files.TypeConfigNoReplace:
-		file, err = asRPMFile(entry, rpmpack.ConfigFile|rpmpack.NoReplaceFile)
+		file, err = asRPMFile(entry, pack.ConfigFile|pack.NoReplaceFile)
 	case files.TypeSymlink:
 		file, err = asRPMSymlink(entry)
 	case files.TypeDir:
 		file, err = asRPMDirectory(entry)
 	case files.TypeFile:
-		file, err = asRPMFile(entry, rpmpack.GenericFile)
+		file, err = asRPMFile(entry, pack.GenericFile)
 	}
 
 	return file, err
@@ -506,12 +506,12 @@ func (r *RPM) getRelease() {
 	r.FormatRelease(RPMDistros)
 }
 
-// rpmRelations bundles all dependency-relation flavors consumed by rpmpack.NewRPM.
+// rpmRelations bundles all dependency-relation flavors consumed by pack.NewRPM.
 // Grouping them avoids 7 sequential local variables in BuildPackage and makes the
 // build-up phase trivially testable in isolation.
 type rpmRelations struct {
-	obsoletes, provides, requires, conflicts    rpmpack.Relations
-	recommends, suggests, enhances, supplements rpmpack.Relations
+	obsoletes, provides, requires, conflicts    pack.Relations
+	recommends, suggests, enhances, supplements pack.Relations
 }
 
 // buildDependencyRelations computes every dependency relation needed by the RPM
@@ -520,7 +520,7 @@ func (r *RPM) buildDependencyRelations() (rpmRelations, error) {
 	var rel rpmRelations
 
 	specs := []struct {
-		dst  *rpmpack.Relations
+		dst  *pack.Relations
 		deps []string
 	}{
 		{&rel.obsoletes, r.PKGBUILD.Replaces},
@@ -545,13 +545,13 @@ func (r *RPM) buildDependencyRelations() (rpmRelations, error) {
 	return rel, nil
 }
 
-// processDepends converts dependency strings to rpmpack.Relations format.
+// processDepends converts dependency strings to pack.Relations format.
 // It uses the common BaseBuilder.ProcessDependencies for consistent version
 // operator handling, then converts the result to RPM-specific Relations type.
 // Returns an error if any dependency string is invalid.
-func (r *RPM) processDepends(depends []string) (rpmpack.Relations, error) {
+func (r *RPM) processDepends(depends []string) (pack.Relations, error) {
 	processed := r.ProcessDependencies(depends)
-	relations := make(rpmpack.Relations, 0)
+	relations := make(pack.Relations, 0)
 
 	for _, dep := range processed {
 		if err := relations.Set(dep); err != nil {
@@ -581,12 +581,12 @@ func (r *RPM) processDepends(depends []string) (rpmpack.Relations, error) {
 // Each entry block starts with "* " followed by a date, author, and version.
 // Subsequent lines starting with "- " are change descriptions.
 // If date parsing fails, time.Now() is used as fallback.
-func parseRPMChangelog(data []byte) []rpmpack.ChangelogEntry {
-	var entries []rpmpack.ChangelogEntry
+func parseRPMChangelog(data []byte) []pack.ChangelogEntry {
+	var entries []pack.ChangelogEntry
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 
-	var currentEntry *rpmpack.ChangelogEntry
+	var currentEntry *pack.ChangelogEntry
 
 	var textLines []string
 
@@ -623,7 +623,7 @@ func parseRPMChangelog(data []byte) []rpmpack.ChangelogEntry {
 // * Wed Jan 01 2025 Author Name <email@example.com> - 1.0-1
 // Returns a ChangelogEntry with the parsed date and author.
 // If date parsing fails, uses time.Now() as fallback.
-func parseChangelogHeader(line string) *rpmpack.ChangelogEntry {
+func parseChangelogHeader(line string) *pack.ChangelogEntry {
 	// Remove the leading "* "
 	line = strings.TrimPrefix(line, "* ")
 
@@ -642,7 +642,7 @@ func parseChangelogHeader(line string) *rpmpack.ChangelogEntry {
 	parts := strings.Fields(dateAndAuthor)
 	if len(parts) < 4 {
 		// Not enough parts for a valid date, use current time
-		return &rpmpack.ChangelogEntry{
+		return &pack.ChangelogEntry{
 			Time:   time.Now(),
 			Author: dateAndAuthor,
 			Text:   "",
@@ -664,7 +664,7 @@ func parseChangelogHeader(line string) *rpmpack.ChangelogEntry {
 		}
 	}
 
-	return &rpmpack.ChangelogEntry{
+	return &pack.ChangelogEntry{
 		Time:   parsedTime,
 		Author: author,
 		Text:   "",

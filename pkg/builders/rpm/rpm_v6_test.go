@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	rpmutils "github.com/M0Rf30/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/stretchr/testify/require"
 
@@ -72,7 +72,7 @@ func TestBuildPackageFormatAndEmbeddedSignature(t *testing.T) {
 		f, err := os.Open(path)
 		require.NoError(t, err)
 
-		hdr, sigs, err := rpmutils.Verify(f, keyring)
+		hdr, sigs, err := pkgrpm.Verify(f, keyring)
 		require.NoError(t, err, "format %d", tc.format)
 		require.Equal(t, tc.format, hdr.Format())
 		require.Len(t, sigs, tc.wantSigs, "format %d", tc.format)
@@ -82,7 +82,7 @@ func TestBuildPackageFormatAndEmbeddedSignature(t *testing.T) {
 		f, err = os.Open(path)
 		require.NoError(t, err)
 
-		rpm, err := rpmutils.ReadRpm(f)
+		rpm, err := pkgrpm.ReadRpm(f)
 		require.NoError(t, err)
 
 		pr, err := rpm.PayloadReaderExtended()
@@ -122,8 +122,8 @@ func TestBuildPackageV6WrongKey(t *testing.T) {
 
 	defer func() { _ = f.Close() }()
 
-	_, _, err = rpmutils.Verify(f, openpgp.EntityList{other})
+	_, _, err = pkgrpm.Verify(f, openpgp.EntityList{other})
 
-	var knf rpmutils.KeyNotFoundError
+	var knf pkgrpm.KeyNotFoundError
 	require.ErrorAs(t, err, &knf)
 }

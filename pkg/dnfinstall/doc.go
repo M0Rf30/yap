@@ -3,7 +3,7 @@
 
 // Package dnfinstall replaces "dnf install" and "rpm --install" subprocesses.
 //
-// It resolves transitive package dependencies via dnfcache, downloads RPM
+// It resolves transitive package dependencies via pkgformat/rpm/dnf, downloads RPM
 // files, and extracts them to a target filesystem root. This mirrors the
 // functionality of pkg/aptinstall (for Debian) and pkg/apkindex (for Alpine).
 //

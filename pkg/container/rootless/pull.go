@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/M0Rf30/pkgformat/safepath"
 	"github.com/google/go-containerregistry/pkg/crane"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 
@@ -23,7 +24,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // imageStorePath returns the local OCI store path for a given distro image.

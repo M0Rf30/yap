@@ -11,7 +11,8 @@ import (
 	"os"
 	"path/filepath"
 
-	rpmutils "github.com/M0Rf30/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	rpmtag "github.com/M0Rf30/pkgformat/rpm/tag"
 
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -120,20 +121,20 @@ func (w *Writer) Close() error {
 	return w.db.Close()
 }
 
-// Install inserts an installed-package record from a parsed *rpmutils.Rpm and
+// Install inserts an installed-package record from a parsed *pkgrpm.Rpm and
 // the list of files actually placed on disk by the extractor.
 //
 // The operation is atomic: either all tables are updated or none are.
 // Returns a wrapped error if the operation fails.
 //
 //nolint:gocyclo,cyclop // install pipeline orchestration
-func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []InstalledFile) error {
+func (w *Writer) Install(ctx context.Context, rpm *pkgrpm.Rpm, files []InstalledFile) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
 	// Extract package name for logging
-	name, _ := rpm.Header.GetString(rpmutils.NAME)
+	name, _ := rpm.Header.GetString(rpmtag.NAME)
 
 	// Serialize the header blob
 	headerBlob, err := serializeHeader(rpm, files)
@@ -209,7 +210,7 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 	}
 
 	// Insert provides
-	provides, _ := rpm.Header.GetStrings(rpmutils.PROVIDENAME)
+	provides, _ := rpm.Header.GetStrings(rpmtag.PROVIDENAME)
 	for idx, prov := range provides {
 		if err := qtx.InsertProvidename(ctx, rpmdbgen.InsertProvidenameParams{
 			Key:  prov,
@@ -225,7 +226,7 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 	}
 
 	// Insert requires
-	requires, _ := rpm.Header.GetStrings(rpmutils.REQUIRENAME)
+	requires, _ := rpm.Header.GetStrings(rpmtag.REQUIRENAME)
 	for idx, req := range requires {
 		if err := qtx.InsertRequirename(ctx, rpmdbgen.InsertRequirenameParams{
 			Key:  req,
@@ -241,7 +242,7 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 	}
 
 	// Insert conflicts
-	conflicts, _ := rpm.Header.GetStrings(rpmutils.CONFLICTNAME)
+	conflicts, _ := rpm.Header.GetStrings(rpmtag.CONFLICTNAME)
 	for idx, conf := range conflicts {
 		if err := qtx.InsertConflictname(ctx, rpmdbgen.InsertConflictnameParams{
 			Key:  conf,
@@ -257,7 +258,7 @@ func (w *Writer) Install(ctx context.Context, rpm *rpmutils.Rpm, files []Install
 	}
 
 	// Insert obsoletes
-	obsoletes, _ := rpm.Header.GetStrings(rpmutils.OBSOLETENAME)
+	obsoletes, _ := rpm.Header.GetStrings(rpmtag.OBSOLETENAME)
 	for idx, obs := range obsoletes {
 		if err := qtx.InsertObsoletename(ctx, rpmdbgen.InsertObsoletenameParams{
 			Key:  obs,

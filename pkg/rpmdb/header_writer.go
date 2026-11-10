@@ -10,7 +10,8 @@ import (
 	"os"
 	"slices"
 
-	rpmutils "github.com/M0Rf30/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	rpmtag "github.com/M0Rf30/pkgformat/rpm/tag"
 )
 
 // POSIX file type bits (S_IFMT and friends) as stored in RPMTAG_FILEMODES.
@@ -74,7 +75,7 @@ func (b *headerBuilder) addStrings(tag int, values []string) {
 	}
 
 	b.chunks[tag] = headerChunk{
-		dataType: int32(rpmutils.RPM_STRING_ARRAY_TYPE),
+		dataType: int32(rpmtag.RPM_STRING_ARRAY_TYPE),
 		count:    int32(len(values)), //nolint:gosec
 		align:    1,
 		data:     data,
@@ -83,21 +84,21 @@ func (b *headerBuilder) addStrings(tag int, values []string) {
 
 // addInt16s stores an INT16 array (big-endian, 2-byte aligned).
 func (b *headerBuilder) addInt16s(tag int, values []uint16) {
-	b.addInts(tag, int32(rpmutils.RPM_INT16_TYPE), 2, len(values), func(dst []byte, i int) []byte {
+	b.addInts(tag, int32(rpmtag.RPM_INT16_TYPE), 2, len(values), func(dst []byte, i int) []byte {
 		return binary.BigEndian.AppendUint16(dst, values[i])
 	})
 }
 
 // addInt32s stores an INT32 array (big-endian, 4-byte aligned).
 func (b *headerBuilder) addInt32s(tag int, values []int32) {
-	b.addInts(tag, int32(rpmutils.RPM_INT32_TYPE), 4, len(values), func(dst []byte, i int) []byte {
+	b.addInts(tag, int32(rpmtag.RPM_INT32_TYPE), 4, len(values), func(dst []byte, i int) []byte {
 		return binary.BigEndian.AppendUint32(dst, uint32(values[i])) //nolint:gosec
 	})
 }
 
 // addInt64s stores an INT64 array (big-endian, 8-byte aligned).
 func (b *headerBuilder) addInt64s(tag int, values []int64) {
-	b.addInts(tag, int32(rpmutils.RPM_INT64_TYPE), 8, len(values), func(dst []byte, i int) []byte {
+	b.addInts(tag, int32(rpmtag.RPM_INT64_TYPE), 8, len(values), func(dst []byte, i int) []byte {
 		return binary.BigEndian.AppendUint64(dst, uint64(values[i])) //nolint:gosec
 	})
 }
@@ -124,13 +125,13 @@ func (b *headerBuilder) addInts(
 	}
 }
 
-// serializeHeader extracts selected tags from an rpmutils.Rpm and serializes
+// serializeHeader extracts selected tags from an pkgrpm.Rpm and serializes
 // them into an RPM header image suitable for storage in the rpmdb Packages
 // table.
 //
 // This is a partial serializer — it handles the tags required for rpm -q,
 // rpm -qf, and rpm -e to work. Full byte-identity round-trip is not a goal.
-func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
+func serializeHeader(rpm *pkgrpm.Rpm, files []InstalledFile) ([]byte, error) {
 	b := newHeaderBuilder()
 
 	addBasicTags(b, rpm)
@@ -138,10 +139,10 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 	for _, g := range []struct {
 		name, flags, version int
 	}{
-		{rpmutils.PROVIDENAME, rpmutils.PROVIDEFLAGS, rpmutils.PROVIDEVERSION},
-		{rpmutils.REQUIRENAME, rpmutils.REQUIREFLAGS, rpmutils.REQUIREVERSION},
-		{rpmutils.CONFLICTNAME, rpmutils.CONFLICTFLAGS, rpmutils.CONFLICTVERSION},
-		{rpmutils.OBSOLETENAME, rpmutils.OBSOLETEFLAGS, rpmutils.OBSOLETEVERSION},
+		{rpmtag.PROVIDENAME, rpmtag.PROVIDEFLAGS, rpmtag.PROVIDEVERSION},
+		{rpmtag.REQUIRENAME, rpmtag.REQUIREFLAGS, rpmtag.REQUIREVERSION},
+		{rpmtag.CONFLICTNAME, rpmtag.CONFLICTFLAGS, rpmtag.CONFLICTVERSION},
+		{rpmtag.OBSOLETENAME, rpmtag.OBSOLETEFLAGS, rpmtag.OBSOLETEVERSION},
 	} {
 		addDepGroup(b, rpm, g.name, g.flags, g.version)
 	}
@@ -152,53 +153,53 @@ func serializeHeader(rpm *rpmutils.Rpm, files []InstalledFile) ([]byte, error) {
 }
 
 // addBasicTags writes the scalar metadata tags (name, version, sizes, ...).
-func addBasicTags(b *headerBuilder, rpm *rpmutils.Rpm) {
-	str := int32(rpmutils.RPM_STRING_TYPE)
-	i18n := int32(rpmutils.RPM_I18NSTRING_TYPE)
+func addBasicTags(b *headerBuilder, rpm *pkgrpm.Rpm) {
+	str := int32(rpmtag.RPM_STRING_TYPE)
+	i18n := int32(rpmtag.RPM_I18NSTRING_TYPE)
 
 	for _, st := range []struct {
 		tag      int
 		dataType int32
 	}{
-		{rpmutils.NAME, str},
-		{rpmutils.VERSION, str},
-		{rpmutils.RELEASE, str},
-		{rpmutils.ARCH, str},
-		{rpmutils.OS, str},
-		{rpmutils.SUMMARY, i18n},
-		{rpmutils.DESCRIPTION, i18n},
-		{rpmutils.LICENSE, str},
-		{rpmutils.GROUP, i18n},
-		{rpmutils.URL, str},
-		{rpmutils.PACKAGER, str},
-		{rpmutils.VENDOR, str},
-		{rpmutils.BUILDHOST, str},
-		{rpmutils.PAYLOADFORMAT, str},
-		{rpmutils.PAYLOADCOMPRESSOR, str},
+		{rpmtag.NAME, str},
+		{rpmtag.VERSION, str},
+		{rpmtag.RELEASE, str},
+		{rpmtag.ARCH, str},
+		{rpmtag.OS, str},
+		{rpmtag.SUMMARY, i18n},
+		{rpmtag.DESCRIPTION, i18n},
+		{rpmtag.LICENSE, str},
+		{rpmtag.GROUP, i18n},
+		{rpmtag.URL, str},
+		{rpmtag.PACKAGER, str},
+		{rpmtag.VENDOR, str},
+		{rpmtag.BUILDHOST, str},
+		{rpmtag.PAYLOADFORMAT, str},
+		{rpmtag.PAYLOADCOMPRESSOR, str},
 	} {
 		v, _ := rpm.Header.GetString(st.tag)
 		b.addString(st.tag, st.dataType, v)
 	}
 
-	if rpm.Header.HasTag(rpmutils.EPOCH) {
-		epoch, _ := rpm.Header.GetInt(rpmutils.EPOCH)
-		b.addInt32s(rpmutils.EPOCH, []int32{int32(epoch)}) //nolint:gosec
+	if rpm.Header.HasTag(rpmtag.EPOCH) {
+		epoch, _ := rpm.Header.GetInt(rpmtag.EPOCH)
+		b.addInt32s(rpmtag.EPOCH, []int32{int32(epoch)}) //nolint:gosec
 	}
 
-	buildtime, _ := rpm.Header.GetInt(rpmutils.BUILDTIME)
-	b.addInt32s(rpmutils.BUILDTIME, []int32{int32(buildtime)}) //nolint:gosec
+	buildtime, _ := rpm.Header.GetInt(rpmtag.BUILDTIME)
+	b.addInt32s(rpmtag.BUILDTIME, []int32{int32(buildtime)}) //nolint:gosec
 
 	// SIZE is an INT32 tag; payloads that do not fit use LONGSIZE (INT64).
 	size, _ := rpm.Header.InstalledSize()
 	if size > math.MaxInt32 {
-		b.addInt64s(rpmutils.LONGSIZE, []int64{size})
+		b.addInt64s(rpmtag.LONGSIZE, []int64{size})
 	} else {
-		b.addInt32s(rpmutils.SIZE, []int32{int32(size)}) //nolint:gosec
+		b.addInt32s(rpmtag.SIZE, []int32{int32(size)}) //nolint:gosec
 	}
 }
 
 // addDepGroup writes a dependency group (names + flags + versions).
-func addDepGroup(b *headerBuilder, rpm *rpmutils.Rpm, nameTag, flagsTag, versionTag int) {
+func addDepGroup(b *headerBuilder, rpm *pkgrpm.Rpm, nameTag, flagsTag, versionTag int) {
 	names, _ := rpm.Header.GetStrings(nameTag)
 	if len(names) == 0 {
 		return
@@ -286,32 +287,32 @@ func addFileTags(b *headerBuilder, files []InstalledFile) {
 
 	c := buildFileColumns(files)
 
-	b.addStrings(rpmutils.BASENAMES, c.basenames)
-	b.addStrings(rpmutils.DIRNAMES, c.dirnames)
-	b.addStrings(rpmutils.FILEDIGESTS, c.filedigests)
-	b.addStrings(rpmutils.FILELINKTOS, c.filelinktos)
-	b.addStrings(rpmutils.FILEUSERNAME, c.fileusers)
-	b.addStrings(rpmutils.FILEGROUPNAME, c.filegroups)
-	b.addInt32s(rpmutils.DIRINDEXES, c.dirindexes)
-	b.addInt16s(rpmutils.FILEMODES, c.filemodes)
-	b.addInt32s(rpmutils.FILEFLAGS, c.fileflags)
-	b.addInt32s(rpmutils.FILEMTIMES, c.filemtimes)
+	b.addStrings(rpmtag.BASENAMES, c.basenames)
+	b.addStrings(rpmtag.DIRNAMES, c.dirnames)
+	b.addStrings(rpmtag.FILEDIGESTS, c.filedigests)
+	b.addStrings(rpmtag.FILELINKTOS, c.filelinktos)
+	b.addStrings(rpmtag.FILEUSERNAME, c.fileusers)
+	b.addStrings(rpmtag.FILEGROUPNAME, c.filegroups)
+	b.addInt32s(rpmtag.DIRINDEXES, c.dirindexes)
+	b.addInt16s(rpmtag.FILEMODES, c.filemodes)
+	b.addInt32s(rpmtag.FILEFLAGS, c.fileflags)
+	b.addInt32s(rpmtag.FILEMTIMES, c.filemtimes)
 
 	// FILESIZES is INT32; any file >= 2 GiB switches the whole column to
 	// LONGFILESIZES (INT64), as rpm itself does.
 	if c.bigFile {
-		b.addInt64s(rpmutils.LONGFILESIZES, c.filesizes)
+		b.addInt64s(rpmtag.LONGFILESIZES, c.filesizes)
 	} else {
 		sizes := make([]int32, len(c.filesizes))
 		for i, s := range c.filesizes {
 			sizes[i] = int32(s) //nolint:gosec
 		}
 
-		b.addInt32s(rpmutils.FILESIZES, sizes)
+		b.addInt32s(rpmtag.FILESIZES, sizes)
 	}
 
 	if c.hasDigest {
-		b.addInt32s(rpmutils.FILEDIGESTALGO, []int32{digestAlgoSHA256})
+		b.addInt32s(rpmtag.FILEDIGESTALGO, []int32{digestAlgoSHA256})
 	}
 }
 

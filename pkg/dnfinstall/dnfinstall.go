@@ -7,7 +7,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -94,13 +93,19 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 	}
 
 	// Load the dnf cache and resolve the transitive closure of dependencies.
-	cache := dnfcache.Load()
+	client, index, err := hostIndex(ctx)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to load repository metadata").
+			WithOperation("InstallWithOptions")
+	}
 
-	resolved, unresolved, err := cache.ResolveDeps(ctx, names)
+	resolution, err := index.Resolve(ctx, names)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild, "failed to resolve dependencies").
 			WithOperation("InstallWithOptions")
 	}
+
+	resolved, unresolved := resolution.Packages, resolution.Unresolved
 
 	if len(unresolved) > 0 {
 		// Non-fatal: log and continue — installation will surface hard errors.
@@ -116,7 +121,7 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 	}
 
 	// Download and install packages in dependency order.
-	if err := installPackages(ctx, cache, resolved, rootDir, opts); err != nil {
+	if err := downloadAndInstall(ctx, client, resolved, rootDir, opts); err != nil {
 		return err
 	}
 
@@ -187,9 +192,4 @@ func resolveRootDir(opts Options) (string, error) {
 	}
 
 	return rootDir, nil
-}
-
-// installPackages downloads and installs each package in the resolved closure.
-func installPackages(ctx context.Context, cache *dnfcache.Cache, resolved []*dnfcache.PackageInfo, rootDir string, opts Options) error { //nolint:lll
-	return downloadAndInstall(ctx, cache, resolved, rootDir, opts)
 }

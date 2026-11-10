@@ -7,29 +7,29 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
-	rpmutils "github.com/M0Rf30/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	"github.com/M0Rf30/pkgformat/rpm/dnf"
+	rpmtag "github.com/M0Rf30/pkgformat/rpm/tag"
 
-	"github.com/M0Rf30/yap/v2/pkg/rpmdb"
-
-	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
+	"github.com/M0Rf30/yap/v2/pkg/rpmdb"
 	"github.com/M0Rf30/yap/v2/pkg/yapdb"
 )
 
 // formatRPM is the constant identifier for the RPM package format.
 const formatRPM = "rpm"
 
-// downloadAndInstall downloads all packages in the resolved closure and
-// installs them in dependency order.
+// downloadAndInstall downloads all packages in the resolved closure through
+// the dnf client (verified against the repository checksums) and installs
+// them in dependency order.
 func downloadAndInstall(
 	ctx context.Context,
-	cache *dnfcache.Cache,
-	resolved []*dnfcache.PackageInfo,
+	client *dnf.Client,
+	resolved []*dnf.Package,
 	rootDir string,
 	opts Options,
 ) error {
@@ -41,17 +41,17 @@ func downloadAndInstall(
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	// Download all packages concurrently (bounded), failing fast.
-	rpmPaths, err := downloadAll(ctx, cache, resolved, tmpDir)
+	rpmPaths, err := client.DownloadAll(ctx, resolved, tmpDir)
 	if err != nil {
-		return err
+		return errors.Wrap(err, errors.ErrTypeBuild, "failed to download package").
+			WithOperation("downloadAndInstall")
 	}
 
 	// Install packages in dependency order.
-	for _, pkg := range resolved {
-		rpmPath := rpmPaths[pkg.Name]
+	for i, pkg := range resolved {
+		logger.Debug(i18n.T("logger.dnfinstall.debug.downloaded_rpm"), "package", pkg.Name, "path", rpmPaths[i])
 
-		if err := installPackage(ctx, rpmPath, rootDir, opts); err != nil {
+		if err := installPackage(ctx, rpmPaths[i], rootDir, opts); err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "failed to install package").
 				WithOperation("downloadAndInstall").
 				WithContext("package", pkg.Name)
@@ -59,94 +59,6 @@ func downloadAndInstall(
 	}
 
 	return nil
-}
-
-// downloadRPM downloads a single .rpm from the dnfcache to destDir.
-// Returns the local path to the downloaded file.
-func downloadRPM(ctx context.Context, _ *dnfcache.Cache, pkg *dnfcache.PackageInfo, destDir string) (string, error) {
-	if pkg == nil {
-		return "", errors.New(errors.ErrTypeValidation, "nil package").
-			WithOperation("downloadRPM")
-	}
-
-	path, err := dnfcache.DownloadRPM(ctx, pkg, destDir)
-	if err != nil {
-		return "", errors.Wrap(err, errors.ErrTypeNetwork, "failed to download package").
-			WithOperation("downloadRPM").
-			WithContext("package", pkg.Name)
-	}
-
-	return path, nil
-}
-
-// maxParallelDownloads bounds concurrent package downloads.
-const maxParallelDownloads = 4
-
-// downloadAll downloads every resolved package with bounded concurrency and
-// cancels outstanding downloads on the first failure.
-func downloadAll(
-	ctx context.Context,
-	cache *dnfcache.Cache,
-	resolved []*dnfcache.PackageInfo,
-	tmpDir string,
-) (map[string]string, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	rpmPaths := make(map[string]string, len(resolved)) // package name -> local path
-
-	var (
-		mu       sync.Mutex
-		wg       sync.WaitGroup
-		firstErr error
-	)
-
-	sem := make(chan struct{}, maxParallelDownloads)
-
-	for _, pkg := range resolved {
-		wg.Go(func() {
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-ctx.Done():
-				return
-			}
-
-			path, err := downloadRPM(ctx, cache, pkg, tmpDir)
-
-			mu.Lock()
-			defer mu.Unlock()
-
-			if err != nil {
-				if firstErr == nil {
-					firstErr = errors.Wrap(err, errors.ErrTypeBuild, "failed to download package").
-						WithOperation("downloadAndInstall").
-						WithContext("package", pkg.Name)
-
-					cancel()
-				}
-
-				return
-			}
-
-			rpmPaths[pkg.Name] = path
-
-			logger.Debug(i18n.T("logger.dnfinstall.debug.downloaded_rpm"), "package", pkg.Name, "path", path)
-		})
-	}
-
-	wg.Wait()
-
-	if firstErr != nil {
-		return nil, firstErr
-	}
-
-	if err := ctx.Err(); err != nil {
-		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "context cancelled").
-			WithOperation("downloadAndInstall")
-	}
-
-	return rpmPaths, nil
 }
 
 // installPackage extracts a single RPM file to rootDir.
@@ -183,14 +95,14 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 	}
 	defer func() { _ = f.Close() }()
 
-	rpm, err := rpmutils.ReadRpm(f)
+	rpm, err := pkgrpm.ReadRpm(f)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeValidation, "failed to parse RPM").
 			WithOperation("installPackage").
 			WithContext("path", rpmPath)
 	}
 
-	pkgName, _ := rpm.Header.GetString(rpmutils.NAME)
+	pkgName, _ := rpm.Header.GetString(rpmtag.NAME)
 
 	// Run %pretrans scriptlet.
 	// %pretrans is typically optional setup (filesystem layout, SELinux
@@ -275,14 +187,14 @@ func installPackage(ctx context.Context, rpmPath, rootDir string, opts Options) 
 }
 
 // writeYapdb writes the installed package metadata to the YAP state database.
-func writeYapdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir string) error {
+func writeYapdb(ctx context.Context, rpm *pkgrpm.Rpm, entry *rpmEntry, rootDir string) error {
 	// Extract package metadata from RPM header.
-	name, _ := rpm.Header.GetString(rpmutils.NAME)
-	version, _ := rpm.Header.GetString(rpmutils.VERSION)
-	release, _ := rpm.Header.GetString(rpmutils.RELEASE)
-	arch, _ := rpm.Header.GetString(rpmutils.ARCH)
-	epoch, _ := rpm.Header.GetString(rpmutils.EPOCH)
-	summary, _ := rpm.Header.GetString(rpmutils.SUMMARY)
+	name, _ := rpm.Header.GetString(rpmtag.NAME)
+	version, _ := rpm.Header.GetString(rpmtag.VERSION)
+	release, _ := rpm.Header.GetString(rpmtag.RELEASE)
+	arch, _ := rpm.Header.GetString(rpmtag.ARCH)
+	epoch, _ := rpm.Header.GetString(rpmtag.EPOCH)
+	summary, _ := rpm.Header.GetString(rpmtag.SUMMARY)
 
 	// Convert installedFile to yapdb.File.
 	var files []yapdb.File
@@ -321,7 +233,7 @@ func writeYapdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir
 // writeSystemRpmdb optionally writes to the system rpmdb.sqlite (SQLite only).
 // On BDB systems or if the file doesn't exist, returns an error that is logged
 // as a warning by the caller (opting in is treated as a hard failure).
-func writeSystemRpmdb(ctx context.Context, rpm *rpmutils.Rpm, entry *rpmEntry, rootDir string) error {
+func writeSystemRpmdb(ctx context.Context, rpm *pkgrpm.Rpm, entry *rpmEntry, rootDir string) error {
 	rpmdbPath := filepath.Join(rootDir, "var", "lib", "rpm", "rpmdb.sqlite")
 
 	// Check if the SQLite rpmdb exists.

@@ -42,7 +42,7 @@ func TestExtractCapabilitiesIntegration(t *testing.T) {
 	t.Skip("requires real RPM file for integration test")
 }
 
-// TestExtractCapabilitiesWithRealRPM tests extractCapabilities with a real RPM built by rpmpack.
+// TestExtractCapabilitiesWithRealRPM tests extractCapabilities with a real RPM built by pack.
 func TestExtractCapabilitiesWithRealRPM(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -71,9 +71,9 @@ func TestExtractCapabilitiesWithRealRPM(t *testing.T) {
 }
 
 // TestExtractCapabilitiesEmpty tests extractCapabilities with an RPM that has no capabilities.
-// NOTE: This test is skipped because rpmpack automatically adds a "Provides" entry for the package itself.
+// NOTE: This test is skipped because pkgformat/rpm/pack automatically adds a "Provides" entry for the package itself.
 func TestExtractCapabilitiesEmpty(t *testing.T) {
-	t.Skip("rpmpack automatically provides the package itself")
+	t.Skip("pkgformat/rpm/pack automatically provides the package itself")
 }
 
 // TestExtractCapabilitiesProvides tests extractCapabilities for Provides.
@@ -99,7 +99,7 @@ func TestExtractCapabilitiesProvides(t *testing.T) {
 	}
 
 	assert.NotEmpty(t, provides, "should have provides")
-	// The exact names depend on what rpmpack sets, but we should have at least one.
+	// The exact names depend on what pkgformat/rpm/pack sets, but we should have at least one.
 }
 
 // TestExtractCapabilitiesRequires tests extractCapabilities for Requires.

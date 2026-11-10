@@ -13,7 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	rpmutils "github.com/M0Rf30/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	rpmtag "github.com/M0Rf30/pkgformat/rpm/tag"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -62,14 +63,14 @@ var scriptletTags = map[scriptletKind]scriptletTagPair{
 		argValue: "1",
 	},
 	scriptletPreIn: {
-		bodyTag:  rpmutils.PREIN,
-		progTag:  rpmutils.PREINPROG,
+		bodyTag:  rpmtag.PREIN,
+		progTag:  rpmtag.PREINPROG,
 		kindName: kindPreIn,
 		argValue: "1",
 	},
 	scriptletPostIn: {
-		bodyTag:  rpmutils.POSTIN,
-		progTag:  rpmutils.POSTINPROG,
+		bodyTag:  rpmtag.POSTIN,
+		progTag:  rpmtag.POSTINPROG,
 		kindName: kindPostIn,
 		argValue: "1",
 	},
@@ -149,7 +150,7 @@ func hasEnvKey(env []string, key string) bool {
 func runScriptlet(
 	ctx context.Context,
 	kind scriptletKind,
-	rpm *rpmutils.Rpm,
+	rpm *pkgrpm.Rpm,
 	rootDir string,
 	opts Options,
 ) error {
@@ -187,7 +188,7 @@ func runScriptlet(
 	}
 
 	// Get package name for logging.
-	pkgName, _ := rpm.Header.GetString(rpmutils.NAME)
+	pkgName, _ := rpm.Header.GetString(rpmtag.NAME)
 
 	// Detect Lua scriptlets and skip with warning. Some RPMs (notably
 	// json-c-devel on EL8) ship Lua bodies without setting the PROG tag,
@@ -234,11 +235,11 @@ func runScriptlet(
 	)
 
 	// Add version and release if available.
-	if version, err := rpm.Header.GetString(rpmutils.VERSION); err == nil && version != "" {
+	if version, err := rpm.Header.GetString(rpmtag.VERSION); err == nil && version != "" {
 		cmd.Env = append(cmd.Env, "RPM_PACKAGE_VERSION="+version)
 	}
 
-	if release, err := rpm.Header.GetString(rpmutils.RELEASE); err == nil && release != "" {
+	if release, err := rpm.Header.GetString(rpmtag.RELEASE); err == nil && release != "" {
 		cmd.Env = append(cmd.Env, "RPM_PACKAGE_RELEASE="+release)
 	}
 

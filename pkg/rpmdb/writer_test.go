@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	"github.com/M0Rf30/pkgformat/rpm/pack"
 	_ "modernc.org/sqlite"
-
-	rpmutils "github.com/M0Rf30/go-rpmutils"
 )
 
 // TestOpenWriterFresh tests opening a fresh database.
@@ -368,52 +368,34 @@ func TestPathHelpers(t *testing.T) {
 	}
 }
 
-// createMockRPM creates a mock RPM header for testing.
-// This is a simplified version that creates a minimal valid RPM structure.
+// createMockRPM builds a small real RPM with pack and reads it back.
 //
-//nolint:unparam // params kept for documentation / future expansion
-func createMockRPM(t *testing.T, _, _, release string) *rpmutils.Rpm {
+//nolint:unparam // name and version kept for call-site readability
+func createMockRPM(t *testing.T, name, version, release string) *pkgrpm.Rpm {
 	t.Helper()
 
-	// For testing purposes, we create a minimal RPM structure.
-	// In production, you'd use actual RPM files or a proper RPM builder.
-	// This is a placeholder that demonstrates the interface.
-
-	// Create a buffer with minimal RPM structure
-	buf := new(bytes.Buffer)
-
-	// RPM lead (96 bytes)
-	lead := make([]byte, 96)
-	lead[0] = 0xed
-	lead[1] = 0xab
-	lead[2] = 0xee
-	lead[3] = 0xdb
-	buf.Write(lead)
-
-	// Signature header (minimal)
-	sigHeader := make([]byte, 16)
-	sigHeader[0] = 0x8e
-	sigHeader[1] = 0xad
-	sigHeader[2] = 0xe8
-	sigHeader[3] = 0x01
-	buf.Write(sigHeader)
-
-	// General header (minimal)
-	genHeader := make([]byte, 16)
-	genHeader[0] = 0x8e
-	genHeader[1] = 0xad
-	genHeader[2] = 0xe8
-	genHeader[3] = 0x01
-	buf.Write(genHeader)
-
-	// Read the RPM
-	rpm, err := rpmutils.ReadRpm(buf)
+	built, err := pack.NewRPM(pack.RPMMetaData{
+		Name:    name,
+		Version: version,
+		Release: release,
+		Arch:    "x86_64",
+		Licence: "MIT",
+		Summary: "rpmdb writer fixture",
+	})
 	if err != nil {
-		// If we can't create a real RPM, create a mock structure
-		// This is acceptable for unit tests
-		return &rpmutils.Rpm{
-			Header: &rpmutils.RpmHeader{},
-		}
+		t.Fatalf("pack.NewRPM: %v", err)
+	}
+
+	built.AddFile(pack.RPMFile{Name: "/usr/bin/" + name, Body: []byte("x"), Mode: 0o100755})
+
+	buf := new(bytes.Buffer)
+	if err := built.Write(buf); err != nil {
+		t.Fatalf("rpm.Write: %v", err)
+	}
+
+	rpm, err := pkgrpm.ReadRpm(buf)
+	if err != nil {
+		t.Fatalf("ReadRpm: %v", err)
 	}
 
 	return rpm

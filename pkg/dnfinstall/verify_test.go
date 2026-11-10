@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/M0Rf30/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
 )
@@ -280,13 +280,13 @@ func TestWrapRPMSignatureError(t *testing.T) {
 			expected: ErrUnsignedRPM,
 		},
 		{
-			name:     "go-rpmutils key not found",
-			err:      fmt.Errorf("verify: %w", rpmutils.KeyNotFoundError{KeyID: 0xdeadbeef}),
+			name:     "pkgformat/rpm key not found",
+			err:      fmt.Errorf("verify: %w", pkgrpm.KeyNotFoundError{KeyID: 0xdeadbeef}),
 			expected: ErrUnknownSigner,
 		},
 		{
-			name:     "go-rpmutils no PGP signature",
-			err:      fmt.Errorf("verify: %w", rpmutils.ErrNoPGPSignature),
+			name:     "pkgformat/rpm no PGP signature",
+			err:      fmt.Errorf("verify: %w", pkgrpm.ErrNoPGPSignature),
 			expected: ErrUnsignedRPM,
 		},
 		{
