@@ -77,42 +77,6 @@ func TestChmodNonExistent(t *testing.T) {
 	}
 }
 
-func TestCreate(t *testing.T) {
-	tempDir := t.TempDir()
-	testFile := filepath.Join(tempDir, "test.txt")
-
-	file, err := Create(testFile)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-
-	defer func() { _ = file.Close() }()
-
-	if _, err := os.Stat(testFile); os.IsNotExist(err) {
-		t.Fatal("File was not created")
-	}
-}
-
-func TestCreateWrite(t *testing.T) {
-	tempDir := t.TempDir()
-	testFile := filepath.Join(tempDir, "test.txt")
-	testContent := "Hello, World!"
-
-	err := CreateWrite(testFile, testContent)
-	if err != nil {
-		t.Fatalf("CreateWrite failed: %v", err)
-	}
-
-	content, err := os.ReadFile(testFile)
-	if err != nil {
-		t.Fatalf("Failed to read file: %v", err)
-	}
-
-	if string(content) != testContent {
-		t.Fatalf("Expected content '%s', got '%s'", testContent, string(content))
-	}
-}
-
 func TestExists(t *testing.T) {
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "test.txt")

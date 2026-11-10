@@ -9,10 +9,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/M0Rf30/pkgformat/safepath"
+
 	"github.com/M0Rf30/yap/v2/pkg/buffers"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // extractWithIterator is the shared extraction loop that works with any entryIterator.

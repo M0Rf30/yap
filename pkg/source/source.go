@@ -25,8 +25,8 @@ import (
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/download"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/fetch"
 	"github.com/M0Rf30/yap/v2/pkg/files"
 	"github.com/M0Rf30/yap/v2/pkg/git"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -41,10 +41,6 @@ const (
 	tagKey       = "tag"
 	skipValue    = "SKIP"
 )
-
-// partSuffix marks in-progress downloads; the final path only appears once a
-// download has fully completed.
-const partSuffix = ".part"
 
 // Global variables for source handling
 var (
@@ -279,21 +275,14 @@ func (src *Source) getURL(ctx context.Context, protocol, dloadFilePath string) e
 			return err
 		}
 
-		partPath := dloadFilePath + partSuffix
-
-		err = download.WithContext(
-			ctx,
-			partPath,
-			normalizedURI,
-			download.MaxRetries(),
-			src.PkgName,
-			src.SourceItemPath,
-			shell.MultiPrinter.Writer)
-		if err != nil {
-			return err
-		}
-
-		return os.Rename(partPath, dloadFilePath)
+		// The download lands on dloadFilePath+".part" and is renamed on success,
+		// so the final path only appears once a download has fully completed.
+		return fetch.File(ctx, dloadFilePath, normalizedURI, fetch.Options{
+			MaxRetries:  fetch.MaxRetries(),
+			PackageName: src.PkgName,
+			SourceName:  src.SourceItemPath,
+			Progress:    shell.MultiPrinter.Writer,
+		})
 	}
 }
 

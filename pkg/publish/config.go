@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/M0Rf30/pkgformat/httpclient"
+
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 )
 
@@ -109,6 +111,9 @@ type Config struct {
 	AllowInsecureHTTP bool `json:"-"`
 	// Timeout bounds one HTTP request, including the body transfer.
 	Timeout time.Duration `json:"-"`
+	// Retry is the transient-failure policy of every request; the zero value
+	// selects the httpclient defaults.
+	Retry httpclient.RetryPolicy `json:"-"`
 }
 
 // ApplyEnv overrides fields from the YAP_OA_* environment variables. Only

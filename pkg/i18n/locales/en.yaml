@@ -426,9 +426,6 @@
   translation: "Download failed"
 - id: errors.download.download_failed_after_attempts
   translation: "Download failed after %d attempts"
-- id: errors.download.download_failed_no_response
-  translation: "Download failed: no response from server"
-
 # File errors
 - id: errors.files.failed_to_access_directory
   translation: "Failed to access directory: %s"
@@ -644,9 +641,6 @@
   translation: "Failed to remove temporary directory"
 
 # Logger messages - Calculate data hash
-- id: logger.files.warn.failed_to_close_file
-  translation: "Failed to close file after hash calculation"
-
 # Logger messages - Calculate SHA256
 - id: logger.crypto.warn.failed_to_close_file
   translation: "Failed to close file after SHA256 calculation"
@@ -672,39 +666,16 @@
   translation: "Try to use an SSH key or provide credentials"
 
 # Logger messages - Configure resume
-- id: logger.download.info.resuming_download
-  translation: "Resuming download from previous position"
-
 # Logger messages - Create DEB
-- id: logger.deb.warn.failed_to_close_debian
-  translation: "Failed to close Debian archive"
-
 # Logger messages - Create
-- id: logger.files.error.failed_to_create_path
-  translation: "Failed to create path"
-
 # Logger messages - Create mtree gzip
-- id: logger.pacman.warn.failed_to_close_gzip
-  translation: "Failed to close gzip stream"
-- id: logger.pacman.warn.failed_to_close_output
-  translation: "Failed to close output file"
-
 # Logger messages - Create spec
 - id: logger.pkgbuild.warn.failed_to_close_pkgbuild
   translation: "Failed to close PKGBUILD file"
 
 # Logger messages - Create tar.gz
-- id: logger.apk.warn.failed_to_close_output
-  translation: "Failed to close tar.gz output"
-
 # Logger messages - Create tar.zst
-- id: logger.archive.warn.failed_to_close_output
-  translation: "Failed to close tar.zst output"
-
 # Logger messages - Create write
-- id: logger.files.error.failed_to_write_to
-  translation: "Failed to write to file"
-
 # Logger messages - Creating package
 - id: logger.creating_package
   translation: "Creating package"
@@ -779,8 +750,6 @@
 
 # Logger messages - Fatal error
 # Logger messages - Files
-- id: logger.files.warn.close_write
-  translation: "Failed to close file writer"
 - id: logger.failed_to_close_project_file
   translation: "Failed to close project file"
 - id: logger.failed_to_preserve_ownership
@@ -829,11 +798,6 @@
   translation: "Invalid package order"
 
 # Logger messages - Log download start
-- id: logger.download.info.response_status_2
-  translation: "Response status"
-- id: logger.download.info.server_supports_resume
-  translation: "Server supports resume capability"
-
 # Logger messages - Log package created
 - id: logger.common.info.package_artifact_created
   translation: "Package artifact created"
@@ -1024,9 +988,6 @@
   translation: "You can find valid SPDX license identifiers at https://spdx.org/licenses/"
 
 # Logger messages - With resume
-- id: logger.download.info.retrying_download_2
-  translation: "Retrying download with resume support"
-
 # Logger messages - Zap
 - id: logger.zap.cleaning_for_distribution
   translation: "Cleaning build artifacts for distribution"
@@ -1082,10 +1043,6 @@
   translation: "Test message"
 
 # --- Migrated logger messages ---
-- id: logger.apkindex.debug.enqueue_install
-  translation: "Enqueue install"
-- id: logger.apkindex.debug.fetching_repo
-  translation: "Fetching repo"
 - id: logger.apkindex.debug.installed
   translation: "Installed"
 - id: logger.apkindex.debug.resolved_virtual
@@ -1098,8 +1055,6 @@
   translation: "Indexes loaded"
 - id: logger.apkindex.info.installing_apk_packages
   translation: "Installing APK packages"
-- id: logger.apkindex.info.repo_fetched
-  translation: "Repo fetched"
 - id: logger.apkindex.info.resolved_transitive_deps
   translation: "Resolved transitive deps"
 - id: logger.apkindex.info.updating_indexes
@@ -1108,8 +1063,6 @@
   translation: "Could not detect APK architecture"
 - id: logger.apkindex.warn.fetch_failed
   translation: "Fetch failed"
-- id: logger.apkindex.warn.parse_failed
-  translation: "Parse failed"
 - id: logger.apkindex.warn.skipping_unsafe_apk_symlink
   translation: "Skipping unsafe APK symlink"
 - id: logger.apkindex.warn.skipping_unsafe_path_apk
@@ -1148,36 +1101,10 @@
   translation: "Skipping path traversal attempt"
 - id: logger.aptinstall.warn.skipping_unsafe_symlink
   translation: "Skipping unsafe symlink"
-- id: logger.aptrepo.debug.fetching_source
-  translation: "Fetching source"
-- id: logger.aptrepo.info.cache_reloaded
+- id: logger.apthost.info.cache_reloaded
   translation: "Cache reloaded"
-- id: logger.aptrepo.info.source_fetched
-  translation: "Source fetched"
-- id: logger.aptrepo.info.updating_indexes
+- id: logger.apthost.info.updating_indexes
   translation: "Updating indexes"
-- id: logger.aptrepo.info.verified_inrelease_signature
-  translation: "Verified InRelease signature"
-- id: logger.aptrepo.info.verified_release_gpg_signature
-  translation: "Verified Release.gpg signature"
-- id: logger.aptrepo.warn.accepting_unsigned_inrelease_opt
-  translation: "Accepting unsigned InRelease (opt-in)"
-- id: logger.aptrepo.warn.accepting_unsigned_release_opt
-  translation: "Accepting unsigned Release (opt-in)"
-- id: logger.aptrepo.warn.apt_component_fetch_failed
-  translation: "Apt component fetch failed"
-- id: logger.aptrepo.warn.retrying_https_fallback
-  translation: "Retrying over https after transient http failure"
-- id: logger.aptrepo.warn.skipping_inrelease_signature_check
-  translation: "Skipping InRelease signature check (no trust anchor)"
-- id: logger.aptrepo.warn.skipping_inrelease_signature_check_unknown
-  translation: "Skipping InRelease signature check (unknown signer, opt-in)"
-- id: logger.aptrepo.warn.skipping_release_gpg_signature
-  translation: "Skipping Release.gpg signature check (no trust anchor)"
-- id: logger.aptrepo.warn.skipping_release_gpg_signature_check
-  translation: "Skipping Release.gpg signature check (unknown signer, opt-in)"
-- id: logger.aptrepo.warn.source_fetch_failed
-  translation: "Source fetch failed"
 - id: logger.binary.warn.cross_strip_not_found
   translation: "Cross-strip not found and binary is foreign-arch; skipping strip"
 - id: logger.binary.warn.cross_strip_not_found_path
@@ -1258,70 +1185,14 @@
   translation: "No usable podman/docker found, using built-in rootless runner"
 - id: logger.container.warn.container_cli_installed_but
   translation: "Container CLI installed but not reachable, trying next backend"
-- id: logger.deb.warn.failed_close_changelog_file
-  translation: "Failed to close changelog file"
-- id: logger.deb.warn.failed_close_file
-  translation: "Failed to close file"
-- id: logger.deb.warn.failed_close_gzip_writer
-  translation: "Failed to close gzip writer"
-- id: logger.dnfcache.debug.downloaded_rpm
-  translation: "Downloaded RPM"
-- id: logger.dnfcache.debug.enqueue_install
-  translation: "Enqueue install"
-- id: logger.dnfcache.debug.legacy_bdb_rpmdb_falling
+- id: logger.dnfinstall.debug.legacy_bdb_rpmdb_falling
   translation: "Legacy BDB rpmdb, falling back to rpm -qa"
-- id: logger.dnfcache.debug.modules_index_path
-  translation: "Modules index path"
-- id: logger.dnfcache.debug.no_primary_xml_files
-  translation: "No primary.xml files to load"
-- id: logger.dnfcache.debug.primary_index_path
-  translation: "Primary index path"
-- id: logger.dnfcache.debug.resolved_virtual
-  translation: "Resolved virtual"
-- id: logger.dnfcache.debug.resolver_state_loaded
-  translation: "Resolver state loaded"
-- id: logger.dnfcache.debug.skip_already_satisfied
-  translation: "Skip (already satisfied)"
-- id: logger.dnfcache.debug.skip_malformed_modules_yaml
-  translation: "Skip malformed modules.yaml doc"
-- id: logger.dnfcache.debug.unresolved
-  translation: "Unresolved"
-- id: logger.dnfcache.debug.unresolved_weak_ignored
-  translation: "Unresolved (weak, ignored)"
-- id: logger.dnfcache.info.downloading_packages
+- id: logger.dnfinstall.info.downloading_packages
   translation: "Downloading packages"
-- id: logger.dnfcache.info.fetched_repo
-  translation: "Fetched repo"
-- id: logger.dnfcache.info.fetching_repos
-  translation: "Fetching repos"
-- id: logger.dnfcache.info.index_loaded
-  translation: "Index loaded"
-- id: logger.dnfcache.info.installing_rpm_packages
+- id: logger.dnfinstall.info.installing_rpm_packages
   translation: "Installing RPM packages"
-- id: logger.dnfcache.info.module_index_loaded
-  translation: "Module index loaded"
-- id: logger.dnfcache.info.no_enabled_repos_found
-  translation: "No enabled repos found"
-- id: logger.dnfcache.info.resolved_transitive_deps
-  translation: "Resolved transitive deps"
-- id: logger.dnfcache.warn.failed_fetch_modules_yaml
-  translation: "Failed to fetch modules.yaml"
-- id: logger.dnfcache.warn.failed_fetch_repo
-  translation: "Failed to fetch repo"
-- id: logger.dnfcache.warn.failed_parse_modules_yaml
-  translation: "Failed to parse modules.yaml"
-- id: logger.dnfcache.warn.failed_parse_primary_index
-  translation: "Failed to parse primary index"
-- id: logger.dnfcache.warn.mirror_failed_trying_next
-  translation: "Mirror failed, trying next"
-- id: logger.dnfcache.warn.mirrorlist_fallback_failed
-  translation: "Mirrorlist fallback failed, proceeding with primary mirror only"
-- id: logger.dnfcache.warn.plain_http_mirrors_only
-  translation: "Only plain-http mirrors available; relying on checksum verification"
-- id: logger.dnfcache.warn.unresolvable_dependency
+- id: logger.dnfinstall.warn.unresolvable_dependency
   translation: "Unresolvable dependency"
-- id: logger.dnfcache.warn.unverified_download
-  translation: "Downloaded file has no SHA256 checksum; integrity not verified"
 - id: logger.dnfinstall.debug.downloaded_rpm
   translation: "Downloaded RPM"
 - id: logger.dnfinstall.debug.extracted_rpm
@@ -1408,8 +1279,6 @@
   translation: "Cloning"
 - id: logger.git.info.creating_working_copy_bare
   translation: "Creating working copy from bare repository"
-- id: logger.httpclient.warn.transient_fetch_retry
-  translation: "Transient fetch failure, retrying"
 - id: logger.mcp.debug.mcp_request
   translation: "Mcp request"
 - id: logger.mcp.error.mcp_request_failed
@@ -1442,12 +1311,6 @@
   translation: "Failed to separate debug info"
 - id: logger.options.warn.file_still_not_writable
   translation: "File still not writable after chmod"
-- id: logger.pacmandb.debug.mirror_failed
-  translation: "Mirror failed"
-- id: logger.pacmandb.debug.trying_mirror
-  translation: "Trying mirror"
-- id: logger.pacmandb.info.repo_synced
-  translation: "Repo synced"
 - id: logger.pacmandb.info.sync_complete
   translation: "Sync complete"
 - id: logger.pacmandb.info.syncing_repos
@@ -1580,8 +1443,6 @@
   translation: "Archive handler: unrar"
 - id: logger.shell.info.archive_handler_unzip
   translation: "Archive handler: unzip"
-- id: logger.signing.debug.computed_apk_signature
-  translation: "Computed APK signature"
 - id: logger.signing.debug.default_keys_directory_not
   translation: "Default keys directory not found"
 - id: logger.signing.debug.failed_get_home_directory
@@ -1646,3 +1507,9 @@
   translation: "Resolved signing key"
 - id: logger.common.warn.cross_strip_env_set_failed
   translation: "Cross-strip env: failed to set variable"
+- id: logger.apk.warn.epoch_ignored
+  translation: "Alpine versions have no epoch; ignoring it"
+- id: logger.apthost.warn.sources_partially_loaded
+  translation: "Some APT sources could not be loaded"
+- id: logger.apthost.debug.index_files_skipped
+  translation: "Some APT index files were skipped"

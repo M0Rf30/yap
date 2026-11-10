@@ -20,16 +20,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/M0Rf30/yap/v2/pkg/httpclient"
+	"github.com/M0Rf30/pkgformat/httpclient"
+
 	"github.com/M0Rf30/yap/v2/pkg/publish"
 )
 
 const testToken = "oa_dep_0123456789abcdef"
-
-func TestMain(m *testing.M) {
-	httpclient.SetRetryPolicy(3, time.Millisecond)
-	os.Exit(m.Run())
-}
 
 func sum(data []byte) string {
 	h := sha256.Sum256(data)
@@ -246,6 +242,7 @@ func newPublisher(t *testing.T, f *fakeOA, mutate func(*publish.Config)) *publis
 		URL: f.srv.URL, Token: testToken,
 		DebRepo: "debs", RPMRepo: "rpms", APKRepo: "apks", PacmanRepo: "arch",
 		Distribution: "jammy", Component: "universe",
+		Retry: httpclient.RetryPolicy{Attempts: 3, BaseDelay: time.Millisecond},
 	}
 	if mutate != nil {
 		mutate(&cfg)

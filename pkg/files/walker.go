@@ -5,18 +5,12 @@
 package files
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/crypto"
-	"github.com/M0Rf30/yap/v2/pkg/i18n"
-	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
 // WalkOptions configures the behavior of directory walking.
@@ -181,83 +175,4 @@ func (w *Walker) isBackupFile(path string) bool {
 	}
 
 	return false
-}
-
-// CalculateDataHash calculates a hash of all data files for package metadata.
-// This is used by formats like APK that need a hash of the entire data payload.
-func CalculateDataHash(baseDir string, skipPatterns []string) (string, error) {
-	hasher := sha256.New()
-
-	err := filepath.WalkDir(baseDir, func(path string, dirEntry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if path == baseDir {
-			return nil
-		}
-
-		// Skip files matching patterns (and whole directories' contents)
-		fileName := filepath.Base(path)
-		for _, pattern := range skipPatterns {
-			if matched, _ := filepath.Match(pattern, fileName); matched {
-				return skipEntry(dirEntry)
-			}
-		}
-
-		return hashEntry(hasher, baseDir, path, dirEntry)
-	})
-	if err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(hasher.Sum(nil)), nil
-}
-
-// hashEntry feeds the relative path, full mode, symlink target and (for
-// regular files) content of one entry into hasher.
-func hashEntry(hasher io.Writer, baseDir, path string, dirEntry fs.DirEntry) error {
-	relPath, err := filepath.Rel(baseDir, path)
-	if err != nil {
-		return err
-	}
-
-	fileInfo, err := dirEntry.Info()
-	if err != nil {
-		return err
-	}
-
-	_, _ = hasher.Write([]byte(relPath))
-	_, _ = hasher.Write(binary.BigEndian.AppendUint32(nil, uint32(fileInfo.Mode())))
-
-	// Symlink targets are part of the payload.
-	if fileInfo.Mode()&fs.ModeSymlink != 0 {
-		target, linkErr := os.Readlink(path)
-		if linkErr != nil {
-			return linkErr
-		}
-
-		_, _ = hasher.Write([]byte(target))
-	}
-
-	if !fileInfo.Mode().IsRegular() {
-		return nil
-	}
-
-	file, err := os.OpenInRoot(baseDir, relPath)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.files.warn.failed_to_close_file"),
-				"path", path,
-				"error", closeErr)
-		}
-	}()
-
-	_, err = io.Copy(hasher, file)
-
-	return err
 }

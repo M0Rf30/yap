@@ -50,40 +50,6 @@ func Chmod(path string, perm os.FileMode) error {
 	return nil
 }
 
-// Create creates a new file.
-func Create(path string) (*os.File, error) {
-	cleanFilePath := filepath.Clean(path)
-
-	file, err := os.Create(cleanFilePath)
-	if err != nil {
-		logger.Error(i18n.T("logger.files.error.failed_to_create_path"), "path", path, "error", err)
-		return nil, err
-	}
-
-	return file, nil
-}
-
-// CreateWrite creates a file and writes data to it.
-func CreateWrite(path, data string) error {
-	file, err := Create(path)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.files.warn.close_write"), "path", path, "error", closeErr)
-		}
-	}()
-
-	if _, err = file.WriteString(data); err != nil {
-		logger.Error(i18n.T("logger.files.error.failed_to_write_to"), "path", path, "error", err)
-		return err
-	}
-
-	return nil
-}
-
 // Exists checks if a file or directory exists.
 func Exists(path string) bool {
 	_, err := os.Stat(path)

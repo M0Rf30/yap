@@ -23,8 +23,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/M0Rf30/pkgformat/httpclient"
+
 	"github.com/M0Rf30/yap/v2/pkg/errors"
-	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -82,7 +83,7 @@ const (
 type Publisher struct {
 	cfg    Config
 	base   *url.URL
-	client *http.Client
+	client *httpclient.Client
 }
 
 // New validates cfg and returns a Publisher.
@@ -108,10 +109,7 @@ func New(c *Config) (*Publisher, error) {
 
 	p := &Publisher{cfg: cfg, base: base}
 
-	p.client = &http.Client{
-		Transport: httpclient.Client().Transport,
-		Timeout:   cfg.Timeout,
-	}
+	p.client = httpclient.New(httpclient.Options{Timeout: cfg.Timeout, Retry: cfg.Retry})
 
 	return p, nil
 }
@@ -266,7 +264,7 @@ func (p *Publisher) do(
 		req.Header.Set(k, v)
 	}
 
-	resp, err := p.client.Do(req) //nolint:gosec // target is the operator-configured server
+	resp, err := p.client.HTTP().Do(req) //nolint:gosec // target is the operator-configured server
 	if err != nil {
 		// *url.Error carries only method and URL, never the Authorization header.
 		return nil, err
@@ -319,9 +317,9 @@ func redactURL(raw string) string {
 	return u.Redacted()
 }
 
-// withRetry runs fn under the shared exponential-backoff retry policy.
-func withRetry(ctx context.Context, label string, fn func() error) error {
-	return httpclient.WithRetry(ctx, label, fn)
+// withRetry runs fn under the configured exponential-backoff retry policy.
+func (p *Publisher) withRetry(ctx context.Context, label string, fn func() error) error {
+	return p.client.WithRetry(ctx, label, fn)
 }
 
 // ---------------------------------------------------------------------------
@@ -356,7 +354,7 @@ func (p *Publisher) uploadMultipart(
 
 	conflict := false
 
-	err := withRetry(ctx, redactURL(target), func() error {
+	err := p.withRetry(ctx, redactURL(target), func() error {
 		var err error
 
 		serverSum, conflict, err = p.postFile(ctx, a, target, fields)
@@ -505,7 +503,7 @@ func (p *Publisher) listHasSHA(ctx context.Context, a artifact, name string) (bo
 
 		var out listResponse
 
-		err := withRetry(ctx, redactURL(target), func() error {
+		err := p.withRetry(ctx, redactURL(target), func() error {
 			out = listResponse{}
 
 			return p.getJSON(ctx, target, &out)
@@ -571,7 +569,7 @@ func (p *Publisher) publishRaw(ctx context.Context, a artifact, prefix, name str
 
 	var putSum string
 
-	err = withRetry(ctx, redactURL(target), func() error {
+	err = p.withRetry(ctx, redactURL(target), func() error {
 		var err error
 
 		putSum, err = p.putRaw(ctx, a, target)
@@ -594,7 +592,7 @@ func (p *Publisher) publishRaw(ctx context.Context, a artifact, prefix, name str
 
 // headRaw reports the stored SHA-256 (X-Checksum-Sha256) of a raw file.
 func (p *Publisher) headRaw(ctx context.Context, target string) (sum string, exists bool, err error) {
-	err = withRetry(ctx, redactURL(target), func() error {
+	err = p.withRetry(ctx, redactURL(target), func() error {
 		sum, exists = "", false
 
 		resp, err := p.do(ctx, http.MethodHead, target, nil, 0, nil)

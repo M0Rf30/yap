@@ -16,6 +16,7 @@
 package gensum
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
@@ -33,8 +34,8 @@ import (
 	mvdanshell "mvdan.cc/sh/v3/shell"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/download"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/fetch"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
@@ -509,13 +510,12 @@ func downloadAndHash(
 			WithOperation("downloadAndHash")
 	}
 
-	err = download.WithResumeContext(
-		destPath,
-		uri,
-		download.MaxRetries(),
-		"gensum",
-		filepath.Base(rawURI),
-		shell.MultiPrinter.Writer)
+	err = fetch.File(context.Background(), destPath, uri, fetch.Options{
+		MaxRetries:  fetch.MaxRetries(),
+		PackageName: "gensum",
+		SourceName:  filepath.Base(rawURI),
+		Progress:    shell.MultiPrinter.Writer,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrTypeBuild, "failed to download source").
 			WithOperation("downloadAndHash").

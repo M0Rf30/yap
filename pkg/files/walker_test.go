@@ -335,79 +335,6 @@ func TestWalker_WalkWithSymlink(t *testing.T) {
 	}
 }
 
-func TestCalculateDataHash(t *testing.T) {
-	tempDir := t.TempDir()
-
-	// Create test files
-	file1 := filepath.Join(tempDir, "file1.txt")
-
-	err := os.WriteFile(file1, []byte("content1"), 0o644)
-	if err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	file2 := filepath.Join(tempDir, "file2.txt")
-
-	err = os.WriteFile(file2, []byte("content2"), 0o644)
-	if err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	hash, err := CalculateDataHash(tempDir, []string{})
-	if err != nil {
-		t.Fatalf("CalculateDataHash failed: %v", err)
-	}
-
-	if hash == "" {
-		t.Fatal("Hash should not be empty")
-	}
-
-	if len(hash) != 64 { // SHA256 hex string length
-		t.Fatalf("Expected hash length 64, got %d", len(hash))
-	}
-}
-
-func TestCalculateDataHashWithSkipPatterns(t *testing.T) {
-	tempDir := t.TempDir()
-
-	// Create files, one matching skip pattern
-	file1 := filepath.Join(tempDir, "file1.txt")
-
-	err := os.WriteFile(file1, []byte("content1"), 0o644)
-	if err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	tmpFile := filepath.Join(tempDir, "temp.tmp")
-
-	err = os.WriteFile(tmpFile, []byte("temp content"), 0o644)
-	if err != nil {
-		t.Fatalf("Failed to create tmp file: %v", err)
-	}
-
-	hash1, err := CalculateDataHash(tempDir, []string{})
-	if err != nil {
-		t.Fatalf("CalculateDataHash failed: %v", err)
-	}
-
-	hash2, err := CalculateDataHash(tempDir, []string{"*.tmp"})
-	if err != nil {
-		t.Fatalf("CalculateDataHash with skip patterns failed: %v", err)
-	}
-
-	// Hashes should be different when skipping files
-	if hash1 == hash2 {
-		t.Fatal("Hashes should be different when skipping files")
-	}
-}
-
-func TestCalculateDataHashNonExistent(t *testing.T) {
-	_, err := CalculateDataHash("/non/existent/directory", []string{})
-	if err == nil {
-		t.Fatal("Expected error for non-existent directory, got nil")
-	}
-}
-
 func TestWalkerSkipsContentsOfSkippedDirectories(t *testing.T) {
 	tempDir := t.TempDir()
 
@@ -443,35 +370,5 @@ func TestWalkerSkipsContentsOfSkippedDirectories(t *testing.T) {
 
 	if len(got) == 0 {
 		t.Fatal("expected keep/ entries to be returned")
-	}
-}
-
-func TestCalculateDataHashSkipsDirectoryContents(t *testing.T) {
-	tempDir := t.TempDir()
-
-	if err := os.MkdirAll(filepath.Join(tempDir, "skip"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := os.WriteFile(filepath.Join(tempDir, "skip", "f"), []byte("1"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	hashA, err := CalculateDataHash(tempDir, []string{"skip"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := os.WriteFile(filepath.Join(tempDir, "skip", "f"), []byte("2"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	hashB, err := CalculateDataHash(tempDir, []string{"skip"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if hashA != hashB {
-		t.Error("contents of a skipped directory must not affect the hash")
 	}
 }
