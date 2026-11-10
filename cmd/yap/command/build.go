@@ -18,12 +18,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/M0Rf30/yap/v2/pkg/constants"
-
-	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
-	"github.com/M0Rf30/yap/v2/pkg/download"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/fetch"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
@@ -85,10 +84,10 @@ var buildCmd = &cobra.Command{
 		common.SkipToolchainValidation = buildOpts.SkipToolchainValidation
 
 		// Propagate the apt-repo unverified-trust opt-in. The flag is
-		// honoured by pkg/aptrepo whenever a Signed-By keyring resolves
+		// honoured by pkg/apthost whenever a Signed-By keyring resolves
 		// to nothing, never when a present signature fails to verify.
 		if buildOpts.AllowUnverifiedRepos {
-			aptrepo.SetAllowUnverifiedRepos(true)
+			apthost.SetAllowUnverified(true)
 		}
 
 		// Set verbose flag from global flag
@@ -286,8 +285,8 @@ func forwardedBuildFlagsFor(cmd *cobra.Command, hostDir string) []string {
 		}
 	})
 
-	if download.MaxRetries() != download.DefaultMaxRetries {
-		out = append(out, "--source-retries", strconv.Itoa(download.MaxRetries()))
+	if fetch.MaxRetries() != fetch.DefaultMaxRetries {
+		out = append(out, "--source-retries", strconv.Itoa(fetch.MaxRetries()))
 	}
 
 	return out
@@ -350,8 +349,8 @@ func forwardedPrepareFlags() []string {
 		out = append(out, "--skip-toolchain-validation")
 	}
 
-	if download.MaxRetries() != download.DefaultMaxRetries {
-		out = append(out, "--source-retries", strconv.Itoa(download.MaxRetries()))
+	if fetch.MaxRetries() != fetch.DefaultMaxRetries {
+		out = append(out, "--source-retries", strconv.Itoa(fetch.MaxRetries()))
 	}
 
 	return out

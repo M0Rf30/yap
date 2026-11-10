@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/M0Rf30/pkgformat/httpclient"
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
-	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/publish"
@@ -155,7 +155,7 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return dryRunPublish(&cfg, files, fromDir)
 	}
 
-	httpclient.SetRetryPolicy(pubFlags.retries, publishBackoffBase)
+	cfg.Retry = httpclient.RetryPolicy{Attempts: max(pubFlags.retries, 1), BaseDelay: publishBackoffBase}
 
 	pub, err := publish.New(&cfg)
 	if err != nil {

@@ -19,11 +19,10 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 
 	"github.com/M0Rf30/yap/v2/pkg/apkindex"
-	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/aptinstall"
-	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/dnfcache"
+	"github.com/M0Rf30/yap/v2/pkg/dnfinstall"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -135,7 +134,6 @@ type PKGBUILD struct {
 	Copyright       []string
 	CustomArrays    map[string][]string
 	CustomVariables map[string]string
-	DataHash        string
 	DebConfig       string
 	DebTemplate     string
 	Depends         []string
@@ -503,8 +501,8 @@ func (pkgBuild *PKGBUILD) GetDepends(
 	// DNF/YUM: use the in-tree resolver and downloader.
 	switch packageManager {
 	case dnfPM, yumPM:
-		if err := dnfcache.Install(ctx, missingPackages); err != nil {
-			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache install failed").
+		if err := dnfinstall.InstallWithRPM(ctx, missingPackages); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "dnf install failed").
 				WithOperation("GetDepends")
 		}
 
@@ -555,7 +553,7 @@ func resolveVirtualPackages(deps []string) []string {
 // the first concrete provider if so, or the original package name otherwise.
 // It uses the in-process apt cache to avoid spawning apt-cache subprocesses.
 func resolveVirtualPackage(pkg string) string {
-	cache := aptcache.Load()
+	cache := apthost.Cache()
 
 	resolved := cache.ResolveVirtual(pkg)
 	if resolved != pkg {
@@ -601,7 +599,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 ) error {
 	switch packageManager {
 	case aptGetPM, aptPM:
-		n, err := aptrepo.Update(ctx)
+		n, err := apthost.Update(ctx)
 		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "aptrepo update failed").
 				WithOperation("GetUpdates")
@@ -613,7 +611,7 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 		}
 
 		logger.Info(i18n.T("logger.pkgbuild.info.refreshed_apt_indexes"), "count", n)
-		aptcache.Reload()
+		apthost.Reload()
 
 		return nil
 
@@ -642,8 +640,8 @@ func (pkgBuild *PKGBUILD) GetUpdates(
 		return nil
 
 	case dnfPM, yumPM:
-		if err := dnfcache.Update(ctx); err != nil {
-			return errors.Wrap(err, errors.ErrTypeBuild, "dnfcache update failed").
+		if err := dnfinstall.Update(ctx); err != nil {
+			return errors.Wrap(err, errors.ErrTypeBuild, "dnf update failed").
 				WithOperation("GetUpdates")
 		}
 

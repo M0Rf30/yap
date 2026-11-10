@@ -12,7 +12,7 @@ import (
 	"maps"
 	"os"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/pkgformat/deb/apt"
 )
 
 // WriteDeb822FieldForTesting exposes the deb822 field emitter so round-
@@ -42,16 +42,6 @@ func DecompressStreamForTesting(r io.Reader, name string) (io.ReadCloser, error)
 // (C-6 regression).
 func ExtractDataTarWithConffilesForTesting(dataTarPath, destDir string, conffiles []string) error {
 	return extractDataTarWithConffiles(dataTarPath, destDir, conffiles)
-}
-
-// SafeJoinForTesting exposes safeJoin for path-traversal regression tests.
-func SafeJoinForTesting(destDir, entry string) (string, error) {
-	return safeJoin(destDir, entry)
-}
-
-// SafeSymlinkTargetForTesting exposes safeSymlinkTarget for tests.
-func SafeSymlinkTargetForTesting(destDir, linkPath, target string) error {
-	return safeSymlinkTarget(destDir, linkPath, target)
 }
 
 // ExtractDataTarForTesting exposes extractDataTar for unit tests.
@@ -339,12 +329,12 @@ type DebContentsForTesting struct {
 }
 
 // FilterForeignArchPackagesForTesting exposes filterForeignArchPackages for unit tests.
-func FilterForeignArchPackagesForTesting(pkgs []*aptcache.PackageInfo) []*aptcache.PackageInfo {
+func FilterForeignArchPackagesForTesting(pkgs []*apt.PackageInfo) []*apt.PackageInfo {
 	return filterForeignArchPackages(pkgs)
 }
 
 // CurrentInstalledVersionForTesting exposes currentInstalledVersion for unit tests.
-func CurrentInstalledVersionForTesting(pkg *aptcache.PackageInfo) string {
+func CurrentInstalledVersionForTesting(pkg *apt.PackageInfo) string {
 	return currentInstalledVersion("/", pkg)
 }
 

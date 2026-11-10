@@ -6,7 +6,7 @@ package common
 import (
 	"testing"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/pkgformat/deb/apt"
 )
 
 // ─── isPerlModule ────────────────────────────────────────────────────────────
@@ -48,42 +48,42 @@ func TestIsPerlModule(t *testing.T) {
 // ─── partitionArchAllDeps ────────────────────────────────────────────────────
 
 // makeArchAllPkg returns a PackageInfo with Architecture: all.
-func makeArchAllPkg(name string) aptcache.PackageInfo { //nolint:unparam // test helper; name varies by call site
-	return aptcache.PackageInfo{Name: name, Architecture: "all"}
+func makeArchAllPkg(name string) apt.PackageInfo { //nolint:unparam // test helper; name varies by call site
+	return apt.PackageInfo{Name: name, Architecture: "all"}
 }
 
 // makeArchSpecificPkg returns a PackageInfo with Architecture: amd64 and
 // Multi-Arch: same (typical dev library — must be qualified per arch).
-func makeArchSpecificPkg(name string) aptcache.PackageInfo { //nolint:unparam // test helper; name varies by call site
-	return aptcache.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "same"}
+func makeArchSpecificPkg(name string) apt.PackageInfo { //nolint:unparam // test helper; name varies by call site
+	return apt.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "same"}
 }
 
 // makeMultiArchForeignPkg returns a PackageInfo with Multi-Arch: foreign
 // (host tool — must NOT be qualified with target arch).
-func makeMultiArchForeignPkg(name string) aptcache.PackageInfo { //nolint:unparam // test helper; name varies by call site
-	return aptcache.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "foreign"}
+func makeMultiArchForeignPkg(name string) apt.PackageInfo { //nolint:unparam // test helper; name varies by call site
+	return apt.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "foreign"}
 }
 
 // makeMultiArchAllowedPkg returns a PackageInfo with Multi-Arch: allowed.
-func makeMultiArchAllowedPkg(name string) aptcache.PackageInfo {
-	return aptcache.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "allowed"}
+func makeMultiArchAllowedPkg(name string) apt.PackageInfo {
+	return apt.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "allowed"}
 }
 
 // makeEssentialPkg returns a PackageInfo with Essential: true.
-func makeEssentialPkg(name string) aptcache.PackageInfo {
-	return aptcache.PackageInfo{Name: name, Architecture: "amd64", Essential: true}
+func makeEssentialPkg(name string) apt.PackageInfo {
+	return apt.PackageInfo{Name: name, Architecture: "amd64", Essential: true}
 }
 
 // makeInstalledNoMultiArch returns a PackageInfo that is installed but has no
 // Multi-Arch field (absent/no) — should go to archAll when installed.
-func makeInstalledNoMultiArch(name string) aptcache.PackageInfo {
-	return aptcache.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "", Installed: true}
+func makeInstalledNoMultiArch(name string) apt.PackageInfo {
+	return apt.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "", Installed: true}
 }
 
 // makeNotInstalledNoMultiArch returns a PackageInfo that is NOT installed and
 // has no Multi-Arch field — should go to archSpecific.
-func makeNotInstalledNoMultiArch(name string) aptcache.PackageInfo {
-	return aptcache.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "", Installed: false}
+func makeNotInstalledNoMultiArch(name string) apt.PackageInfo {
+	return apt.PackageInfo{Name: name, Architecture: "amd64", MultiArch: "", Installed: false}
 }
 
 func TestPartitionArchAllDeps_Empty(t *testing.T) {
@@ -101,7 +101,7 @@ func TestPartitionArchAllDeps_Empty(t *testing.T) {
 }
 
 func TestPartitionArchAllDeps_ArchAllPackage(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeArchAllPkg("python3-six"),
 	})
 
@@ -117,7 +117,7 @@ func TestPartitionArchAllDeps_ArchAllPackage(t *testing.T) {
 }
 
 func TestPartitionArchAllDeps_ArchSpecificPackage(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeArchSpecificPkg("libssl-dev"),
 	})
 
@@ -134,7 +134,7 @@ func TestPartitionArchAllDeps_ArchSpecificPackage(t *testing.T) {
 
 func TestPartitionArchAllDeps_PerlModuleAlwaysArchAll(t *testing.T) {
 	// Perl modules go to archAll regardless of their apt metadata.
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		// Even if the cache says Multi-Arch: same, perl modules are host tools.
 		{Name: "libxml-parser-perl", Architecture: "amd64", MultiArch: "same"},
 	})
@@ -151,7 +151,7 @@ func TestPartitionArchAllDeps_PerlModuleAlwaysArchAll(t *testing.T) {
 }
 
 func TestPartitionArchAllDeps_MultiArchForeign(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeMultiArchForeignPkg("cmake"),
 	})
 
@@ -167,7 +167,7 @@ func TestPartitionArchAllDeps_MultiArchForeign(t *testing.T) {
 }
 
 func TestPartitionArchAllDeps_MultiArchAllowed(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeMultiArchAllowedPkg("git"),
 	})
 
@@ -183,7 +183,7 @@ func TestPartitionArchAllDeps_MultiArchAllowed(t *testing.T) {
 }
 
 func TestPartitionArchAllDeps_EssentialPackage(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeEssentialPkg("bash"),
 	})
 
@@ -200,7 +200,7 @@ func TestPartitionArchAllDeps_EssentialPackage(t *testing.T) {
 
 func TestPartitionArchAllDeps_InstalledNoMultiArch(t *testing.T) {
 	// Installed + no Multi-Arch → archAll (avoid dpkg conflict).
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeInstalledNoMultiArch("zlib1g"),
 	})
 
@@ -217,7 +217,7 @@ func TestPartitionArchAllDeps_InstalledNoMultiArch(t *testing.T) {
 
 func TestPartitionArchAllDeps_NotInstalledNoMultiArch(t *testing.T) {
 	// Not installed + no Multi-Arch → archSpecific.
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeNotInstalledNoMultiArch("zlib1g-dev"),
 	})
 
@@ -249,7 +249,7 @@ func TestPartitionArchAllDeps_NotInCache(t *testing.T) {
 
 func TestPartitionArchAllDeps_VersionConstraintStripped(t *testing.T) {
 	// "libssl-dev (>= 1.0)" — version constraint must be stripped for lookup.
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeArchSpecificPkg("libssl-dev"),
 	})
 
@@ -266,7 +266,7 @@ func TestPartitionArchAllDeps_VersionConstraintStripped(t *testing.T) {
 
 func TestPartitionArchAllDeps_ArchQualifierStripped(t *testing.T) {
 	// "libssl-dev:amd64" — arch qualifier must be stripped for lookup.
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeArchSpecificPkg("libssl-dev"),
 	})
 
@@ -282,7 +282,7 @@ func TestPartitionArchAllDeps_ArchQualifierStripped(t *testing.T) {
 }
 
 func TestPartitionArchAllDeps_MixedDeps(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeArchSpecificPkg("libssl-dev"),
 		makeArchAllPkg("python3-six"),
 		makeMultiArchForeignPkg("cmake"),
@@ -318,7 +318,7 @@ func TestPartitionArchAllDepsForExtract_Empty(t *testing.T) {
 }
 
 func TestPartitionArchAllDepsForExtract_ArchAllPackage(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeArchAllPkg("python3-six"),
 	})
 
@@ -334,7 +334,7 @@ func TestPartitionArchAllDepsForExtract_ArchAllPackage(t *testing.T) {
 }
 
 func TestPartitionArchAllDepsForExtract_PerlModule(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		{Name: "libxml-parser-perl", Architecture: "amd64", MultiArch: "same"},
 	})
 
@@ -350,7 +350,7 @@ func TestPartitionArchAllDepsForExtract_PerlModule(t *testing.T) {
 }
 
 func TestPartitionArchAllDepsForExtract_MultiArchForeign(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeMultiArchForeignPkg("cmake"),
 	})
 
@@ -366,7 +366,7 @@ func TestPartitionArchAllDepsForExtract_MultiArchForeign(t *testing.T) {
 }
 
 func TestPartitionArchAllDepsForExtract_EssentialPackage(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeEssentialPkg("bash"),
 	})
 
@@ -385,7 +385,7 @@ func TestPartitionArchAllDepsForExtract_InstalledIsStillArchSpecific(t *testing.
 	// Unlike partitionArchAllDeps, the extract variant does NOT check Installed —
 	// installed packages still get qualified because extraction overwrites files
 	// without dpkg conflict checks.
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeInstalledNoMultiArch("zlib1g"),
 	})
 
@@ -416,7 +416,7 @@ func TestPartitionArchAllDepsForExtract_NotInCache(t *testing.T) {
 }
 
 func TestPartitionArchAllDepsForExtract_MixedDeps(t *testing.T) {
-	MakeTestCache([]aptcache.PackageInfo{
+	MakeTestCache([]apt.PackageInfo{
 		makeArchSpecificPkg("libssl-dev"),
 		makeArchAllPkg("python3-six"),
 		makeMultiArchForeignPkg("cmake"),
@@ -448,7 +448,7 @@ func TestCountDirect_EmptyResolved(t *testing.T) {
 func TestCountDirect_EmptySeedSet(t *testing.T) {
 	t.Parallel()
 
-	resolved := []*aptcache.PackageInfo{
+	resolved := []*apt.PackageInfo{
 		{Name: "libssl-dev"},
 		{Name: "cmake"},
 	}
@@ -462,7 +462,7 @@ func TestCountDirect_EmptySeedSet(t *testing.T) {
 func TestCountDirect_AllInSeedSet(t *testing.T) {
 	t.Parallel()
 
-	resolved := []*aptcache.PackageInfo{
+	resolved := []*apt.PackageInfo{
 		{Name: "libssl-dev"},
 		{Name: "cmake"},
 	}
@@ -477,7 +477,7 @@ func TestCountDirect_AllInSeedSet(t *testing.T) {
 func TestCountDirect_NoneInSeedSet(t *testing.T) {
 	t.Parallel()
 
-	resolved := []*aptcache.PackageInfo{
+	resolved := []*apt.PackageInfo{
 		{Name: "libssl1.1"},
 		{Name: "zlib1g"},
 	}
@@ -492,7 +492,7 @@ func TestCountDirect_NoneInSeedSet(t *testing.T) {
 func TestCountDirect_MixedSeedSet(t *testing.T) {
 	t.Parallel()
 
-	resolved := []*aptcache.PackageInfo{
+	resolved := []*apt.PackageInfo{
 		{Name: "libssl-dev"}, // direct
 		{Name: "libssl1.1"},  // transitive
 		{Name: "cmake"},      // direct
@@ -509,7 +509,7 @@ func TestCountDirect_MixedSeedSet(t *testing.T) {
 func TestCountDirect_NilEntrySkipped(t *testing.T) {
 	t.Parallel()
 
-	resolved := []*aptcache.PackageInfo{
+	resolved := []*apt.PackageInfo{
 		{Name: "libssl-dev"},
 		nil,
 		{Name: "cmake"},
@@ -531,7 +531,7 @@ func TestCrossDepDestinations(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		info        *aptcache.PackageInfo
+		info        *apt.PackageInfo
 		isSeed      bool
 		installed   map[string]bool
 		wantSysroot bool
@@ -539,7 +539,7 @@ func TestCrossDepDestinations(t *testing.T) {
 	}{
 		{
 			name:        "host-arch package",
-			info:        &aptcache.PackageInfo{Name: "libc6", Architecture: hostArch},
+			info:        &apt.PackageInfo{Name: "libc6", Architecture: hostArch},
 			isSeed:      true,
 			installed:   map[string]bool{},
 			wantSysroot: false,
@@ -547,7 +547,7 @@ func TestCrossDepDestinations(t *testing.T) {
 		},
 		{
 			name:        "arch-all transitive",
-			info:        &aptcache.PackageInfo{Name: "vendor-core", Architecture: debArchAll},
+			info:        &apt.PackageInfo{Name: "vendor-core", Architecture: debArchAll},
 			isSeed:      false,
 			installed:   map[string]bool{},
 			wantSysroot: false,
@@ -555,7 +555,7 @@ func TestCrossDepDestinations(t *testing.T) {
 		},
 		{
 			name:        "arch-all seed",
-			info:        &aptcache.PackageInfo{Name: "vendor-core", Architecture: debArchAll},
+			info:        &apt.PackageInfo{Name: "vendor-core", Architecture: debArchAll},
 			isSeed:      true,
 			installed:   map[string]bool{},
 			wantSysroot: true,
@@ -563,7 +563,7 @@ func TestCrossDepDestinations(t *testing.T) {
 		},
 		{
 			name:        "escript clobber regression: target-arch seed installed on host",
-			info:        &aptcache.PackageInfo{Name: "carbonio-erlang", Architecture: "arm64"},
+			info:        &apt.PackageInfo{Name: "carbonio-erlang", Architecture: "arm64"},
 			isSeed:      true,
 			installed:   map[string]bool{"carbonio-erlang": true},
 			wantSysroot: true,
@@ -571,7 +571,7 @@ func TestCrossDepDestinations(t *testing.T) {
 		},
 		{
 			name:        "target-arch transitive installed on host",
-			info:        &aptcache.PackageInfo{Name: "carbonio-openssl", Architecture: "arm64"},
+			info:        &apt.PackageInfo{Name: "carbonio-openssl", Architecture: "arm64"},
 			isSeed:      false,
 			installed:   map[string]bool{"carbonio-openssl": true},
 			wantSysroot: true,
@@ -579,7 +579,7 @@ func TestCrossDepDestinations(t *testing.T) {
 		},
 		{
 			name:        "target-arch seed not installed",
-			info:        &aptcache.PackageInfo{Name: "vendor-ffmpeg", Architecture: "arm64"},
+			info:        &apt.PackageInfo{Name: "vendor-ffmpeg", Architecture: "arm64"},
 			isSeed:      true,
 			installed:   map[string]bool{},
 			wantSysroot: true,

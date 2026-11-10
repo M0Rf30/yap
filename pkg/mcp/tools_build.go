@@ -11,11 +11,10 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/M0Rf30/yap/v2/pkg/constants"
-
 	"github.com/M0Rf30/yap/v2/cmd/yap/command"
-	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
+	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/container"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
@@ -471,9 +470,9 @@ func applyUnverifiedRepos(allow bool) func() {
 		return func() {}
 	}
 
-	prev := aptrepo.AllowUnverifiedRepos()
+	prev := apthost.AllowUnverified()
 
-	aptrepo.SetAllowUnverifiedRepos(true)
+	apthost.SetAllowUnverified(true)
 
-	return func() { aptrepo.SetAllowUnverifiedRepos(prev) }
+	return func() { apthost.SetAllowUnverified(prev) }
 }

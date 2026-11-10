@@ -7,7 +7,7 @@ package mcp
 import (
 	"testing"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/project"
 	"github.com/M0Rf30/yap/v2/pkg/signing"
 )
@@ -46,13 +46,13 @@ func TestPropagateSigningNoopWhenUnset(t *testing.T) {
 // aptrepo global for the duration of a native build and is restored after.
 func TestApplyUnverifiedRepos(t *testing.T) {
 	t.Setenv("YAP_ALLOW_UNVERIFIED_REPOS", "")
-	aptrepo.SetAllowUnverifiedRepos(false)
+	apthost.SetAllowUnverified(false)
 
-	t.Cleanup(func() { aptrepo.SetAllowUnverifiedRepos(false) })
+	t.Cleanup(func() { apthost.SetAllowUnverified(false) })
 
 	restore := applyUnverifiedRepos(false)
 
-	if aptrepo.AllowUnverifiedRepos() {
+	if apthost.AllowUnverified() {
 		t.Fatal("allow=false must not enable the opt-in")
 	}
 
@@ -60,13 +60,13 @@ func TestApplyUnverifiedRepos(t *testing.T) {
 
 	restore = applyUnverifiedRepos(true)
 
-	if !aptrepo.AllowUnverifiedRepos() {
+	if !apthost.AllowUnverified() {
 		t.Fatal("allow=true must enable the opt-in")
 	}
 
 	restore()
 
-	if aptrepo.AllowUnverifiedRepos() {
+	if apthost.AllowUnverified() {
 		t.Fatal("restore must reset the opt-in")
 	}
 }

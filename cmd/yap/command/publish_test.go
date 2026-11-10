@@ -16,8 +16,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 )
 
 // newPublishTestCmd returns a fresh command bound to the shared pubFlags and
@@ -122,7 +120,6 @@ func TestRunPublishDryRunNeedsNoServerOrToken(t *testing.T) {
 
 func TestRunPublishEndToEnd(t *testing.T) {
 	clearPublishEnv(t)
-	httpclient.SetRetryPolicy(2, time.Millisecond)
 
 	var posts atomic.Int32
 
@@ -159,7 +156,6 @@ func TestRunPublishEndToEnd(t *testing.T) {
 
 func TestRunPublishReportsFailure(t *testing.T) {
 	clearPublishEnv(t)
-	httpclient.SetRetryPolicy(1, time.Millisecond)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)

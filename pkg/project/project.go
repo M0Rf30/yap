@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/builder"
 	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -301,7 +301,7 @@ func (mpc *MultipleProject) syncDependencies(ctx context.Context, makeDepends, r
 		// Invalidate the aptcache singleton so that packages from newly added
 		// repositories (e.g. --repo flags) are visible to subsequent partition
 		// decisions in DownloadAndExtractCrossDeps.
-		aptcache.Reload()
+		apthost.Reload()
 	}
 
 	if !mpc.Opts.NoMakeDeps {

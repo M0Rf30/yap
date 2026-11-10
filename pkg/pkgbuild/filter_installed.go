@@ -17,7 +17,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -54,7 +54,7 @@ func filterInstalledPackages(packageManager string, packages []string) []string 
 // on an amd64 host) cannot be answered from a single Installed bit, so those are
 // reported as missing and let apt-get install decide (it is idempotent).
 func filterInstalledDEB(packages []string) []string {
-	cache := aptcache.Load()
+	cache := apthost.Cache()
 	hostDebArch := constants.GetArchMapping().TranslateArch(constants.FormatDEB, runtime.GOARCH)
 
 	missing := make([]string, 0, len(packages))

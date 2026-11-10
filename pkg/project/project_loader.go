@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/pkgformat/safepath"
 	cp "github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
@@ -23,7 +24,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/repo"
-	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // readProject reads the project file at the specified path

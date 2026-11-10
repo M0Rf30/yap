@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/pkgformat/safepath"
 	"github.com/m0rf30/ar"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // extractDataTar extracts the data.tar member of a .deb to the destination directory.
@@ -92,22 +92,6 @@ func extractDataTar(debPath, destDir string, conffiles []string) error {
 	return extractDataTarWithConffiles(dataTarPath, destDir, conffiles)
 }
 
-// safeJoin joins destDir with a tar-entry path, rejecting anything that
-// escapes destDir via "..", absolute paths, or prefix-aliasing
-// (`destDir="/tmp/foo"`, entry resolves to "/tmp/foobar/evil").
-// Containment logic lives in pkg/safepath.
-func safeJoin(destDir, entry string) (string, error) {
-	return safepath.Join(destDir, entry)
-}
-
-// safeSymlinkTarget validates that a symlink's target stays under destDir.
-// Absolute targets are permitted (common in Debian packages; they only
-// resolve at runtime); relative targets are resolved against the symlink's
-// own location. Containment logic lives in pkg/safepath.
-func safeSymlinkTarget(destDir, linkPath, target string) error {
-	return safepath.SymlinkTarget(destDir, linkPath, target)
-}
-
 // extractDataTarWithConffiles extracts a data.tar file, skipping conffiles that already exist.
 func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string) error {
 	// Build a set of conffiles for quick lookup. Conffile entries in the
@@ -168,7 +152,7 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 		}
 
 		// Compute the destination path while rejecting traversal attempts.
-		fullPath, err := safeJoin(destDir, path)
+		fullPath, err := safepath.Join(destDir, path)
 		if err != nil {
 			logger.Warn(i18n.T("logger.aptinstall.warn.skipping_path_traversal_attempt"), "path", path, "error", err)
 
@@ -246,7 +230,7 @@ func extractTarEntry(
 func extractTarDir(hdr *tar.Header, fullPath string, dirMap map[string]bool) error {
 	dirMap[fullPath] = true
 
-	// nolint:gosec // G301: mode is from tar header, constrained by safeJoin
+	// nolint:gosec // G301: mode is from tar header, constrained by safepath.Join
 	if err := os.MkdirAll(fullPath, tarMode(hdr)); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "mkdir").
 			WithOperation("extractTarDir").WithContext("path", fullPath)
@@ -263,7 +247,7 @@ func extractTarDir(hdr *tar.Header, fullPath string, dirMap map[string]bool) err
 // extractTarSymlink creates a symlink from a tar entry after validating the
 // link target cannot escape destDir.
 func extractTarSymlink(hdr *tar.Header, destDir, fullPath string, dirMap map[string]bool) error {
-	if err := safeSymlinkTarget(destDir, fullPath, hdr.Linkname); err != nil {
+	if err := safepath.SymlinkTarget(destDir, fullPath, hdr.Linkname); err != nil {
 		logger.Warn(i18n.T("logger.aptinstall.warn.skipping_unsafe_symlink"),
 			"path", hdr.Name, "target", hdr.Linkname, "error", err)
 
@@ -301,7 +285,7 @@ func extractTarSymlink(hdr *tar.Header, destDir, fullPath string, dirMap map[str
 // destDir, filesystem without hardlink support) the target is copied
 // instead: a divergent copy beats a missing file.
 func extractTarHardlink(hdr *tar.Header, destDir, fullPath string, dirMap map[string]bool) error {
-	target, err := safeJoin(destDir, strings.TrimPrefix(hdr.Linkname, "./"))
+	target, err := safepath.Join(destDir, strings.TrimPrefix(hdr.Linkname, "./"))
 	if err == nil && filepath.Clean(destDir) != "/" {
 		target, err = safepath.ResolveInRoot(destDir, strings.TrimPrefix(hdr.Linkname, "./"))
 	}
@@ -337,7 +321,7 @@ func extractTarHardlink(hdr *tar.Header, destDir, fullPath string, dirMap map[st
 
 // copyFile duplicates src to dst with the given mode.
 func copyFile(src, dst string, mode os.FileMode) error {
-	in, err := os.Open(src) //nolint:gosec // path validated by safeJoin
+	in, err := os.Open(src) //nolint:gosec // path validated by safepath.Join
 	if err != nil {
 		return err
 	}
@@ -396,7 +380,7 @@ func extractTarFile(
 	}
 
 	// Create the file.
-	// nolint:gosec // G304: fullPath is constrained by safeJoin; G306: mode is from tar header
+	// nolint:gosec // G304: fullPath is constrained by safepath.Join; G306: mode is from tar header
 	f, err := os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, tarMode(hdr))
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "create file").
