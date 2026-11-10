@@ -1048,6 +1048,8 @@
 # --- Migrated logger messages ---
 - id: logger.apkindex.debug.installed
   translation: "Installato"
+- id: logger.apkindex.debug.installed_db_unreadable
+  translation: "Database apk dei pacchetti installati non leggibile; si assume che nulla sia installato"
 - id: logger.apkindex.debug.resolved_virtual
   translation: "Pacchetto virtuale risolto"
 - id: logger.apkindex.debug.unresolved
@@ -1330,6 +1332,8 @@
   translation: "Chiusura del file PKGBUILD non riuscita"
 - id: logger.parser.warn.variable_expansion_failed
   translation: "Impossibile espandere la variabile del PKGBUILD; viene usato un valore vuoto"
+- id: logger.pkgbuild.debug.installed_db_unreadable
+  translation: "Database dei pacchetti installati non leggibile; si assume che nulla sia installato"
 - id: logger.pkgbuild.debug.no_rpmdb_host_falling
   translation: "Nessun database RPM sull'host, ripiego sul sottoprocesso"
 - id: logger.pkgbuild.info.delegating_package_install_subprocess

@@ -110,43 +110,39 @@ func (r *Repos) InstallPackages(ctx context.Context, names []string) error {
 	return nil
 }
 
-// readInstalledDB parses /lib/apk/db/installed and returns a set of
-// installed package names. Returns empty map on read error.
-func readInstalledDB() map[string]bool {
-	f, err := os.Open(apkInstalledDB)
-	if err != nil {
-		return make(map[string]bool)
-	}
-	defer func() { _ = f.Close() }()
+// readInstalledDB returns the set of installed package names of the host's
+// apk database. It is empty when the database cannot be read.
+func readInstalledDB() map[string]bool { return readInstalledDBAt("/") }
 
+// readInstalledDBAt is readInstalledDB for the database under root.
+func readInstalledDBAt(root string) map[string]bool {
 	installed := make(map[string]bool)
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
-	var currentPkg string
+	path, err := pkgapk.FindInstalled(root)
+	if err != nil {
+		logger.Debug(i18n.T("logger.apkindex.debug.installed_db_unreadable"), "error", err)
 
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if line == "" {
-			// End of stanza — commit the package name.
-			if currentPkg != "" {
-				installed[currentPkg] = true
-				currentPkg = ""
-			}
-
-			continue
-		}
-
-		// APK installed DB uses single-char field tags: "P:<pkgname>"
-		if pkg, ok := strings.CutPrefix(line, "P:"); ok {
-			currentPkg = pkg
-		}
+		return installed
 	}
 
-	// Flush last stanza (file may not end with blank line).
-	if currentPkg != "" {
-		installed[currentPkg] = true
+	db, err := pkgapk.OpenInstalled(path, pkgapk.InstalledOptions{Logger: logger.Slog(), SkipFiles: true})
+	if err != nil {
+		logger.Debug(i18n.T("logger.apkindex.debug.installed_db_unreadable"), "error", err)
+
+		return installed
+	}
+
+	defer func() { _ = db.Close() }()
+
+	names, err := db.InstalledNames(context.Background())
+	if err != nil {
+		logger.Debug(i18n.T("logger.apkindex.debug.installed_db_unreadable"), "error", err)
+
+		return installed
+	}
+
+	for _, name := range names {
+		installed[name] = true
 	}
 
 	return installed

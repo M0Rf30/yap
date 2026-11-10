@@ -5,7 +5,9 @@ package aptinstall
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -14,8 +16,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/M0Rf30/yap/v2/pkg/deb822"
+	"github.com/M0Rf30/pkgformat/deb"
+
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/yapdb"
 )
 
@@ -41,87 +45,17 @@ type dpkgStatusEntry struct {
 	fields map[string]string
 }
 
-// dpkgParseState holds the state of a dpkg status stanza being parsed.
-type dpkgParseState struct {
-	currentEntry *dpkgStatusEntry
-	currentField string
-	currentValue strings.Builder
-}
-
-// handleDpkgStatusLine processes a single line from a dpkg status stanza.
-// Returns nothing; mutates state. Handles blank line (flush), continuation, or field.
-func handleDpkgStatusLine(line string, st *dpkgParseState, entries map[string]*dpkgStatusEntry) {
-	// Blank line → end of stanza.
-	if line == "" {
-		flushDpkgStatusEntry(st, entries)
-		*st = dpkgParseState{}
-
-		return
-	}
-
-	// Continuation line (starts with space or tab).
-	if line != "" && (line[0] == ' ' || line[0] == '\t') {
-		st.currentValue.WriteString("\n")
-		st.currentValue.WriteString(strings.TrimPrefix(line, " "))
-
-		return
-	}
-
-	// Flush previous field.
-	if st.currentField != "" && st.currentEntry != nil {
-		st.currentEntry.fields[st.currentField] = st.currentValue.String()
-	}
-	// Parse new field line.
-	if field, value, ok := strings.Cut(line, ":"); ok {
-		if st.currentEntry == nil {
-			st.currentEntry = &dpkgStatusEntry{fields: make(map[string]string)}
-		}
-
-		st.currentField = field
-		st.currentValue.Reset()
-		st.currentValue.WriteString(strings.TrimSpace(value))
-	} else {
-		st.currentField = ""
-	}
-}
-
-// flushDpkgStatusEntry adds a completed entry to the entries map.
-// Crucially, it flushes any pending field/value into the entry before
-// publishing — without this step the *last* field of every stanza is
-// silently dropped on a re-parse, corrupting the dpkg database after a
-// single round-trip.
-func flushDpkgStatusEntry(st *dpkgParseState, entries map[string]*dpkgStatusEntry) {
-	if st.currentEntry == nil {
-		return
-	}
-
-	// Flush the in-flight field that was being accumulated when the stanza
-	// ended. Previously this was only done on the "next field" branch, so
-	// the trailing field (often Description or Conffiles) was lost.
-	if st.currentField != "" {
-		st.currentEntry.fields[st.currentField] = st.currentValue.String()
-	}
-
-	if st.currentEntry.fields["Package"] == "" {
-		return
-	}
-
-	key := st.currentEntry.fields["Package"]
-	if arch, ok := st.currentEntry.fields["Architecture"]; ok && arch != "" {
-		key = key + ":" + arch
-	}
-
-	entries[key] = st.currentEntry
-}
-
-// readDpkgStatus reads and parses /var/lib/dpkg/status.
+// readDpkgStatus reads /var/lib/dpkg/status under rootDir with the dpkg status
+// reader of pkgformat. The entries keep every field with its logical value
+// (continuation markers removed), which writeStatusEntry encodes again; a
+// missing file is an empty database.
 func readDpkgStatus(rootDir string) (map[string]*dpkgStatusEntry, error) {
 	entries := make(map[string]*dpkgStatusEntry)
 	statusPath := rooted(rootDir, dpkgStatusPath)
 
-	data, err := os.ReadFile(statusPath) //nolint:gosec // rooted constant path
+	db, err := deb.OpenStatus(statusPath, deb.StatusOptions{Logger: logger.Slog()})
 	if err != nil {
-		if os.IsNotExist(err) {
+		if stderrors.Is(err, fs.ErrNotExist) {
 			return entries, nil // File doesn't exist yet; that's OK.
 		}
 
@@ -129,28 +63,20 @@ func readDpkgStatus(rootDir string) (map[string]*dpkgStatusEntry, error) {
 			WithOperation("readDpkgStatus").WithContext("path", statusPath)
 	}
 
-	if err := deb822.Parse(strings.NewReader(string(data)), func(stanzaMap deb822.Stanza) error {
-		entry := &dpkgStatusEntry{fields: make(map[string]string)}
+	defer func() { _ = db.Close() }()
 
-		// Copy all fields from the stanza into the entry
-		maps.Copy(entry.fields, stanzaMap)
-
-		// Add the entry to the map using the same logic as flushDpkgStatusEntry
-		if entry.fields["Package"] == "" {
-			return nil
+	for entry, err := range db.Entries(context.Background()) {
+		if err != nil {
+			return nil, errors.Wrap(err, errors.ErrTypeParser, "parse dpkg status").
+				WithOperation("readDpkgStatus").WithContext("path", statusPath)
 		}
 
-		key := entry.fields["Package"]
-		if arch, ok := entry.fields["Architecture"]; ok && arch != "" {
-			key = key + ":" + arch
+		key := entry.Control.Get("Package")
+		if arch := entry.Control.Get("Architecture"); arch != "" {
+			key += ":" + arch
 		}
 
-		entries[key] = entry
-
-		return nil
-	}); err != nil {
-		return nil, errors.Wrap(err, errors.ErrTypeParser, "parse dpkg status").
-			WithOperation("readDpkgStatus").WithContext("path", statusPath)
+		entries[key] = &dpkgStatusEntry{fields: maps.Clone(entry.Control.Fields)}
 	}
 
 	return entries, nil
@@ -309,7 +235,14 @@ func writeDeb822Field(f *os.File, field, value string) error {
 	// dpkg's paragraph-break convention is preserved.
 	lines := strings.Split(value, "\n")
 
-	if _, err := fmt.Fprintf(f, "%s: %s\n", field, lines[0]); err != nil {
+	// A field whose value starts on the next line (Conffiles) has no space
+	// after its colon, as dpkg writes it.
+	head := "%s: %s\n"
+	if lines[0] == "" {
+		head = "%s:%s\n"
+	}
+
+	if _, err := fmt.Fprintf(f, head, field, lines[0]); err != nil {
 		return err
 	}
 

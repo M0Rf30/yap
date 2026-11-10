@@ -11,6 +11,7 @@ import (
 	"context"
 	"maps"
 	"os"
+	"path/filepath"
 
 	"github.com/M0Rf30/pkgformat/deb/apt"
 )
@@ -70,40 +71,41 @@ func ExtractTarSymlinkForTesting(hdr *tar.Header, destDir, fullPath string) erro
 // payload (avoiding the real filesystem) so tests can assert the parser
 // preserves every field of every stanza across a round-trip.
 func ReadDpkgStatusFromStringForTesting(data string) (map[string]map[string]string, error) {
-	entries := make(map[string]*dpkgStatusEntry)
-	st := dpkgParseState{}
-
-	for _, line := range splitLines(data) {
-		handleDpkgStatusLine(line, &st, entries)
+	entries, err := readStatusData(data)
+	if err != nil {
+		return nil, err
 	}
 
-	flushDpkgStatusEntry(&st, entries)
+	return fieldMaps(entries), nil
+}
 
+// readStatusData parses status text with readDpkgStatus, from a scratch root.
+func readStatusData(data string) (map[string]*dpkgStatusEntry, error) {
+	root, err := os.MkdirTemp("", "yap-status-*")
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = os.RemoveAll(root) }()
+
+	if err := os.MkdirAll(filepath.Join(root, "var", "lib", "dpkg"), 0o755); err != nil {
+		return nil, err
+	}
+
+	if err := os.WriteFile(filepath.Join(root, dpkgStatusPath), []byte(data), 0o600); err != nil {
+		return nil, err
+	}
+
+	return readDpkgStatus(root)
+}
+
+func fieldMaps(entries map[string]*dpkgStatusEntry) map[string]map[string]string {
 	out := make(map[string]map[string]string, len(entries))
 	for k, v := range entries {
 		out[k] = v.fields
 	}
 
-	return out, nil
-}
-
-func splitLines(s string) []string {
-	var lines []string
-
-	start := 0
-
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			lines = append(lines, s[start:i])
-			start = i + 1
-		}
-	}
-
-	if start < len(s) {
-		lines = append(lines, s[start:])
-	}
-
-	return lines
+	return out
 }
 
 // HasEnvKeyForTesting exposes hasEnvKey for unit tests.
@@ -120,14 +122,10 @@ func ResolveRootDirForTesting(rootDir string, allowRoot bool) (string, error) {
 // for a package from a synthetic dpkg status string (avoids touching the
 // real /var/lib/dpkg/status on the test host).
 func CurrentInstalledVersionFromStatusForTesting(statusData, pkgName, arch string) string {
-	entries := make(map[string]*dpkgStatusEntry)
-	st := dpkgParseState{}
-
-	for _, line := range splitLines(statusData) {
-		handleDpkgStatusLine(line, &st, entries)
+	entries, err := readStatusData(statusData)
+	if err != nil {
+		return ""
 	}
-
-	flushDpkgStatusEntry(&st, entries)
 
 	key := pkgName
 	if arch != "" {
@@ -207,21 +205,12 @@ func ReadDpkgStatusFromPathForTesting(path string) (map[string]map[string]string
 		return nil, err
 	}
 
-	entries := make(map[string]*dpkgStatusEntry)
-	st := dpkgParseState{}
-
-	for _, line := range splitLines(string(data)) {
-		handleDpkgStatusLine(line, &st, entries)
+	entries, err := readStatusData(string(data))
+	if err != nil {
+		return nil, err
 	}
 
-	flushDpkgStatusEntry(&st, entries)
-
-	out := make(map[string]map[string]string, len(entries))
-	for k, v := range entries {
-		out[k] = v.fields
-	}
-
-	return out, nil
+	return fieldMaps(entries), nil
 }
 
 // WriteDpkgStatusToPathForTesting writes dpkg status entries to a custom

@@ -5,13 +5,13 @@
 package pkgbuild
 
 // ApkInstalledSetForTesting exposes apkInstalledSet for unit tests.
-func ApkInstalledSetForTesting(path string) map[string]bool {
-	return apkInstalledSet(path)
+func ApkInstalledSetForTesting(root string) (map[string]bool, error) {
+	return apkInstalledSet(root)
 }
 
-// PacmanDirToNameForTesting exposes pacmanDirToName for unit tests.
-func PacmanDirToNameForTesting(dir string) string {
-	return pacmanDirToName(dir)
+// PacmanInstalledSetForTesting exposes pacmanInstalledSet for unit tests.
+func PacmanInstalledSetForTesting(root string) (map[string]bool, error) {
+	return pacmanInstalledSet(root)
 }
 
 // StripVersionConstraintForTesting exposes stripVersionConstraint for unit tests.
