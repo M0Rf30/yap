@@ -33,7 +33,7 @@ echo "==> Baseline check passed: tree not installed"
 
 # 3. Install via YAP
 echo "==> Installing via yap install..."
-./yap install "$RPM_PATH"
+./bin/yap install "$RPM_PATH"
 
 # 4. Assert files placed
 if ! test -x /usr/bin/tree; then
