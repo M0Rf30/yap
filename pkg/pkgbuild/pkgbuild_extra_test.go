@@ -18,37 +18,45 @@ import (
 // apkInstalledSet
 // ---------------------------------------------------------------------------
 
-func TestApkInstalledSet_NonExistentPath(t *testing.T) {
-	result := pkgbuild.ApkInstalledSetForTesting("/nonexistent/path/that/does/not/exist")
-	assert.Nil(t, result, "non-existent path should return nil")
+// writeAPKDB writes content as the apk installed database of a scratch root.
+func writeAPKDB(t *testing.T, content string) string {
+	t.Helper()
+
+	root := t.TempDir()
+	dir := filepath.Join(root, "lib", "apk", "db")
+
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "installed"), []byte(content), 0o600))
+
+	return root
+}
+
+func TestApkInstalledSet_NoDatabase(t *testing.T) {
+	result, err := pkgbuild.ApkInstalledSetForTesting(t.TempDir())
+	require.Error(t, err, "a root without a database is an error, so callers fall back")
+	assert.Nil(t, result)
 }
 
 func TestApkInstalledSet_EmptyFile(t *testing.T) {
-	f, err := os.CreateTemp(t.TempDir(), "apk-installed-*")
+	result, err := pkgbuild.ApkInstalledSetForTesting(writeAPKDB(t, ""))
 	require.NoError(t, err)
-	require.NoError(t, f.Close())
-
-	result := pkgbuild.ApkInstalledSetForTesting(f.Name())
 	assert.NotNil(t, result, "empty file should return empty map, not nil")
 	assert.Empty(t, result, "empty file should produce empty map")
 }
 
 func TestApkInstalledSet_SinglePackage(t *testing.T) {
-	content := "P:musl\nV:1.2.3-r0\nA:x86_64\n\n"
-	path := writeTemp(t, content)
-
-	result := pkgbuild.ApkInstalledSetForTesting(path)
-	require.NotNil(t, result)
+	result, err := pkgbuild.ApkInstalledSetForTesting(writeAPKDB(t, "P:musl\nV:1.2.3-r0\nA:x86_64\n\n"))
+	require.NoError(t, err)
 	assert.True(t, result["musl"], "musl should be in the installed set")
 	assert.Len(t, result, 1)
 }
 
 func TestApkInstalledSet_MultiplePackages(t *testing.T) {
-	content := "P:musl\nV:1.2.3-r0\n\nP:busybox\nV:1.35.0-r0\n\nP:alpine-baselayout\nV:3.4.0-r0\n\n"
-	path := writeTemp(t, content)
+	content := "P:musl\nV:1.2.3-r0\nA:x86_64\n\nP:busybox\nV:1.35.0-r0\nA:x86_64\n\n" +
+		"P:alpine-baselayout\nV:3.4.0-r0\nA:x86_64\n\n"
 
-	result := pkgbuild.ApkInstalledSetForTesting(path)
-	require.NotNil(t, result)
+	result, err := pkgbuild.ApkInstalledSetForTesting(writeAPKDB(t, content))
+	require.NoError(t, err)
 	assert.True(t, result["musl"])
 	assert.True(t, result["busybox"])
 	assert.True(t, result["alpine-baselayout"])
@@ -57,65 +65,104 @@ func TestApkInstalledSet_MultiplePackages(t *testing.T) {
 
 func TestApkInstalledSet_NoTrailingBlankLine(t *testing.T) {
 	// Last package entry has no trailing blank line — should still be included.
-	content := "P:musl\nV:1.2.3-r0\nA:x86_64"
-	path := writeTemp(t, content)
-
-	result := pkgbuild.ApkInstalledSetForTesting(path)
-	require.NotNil(t, result)
+	result, err := pkgbuild.ApkInstalledSetForTesting(writeAPKDB(t, "P:musl\nV:1.2.3-r0\nA:x86_64"))
+	require.NoError(t, err)
 	assert.True(t, result["musl"], "package without trailing blank line should still be included")
 }
 
 func TestApkInstalledSet_OnlyBlankLines(t *testing.T) {
-	content := "\n\n\n"
-	path := writeTemp(t, content)
-
-	result := pkgbuild.ApkInstalledSetForTesting(path)
-	require.NotNil(t, result)
+	result, err := pkgbuild.ApkInstalledSetForTesting(writeAPKDB(t, "\n\n\n"))
+	require.NoError(t, err)
 	assert.Empty(t, result)
 }
 
 func TestApkInstalledSet_PackageWithHyphenatedName(t *testing.T) {
-	content := "P:alpine-baselayout-data\nV:3.4.0-r0\n\n"
-	path := writeTemp(t, content)
-
-	result := pkgbuild.ApkInstalledSetForTesting(path)
-	require.NotNil(t, result)
+	result, err := pkgbuild.ApkInstalledSetForTesting(writeAPKDB(t, "P:alpine-baselayout-data\nV:3.4.0-r0\nA:noarch\n\n"))
+	require.NoError(t, err)
 	assert.True(t, result["alpine-baselayout-data"])
 }
 
+func TestApkInstalledSet_VirtualPackageAndFileRecords(t *testing.T) {
+	content := "P:.build-deps\nV:20260101.000000\nA:noarch\n\n" +
+		"P:busybox\nV:1.37.0-r31\nA:x86_64\nF:bin\nR:busybox\na:0:0:755\nZ:Q1y5VcgN7Y1x2d9E1Gp7BkG5mZYGM=\n\n"
+
+	result, err := pkgbuild.ApkInstalledSetForTesting(writeAPKDB(t, content))
+	require.NoError(t, err)
+	assert.True(t, result[".build-deps"])
+	assert.True(t, result["busybox"])
+	assert.Len(t, result, 2)
+}
+
 // ---------------------------------------------------------------------------
-// pacmanDirToName
+// pacmanInstalledSet
 // ---------------------------------------------------------------------------
 
-func TestPacmanDirToName_Standard(t *testing.T) {
-	assert.Equal(t, "gcc", pkgbuild.PacmanDirToNameForTesting("gcc-12.2.0-1"))
+// writePacmanDB writes package directories (name of directory → desc) as the
+// local database of a scratch root.
+func writePacmanDB(t *testing.T, pkgs map[string]string) string {
+	t.Helper()
+
+	root := t.TempDir()
+	local := filepath.Join(root, "var", "lib", "pacman", "local")
+
+	require.NoError(t, os.MkdirAll(local, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(local, "ALPM_DB_VERSION"), []byte("9\n"), 0o600))
+
+	for dir, desc := range pkgs {
+		require.NoError(t, os.MkdirAll(filepath.Join(local, dir), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(local, dir, "desc"), []byte(desc), 0o600))
+	}
+
+	return root
 }
 
-func TestPacmanDirToName_HyphenatedName(t *testing.T) {
-	assert.Equal(t, "linux-headers", pkgbuild.PacmanDirToNameForTesting("linux-headers-6.1.1-1"))
+func pacmanDesc(name, version string) string {
+	return "%NAME%\n" + name + "\n\n%VERSION%\n" + version + "\n\n"
 }
 
-func TestPacmanDirToName_OnlyOneSegment(t *testing.T) {
-	// "no-hyphens" has only one hyphen — stripping last two segments leaves nothing.
-	assert.Equal(t, "", pkgbuild.PacmanDirToNameForTesting("no-hyphens"))
+func TestPacmanInstalledSet_NoDatabase(t *testing.T) {
+	result, err := pkgbuild.PacmanInstalledSetForTesting(t.TempDir())
+	require.Error(t, err, "a root without a database is an error, so callers fall back")
+	assert.Nil(t, result)
 }
 
-func TestPacmanDirToName_Empty(t *testing.T) {
-	assert.Equal(t, "", pkgbuild.PacmanDirToNameForTesting(""))
+func TestPacmanInstalledSet_Empty(t *testing.T) {
+	result, err := pkgbuild.PacmanInstalledSetForTesting(writePacmanDB(t, nil))
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Empty(t, result)
 }
 
-func TestPacmanDirToName_ThreeSegments(t *testing.T) {
-	// "a-b-c": strip last → "a-b", strip last → "a"
-	assert.Equal(t, "a", pkgbuild.PacmanDirToNameForTesting("a-b-c"))
+func TestPacmanInstalledSet_Names(t *testing.T) {
+	root := writePacmanDB(t, map[string]string{
+		"gcc-12.2.0-1":           pacmanDesc("gcc", "12.2.0-1"),
+		"linux-headers-6.1.1-1":  pacmanDesc("linux-headers", "6.1.1-1"),
+		"lib32-glibc-2.37-1":     pacmanDesc("lib32-glibc", "2.37-1"),
+		"python-3.11.3-1":        pacmanDesc("python", "3.11.3-1"),
+		"ca-certificates-2024-1": pacmanDesc("ca-certificates", "2024-1"),
+	})
+
+	result, err := pkgbuild.PacmanInstalledSetForTesting(root)
+	require.NoError(t, err)
+	assert.Len(t, result, 5)
+
+	for _, name := range []string{"gcc", "linux-headers", "lib32-glibc", "python", "ca-certificates"} {
+		assert.True(t, result[name], name)
+	}
 }
 
-func TestPacmanDirToName_MultiHyphenName(t *testing.T) {
-	// "lib32-glibc-2.37-1": strip last → "lib32-glibc-2.37", strip last → "lib32-glibc"
-	assert.Equal(t, "lib32-glibc", pkgbuild.PacmanDirToNameForTesting("lib32-glibc-2.37-1"))
-}
+// The name of a package is the %NAME% of its desc, not a guess from the
+// directory name; a directory without a valid desc is not a package.
+func TestPacmanInstalledSet_NameFromDesc(t *testing.T) {
+	root := writePacmanDB(t, map[string]string{
+		"odd-dir-name":   pacmanDesc("real", "1.0-1"),
+		"broken-1.0-1":   "%VERSION%\n1.0-1\n\n",
+		"empty-name-1-1": "",
+	})
 
-func TestPacmanDirToName_NoHyphen(t *testing.T) {
-	assert.Equal(t, "", pkgbuild.PacmanDirToNameForTesting("nohyphen"))
+	result, err := pkgbuild.PacmanInstalledSetForTesting(root)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{"real": true}, result)
 }
 
 // ---------------------------------------------------------------------------
@@ -308,20 +355,4 @@ func TestRestoreTopLevelOverrides_MultipleRestores(t *testing.T) {
 	p.PkgDesc = "sub2"
 	p.RestoreTopLevelOverrides()
 	assert.Equal(t, originalDesc, p.PkgDesc)
-}
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
-// writeTemp writes content to a temp file and returns its path.
-func writeTemp(t *testing.T, content string) string {
-	t.Helper()
-
-	dir := t.TempDir()
-	path := filepath.Join(dir, "db")
-
-	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-
-	return path
 }

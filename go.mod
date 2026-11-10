@@ -3,7 +3,7 @@ module github.com/M0Rf30/yap/v2
 go 1.27.3
 
 require (
-	github.com/M0Rf30/pkgformat v0.2.0
+	github.com/M0Rf30/pkgformat v0.3.1
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/github/go-spdx/v2 v2.8.0

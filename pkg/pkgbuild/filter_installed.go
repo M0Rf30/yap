@@ -9,13 +9,14 @@
 package pkgbuild
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	stderrors "errors"
-	"os"
 	"runtime"
 	"strings"
+
+	pkgapk "github.com/M0Rf30/pkgformat/apk"
+	"github.com/M0Rf30/pkgformat/pacman"
 
 	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
@@ -82,119 +83,108 @@ func filterInstalledDEB(packages []string) []string {
 	return missing
 }
 
-// filterInstalledAPK reads /lib/apk/db/installed to check which APK packages are installed.
+// hostRoot is the directory the host's apk and pacman databases are looked up
+// under.
+const hostRoot = "/"
+
+// filterInstalledAPK reads the apk installed database (/lib/apk/db/installed)
+// to check which APK packages are installed.
 func filterInstalledAPK(packages []string) []string {
-	const apkInstalledDB = "/lib/apk/db/installed"
-
-	installed := apkInstalledSet(apkInstalledDB)
-	if installed == nil {
+	installed, err := apkInstalledSet(hostRoot)
+	if err != nil {
 		// DB unreadable — assume nothing is installed so we don't skip deps.
+		logger.Debug(i18n.T("logger.pkgbuild.debug.installed_db_unreadable"), "format", "apk", "error", err)
+
 		return packages
 	}
 
-	missing := make([]string, 0, len(packages))
-
-	for _, pkg := range packages {
-		name := stripVersionConstraint(pkg)
-		if !installed[name] {
-			missing = append(missing, pkg)
-		}
-	}
-
-	return missing
+	return filterMissing(packages, installed)
 }
 
-// apkInstalledSet parses the APK installed database and returns a set of
-// installed package names. Returns nil on read error.
-func apkInstalledSet(path string) map[string]bool {
-	f, err := os.Open(path) //nolint:gosec
+// installedNamer is what the apk and pacman database readers have in common.
+type installedNamer interface {
+	InstalledNames(ctx context.Context) ([]string, error)
+	Close() error
+}
+
+// installedSet finds the database under root, opens it and returns the set of
+// the names of its packages.
+func installedSet(
+	root string,
+	find func(root string) (string, error),
+	open func(path string) (installedNamer, error),
+) (map[string]bool, error) {
+	path, err := find(root)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	defer func() { _ = f.Close() }()
-
-	installed := make(map[string]bool)
-	scanner := bufio.NewScanner(f)
-
-	var currentPkg string
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if line == "" {
-			if currentPkg != "" {
-				installed[currentPkg] = true
-				currentPkg = ""
-			}
-
-			continue
-		}
-
-		if pkg, ok := strings.CutPrefix(line, "P:"); ok {
-			currentPkg = pkg
-		}
+	db, err := open(path)
+	if err != nil {
+		return nil, err
 	}
 
-	if currentPkg != "" {
-		installed[currentPkg] = true
+	defer func() { _ = db.Close() }()
+
+	names, err := db.InstalledNames(context.Background())
+	if err != nil {
+		return nil, err
 	}
 
-	return installed
+	return nameSet(names), nil
 }
 
-// filterInstalledPacman checks /var/lib/pacman/local/ for installed packages.
-// Each installed package has a subdirectory named "<pkgname>-<version>-<pkgrel>/".
+// apkInstalledSet returns the set of installed package names of the apk
+// database under root.
+func apkInstalledSet(root string) (map[string]bool, error) {
+	return installedSet(root, pkgapk.FindInstalled, func(path string) (installedNamer, error) {
+		return pkgapk.OpenInstalled(path, pkgapk.InstalledOptions{Logger: logger.Slog(), SkipFiles: true})
+	})
+}
+
+// filterInstalledPacman reads the pacman local database
+// (/var/lib/pacman/local) to check which packages are installed. A package is
+// named by the %NAME% of its desc, not by its directory.
 func filterInstalledPacman(packages []string) []string {
-	const pacmanLocalDB = "/var/lib/pacman/local"
-
-	entries, err := os.ReadDir(pacmanLocalDB)
+	installed, err := pacmanInstalledSet(hostRoot)
 	if err != nil {
+		logger.Debug(i18n.T("logger.pkgbuild.debug.installed_db_unreadable"), "format", "pacman", "error", err)
+
 		return packages
 	}
 
-	installed := make(map[string]bool, len(entries))
+	return filterMissing(packages, installed)
+}
 
-	for _, e := range entries {
-		if !e.IsDir() || e.Name() == "ALPM_DB_VERSION" {
-			continue
-		}
+// pacmanInstalledSet returns the set of installed package names of the pacman
+// local database under root.
+func pacmanInstalledSet(root string) (map[string]bool, error) {
+	return installedSet(root, pacman.FindLocalDB, func(path string) (installedNamer, error) {
+		return pacman.OpenLocalDB(path, pacman.LocalDBOptions{Logger: logger.Slog(), SkipFiles: true})
+	})
+}
 
-		name := pacmanDirToName(e.Name())
-		if name != "" {
-			installed[name] = true
-		}
+func nameSet(names []string) map[string]bool {
+	set := make(map[string]bool, len(names))
+	for _, n := range names {
+		set[n] = true
 	}
 
+	return set
+}
+
+// filterMissing returns the packages whose name, without version constraint,
+// is not in installed.
+func filterMissing(packages []string, installed map[string]bool) []string {
 	missing := make([]string, 0, len(packages))
 
 	for _, pkg := range packages {
-		name := stripVersionConstraint(pkg)
-		if !installed[name] {
+		if !installed[stripVersionConstraint(pkg)] {
 			missing = append(missing, pkg)
 		}
 	}
 
 	return missing
-}
-
-// pacmanDirToName extracts the package name from a pacman local DB directory
-// name of the form "<name>-<version>-<pkgrel>". pkgver cannot contain hyphens
-// (per Arch wiki), so stripping the last two hyphen-delimited segments is safe.
-func pacmanDirToName(dir string) string {
-	idx := strings.LastIndex(dir, "-")
-	if idx < 0 {
-		return ""
-	}
-
-	withoutPkgrel := dir[:idx]
-
-	idx = strings.LastIndex(withoutPkgrel, "-")
-	if idx < 0 {
-		return ""
-	}
-
-	return withoutPkgrel[:idx]
 }
 
 // filterInstalledRPM reads the host's RPM database directly, whichever format

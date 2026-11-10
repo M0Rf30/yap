@@ -19,10 +19,10 @@
 | `pkg/graph/` | Build order / dependency resolution |
 | `pkg/source/` | Source download and validation |
 | `pkg/fetch/` | Source download: retry budget, progress bar and i18n over `pkgformat/download` |
-| `pkg/pkgbuild/`, `pkg/parser/` | Extended PKGBUILD format |
+| `pkg/pkgbuild/`, `pkg/parser/` | Extended PKGBUILD format; `filter_installed.go` skips installed makedepends through the `pkgformat` readers (`deb/apt` cache, `apk.OpenInstalled`, `pacman.OpenLocalDB`, `rpm/rpmdb`) |
 | `pkg/apthost/` | Host adapter over `pkgformat/deb/apt`: dpkg/apt paths and keyrings, lazy process-wide cache, `apt-get update` |
-| `pkg/aptinstall/` | `apt-get install` (transitive dep resolution, scriptlets) |
-| `pkg/apkindex/` | `apk update` + `apk add`; app-side adapter over `pkgformat/apk` (`Client`, `Index`) with the trust decision |
+| `pkg/aptinstall/` | `apt-get install` (transitive dep resolution, scriptlets); reads `/var/lib/dpkg/status` with `pkgformat/deb` `OpenStatus` |
+| `pkg/apkindex/` | `apk update` + `apk add`; app-side adapter over `pkgformat/apk` (`Client`, `Index`, `OpenInstalled` for the installed set) with the trust decision |
 | `pkg/pacmandb/` | `pacman -Sy`; thin adapter over `pkgformat/pacman` (`ParseConfigFile`, `Client.Sync`) |
 | `pkg/rpmdb/` | Host RPM database queries (ListInstalled / ListInstalledProvides / FilterInstalled) via `pkgformat/rpm/rpmdb` (SQLite, ndb, BerkeleyDB) + optional SQLite writer (Fedora 33+, RHEL 9+) |
 | `pkg/dnfinstall/` | RPM install (GPG verify → CPIO extract → scriptlets → yapdb); host adapter over `pkgformat/rpm/dnf` (`host.go`) and the `rpm --install` path (`rpmcli.go`) |
@@ -260,6 +260,7 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - `apt-get install` — `pkg/aptinstall` (transitive deps, scriptlets, yapdb state by default)
 - `apk update` + `apk add` — `pkg/apkindex` over `pkgformat/apk`; indexes are verified against `/etc/apk/keys`; with no matching key a privileged host installs unverified with a warning, an unprivileged one refuses. `epoch:` is ignored with a warning (Alpine has none)
 - `pacman -Sy` — `pkg/pacmandb` over `pkgformat/pacman`
+- Installed-package databases — dpkg `status` (`pkg/aptinstall`, `pkgformat/deb` `OpenStatus`; the apt cache of `pkg/apthost` reads the same file through it), apk `/lib/apk/db/installed` (`pkgformat/apk` `OpenInstalled`) and pacman `/var/lib/pacman/local` (`pkgformat/pacman` `OpenLocalDB`; a package is named by its `desc` `%NAME%`), all read-only; an unreadable database means "nothing installed" to the callers that filter makedepends. `pkg/aptinstall` keeps the writer (`writeDpkgStatus`) and encodes the library's logical field values back
 - RPM database reader — `pkg/rpmdb`: wraps `github.com/M0Rf30/pkgformat/rpm/rpmdb` (`Find("/")` + `Open`), one code path for SQLite (Fedora 33+, RHEL 9+, Arch), ndb (openSUSE/SLE `Packages.db`) and BerkeleyDB (RHEL 8 and earlier); `ErrNoDatabase` when the host has none, and only then the batched `rpm -q` / `rpm -qa` subprocess fallback
 - RPM install — `pkg/dnfinstall` (GPG verify → CPIO extract → scriptlets → yapdb); replaces `dnf install` for both `yap install <pkg.rpm>` and build-time makedepends on RPM distros
 - YAP-internal package state — `pkg/yapdb` (cross-format SQLite registry at `<rootDir>/var/lib/yap/installed.db`); decouples YAP from system dpkg/rpm DBs (ephemeral build container friendly)
