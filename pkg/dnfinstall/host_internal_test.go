@@ -4,12 +4,16 @@
 package dnfinstall
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/M0Rf30/yap/v2/pkg/rpmdb"
 )
 
 // TestHostInstalledNeverFails: whatever the host's rpm database looks like
@@ -63,4 +67,28 @@ func TestUpdateWithoutRepos(t *testing.T) {
 	defer hostState.mu.Unlock()
 
 	assert.Nil(t, hostState.index)
+}
+
+// TestQueryInstalledFallsBackWithoutDatabase: a host with no rpm database is
+// asked through "rpm -qa"; any other failure reads as nothing installed.
+func TestQueryInstalledFallsBackWithoutDatabase(t *testing.T) {
+	bin := t.TempDir()
+	script := "#!/bin/sh\nprintf 'bash\\n'\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "rpm"), []byte(script), 0o755)) //nolint:gosec
+	t.Setenv("PATH", bin)
+
+	got := queryInstalled(t.Context(), func(context.Context) ([]string, error) {
+		return nil, rpmdb.ErrNoDatabase
+	}, "%{NAME}\n")
+	assert.Equal(t, []string{"bash"}, got)
+
+	got = queryInstalled(t.Context(), func(context.Context) ([]string, error) {
+		return nil, errors.New("corrupt")
+	}, "%{NAME}\n")
+	assert.Empty(t, got)
+
+	got = queryInstalled(t.Context(), func(context.Context) ([]string, error) {
+		return []string{"glibc"}, nil
+	}, "%{NAME}\n")
+	assert.Equal(t, []string{"glibc"}, got)
 }

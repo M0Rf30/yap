@@ -3,7 +3,7 @@ module github.com/M0Rf30/yap/v2
 go 1.27.3
 
 require (
-	github.com/M0Rf30/pkgformat v0.1.0
+	github.com/M0Rf30/pkgformat v0.2.0
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/github/go-spdx/v2 v2.8.0
@@ -11,7 +11,6 @@ require (
 	github.com/go-playground/validator/v10 v10.30.6
 	github.com/google/go-containerregistry v0.22.1
 	github.com/klauspost/compress v1.20.4
-	github.com/knqyf263/go-rpmdb v0.1.1
 	github.com/m0rf30/ar v1.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/nicksnyder/go-i18n/v2 v2.7.0
@@ -28,7 +27,7 @@ require (
 	golang.org/x/term v0.47.0
 	golang.org/x/text v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.61.1
+	modernc.org/sqlite v1.62.0
 	mvdan.cc/sh/v3 v3.14.1
 )
 
@@ -85,9 +84,8 @@ require (
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
-	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	modernc.org/libc v1.79.0 // indirect
+	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )

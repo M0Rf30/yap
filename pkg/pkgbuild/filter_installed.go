@@ -3,7 +3,7 @@
 
 // filter_installed.go: host package-database probes used to skip already-
 // installed makedepends. Backed by the per-format readers (aptcache, apk
-// installed DB, pacman local DB, rpmdb SQLite/BDB); subprocess fallbacks
+// installed DB, pacman local DB, rpmdb SQLite/ndb/BDB); subprocess fallbacks
 // remain only for legacy RPM hosts.
 
 package pkgbuild
@@ -197,24 +197,17 @@ func pacmanDirToName(dir string) string {
 	return withoutPkgrel[:idx]
 }
 
-// filterInstalledRPM queries the SQLite rpmdb directly on modern hosts
-// (Fedora 33+, RHEL 9+, Rocky 9+, Alma 9+, openSUSE 15.5+). On legacy
-// BerkeleyDB hosts it reads the BDB Packages database natively; a batched
-// `rpm -q` subprocess remains the last-resort fallback.
+// filterInstalledRPM reads the host's RPM database directly, whichever format
+// it is in (SQLite, ndb, BerkeleyDB). A batched `rpm -q` subprocess is the
+// fallback for hosts with no database file, or one that cannot be read.
 func filterInstalledRPM(packages []string) []string {
-	db, err := rpmdb.Open()
+	missing, err := rpmdb.FilterInstalled(context.Background(), packages)
 	if err == nil {
-		return db.FilterInstalled(context.Background(), packages)
+		return missing
 	}
 
-	if stderrors.Is(err, rpmdb.ErrLegacyDB) {
-		logger.Debug(i18n.T("logger.pkgbuild.debug.legacy_bdb_host_falling"))
-
-		if legacy, err := rpmdb.OpenLegacy(); err == nil {
-			if missing, err := legacy.FilterInstalled(context.Background(), packages); err == nil {
-				return missing
-			}
-		}
+	if stderrors.Is(err, rpmdb.ErrNoDatabase) {
+		logger.Debug(i18n.T("logger.pkgbuild.debug.no_rpmdb_host_falling"))
 	} else {
 		logger.Warn(i18n.T("logger.pkgbuild.warn.open_failed_falling_back"), "error", err)
 	}
@@ -222,7 +215,7 @@ func filterInstalledRPM(packages []string) []string {
 	return filterInstalledRPMSubprocess(packages)
 }
 
-// filterInstalledRPMSubprocess is the legacy BerkeleyDB fallback. It runs a
+// filterInstalledRPMSubprocess is the subprocess fallback. It runs a
 // single batched `rpm -q pkg1 pkg2 …` (one line of output per argument, in
 // order) instead of one subprocess per package.
 func filterInstalledRPMSubprocess(packages []string) []string {

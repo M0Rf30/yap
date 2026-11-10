@@ -106,50 +106,35 @@ func Update(ctx context.Context) error {
 	return hostState.client.Update(ctx)
 }
 
-// hostInstalled answers the dnf resolver from the host's RPM database: the
-// SQLite rpmdb, the BerkeleyDB one on legacy hosts (RHEL 8 and earlier), and
-// "rpm -qa" as the last resort. A host with no readable database has nothing
-// installed as far as the resolver is concerned.
+// hostInstalled answers the dnf resolver from the host's RPM database, in
+// whichever format the host keeps it (SQLite, ndb, BerkeleyDB), and from
+// "rpm -qa" when the host has none. A host with no readable database has
+// nothing installed as far as the resolver is concerned.
 type hostInstalled struct{}
 
 func (hostInstalled) InstalledNames(ctx context.Context) ([]string, error) {
-	return queryInstalled(ctx,
-		func(db *rpmdb.DB) ([]string, error) { return db.ListInstalled(ctx) },
-		func(db *rpmdb.LegacyDB) ([]string, error) { return db.ListInstalled(ctx) },
-		"%{NAME}\n"), nil
+	return queryInstalled(ctx, rpmdb.ListInstalled, "%{NAME}\n"), nil
 }
 
 func (hostInstalled) InstalledProvides(ctx context.Context) ([]string, error) {
-	return queryInstalled(ctx,
-		func(db *rpmdb.DB) ([]string, error) { return db.ListInstalledProvides(ctx) },
-		func(db *rpmdb.LegacyDB) ([]string, error) { return db.ListInstalledProvides(ctx) },
-		"[%{PROVIDENAME}\n]"), nil
+	return queryInstalled(ctx, rpmdb.ListInstalledProvides, "[%{PROVIDENAME}\n]"), nil
 }
 
 func queryInstalled(
 	ctx context.Context,
-	sqlite func(*rpmdb.DB) ([]string, error),
-	legacy func(*rpmdb.LegacyDB) ([]string, error),
+	list func(context.Context) ([]string, error),
 	queryFormat string,
 ) []string {
-	db, err := rpmdb.Open()
+	out, err := list(ctx)
 	if err == nil {
-		if out, err := sqlite(db); err == nil {
-			return out
-		}
+		return out
 	}
 
-	if err != nil && !errors.Is(err, rpmdb.ErrLegacyDB) {
+	if !errors.Is(err, rpmdb.ErrNoDatabase) {
 		return nil
 	}
 
-	logger.Debug(i18n.T("logger.dnfinstall.debug.legacy_bdb_rpmdb_falling"))
-
-	if ldb, err := rpmdb.OpenLegacy(); err == nil {
-		if out, err := legacy(ldb); err == nil {
-			return out
-		}
-	}
+	logger.Debug(i18n.T("logger.dnfinstall.debug.no_rpmdb_falling"))
 
 	return rpmQuery(ctx, queryFormat)
 }
