@@ -7,8 +7,8 @@ package aptinstall
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	"context"
-	"io"
 	"maps"
 	"os"
 
@@ -32,16 +32,23 @@ func ParseDEBForTesting(debPath string) (*debContents, error) {
 	return parseDEB(debPath)
 }
 
-// DecompressStreamForTesting exposes decompressStream for unit tests.
-func DecompressStreamForTesting(r io.Reader, name string) (io.ReadCloser, error) {
-	return decompressStream(r, name)
-}
-
 // ExtractDataTarWithConffilesForTesting exposes the conffile-aware
-// extractor so safety tests can assert that conffiles are NOT overwritten
+// extractor (the file is a gzip-compressed tar) so safety tests can assert that conffiles are NOT overwritten
 // (C-6 regression).
 func ExtractDataTarWithConffilesForTesting(dataTarPath, destDir string, conffiles []string) error {
-	return extractDataTarWithConffiles(dataTarPath, destDir, conffiles)
+	file, err := os.Open(dataTarPath) //nolint:gosec // test helper
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = file.Close() }()
+
+	gz, err := gzip.NewReader(file)
+	if err != nil {
+		return err
+	}
+
+	return extractTarWithConffiles(gz, destDir, conffiles)
 }
 
 // ExtractDataTarForTesting exposes extractDataTar for unit tests.

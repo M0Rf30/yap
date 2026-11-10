@@ -4,8 +4,8 @@
 // Package aptinstall installs Debian packages into a target root.
 //
 // It runs the dpkg install pipeline: transitive dep resolution against
-// pkg/apthost, .deb download via grab, ar/control.tar/data.tar
-// extraction, maintainer scriptlets via /bin/sh, atomic
+// pkg/apthost, .deb download and parsing through pkgformat/deb,
+// conffile-aware data-archive extraction, maintainer scriptlets via /bin/sh, atomic
 // /var/lib/dpkg/status + /var/lib/dpkg/info/<pkg>.* updates,
 // conffile-preserving extraction, and a single ldconfig at the end of
 // the transaction. Failures surface as errors; nothing falls back to a

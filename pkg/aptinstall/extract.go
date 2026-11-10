@@ -11,89 +11,37 @@ import (
 	"strings"
 
 	"github.com/M0Rf30/pkgformat/safepath"
-	"github.com/m0rf30/ar"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
-// extractDataTar extracts the data.tar member of a .deb to the destination directory.
+// extractDataTar extracts the data archive of a .deb to the destination directory.
 // It handles conffile collisions: if a conffile already exists on disk, it is NOT
 // overwritten (dpkg behavior with DEBIAN_FRONTEND=noninteractive).
 func extractDataTar(debPath, destDir string, conffiles []string) error {
-	file, err := os.Open(debPath) //nolint:gosec
+	deb, closeFile, err := openDEB(debPath)
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "open DEB").
-			WithOperation("extractDataTar").WithContext("path", debPath)
+		return err
 	}
 
-	defer func() { _ = file.Close() }()
+	defer closeFile()
 
-	arReader, err := ar.NewReader(file)
+	data, err := deb.OpenData()
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeParser, "parse AR archive").
+		return errors.Wrap(err, errors.ErrTypeParser, "open data archive").
 			WithOperation("extractDataTar").WithContext("path", debPath)
 	}
 
-	var dataTarPath string
+	defer func() { _ = data.Close() }()
 
-	for {
-		header, err := arReader.Next()
-		if err != nil {
-			if err == io.EOF { //nolint:errorlint
-				break
-			}
-
-			return errors.Wrap(err, errors.ErrTypeParser, "read AR header").
-				WithOperation("extractDataTar")
-		}
-
-		if strings.HasPrefix(header.Name, "data.tar") {
-			// Create a temporary file for data.tar.
-			tmpFile, err := os.CreateTemp("", "data.tar.*")
-			if err != nil {
-				return errors.Wrap(err, errors.ErrTypeFileSystem, "create temp file").
-					WithOperation("extractDataTar")
-			}
-
-			dataTarPath = tmpFile.Name()
-
-			// Copy data.tar to temp file.
-			if _, err := io.Copy(tmpFile, arReader); err != nil {
-				_ = tmpFile.Close()
-				_ = os.Remove(dataTarPath)
-
-				return errors.Wrap(err, errors.ErrTypeFileSystem, "write temp file").
-					WithOperation("extractDataTar")
-			}
-
-			if err := tmpFile.Close(); err != nil {
-				_ = os.Remove(dataTarPath)
-
-				return errors.Wrap(err, errors.ErrTypeFileSystem, "close temp file").
-					WithOperation("extractDataTar")
-			}
-
-			break
-		}
-	}
-
-	if dataTarPath == "" {
-		return errors.New(errors.ErrTypeParser, "data.tar not found in DEB").
-			WithOperation("extractDataTar").WithContext("path", debPath)
-	}
-
-	defer func() {
-		_ = os.Remove(dataTarPath)
-	}()
-
-	// Now extract the data.tar, handling conffiles.
-	return extractDataTarWithConffiles(dataTarPath, destDir, conffiles)
+	return extractTarWithConffiles(data, destDir, conffiles)
 }
 
-// extractDataTarWithConffiles extracts a data.tar file, skipping conffiles that already exist.
-func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string) error {
+// extractTarWithConffiles extracts a decompressed data tar stream, skipping
+// conffiles that already exist.
+func extractTarWithConffiles(data io.Reader, destDir string, conffiles []string) error {
 	// Build a set of conffiles for quick lookup. Conffile entries in the
 	// control file are absolute paths (e.g. "/etc/apt/sources.list"); we
 	// store both the original form and the destDir-rooted form so the
@@ -114,24 +62,7 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 		conffileSet[joined] = true
 	}
 
-	// Open and decompress the data.tar.
-	file, err := os.Open(dataTarPath) //nolint:gosec
-	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "open data.tar").
-			WithOperation("extractDataTarWithConffiles").WithContext("path", dataTarPath)
-	}
-
-	defer func() { _ = file.Close() }()
-
-	decompressed, err := decompressStream(file, dataTarPath)
-	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeParser, "decompress data.tar").
-			WithOperation("extractDataTarWithConffiles")
-	}
-
-	defer func() { _ = decompressed.Close() }()
-
-	tr := tar.NewReader(decompressed)
+	tr := tar.NewReader(data)
 	dirMap := make(map[string]bool)
 
 	for {
@@ -142,7 +73,7 @@ func extractDataTarWithConffiles(dataTarPath, destDir string, conffiles []string
 			}
 
 			return errors.Wrap(err, errors.ErrTypeParser, "read tar entry").
-				WithOperation("extractDataTarWithConffiles")
+				WithOperation("extractTarWithConffiles")
 		}
 
 		// Strip leading "./" from tar entry names.

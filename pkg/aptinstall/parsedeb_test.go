@@ -357,7 +357,7 @@ func TestParseDEB_InvalidARArchive(t *testing.T) {
 
 	_, err := aptinstall.ParseDEBForTesting(badPath)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "parse AR archive")
+	assert.Contains(t, err.Error(), "invalid ar archive")
 }
 
 // TestParseDEB_MissingControlFile verifies that a .deb whose control.tar.gz
@@ -374,7 +374,7 @@ func TestParseDEB_MissingControlFile(t *testing.T) {
 
 	_, err := aptinstall.ParseDEBForTesting(debPath)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "control file not found")
+	assert.Contains(t, err.Error(), "file not found in tar archive")
 }
 
 // TestParseDEB_FullPackage exercises all fields together: control, scriptlets,
