@@ -159,7 +159,7 @@ func TestFilterScriptletEnvMinimal(t *testing.T) {
 
 // TestScriptletTagConstants verifies that the tag constants are correct.
 func TestScriptletTagConstants(t *testing.T) {
-	// Verify PREIN and POSTIN tags from rpmutils.
+	// Verify PREIN and POSTIN tags from pkgformat/rpm.
 	assert.Equal(t, 1023, scriptletTags[scriptletPreIn].bodyTag, "PREIN tag should be 1023")
 	assert.Equal(t, 1085, scriptletTags[scriptletPreIn].progTag, "PREINPROG tag should be 1085")
 	assert.Equal(t, 1024, scriptletTags[scriptletPostIn].bodyTag, "POSTIN tag should be 1024")

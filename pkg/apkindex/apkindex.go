@@ -1,24 +1,32 @@
 // SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package apkindex parses Alpine APKINDEX files and installs .apk packages
-// APK packages. It replaces "apk update" and "apk add" subprocess calls.
+// Package apkindex installs .apk packages onto the running Alpine system. It
+// replaces "apk update" and "apk add" subprocess calls.
+//
+// The repository client, the APKINDEX parser and the dependency resolver are
+// github.com/M0Rf30/pkgformat/apk; this package adds what is specific to yap:
+// the host configuration (/etc/apk/repositories, /etc/apk/keys), the trust
+// decision, the extraction onto "/" and the installed database.
 //
 // Typical usage:
 //
-//	idx, err := apkindex.Update(ctx)
+//	repos, err := apkindex.Update(ctx)
 //	if err != nil {
 //		return err
 //	}
-//	if err := idx.Install(ctx, []string{"gcc", "musl-dev"}); err != nil {
+//	if err := repos.InstallPackages(ctx, []string{"gcc", "musl-dev"}); err != nil {
 //		return err
 //	}
 package apkindex
 
 import (
 	"context"
-	"sync"
+	"os"
 	"sync/atomic"
+
+	pkgapk "github.com/M0Rf30/pkgformat/apk"
+	"github.com/M0Rf30/pkgformat/httpclient"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -26,215 +34,172 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/platform"
 )
 
-// globalIndex caches the most recent Index from Update so Install can reuse it
+const (
+	apkCacheDir = "/var/cache/apk"
+	apkKeysDir  = "/etc/apk/keys"
+)
+
+// globalRepos caches the most recent Repos from Update so Install can reuse it
 // without re-fetching.
-var globalIndex atomic.Pointer[Index]
+var globalRepos atomic.Pointer[Repos]
 
-// Package holds the subset of APKINDEX fields needed for install/dep resolution.
-type Package struct {
-	Name        string
-	Version     string
-	Arch        string
-	Size        int64
-	InstSize    int64
-	Description string
-	URL         string
-	License     string
-	Origin      string
-	Maintainer  string
-	Depends     []string
-	Provides    []string
-	Checksum    string // Q1+base64-SHA1 — for content addressing
-	RepoBaseURL string // populated at parse time
+// Repos is the loaded state of the configured repositories: the merged index
+// and the client that downloads the packages the index lists.
+type Repos struct {
+	Index  *pkgapk.Index
+	client *pkgapk.Client
 }
 
-// Index is an in-memory APKINDEX from one or more Alpine repositories.
-type Index struct {
-	mu        sync.RWMutex
-	packages  map[string]*Package   // name → first-winning Package
-	providers map[string][]*Package // virtual name → providers
+// UpdateOptions configures UpdateWithOptions.
+type UpdateOptions struct {
+	// Repos are the repositories, in order of preference.
+	Repos []pkgapk.Repo
+	// Arch is the architecture directory of every repository.
+	Arch string
+	// KeysDir is the directory of trusted public keys. An index is only
+	// accepted with a valid signature by one of them.
+	KeysDir string
+	// CacheDir receives a copy of each verified index.
+	CacheDir string
+	// AllowUnverified accepts indexes without checking their signature when
+	// KeysDir holds no keys at all. Downloaded packages are still checked
+	// against the index entries.
+	AllowUnverified bool
+	// HTTP fetches indexes and packages; nil selects the library default.
+	HTTP *httpclient.Client
 }
 
-// NewIndex creates a new empty Index.
-func NewIndex() *Index {
-	return &Index{
-		packages:  make(map[string]*Package),
-		providers: make(map[string][]*Package),
-	}
-}
-
-// Lookup returns the Package for the named package and whether it was found.
-// The name must be the bare package name without version constraints.
-func (idx *Index) Lookup(name string) (*Package, bool) {
-	idx.mu.RLock()
-	defer idx.mu.RUnlock()
-
-	pkg, ok := idx.packages[name]
-
-	return pkg, ok
-}
-
-// Stats returns the number of packages and capabilities (Provides) indexed.
-// Useful for diagnostic logging after Update.
-func (idx *Index) Stats() (packages, capabilities int) {
-	idx.mu.RLock()
-	defer idx.mu.RUnlock()
-
-	return len(idx.packages), len(idx.providers)
-}
-
-// ResolveVirtual returns the first concrete provider of a virtual package, or
-// nil if no provider is found.
-func (idx *Index) ResolveVirtual(name string) (*Package, bool) {
-	idx.mu.RLock()
-	defer idx.mu.RUnlock()
-
-	providers, ok := idx.providers[name]
-	if !ok || len(providers) == 0 {
-		return nil, false
+// Update fetches APKINDEX.tar.gz from every repo in /etc/apk/repositories,
+// verifies it against the keys in /etc/apk/keys, and returns the loaded
+// repositories. Replaces "apk update". The result is cached globally so
+// Install can reuse it without re-fetching.
+//
+// Without any trusted key the indexes are accepted unverified only on a
+// privileged host (uid 0, the expected case inside a yap build container) and
+// refused on a developer workstation.
+func Update(ctx context.Context) (*Repos, error) {
+	repos, err := LoadRepos()
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeConfiguration, "load repos").
+			WithOperation("Update")
 	}
 
-	return providers[0], true
-}
-
-// ResolveDeps does a simple greedy BFS over the index to resolve transitive
-// dependencies. Returns a list of packages to install (in dependency order).
-// Alpine deps are not a true SAT problem; conflicts are rare in practice.
-func (idx *Index) ResolveDeps(names []string) ([]*Package, error) {
-	var out []*Package
-
-	seen := make(map[string]bool)
-
-	var (
-		viaVirtual int
-		unresolved int
-	)
-
-	var visit func(n string) error
-
-	visit = func(n string) error {
-		n = stripVersionConstraint(n)
-		if seen[n] {
-			return nil
-		}
-
-		seen[n] = true
-
-		pkg, ok := idx.Lookup(n)
-		if !ok {
-			// Try virtual package resolution.
-			if vp, ok := idx.ResolveVirtual(n); ok {
-				logger.Debug(i18n.T("logger.apkindex.debug.resolved_virtual"), "capability", n,
-					"provider", vp.Name)
-
-				viaVirtual++
-
-				pkg = vp
-			} else {
-				// Package not found — skip it; apk will reject it later if needed.
-				logger.Debug(i18n.T("logger.apkindex.debug.unresolved"), "package", n)
-
-				unresolved++
-
-				return nil
-			}
-		}
-
-		// Dedupe on the resolved name: the same package may be reached by
-		// its real name and by a virtual capability it provides.
-		if pkg.Name != n {
-			if seen[pkg.Name] {
-				return nil
-			}
-
-			seen[pkg.Name] = true
-		}
-
-		// Recursively visit dependencies.
-		for _, d := range pkg.Depends {
-			// Skip negations like "!conflict".
-			if d != "" && d[0] == '!' {
-				continue
-			}
-
-			// Skip /-prefixed paths (file-based deps); apk handles these via Provides.
-			if d != "" && d[0] == '/' {
-				continue
-			}
-
-			if err := visit(d); err != nil {
-				return err
-			}
-		}
-
-		logger.Debug(i18n.T("logger.apkindex.debug.enqueue_install"), "package", pkg.Name,
-			"version", pkg.Version,
-			"size", pkg.Size)
-
-		out = append(out, pkg)
-
-		return nil
+	arch := DetectArch()
+	if arch == "" {
+		return nil, errors.New(errors.ErrTypeConfiguration, "could not detect APK architecture").
+			WithOperation("Update")
 	}
 
-	for _, n := range names {
-		if !idx.known(stripVersionConstraint(n)) {
-			return nil, errors.New(errors.ErrTypeValidation,
-				"package not found in APK index").
-				WithOperation("ResolveDeps").
-				WithContext("package", n)
-		}
-
-		if err := visit(n); err != nil {
-			return nil, err
-		}
-	}
-
-	logger.Info(i18n.T("logger.apkindex.info.resolved_transitive_deps"), "seeds", len(names),
-		"to_install", len(out),
-		"via_virtual", viaVirtual,
-		"unresolved", unresolved)
-
-	return out, nil
+	return UpdateWithOptions(ctx, &UpdateOptions{
+		Repos:           repos,
+		Arch:            arch,
+		KeysDir:         apkKeysDir,
+		CacheDir:        apkCacheDir,
+		AllowUnverified: platform.IsPrivilegedHost(),
+	})
 }
 
-// known reports whether name is a package or a provided capability.
-func (idx *Index) known(name string) bool {
-	if _, ok := idx.Lookup(name); ok {
-		return true
+// UpdateWithOptions is Update with explicit repositories, trust and HTTP client.
+func UpdateWithOptions(ctx context.Context, opts *UpdateOptions) (*Repos, error) {
+	copts := pkgapk.ClientOptions{
+		Repos:    opts.Repos,
+		Arch:     opts.Arch,
+		CacheDir: opts.CacheDir,
+		HTTP:     opts.HTTP,
+		Logger:   logger.Slog(),
 	}
 
-	_, ok := idx.ResolveVirtual(name)
+	trusted, err := hasTrustedKeys(opts.KeysDir)
+	if err != nil {
+		return nil, err
+	}
 
-	return ok
+	switch {
+	case trusted:
+		copts.KeysDir = opts.KeysDir
+		// apk-tools verifies SHA-1 signatures and Alpine still signs its
+		// indexes with them, so both types are accepted.
+		copts.Algorithms = []pkgapk.SigAlgorithm{pkgapk.SigRSASHA1, pkgapk.SigRSASHA256}
+	case opts.AllowUnverified:
+		logger.Warn(i18n.T("logger.apkindex.warn.installing_without_verification"), "keys_dir", opts.KeysDir)
+
+		copts.InsecureSkipVerify = true
+	default:
+		return nil, errors.New(errors.ErrTypeValidation,
+			"no trusted APK keys; install keys or run on a privileged host to accept unverified indexes").
+			WithOperation("UpdateWithOptions").
+			WithContext("keys_dir", opts.KeysDir)
+	}
+
+	client, err := pkgapk.NewClient(copts)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeConfiguration, "failed to create APK client").
+			WithOperation("UpdateWithOptions")
+	}
+
+	logger.Info(i18n.T("logger.apkindex.info.updating_indexes"), "repos", len(opts.Repos), "arch", opts.Arch)
+
+	updated, err := client.Update(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeNetwork, "no APK repository index could be loaded").
+			WithOperation("UpdateWithOptions").
+			WithContext("repos", len(opts.Repos))
+	}
+
+	for _, failure := range updated.Failures {
+		logger.Warn(i18n.T("logger.apkindex.warn.fetch_failed"), "url", failure.Repo.URL, "error", failure.Err)
+	}
+
+	pkgs, caps := updated.Stats()
+	logger.Info(i18n.T("logger.apkindex.info.indexes_loaded"),
+		"repos_succeeded", len(opts.Repos)-len(updated.Failures),
+		"repos_total", len(opts.Repos),
+		"packages", pkgs,
+		"capabilities", caps)
+
+	loaded := &Repos{Index: updated.Index, client: client}
+	globalRepos.Store(loaded)
+
+	return loaded, nil
 }
 
-// Load returns the cached Index from the most recent Update call, or nil if
+// hasTrustedKeys reports whether dir holds at least one trusted public key. A
+// missing directory holds none; a damaged key is an error, never silently
+// dropped from the trust set.
+func hasTrustedKeys(dir string) (bool, error) {
+	ring, err := pkgapk.LoadKeyring(dir)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, errors.Wrap(err, errors.ErrTypeConfiguration, "failed to load APK keys").
+			WithOperation("hasTrustedKeys").
+			WithContext("keys_dir", dir)
+	}
+
+	return ring.Len() > 0, nil
+}
+
+// Load returns the cached Repos from the most recent Update call, or nil if
 // Update has not been called yet.
-func Load() *Index {
-	return globalIndex.Load()
+func Load() *Repos {
+	return globalRepos.Load()
 }
 
-// Install is a convenience function that calls Update to fetch the index,
+// Install is a convenience function that calls Update to fetch the indexes,
 // then installs the requested packages. This is the main entry point for
 // replacing "apk update && apk add <pkgs>" subprocess calls.
-//
-// APK package signature verification (RSA against the trusted keyring in
-// /etc/apk/keys) is not yet implemented; the convenience wrapper accepts
-// that gap when running on a privileged host (uid 0 — the expected case
-// inside a yap build container) and refuses on a developer workstation.
-// Use InstallPackagesWithOptions for explicit control.
 func Install(ctx context.Context, names []string) error {
-	idx := Load()
-	if idx == nil {
+	repos := Load()
+	if repos == nil {
 		var err error
 
-		idx, err = Update(ctx)
+		repos, err = Update(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
-	return idx.InstallPackagesWithOptions(ctx, names, InstallOptions{
-		AllowUnverifiedPackages: platform.IsPrivilegedHost(),
-	})
+	return repos.InstallPackages(ctx, names)
 }

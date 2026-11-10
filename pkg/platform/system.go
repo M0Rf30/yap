@@ -15,12 +15,13 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/M0Rf30/pkgformat/httpclient"
+
 	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
-	"github.com/M0Rf30/yap/v2/pkg/download"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/fetch"
 	"github.com/M0Rf30/yap/v2/pkg/files"
-	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/shell"
@@ -207,13 +208,12 @@ func GOSetupContext(ctx context.Context) error {
 	archivePath := filepath.Join(tmpDir, goArchiveName)
 	archiveURL := constants.GoArchiveURL()
 
-	if err := download.WithContext(
-		ctx,
-		archivePath,
-		archiveURL,
-		download.MaxRetries(),
-		"yap", "go-toolchain",
-		shell.MultiPrinter.Writer); err != nil {
+	if err := fetch.File(ctx, archivePath, archiveURL, fetch.Options{
+		MaxRetries:  fetch.MaxRetries(),
+		PackageName: "yap",
+		SourceName:  "go-toolchain",
+		Progress:    shell.MultiPrinter.Writer,
+	}); err != nil {
 		return errors.Wrap(err, errors.ErrTypeBuild,
 			i18n.T("errors.platform.download_go_archive_failed")).
 			WithOperation("GOSetup")
@@ -262,7 +262,8 @@ func goChecksumURL(archiveURL string) string {
 func verifyGoArchive(ctx context.Context, archivePath, archiveURL string) error {
 	sumURL := goChecksumURL(archiveURL)
 
-	body, err := httpclient.FetchBytes(ctx, sumURL, goChecksumMaxBytes)
+	body, err := httpclient.New(httpclient.Options{Logger: logger.Slog()}).
+		FetchBytes(ctx, sumURL, goChecksumMaxBytes)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeNetwork,
 			i18n.T("errors.platform.download_go_archive_failed")).

@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
-	"github.com/M0Rf30/yap/v2/pkg/download"
+	"github.com/M0Rf30/yap/v2/pkg/fetch"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/packer"
@@ -79,7 +79,7 @@ var (
 				}
 			}
 
-			packageManager, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
+			packageManager, err := packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, packer.Options{})
 			if err != nil {
 				return err
 			}
@@ -147,8 +147,8 @@ func preparePassthroughFlags() []string {
 		out = append(out, "--skip-toolchain-validation")
 	}
 
-	if download.MaxRetries() != download.DefaultMaxRetries {
-		out = append(out, "--source-retries", strconv.Itoa(download.MaxRetries()))
+	if fetch.MaxRetries() != fetch.DefaultMaxRetries {
+		out = append(out, "--source-retries", strconv.Itoa(fetch.MaxRetries()))
 	}
 
 	return out

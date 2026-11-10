@@ -51,6 +51,42 @@ func (mpc *MultipleProject) signArtifact(
 	return nil
 }
 
+// embeddedSigner is implemented by builders whose package format carries
+// signatures inside the artifact (RPM). The function receives the bytes to
+// sign and returns a binary OpenPGP detached signature.
+type embeddedSigner interface {
+	SetPGPSigner(f func([]byte) ([]byte, error))
+}
+
+// prepareEmbeddedSigning registers the project's OpenPGP key with builders
+// that embed signatures in the artifact, so `rpm -K` and dnf can verify the
+// package itself and not only the detached sidecar written by signArtifact.
+// Formats without a usable key of the right type stay unsigned, as with
+// signArtifact.
+func (mpc *MultipleProject) prepareEmbeddedSigning(proj *Project) error {
+	if proj.Signing == nil || !proj.Signing.Enabled {
+		return nil
+	}
+
+	es, ok := proj.PackageManager.(embeddedSigner)
+	if !ok {
+		return nil
+	}
+
+	signer, err := signing.NewSigner(signing.FormatRPM, *proj.Signing)
+	if err != nil {
+		return yerrors.Wrap(err, yerrors.ErrTypeBuild, "failed to create signer").
+			WithOperation("prepareEmbeddedSigning").
+			WithContext("format", string(signing.FormatRPM))
+	}
+
+	if gpg, ok := signer.(*signing.GPGSigner); ok {
+		es.SetPGPSigner(gpg.DetachSignBinary)
+	}
+
+	return nil
+}
+
 // signingFormatForArtifact maps a file extension to a signing.Format.
 func signingFormatForArtifact(artifactPath string) (signing.Format, bool) {
 	lower := strings.ToLower(artifactPath)

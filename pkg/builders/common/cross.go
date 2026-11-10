@@ -13,7 +13,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/pkgformat/deb/apt"
+
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
+	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -27,13 +30,13 @@ import (
 // PackageInfo slice in dependency order plus the list of unresolvable
 // names.
 //
-// Reloads the aptcache singleton first so freshly-added cross-arch repos
+// Reloads the apthost cache first so freshly-added cross-arch repos
 // (see pkg/repo/cross.go) are visible to the resolver.
 func aptCacheDownloadClosure(
 	ctx context.Context, dir string, seeds []string,
-) ([]*aptcache.PackageInfo, []string, error) {
-	cache := aptcache.Reload()
-	return cache.DownloadClosure(ctx, dir, seeds)
+) ([]*apt.PackageInfo, []string, error) {
+	cache := apthost.Reload()
+	return cache.DownloadClosure(ctx, dir, seeds, apthost.DownloadOptions())
 }
 
 // crossCompileParams holds pre-computed cross-compilation parameters
@@ -224,8 +227,8 @@ const (
 )
 
 // partitionArchAllDeps splits deps according to apt Multi-Arch policy. The
-// caller is responsible for ensuring the aptcache singleton is up to date
-// (e.g. via aptcache.Reload after apt-get update or SetupCrossAPT). Tests
+// caller is responsible for ensuring the apthost cache is up to date
+// (e.g. via apthost.Reload after apt-get update or SetupCrossAPT). Tests
 // install a synthetic cache via StoreGlobal and must not be clobbered by an
 // implicit disk reload.
 //
@@ -240,7 +243,7 @@ const (
 // partitionForInstall additionally leaves host-installed non-Multi-Arch:same
 // packages unqualified (see partitionMode).
 func partitionArchAllDeps(deps []string, mode partitionMode) (archSpecific, archAll []string) {
-	cache := aptcache.Load()
+	cache := apthost.Cache()
 
 	for _, dep := range deps {
 		// Strip version constraint for the lookup: "libssl-dev (>= 1.0)" → "libssl-dev"
@@ -266,10 +269,10 @@ func partitionArchAllDeps(deps []string, mode partitionMode) (archSpecific, arch
 			// apt lists or pre-install the host-arch variant before building.
 			//
 			// Note: a previous version of this branch checked info.Installed,
-			// but aptcache.Lookup returns a zero-value PackageInfo when not
+			// but apt.Cache.Lookup returns a zero-value PackageInfo when not
 			// found, so that flag could never be true here. Lookup-and-found
 			// covers the dpkg-installed case via the merged status overlay
-			// (see pkg/aptcache.Cache.loadDpkgStatus).
+			// (see apt.Load).
 			archSpecific = append(archSpecific, dep)
 
 			continue
@@ -393,7 +396,7 @@ func qualifyDepsForTargetArch(deps []string, format, targetArch string) []string
 // name, in which case only the sysroot receives it.
 //
 // **Transitive resolution**: the declared PKGBUILD dependencies are walked
-// through aptcache.DownloadClosure so transitive runtime libraries that
+// through apt.Cache.DownloadClosure so transitive runtime libraries that
 // the declared deps themselves need are pulled in too. Without this, a
 // PKGBUILD listing only vendor-ffmpeg fails to cross-link because
 // libavcodec.so has DT_NEEDED entries for libvpx.so / libx264.so which
@@ -425,7 +428,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 
 	// Same Reload rationale as installCrossDeps: pick up packages from any
 	// extra/cross repos added after the cache was first populated.
-	aptcache.Reload()
+	apthost.Reload()
 
 	// Use the extract-safe partitioning: since we download+extract (not dpkg -i),
 	// there are no dpkg conflicts, so packages already installed for the host arch
@@ -459,7 +462,7 @@ func (bb *BaseBuilder) DownloadAndExtractCrossDeps(
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Resolve transitive closure, then download every .deb in the closure.
-	// aptcache skips packages already marked Installed (i.e. present in the
+	// the apt cache skips packages already marked Installed (i.e. present in the
 	// build container's dpkg status) so we don't re-extract libc6, glibc,
 	// etc. Their dep edges are still walked so a transitive-only library
 	// reachable only through an installed package is still pulled in.
@@ -544,12 +547,12 @@ const debArchAll = "all"
 // to both destinations.
 func extractCrossDeps(
 	ctx context.Context,
-	resolved []*aptcache.PackageInfo,
+	resolved []*apt.PackageInfo,
 	seedSet map[string]bool,
 	tmpDir string,
 	sysrootDir string,
 ) (skipped int, sysrootOnly int, err error) {
-	hostArch := aptcache.GoarchToDebArch()
+	hostArch := apthost.HostArch()
 	installedNames := hostInstalledNames(ctx)
 
 	if err := os.MkdirAll(sysrootDir, 0o755); err != nil {
@@ -587,7 +590,7 @@ func extractCrossDeps(
 		debPath := filepath.Join(tmpDir, filepath.Base(info.Filename))
 
 		if sysroot {
-			if err := ExtractDEB(debPath, sysrootDir); err != nil {
+			if err := archive.ExtractDEB(debPath, sysrootDir); err != nil {
 				return skipped, sysrootOnly, errors.Wrap(err, errors.ErrTypeBuild, "extract cross dep to sysroot").
 					WithOperation("DownloadAndExtractCrossDeps").
 					WithContext("package", info.Name)
@@ -603,7 +606,7 @@ func extractCrossDeps(
 			continue
 		}
 
-		if err := ExtractDEB(debPath, "/"); err != nil {
+		if err := archive.ExtractDEB(debPath, "/"); err != nil {
 			return skipped, sysrootOnly, errors.Wrap(err, errors.ErrTypeBuild, "extract cross dep").
 				WithOperation("DownloadAndExtractCrossDeps").
 				WithContext("package", info.Name)
@@ -623,7 +626,7 @@ func extractCrossDeps(
 // every makedepend installed during this run — precisely the packages whose
 // host-arch payload a target-arch extraction would clobber.
 func hostInstalledNames(ctx context.Context) map[string]bool {
-	names := aptcache.Load().InstalledNames()
+	names := apthost.Cache().InstalledNames()
 
 	db, err := yapdb.Open(ctx, yapdb.DefaultPath("/"))
 	if err != nil {
@@ -659,7 +662,7 @@ func hostInstalledNames(ctx context.Context) map[string]bool {
 //	                                 architecture)
 //	otherwise                     -> sysroot and "/"
 func crossDepDestinations(
-	info *aptcache.PackageInfo,
+	info *apt.PackageInfo,
 	hostArch string,
 	isSeed bool,
 	installedNames map[string]bool,
@@ -682,7 +685,7 @@ func crossDepDestinations(
 // countDirect returns the number of resolved entries whose name appears in
 // the seedSet — i.e. were directly declared by the PKGBUILD rather than
 // pulled in transitively. Used purely for logger summary.
-func countDirect(resolved []*aptcache.PackageInfo, seedSet map[string]bool) int {
+func countDirect(resolved []*apt.PackageInfo, seedSet map[string]bool) int {
 	n := 0
 
 	for _, p := range resolved {
@@ -710,7 +713,7 @@ func (bb *BaseBuilder) installCrossDeps(
 	// SetupCrossAPT). A stale cache means host-tools like perl (Multi-Arch:
 	// allowed) get misclassified as arch-specific and incorrectly qualified
 	// with the target arch (e.g. perl:arm64), producing a broken build env.
-	aptcache.Reload()
+	apthost.Reload()
 
 	archSpecific, archAll := partitionArchAllDeps(makeDepends, partitionForInstall)
 	qualified := qualifyDepsForTargetArch(archSpecific, bb.Format, targetArch)

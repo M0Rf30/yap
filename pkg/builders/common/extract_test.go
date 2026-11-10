@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/M0Rf30/rpmpack"
+	"github.com/M0Rf30/pkgformat/rpm/pack"
 	"github.com/m0rf30/ar"
 
 	"github.com/M0Rf30/yap/v2/pkg/archive"
@@ -152,7 +152,7 @@ func TestExtractToRoot(t *testing.T) {
 
 	// For this test, we'll extract to the test root directory
 	// by modifying the test to use ExtractDEB directly
-	err := ExtractDEB(debPath, testRootDir)
+	err := archive.ExtractDEB(debPath, testRootDir)
 	if err != nil {
 		t.Fatalf("extractDEB failed: %v", err)
 	}
@@ -250,20 +250,20 @@ func TestExtractDEB_MissingDataTar(t *testing.T) {
 
 	destDir := filepath.Join(tmpDir, "dest")
 
-	err := ExtractDEB(invalidDEB, destDir)
+	err := archive.ExtractDEB(invalidDEB, destDir)
 	if err == nil {
 		t.Error("Expected error for invalid DEB, got nil")
 	}
 }
 
-// createTestRPM builds a minimal but real RPM in tmpDir via rpmpack and returns
+// createTestRPM builds a minimal but real RPM in tmpDir via pkgformat/rpm/pack and returns
 // its path. The payload contains a couple of representative files (including a
 // pkgconfig .pc file mirroring the vendor-libopus scenario that surfaced the
 // silent no-op bug fixed in extractRPM).
 func createTestRPM(t *testing.T, tmpDir string) string {
 	t.Helper()
 
-	rpm, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+	rpm, err := pack.NewRPM(pack.RPMMetaData{
 		Name:        "yap-extract-test",
 		Summary:     "Extraction regression fixture",
 		Description: "Regression fixture for extractRPM",
@@ -273,15 +273,15 @@ func createTestRPM(t *testing.T, tmpDir string) string {
 		Licence:     "GPL-3.0-only",
 	})
 	if err != nil {
-		t.Fatalf("rpmpack.NewRPM: %v", err)
+		t.Fatalf("pack.NewRPM: %v", err)
 	}
 
-	rpm.AddFile(rpmpack.RPMFile{
+	rpm.AddFile(pack.RPMFile{
 		Name: "/opt/vendor/common/lib/pkgconfig/opus.pc",
 		Body: []byte("Name: opus\nVersion: 1.5.2\n"),
 		Mode: 0o100644,
 	})
-	rpm.AddFile(rpmpack.RPMFile{
+	rpm.AddFile(pack.RPMFile{
 		Name: "/opt/vendor/common/lib/libopus.so",
 		Body: []byte("stub shared object"),
 		Mode: 0o100755,
@@ -343,8 +343,8 @@ func TestExtractRPM(t *testing.T) {
 }
 
 // TestExtractRPM_AbsoluteEntryNames is the regression guard for the
-// 'invalid cpio path "/opt/..."' failure: rpmpack writes absolute entry names
-// like "/opt/vendor/common/bin/x264", but go-rpmutils' bundled ExpandPayload
+// 'invalid cpio path "/opt/..."' failure: pkgformat/rpm/pack writes absolute entry names
+// like "/opt/vendor/common/bin/x264", but pkgformat/rpm' bundled ExpandPayload
 // rejects them whenever destDir is "/" (its containment check builds
 // dest+"/" → "//" which fails to prefix-match the absolute target).
 //
@@ -354,15 +354,15 @@ func TestExtractRPM(t *testing.T) {
 func TestExtractRPM_AbsoluteEntryNames(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	rpm, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+	rpm, err := pack.NewRPM(pack.RPMMetaData{
 		Name: "abs-entry-test", Version: "1.0", Release: "1", Arch: "x86_64",
 	})
 	if err != nil {
-		t.Fatalf("rpmpack.NewRPM: %v", err)
+		t.Fatalf("pack.NewRPM: %v", err)
 	}
 
 	// Mimic the exact vendor-x264 entry that triggered the bug.
-	rpm.AddFile(rpmpack.RPMFile{
+	rpm.AddFile(pack.RPMFile{
 		Name: "/opt/vendor/common/bin/x264",
 		Body: []byte("stub binary"),
 		Mode: 0o100755,

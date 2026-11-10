@@ -437,3 +437,23 @@ func Fatal(msg string, args ...any) { Logger.Fatal(msg, args...) }
 
 // Tips logs a tip message using the global logger.
 func Tips(msg string, args ...any) { Logger.Tips(msg, args...) }
+
+// liveHandler forwards to the current package handler on every record, so a
+// *slog.Logger handed to a library keeps following SetWriter.
+type liveHandler struct{}
+
+func (liveHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return getHandler().Enabled(ctx, level)
+}
+
+func (liveHandler) Handle(ctx context.Context, record slog.Record) error { //nolint:gocritic // slog.Handler signature
+	return getHandler().Handle(ctx, record)
+}
+
+func (h liveHandler) WithAttrs(_ []slog.Attr) slog.Handler { return h }
+
+func (h liveHandler) WithGroup(_ string) slog.Handler { return h }
+
+// Slog returns a *slog.Logger that renders through the yap log handler, for
+// libraries that take a *slog.Logger.
+func Slog() *slog.Logger { return slog.New(liveHandler{}) }

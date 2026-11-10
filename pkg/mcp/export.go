@@ -16,6 +16,8 @@ func allFieldsBuildArgs() *buildArgs {
 			f.SetBool(true)
 		case reflect.String:
 			f.SetString("x")
+		case reflect.Int:
+			f.SetInt(6)
 		case reflect.Slice:
 			f.Set(reflect.ValueOf([]string{"x"}))
 		default:

@@ -19,7 +19,7 @@ func TestGetPackageManager_APK(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	packer, err := GetPackageManager(pkgBuild, "alpine", "", "")
+	packer, err := GetPackageManager(pkgBuild, "alpine", Options{})
 	if err != nil {
 		t.Fatalf("GetPackageManager returned error for alpine: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestGetPackageManager_DEB(t *testing.T) {
 
 	for _, distro := range debDistros {
 		t.Run(distro, func(t *testing.T) {
-			packer, err := GetPackageManager(pkgBuild, distro, "", "")
+			packer, err := GetPackageManager(pkgBuild, distro, Options{})
 			if err != nil {
 				t.Fatalf("GetPackageManager returned error for %s: %v", distro, err)
 			}
@@ -67,7 +67,7 @@ func TestGetPackageManager_PKG(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	packer, err := GetPackageManager(pkgBuild, "arch", "", "")
+	packer, err := GetPackageManager(pkgBuild, "arch", Options{})
 	if err != nil {
 		t.Fatalf("GetPackageManager returned error for arch: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestGetPackageManager_RPM_YUM(t *testing.T) {
 
 	for _, distro := range yumDistros {
 		t.Run(distro, func(t *testing.T) {
-			packer, err := GetPackageManager(pkgBuild, distro, "", "")
+			packer, err := GetPackageManager(pkgBuild, distro, Options{})
 			if err != nil {
 				t.Fatalf("GetPackageManager returned error for %s: %v", distro, err)
 			}
@@ -115,7 +115,7 @@ func TestGetPackageManager_RPM_Zypper(t *testing.T) {
 		PkgVer:  "1.0.0",
 	}
 
-	packer, err := GetPackageManager(pkgBuild, "opensuse-leap", "", "")
+	packer, err := GetPackageManager(pkgBuild, "opensuse-leap", Options{})
 	if err != nil {
 		t.Fatalf("GetPackageManager returned error for opensuse-leap: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestGetPackageManager_Integration(t *testing.T) {
 
 	for distro, expectedType := range testCases {
 		t.Run(distro, func(t *testing.T) {
-			packer, err := GetPackageManager(pkgBuild, distro, "", "")
+			packer, err := GetPackageManager(pkgBuild, distro, Options{})
 			if err != nil {
 				t.Fatalf("GetPackageManager returned error for %s: %v", distro, err)
 			}
@@ -212,7 +212,7 @@ func TestGetPackageManager_ValidatesInterface(t *testing.T) {
 
 	for _, distro := range distros {
 		t.Run(distro, func(t *testing.T) {
-			packer, err := GetPackageManager(pkgBuild, distro, "", "")
+			packer, err := GetPackageManager(pkgBuild, distro, Options{})
 			if err != nil {
 				t.Fatalf("GetPackageManager returned error for %s: %v", distro, err)
 			}

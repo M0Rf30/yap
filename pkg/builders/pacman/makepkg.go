@@ -5,26 +5,18 @@
 package pacman
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
-	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
-	"text/template"
 
-	"github.com/klauspost/pgzip"
+	"github.com/M0Rf30/pkgformat/pacman"
 
-	"github.com/M0Rf30/yap/v2/pkg/archive"
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/crypto"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
-	"github.com/M0Rf30/yap/v2/pkg/i18n"
-	"github.com/M0Rf30/yap/v2/pkg/logger"
 	"github.com/M0Rf30/yap/v2/pkg/pkgbuild"
 )
 
@@ -53,12 +45,25 @@ func NewBuilder(pkgBuild *pkgbuild.PKGBUILD) *Pkg {
 func (m *Pkg) BuildPackage(ctx context.Context, artifactsPath string, targetArch string) (string, error) {
 	m.SetTargetArchitecture(targetArch)
 
-	pkgName := m.BuildPackageName(constants.ExtPacmanZst)
-	pkgFilePath := filepath.Join(artifactsPath, pkgName)
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 
-	err := archive.CreateTarZst(ctx, m.PKGBUILD.PackageDir, pkgFilePath, false)
+	spec, err := m.spec()
 	if err != nil {
 		return "", err
+	}
+
+	pkgFilePath := filepath.Join(artifactsPath, m.BuildPackageName(constants.ExtPacmanZst))
+
+	err = spec.WriteFile(pkgFilePath, pacman.WriteOptions{
+		Compression: pacman.CompressionZstd,
+		Generator:   "yap " + m.PKGBUILD.YAPVersion,
+	})
+	if err != nil {
+		return "", errors.Wrap(err, errors.ErrTypePackaging, "failed to write pacman package").
+			WithOperation("BuildPackage").
+			WithContext("path", pkgFilePath)
 	}
 
 	// Log package creation using common functionality
@@ -98,21 +103,7 @@ func (m *Pkg) PrepareFakeroot(ctx context.Context, artifactsPath string, targetA
 		return err
 	}
 
-	if err := m.writePackageMetadata(); err != nil {
-		return err
-	}
-
-	if err := m.writeInstallScriptIfNeeded(); err != nil {
-		return err
-	}
-
-	// .CHANGELOG and .INSTALL are part of the payload, so they must exist
-	// before .MTREE is generated.
-	if err := m.writeChangelogIfPresent(); err != nil {
-		return err
-	}
-
-	return m.writeMTREE()
+	return m.writeInstallCopy()
 }
 
 // computeBuildMetadata computes installed size, source date epoch, and other
@@ -163,167 +154,120 @@ func (m *Pkg) renderPKGBUILDFile() error {
 	return nil
 }
 
-// writePackageMetadata renders and writes the .PKGINFO and .BUILDINFO files.
-func (m *Pkg) writePackageMetadata() error {
-	pkgInfoTmpl := m.PKGBUILD.RenderSpec(dotPkginfo)
-	if err := m.PKGBUILD.CreateSpec(
-		filepath.Join(m.PKGBUILD.PackageDir, ".PKGINFO"), pkgInfoTmpl); err != nil {
-		return err
+// spec maps the PKGBUILD to the package the pacman library writes: .PKGINFO,
+// .BUILDINFO, .INSTALL, .CHANGELOG and the payload staged in PackageDir (the
+// library generates .MTREE).
+func (m *Pkg) spec() (*pacman.Spec, error) {
+	pb := m.PKGBUILD
+
+	changelog, err := pb.ReadChangelog()
+	if err != nil {
+		return nil, err
 	}
 
-	buildInfoTmpl := m.PKGBUILD.RenderSpec(dotBuildinfo)
+	payload, err := pacman.ScanDir(pb.PackageDir)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "failed to list package payload").
+			WithOperation("spec").
+			WithContext("package_dir", pb.PackageDir)
+	}
 
-	return m.PKGBUILD.CreateSpec(
-		filepath.Join(m.PKGBUILD.PackageDir, ".BUILDINFO"), buildInfoTmpl)
+	version := pb.PkgVer + "-" + pb.PkgRel
+	if pb.Epoch != "" {
+		version = pb.Epoch + ":" + version
+	}
+
+	var groups []string
+	if pb.Group != "" {
+		groups = []string{pb.Group}
+	}
+
+	buildOptions := pb.Options
+	if len(buildOptions) == 0 {
+		buildOptions = []string{"strip", "staticlibs"}
+	}
+
+	return &pacman.Spec{
+		Info: pacman.PkgInfo{
+			Name:        pb.PkgName,
+			Base:        pb.EffectivePkgBase(),
+			Version:     version,
+			Description: pb.PkgDesc,
+			URL:         pb.URL,
+			Packager:    pb.Maintainer,
+			Arch:        pb.ArchComputed,
+			BuildDate:   pb.BuildDate,
+			InstalledSz: pb.InstalledSize,
+			Licenses:    pb.License,
+			Groups:      groups,
+			Replaces:    pb.Replaces,
+			Conflicts:   pb.Conflicts,
+			Provides:    pb.Provides,
+			Backup:      pb.Backup,
+			Depends:     pb.Depends,
+			OptDepends:  pb.OptDepends,
+			MakeDepends: pb.MakeDepends,
+			XData:       []string{"pkgtype=" + pb.PkgType},
+		},
+		BuildInfo: &pacman.BuildInfo{
+			PkgName:        pb.PkgName,
+			PkgBase:        pb.EffectivePkgBase(),
+			PkgVer:         version,
+			PkgArch:        pb.ArchComputed,
+			PkgbuildSHA256: pb.Checksum,
+			Packager:       pb.Maintainer,
+			BuildDate:      pb.BuildDate,
+			BuildDir:       pb.PackageDir,
+			StartDir:       pb.Home,
+			BuildTool:      "yap",
+			BuildToolVer:   pb.YAPVersion,
+			Options:        buildOptions,
+		},
+		Scriptlets: m.scriptlets(),
+		Changelog:  changelog,
+		Files:      payload,
+	}, nil
 }
 
-// writeMTREE walks the package directory and writes a gzip-compressed .MTREE.
-// Dotfiles are included (.PKGINFO, .BUILDINFO, .INSTALL and legitimately
-// packaged ones such as /etc/skel/.bashrc); only .MTREE itself is skipped.
-func (m *Pkg) writeMTREE() error {
-	walker := files.NewWalker(m.PKGBUILD.PackageDir, files.WalkOptions{
-		BackupFiles:  m.PKGBUILD.Backup,
-		SkipPatterns: []string{".MTREE"},
-	})
+// scriptlets maps the six PKGBUILD hooks to the .INSTALL file, preceded by the
+// PKGBUILD helper functions the hooks call. Hooks that only declare install
+// steps also run them on upgrade. It returns nil when no hook is declared.
+func (m *Pkg) scriptlets() *pacman.Scriptlets {
+	pb := m.PKGBUILD
 
-	entries, err := walker.Walk()
-	if err != nil {
-		return err
+	sc := &pacman.Scriptlets{
+		PreInstall:      pb.PreInst,
+		PostInstall:     pb.PostInst,
+		PreUpgrade:      pb.PreUpgrade,
+		PostUpgrade:     pb.PostUpgrade,
+		PreRemove:       pb.PreRm,
+		PostRemove:      pb.PostRm,
+		UpgradeFallback: true,
 	}
 
-	mtreeFile, err := renderMtree(entries)
-	if err != nil {
-		return err
-	}
-
-	return createMTREEGzip(mtreeFile, filepath.Join(m.PKGBUILD.PackageDir, ".MTREE"))
-}
-
-// writeInstallScriptIfNeeded renders the pacman install scriptlet when the
-// PKGBUILD declares any of the six hooks. It is shipped inside the package
-// payload as .INSTALL (the only name pacman honours), prefixed with the
-// PKGBUILD helper functions the hooks call. A <pkgname>.install copy is also
-// kept next to the generated PKGBUILD, which references it via install=.
-func (m *Pkg) writeInstallScriptIfNeeded() error {
-	if m.PKGBUILD.PreInst == "" && m.PKGBUILD.PostInst == "" &&
-		m.PKGBUILD.PreRm == "" && m.PKGBUILD.PostRm == "" &&
-		m.PKGBUILD.PreUpgrade == "" && m.PKGBUILD.PostUpgrade == "" {
+	if sc.Empty() {
 		return nil
 	}
 
-	var buf bytes.Buffer
+	sc.Preamble = pb.HelperFunctionsPreamble(sc.Hooks())
 
-	if err := m.PKGBUILD.RenderSpec(postInstall).Execute(&buf, m.PKGBUILD); err != nil {
-		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to render .INSTALL").
-			WithOperation("writeInstallScriptIfNeeded")
-	}
-
-	script := []byte(m.PrepareScriptletWithHelpers(buf.String()))
-
-	targets := []string{
-		filepath.Join(m.PKGBUILD.PackageDir, ".INSTALL"),
-		filepath.Join(m.pacmanDir, m.PKGBUILD.PkgName+".install"),
-	}
-
-	for _, target := range targets {
-		if err := os.WriteFile(filepath.Clean(target), script, 0o644); err != nil { //nolint:gosec
-			return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write install scriptlet").
-				WithContext("path", target).
-				WithOperation("writeInstallScriptIfNeeded")
-		}
-	}
-
-	return nil
+	return sc
 }
 
-// writeChangelogIfPresent writes a .CHANGELOG file in the package root when
-// the PKGBUILD declares a changelog source.
-func (m *Pkg) writeChangelogIfPresent() error {
-	changelogData, err := m.PKGBUILD.ReadChangelog()
-	if err != nil {
-		return err
-	}
-
-	if changelogData == nil {
+// writeInstallCopy keeps a <pkgname>.install copy of the scriptlet next to the
+// generated PKGBUILD, which references it via install=. The package itself
+// carries .INSTALL, written by the library.
+func (m *Pkg) writeInstallCopy() error {
+	sc := m.scriptlets()
+	if sc == nil {
 		return nil
 	}
 
-	changelogPath := filepath.Join(m.PKGBUILD.PackageDir, ".CHANGELOG")
-
-	return os.WriteFile(filepath.Clean(changelogPath), changelogData, 0o644) //nolint:gosec
-}
-
-// mtreeMode converts a Go os.FileMode into the POSIX octal permission string
-// used by mtree: permission bits plus setuid (4000), setgid (2000) and
-// sticky (1000). Go's type bits (ModeDir, ModeSymlink, ...) are dropped.
-func mtreeMode(mode os.FileMode) string {
-	posix := uint32(mode.Perm())
-
-	if mode&os.ModeSetuid != 0 {
-		posix |= 0o4000
-	}
-
-	if mode&os.ModeSetgid != 0 {
-		posix |= 0o2000
-	}
-
-	if mode&os.ModeSticky != 0 {
-		posix |= 0o1000
-	}
-
-	return strconv.FormatUint(uint64(posix), 8)
-}
-
-func renderMtree(entries []*files.Entry) (string, error) {
-	tmpl, err := template.New("mtree").
-		Funcs(template.FuncMap{"mode": mtreeMode}).
-		Parse(dotMtree)
-	if err != nil {
-		return "", err
-	}
-
-	var buf bytes.Buffer
-
-	err = tmpl.Execute(&buf, entries)
-	if err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
-}
-
-// createMTREEGzip creates a compressed tar.zst archive from the specified source
-// directory. It takes the source directory and the output file path as
-// arguments and returns an error if any occurs.
-func createMTREEGzip(mtreeContent, outputFile string) error {
-	cleanFilePath := filepath.Clean(outputFile)
-
-	out, err := os.Create(cleanFilePath)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		err := out.Close()
-		if err != nil {
-			logger.Warn(i18n.T("logger.pacman.warn.failed_to_close_output"), "error", err)
-		}
-	}()
-
-	// Create a gzip writer
-	gzipWriter := pgzip.NewWriter(out)
-
-	defer func() {
-		err := gzipWriter.Close()
-		if err != nil {
-			logger.Warn(i18n.T("logger.pacman.warn.failed_to_close_gzip"), "error", err)
-		}
-	}()
-
-	// Copy the source file to the gzip writer
-	_, err = io.Copy(gzipWriter, strings.NewReader(mtreeContent))
-	if err != nil {
-		return err
+	target := filepath.Join(m.pacmanDir, m.PKGBUILD.PkgName+".install")
+	if err := os.WriteFile(filepath.Clean(target), sc.Render(), 0o644); err != nil { //nolint:gosec
+		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to write install scriptlet").
+			WithContext("path", target).
+			WithOperation("writeInstallCopy")
 	}
 
 	return nil

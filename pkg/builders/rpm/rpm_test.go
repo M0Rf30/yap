@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	rpmpack "github.com/M0Rf30/rpmpack"
+	"github.com/M0Rf30/pkgformat/rpm/pack"
 
 	"github.com/M0Rf30/yap/v2/pkg/builders/common"
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -380,7 +380,7 @@ func TestCreateFilesInsideRPM(t *testing.T) {
 	rpm.PKGBUILD.PackageDir = packageDir
 
 	// Create RPM object
-	rpmObj, _ := rpmpack.NewRPM(rpmpack.RPMMetaData{
+	rpmObj, _ := pack.NewRPM(pack.RPMMetaData{
 		Name:    "test",
 		Version: "1.0",
 		Release: "1",
@@ -398,7 +398,7 @@ func TestAddScriptlets(t *testing.T) {
 	rpm := &RPM{BaseBuilder: common.NewBaseBuilder(pkgBuild, "rpm")}
 
 	// Create RPM object
-	rpmObj, _ := rpmpack.NewRPM(rpmpack.RPMMetaData{
+	rpmObj, _ := pack.NewRPM(pack.RPMMetaData{
 		Name:    "test",
 		Version: "1.0",
 		Release: "1",
@@ -475,7 +475,7 @@ func TestAsRPMFile(t *testing.T) {
 		Type:        files.TypeFile,
 	}
 
-	rpmFile, err := asRPMFile(entry, rpmpack.GenericFile)
+	rpmFile, err := asRPMFile(entry, pack.GenericFile)
 	if err != nil {
 		t.Errorf("asRPMFile failed: %v", err)
 	}
@@ -677,7 +677,7 @@ func TestBuildPackageNoIntermediateDirs(t *testing.T) {
 	}
 
 	// Simulate what addContentsToRPM does and collect names.
-	rpmObj, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+	rpmObj, err := pack.NewRPM(pack.RPMMetaData{
 		Name:    "test",
 		Version: "1.0",
 		Release: "1",
@@ -691,7 +691,7 @@ func TestBuildPackageNoIntermediateDirs(t *testing.T) {
 		t.Fatalf("addContentsToRPM: %v", err)
 	}
 
-	// We can't read back from rpmpack directly, so verify via the walker entries
+	// We can't read back from pkgformat/rpm/pack directly, so verify via the walker entries
 	// that addContentsToRPM would skip intermediate dirs.
 	// Build the expected set: only the 4 leaf files.
 	wantFiles := map[string]bool{

@@ -76,6 +76,28 @@ func IsSupportedCompression(algo string) bool {
 	return slices.Contains(SupportedCompressions, algo)
 }
 
+// RPM package format versions accepted by the RPM builder.
+const (
+	// RPMFormatV4 is the classic RPM v4 package format, installable by
+	// rpm 4.x and 6.x. It is the default.
+	RPMFormatV4 = 4
+	// RPMFormatV6 is the RPM v6 package format introduced by rpm 6.0
+	// (SHA-256/SHA3-256/SHA-512 digests, 64-bit sizes, OpenPGP v6 signature
+	// tag). Fully supported only by rpm >= 6.0.
+	RPMFormatV6 = 6
+)
+
+// SupportedRPMFormats is the canonical set of RPM package format versions,
+// shared by the CLI (cmd/yap/command) and the MCP server (pkg/mcp).
+var SupportedRPMFormats = []int{RPMFormatV4, RPMFormatV6}
+
+// IsSupportedRPMFormat reports whether format is a supported RPM package
+// format version. Zero is treated as supported (the builder applies the v4
+// default downstream).
+func IsSupportedRPMFormat(format int) bool {
+	return format == 0 || slices.Contains(SupportedRPMFormats, format)
+}
+
 // BuildEnvironmentDeps provides build environment dependencies for each package manager.
 type BuildEnvironmentDeps struct {
 	APK    []string

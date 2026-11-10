@@ -166,6 +166,7 @@ artifacts/
 | `projects[].name` | yes | — | Sub-directory containing the package's PKGBUILD |
 | `projects[].install` | no | `false` | Install immediately after build so later packages can depend on it |
 | `compressionDeb` / `compressionRpm` | no | `zstd` | Per-format compression: `zstd`/`gzip`/`xz` |
+| `rpmFormat` | no | `4` | RPM package format: `4` (rpm 4.x+) or `6` (RPM v6, rpm 6.0+) |
 | `signing` | no | — | Signing config (see [Package signing](#package-signing)) |
 | `repos` | no | — | Extra package repositories to configure before resolving deps |
 | `skipDeps` | no | — | Package names to omit from makedepends |
@@ -428,6 +429,10 @@ yap completion <shell>                # Generate shell completion (bash/zsh/fish
 --compression-deb gzip      # DEB: zstd|gzip|xz (default: zstd)
 --compression-rpm xz        # RPM: zstd|gzip|xz (default: zstd)
 
+# RPM package format
+--rpm-format 6              # RPM v6 (rpm 6.0+: SHA3-256/SHA-512 digests,
+                            # 64-bit sizes, OpenPGP v6 signature tag); default 4
+
 # Debug / output
 --debug-dir /path, -D       # Emit split debug info
 --verbose                   # Verbose logging
@@ -449,7 +454,7 @@ yap completion powershell > yap.ps1
 |--------|-----------|--------|
 | APK | RSA PKCS#1 v1.5 SHA1 | `.SIGN.RSA.<keyname>.rsa.pub` embedded stream |
 | DEB | OpenPGP | `<package>.deb.asc` (ASCII-armored detached) |
-| RPM | OpenPGP | `<package>.rpm.asc` + optional in-RPM via rpmpack |
+| RPM | OpenPGP | Embedded in the package (v4: RSA header + PGP header+payload tags; v6: `OPENPGP` header tag) + `<package>.rpm.asc` (binary detached) |
 | Pacman | OpenPGP | `<package>.pkg.tar.zst.sig` (binary detached) |
 
 Signing uses `github.com/ProtonMail/go-crypto/openpgp` — no `gpg` binary required.
@@ -816,7 +821,7 @@ go test ./pkg/source -v
 go test ./pkg/builders/deb -v
 go test ./pkg/graph -v
 go test -race ./pkg/builders/...
-go test -timeout 30s ./pkg/download/...
+go test -timeout 30s ./pkg/fetch/...
 ```
 
 ### Internationalization

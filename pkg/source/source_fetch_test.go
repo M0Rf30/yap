@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/M0Rf30/yap/v2/pkg/download"
+	"github.com/M0Rf30/yap/v2/pkg/fetch"
 )
 
 func TestSource_validateSource_Algorithms(t *testing.T) {
@@ -87,11 +87,11 @@ func TestSource_GetContext_Cancelled(t *testing.T) {
 
 // Not parallel: mutates the global download retry budget.
 func TestSource_Get_PartialDownloadNotLeftAtFinalPath(t *testing.T) {
-	old := download.MaxRetries()
+	old := fetch.MaxRetries()
 
-	download.SetMaxRetries(0)
+	fetch.SetMaxRetries(0)
 
-	defer download.SetMaxRetries(old)
+	defer fetch.SetMaxRetries(old)
 
 	// Advertise more bytes than are sent so the transfer is truncated.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -115,11 +115,11 @@ func TestSource_Get_PartialDownloadNotLeftAtFinalPath(t *testing.T) {
 
 // Not parallel: mutates the global download retry budget.
 func TestSource_Get_CompleteDownloadRenamedIntoPlace(t *testing.T) {
-	old := download.MaxRetries()
+	old := fetch.MaxRetries()
 
-	download.SetMaxRetries(0)
+	fetch.SetMaxRetries(0)
 
-	defer download.SetMaxRetries(old)
+	defer fetch.SetMaxRetries(old)
 
 	body := []byte("complete body")
 	sum := sha256.Sum256(body)
@@ -142,5 +142,5 @@ func TestSource_Get_CompleteDownloadRenamedIntoPlace(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(startDir, "payload.bin"))
 	require.NoError(t, err)
 	assert.Equal(t, body, got)
-	assert.NoFileExists(t, filepath.Join(startDir, "payload.bin"+partSuffix))
+	assert.NoFileExists(t, filepath.Join(startDir, "payload.bin.part"))
 }

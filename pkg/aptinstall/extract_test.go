@@ -193,7 +193,7 @@ func TestExtractDataTar_NonExistentDEB(t *testing.T) {
 }
 
 // TestExtractDataTar_InvalidARArchive verifies that a file that is not an AR
-// archive returns an error containing "parse AR archive".
+// archive returns an error containing "invalid ar archive".
 func TestExtractDataTar_InvalidARArchive(t *testing.T) {
 	t.Parallel()
 
@@ -203,11 +203,11 @@ func TestExtractDataTar_InvalidARArchive(t *testing.T) {
 
 	err := aptinstall.ExtractDataTarForTesting(badPath, t.TempDir(), nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "parse AR archive")
+	assert.Contains(t, err.Error(), "invalid ar archive")
 }
 
 // TestExtractDataTar_NoDataTar verifies that a .deb without a data.tar member
-// returns an error containing "data.tar not found".
+// returns an error containing "data archive not found".
 func TestExtractDataTar_NoDataTar(t *testing.T) {
 	t.Parallel()
 
@@ -215,7 +215,7 @@ func TestExtractDataTar_NoDataTar(t *testing.T) {
 
 	err := aptinstall.ExtractDataTarForTesting(debPath, t.TempDir(), nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "data.tar not found")
+	assert.Contains(t, err.Error(), "data archive not found")
 }
 
 // TestExtractDataTar_ConffileNotOverwritten verifies that a conffile already

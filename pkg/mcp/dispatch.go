@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/M0Rf30/yap/v2/cmd/yap/command"
@@ -313,6 +314,7 @@ func appendStringFlags(c []string, a *buildArgs) []string {
 		{a.SBOMFormat, "--sbom-format"},
 		{a.CompressionDeb, "--compression-deb"},
 		{a.CompressionRpm, "--compression-rpm"},
+		{rpmFormatArg(a.RPMFormat), "--rpm-format"},
 		{a.FromPkgName, "--from"},
 		{a.ToPkgName, "--to"},
 		{a.OnlyPkgNames, "--only"},
@@ -329,6 +331,16 @@ func appendStringFlags(c []string, a *buildArgs) []string {
 	}
 
 	return c
+}
+
+// rpmFormatArg renders the rpmFormat build argument as a CLI flag value; zero
+// (builder default) maps to "" so the flag is omitted.
+func rpmFormatArg(format int) string {
+	if format == 0 {
+		return ""
+	}
+
+	return strconv.Itoa(format)
 }
 
 func appendListFlags(c []string, a *buildArgs) []string {

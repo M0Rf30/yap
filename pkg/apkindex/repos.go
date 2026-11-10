@@ -8,62 +8,23 @@ import (
 	"runtime"
 	"strings"
 
+	pkgapk "github.com/M0Rf30/pkgformat/apk"
+
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
 
-// Repo represents an Alpine repository entry from /etc/apk/repositories.
-type Repo struct {
-	URL string // Base URL of the repository
-	Tag string // Tag for tagged repos (e.g., "@edge"), empty for untagged
-}
-
 // LoadRepos parses /etc/apk/repositories and returns the list of repositories.
-// Returns an empty slice on non-Alpine systems or read errors.
-func LoadRepos() ([]Repo, error) {
-	data, err := os.ReadFile("/etc/apk/repositories")
+// Returns an error on non-Alpine systems or read errors.
+func LoadRepos() ([]pkgapk.Repo, error) {
+	f, err := os.Open("/etc/apk/repositories")
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = f.Close() }()
 
-	return parseReposContent(string(data)), nil
-}
-
-// parseReposContent parses the text content of an /etc/apk/repositories file
-// and returns the list of repositories. Exported for testing via export_test.go.
-func parseReposContent(data string) []Repo {
-	var repos []Repo
-
-	for _, line := range strings.SplitAfter(data, "\n") {
-		line = strings.TrimSpace(line)
-
-		// Skip empty lines and comments.
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		var tag string
-
-		// Check for tagged repo: "@tag https://..."
-		if strings.HasPrefix(line, "@") {
-			parts := strings.SplitN(line, " ", 2)
-			if len(parts) != 2 {
-				continue
-			}
-
-			tag = strings.TrimPrefix(parts[0], "@")
-			line = strings.TrimSpace(parts[1])
-		}
-
-		// Normalize URL: remove trailing slashes.
-		url := strings.TrimRight(line, "/")
-		if url != "" {
-			repos = append(repos, Repo{URL: url, Tag: tag})
-		}
-	}
-
-	return repos
+	return pkgapk.ParseRepositories(f)
 }
 
 // DetectArch returns the APK architecture for this host.

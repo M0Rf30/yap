@@ -14,7 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptrepo"
+	"github.com/M0Rf30/pkgformat/deb/apt"
+
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -171,9 +173,9 @@ func refreshCrossAptIndexes() error {
 	ctx, cancel := context.WithTimeout(context.Background(), aptCommandTimeout)
 	defer cancel()
 
-	n, err := aptrepo.Update(ctx)
+	n, err := apthost.Update(ctx)
 	if err != nil {
-		if n > 0 && aptrepo.IsVerificationError(err) {
+		if n > 0 && apt.IsVerificationError(err) {
 			// Some indexes succeeded (ports fetched) and the only failures
 			// are signature/trust issues on other repos — non-fatal.
 			logger.Warn(i18n.T("logger.repo.warn.cross_apt_update_some"), "indexes_ok", n, "error", err)

@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/M0Rf30/yap/v2/pkg/download"
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
+	"github.com/M0Rf30/yap/v2/pkg/fetch"
 	"github.com/M0Rf30/yap/v2/pkg/project"
 	"github.com/M0Rf30/yap/v2/pkg/signing"
 )
@@ -217,7 +217,7 @@ func TestForwardedBuildFlags_SourceRetries(t *testing.T) {
 	origOpts := buildOpts
 	defer func() { buildOpts = origOpts }()
 
-	defer download.SetMaxRetries(download.DefaultMaxRetries)
+	defer fetch.SetMaxRetries(fetch.DefaultMaxRetries)
 
 	buildOpts = project.BuildOptions{}
 
@@ -228,7 +228,7 @@ func TestForwardedBuildFlags_SourceRetries(t *testing.T) {
 	}{
 		{
 			name:    "default budget forwards nothing",
-			retries: download.DefaultMaxRetries,
+			retries: fetch.DefaultMaxRetries,
 			want:    nil,
 		},
 		{
@@ -240,7 +240,7 @@ func TestForwardedBuildFlags_SourceRetries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			download.SetMaxRetries(tt.retries)
+			fetch.SetMaxRetries(tt.retries)
 
 			assert.Equal(t, tt.want, forwardedBuildFlags())
 			assert.Equal(t, tt.want, forwardedPrepareFlags())

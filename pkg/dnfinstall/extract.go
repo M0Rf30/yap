@@ -14,18 +14,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sassoftware/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	"github.com/M0Rf30/pkgformat/safepath"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // rpmEntry represents a parsed RPM file and its extracted file metadata.
 type rpmEntry struct {
 	Path  string
-	RPM   *rpmutils.Rpm
+	RPM   *pkgrpm.Rpm
 	Files []installedFile
 }
 
@@ -110,7 +110,7 @@ func extractRPM(ctx context.Context, path, rootDir string, opts Options) (*rpmEn
 	}
 	defer func() { _ = f.Close() }()
 
-	rpm, err := rpmutils.ReadRpm(f)
+	rpm, err := pkgrpm.ReadRpm(f)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrTypeValidation, "failed to parse RPM").
 			WithOperation("extractRPM").
@@ -131,7 +131,7 @@ const (
 // handleRegularEntry processes a regular file or hardlink entry.
 // If pr.IsLink() is true, it handles hardlink resolution via the tracker.
 // Otherwise, it writes the file data and materializes any queued hardlinks.
-func handleRegularEntry(pr rpmutils.PayloadReader, targetPath string,
+func handleRegularEntry(pr pkgrpm.PayloadReader, targetPath string,
 	perm os.FileMode, inodeKey uint64, tracker *hardlinkTracker) (string, error) {
 	if pr.IsLink() {
 		return "", tracker.handleHardlink(inodeKey, targetPath)
@@ -146,10 +146,10 @@ func handleRegularEntry(pr rpmutils.PayloadReader, targetPath string,
 }
 
 // extractRPMWithHeader extracts an already-parsed RPM to rootDir using
-// rpmutils' own PayloadReader, which handles cpio framing internally.
+// pkgformat/rpm' own PayloadReader, which handles cpio framing internally.
 //
 //nolint:gocyclo,cyclop,nestif // RPM CPIO extraction has many distinct branches by entry type
-func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmutils.Rpm, _ Options) (*rpmEntry, error) {
+func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *pkgrpm.Rpm, _ Options) (*rpmEntry, error) {
 	if rootDir != "/" {
 		if _, err := os.Stat(rootDir); err != nil {
 			return nil, errors.Wrap(err, errors.ErrTypeFileSystem, "rootDir does not exist").
@@ -193,7 +193,7 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 			name = name[1:]
 		}
 
-		targetPath, err := safeRPMPath(rootDir, name)
+		targetPath, err := safepath.JoinStrict(rootDir, name)
 		if err != nil {
 			logger.Warn(i18n.T("logger.dnfinstall.warn.skipping_unsafe_path_rpm"), "path", name, "error", err)
 			continue
@@ -230,7 +230,7 @@ func extractRPMWithHeader(ctx context.Context, path, rootDir string, rpm *rpmuti
 			}
 
 		case rpmTypeLink:
-			if err := safeRPMSymlinkTarget(rootDir, targetPath, fi.Linkname()); err != nil {
+			if err := safepath.SymlinkTarget(rootDir, targetPath, fi.Linkname()); err != nil {
 				logger.Warn(i18n.T("logger.dnfinstall.warn.skipping_unsafe_rpm_symlink"),
 					"path", name, "target", fi.Linkname(), "error", err)
 
@@ -357,7 +357,7 @@ func resolveTarget(rootDir, targetPath string, isDir bool) (string, error) {
 }
 
 // writeRegularFile streams the current payload entry to targetPath atomically.
-func writeRegularFile(pr rpmutils.PayloadReader, targetPath string,
+func writeRegularFile(pr pkgrpm.PayloadReader, targetPath string,
 	perm os.FileMode) (string, error) {
 	const maxFileSize = 2 << 30 // 2 GiB
 

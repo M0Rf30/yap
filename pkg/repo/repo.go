@@ -19,11 +19,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/M0Rf30/pkgformat/httpclient"
 	"github.com/ProtonMail/go-crypto/openpgp"
 
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
-	"github.com/M0Rf30/yap/v2/pkg/httpclient"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -329,7 +329,8 @@ func fetchKeyContext(ctx context.Context, url, dst string) error {
 	tmp := dst + ".tmp"
 	defer os.Remove(tmp) //nolint:errcheck
 
-	if err := httpclient.FetchToFile(ctx, url, tmp, maxKeyBytes); err != nil {
+	if err := httpclient.New(httpclient.Options{Logger: logger.Slog()}).
+		FetchToFile(ctx, url, tmp, maxKeyBytes); err != nil {
 		return errors.Wrap(err, errors.ErrTypeNetwork,
 			"failed to fetch repo key").
 			WithOperation("fetchKey").

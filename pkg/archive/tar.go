@@ -1,13 +1,12 @@
 // SPDX-FileCopyrightText: 2021-2026 Gianluca Boiano
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package archive provides archive creation and manipulation functionality.
+// Package archive extracts the archives YAP meets: source tarballs and zips,
+// and the payloads of .deb and .rpm packages. Writing packages is the
+// business of github.com/M0Rf30/pkgformat.
 //
-// This package implements a focused subset of tar/zip handling needed by YAP:
+// It implements a focused subset of tar/zip handling needed by YAP:
 //
-//   - Create compressed tar archives (.tar.zst / .tar.gz / .tar.xz) used as
-//     intermediate artifacts and as the on-disk format for Pacman / APK
-//     packages.
 //   - Extract a small set of recognized archive types to disk: tar (plain or
 //     wrapped in gzip / zstd / xz / bz2) and zip. Other formats (rar, 7z, …)
 //     return the ErrUnrecognizedArchive sentinel so callers can fall through
@@ -27,22 +26,20 @@ import (
 	"context"
 	stderrors "errors"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/M0Rf30/pkgformat/safepath"
 	"github.com/bodgit/sevenzip"
 	kzstd "github.com/klauspost/compress/zstd"
 	"github.com/nwaples/rardecode/v2"
 	"github.com/ulikunitz/xz"
 
-	"github.com/M0Rf30/yap/v2/pkg/buffers"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // ErrUnrecognizedArchive is returned by Extract / ExtractFiltered when the
@@ -153,220 +150,6 @@ func hasPrefix(buf, prefix []byte) bool {
 }
 
 // ---------------------------------------------------------------------------
-// Create
-// ---------------------------------------------------------------------------
-
-// CreateTarCompressed creates a compressed tar archive with the specified
-// compression algorithm from the source directory. Supported compression
-// algorithms are "zstd", "gzip", and "xz". If compression is empty, defaults
-// to "zstd". Returns an error if the compression algorithm is unsupported.
-//
-// formatGNU selects tar.FormatGNU when true (used for Pacman packages); the
-// default is tar.FormatPAX (used for APK and source bundles).
-func CreateTarCompressed(
-	ctx context.Context,
-	sourceDir,
-	outputFile,
-	compression string,
-	formatGNU bool,
-) error {
-	if compression == "" {
-		compression = "zstd"
-	}
-
-	cleanOut := filepath.Clean(outputFile)
-
-	out, err := os.Create(cleanOut)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if closeErr := out.Close(); closeErr != nil {
-			logger.Warn(i18n.T("logger.archive.warn.failed_to_close_output"),
-				"path", cleanOut,
-				"error", closeErr)
-		}
-	}()
-
-	cw, closeCompressor, err := newCompressedWriter(out, compression)
-	if err != nil {
-		return err
-	}
-
-	tw := tar.NewWriter(cw)
-
-	if err := writeTarFromDir(ctx, tw, sourceDir, formatGNU); err != nil {
-		_ = tw.Close()
-		_ = closeCompressor()
-
-		return err
-	}
-
-	if err := tw.Close(); err != nil {
-		_ = closeCompressor()
-
-		return err
-	}
-
-	return closeCompressor()
-}
-
-// newCompressedWriter returns an io.Writer that streams compressed bytes to
-// dst, plus a close function that finalises the compressor.
-func newCompressedWriter(dst io.Writer, compression string) (io.Writer, func() error, error) {
-	switch compression {
-	case "zstd":
-		zw, err := kzstd.NewWriter(dst)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return zw, zw.Close, nil
-
-	case "gzip":
-		gw := gzip.NewWriter(dst)
-
-		return gw, gw.Close, nil
-
-	case "xz":
-		xw, err := xz.NewWriter(dst)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return xw, xw.Close, nil
-
-	default:
-		return nil, nil, errors.New(
-			errors.ErrTypeConfiguration,
-			"unsupported compression algorithm",
-		).WithContext("compression", compression).
-			WithOperation("CreateTarCompressed")
-	}
-}
-
-// CreateTarZst creates a compressed tar.zst archive from the specified source
-// directory. This is a convenience wrapper around CreateTarCompressed that
-// defaults to zstd compression.
-func CreateTarZst(ctx context.Context, sourceDir, outputFile string, formatGNU bool) error {
-	return CreateTarCompressed(ctx, sourceDir, outputFile, "zstd", formatGNU)
-}
-
-// writeTarFromDir walks sourceDir and writes every entry into tw with names
-// relative to sourceDir. Honours symlinks. Mirrors the previous behaviour
-// of archives.FilesFromDisk (FollowSymlinks: false).
-//
-//nolint:gocyclo,cyclop // dir + file + symlink dispatch is inherently branchy
-func writeTarFromDir(ctx context.Context, tw *tar.Writer, sourceDir string, formatGNU bool) error {
-	sourceDir = filepath.Clean(sourceDir)
-
-	tarFormat := tar.FormatPAX
-	if formatGNU {
-		tarFormat = tar.FormatGNU
-	}
-
-	return filepath.WalkDir(sourceDir, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		// Skip the source directory itself.
-		if path == sourceDir {
-			return nil
-		}
-
-		rel, err := filepath.Rel(sourceDir, path)
-		if err != nil {
-			return err
-		}
-
-		nameInArchive := filepath.ToSlash(rel)
-
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-
-		hdr, err := buildTarHeader(path, nameInArchive, info)
-		if err != nil {
-			return err
-		}
-
-		hdr.Format = tarFormat
-
-		// Pacman expects directory entries to have a trailing slash.
-		if d.IsDir() && !strings.HasSuffix(hdr.Name, "/") {
-			hdr.Name += "/"
-		}
-
-		if err := tw.WriteHeader(hdr); err != nil {
-			return err
-		}
-
-		// Only regular files have body content.
-		if info.Mode().IsRegular() {
-			if err := copyRegularFile(path, tw); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
-// buildTarHeader constructs a tar.Header for the given on-disk path. Symlinks
-// are recorded with their link target; ownership is forced to root:root for
-// reproducible package builds (mirrors the previous archives.Tar config).
-func buildTarHeader(path, nameInArchive string, info fs.FileInfo) (*tar.Header, error) {
-	var linkTarget string
-
-	if info.Mode()&os.ModeSymlink != 0 {
-		t, err := os.Readlink(path)
-		if err != nil {
-			return nil, err
-		}
-
-		linkTarget = t
-	}
-
-	hdr, err := tar.FileInfoHeader(info, linkTarget)
-	if err != nil {
-		return nil, err
-	}
-
-	hdr.Name = nameInArchive
-	hdr.Uid = 0
-	hdr.Gid = 0
-	hdr.Uname = "root"
-	hdr.Gname = "root"
-
-	return hdr, nil
-}
-
-// copyRegularFile streams the contents of path into tw, using a buffered copy.
-func copyRegularFile(path string, tw io.Writer) error {
-	f, err := os.Open(filepath.Clean(path))
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		_ = f.Close()
-	}()
-
-	copyBuf := buffers.DefaultBufferPool.Get().([]byte)
-	_, err = io.CopyBuffer(tw, f, copyBuf)
-	buffers.DefaultBufferPool.Put(copyBuf) //nolint:staticcheck // SA6002: []byte is fine for sync.Pool
-
-	return err
-}
-
-// ---------------------------------------------------------------------------
 // SafeJoin / SafeSymlinkTarget
 // ---------------------------------------------------------------------------
 
@@ -392,7 +175,7 @@ func SafeSymlinkTarget(entryName, target string) error {
 //
 // Source archives are stricter than package payloads: any ".." segment is
 // rejected outright, even when the cleaned path would stay inside the
-// destination. The containment check itself lives in pkg/safepath.
+// destination. The containment check itself lives in github.com/M0Rf30/pkgformat/safepath.
 func safeJoin(destination, name string) (string, error) {
 	if strings.Contains(name, "..") {
 		segs := strings.Split(filepath.ToSlash(name), "/")

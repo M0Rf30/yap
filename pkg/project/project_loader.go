@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/pkgformat/safepath"
 	cp "github.com/otiai10/copy"
 
 	"github.com/M0Rf30/yap/v2/pkg/builder"
@@ -23,7 +24,6 @@ import (
 	"github.com/M0Rf30/yap/v2/pkg/packer"
 	"github.com/M0Rf30/yap/v2/pkg/parser"
 	"github.com/M0Rf30/yap/v2/pkg/repo"
-	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 // readProject reads the project file at the specified path
@@ -155,8 +155,11 @@ func (mpc *MultipleProject) populateProjects(distro, release, path string) error
 			return err
 		}
 
-		mpc.packageManager, err = packer.GetPackageManager(pkgbuildFile, distro,
-			mpc.CompressionDeb, mpc.CompressionRpm)
+		mpc.packageManager, err = packer.GetPackageManager(pkgbuildFile, distro, packer.Options{
+			CompressionDeb: mpc.CompressionDeb,
+			CompressionRpm: mpc.CompressionRpm,
+			RPMFormat:      mpc.RPMFormat,
+		})
 		if err != nil {
 			return err
 		}

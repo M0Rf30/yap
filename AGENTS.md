@@ -13,24 +13,21 @@
 | `pkg/mcp/` | MCP tool/resource/prompt registrations; thin wrappers over yap pkgs |
 | `pkg/project/` | `MultipleProject`, `BuildAll`, multi-package orchestration |
 | `pkg/core/` | Project config struct (`yap.json`) |
-| `pkg/builders/{apk,deb,rpm,pacman}` | Format-specific builders (openSUSE/zypper uses the `rpm` builder) |
+| `pkg/builders/{apk,deb,rpm,pacman}` | Format-specific builders: map the PKGBUILD to a `pkgformat` spec and write it (openSUSE/zypper uses the `rpm` builder) |
 | `pkg/builders/common` | `BaseBuilder`, shared helpers, cross-compilation |
 | `pkg/packer/` | Selects the right builder per distro/package manager (`yum`+`zypper` → RPM) |
 | `pkg/graph/` | Build order / dependency resolution |
 | `pkg/source/` | Source download and validation |
+| `pkg/fetch/` | Source download: retry budget, progress bar and i18n over `pkgformat/download` |
 | `pkg/pkgbuild/`, `pkg/parser/` | Extended PKGBUILD format |
-| `pkg/aptcache/` | deb822 parser for apt/dpkg metadata |
-| `pkg/aptrepo/` | `apt-get update` + OpenPGP InRelease verification |
+| `pkg/apthost/` | Host adapter over `pkgformat/deb/apt`: dpkg/apt paths and keyrings, lazy process-wide cache, `apt-get update` |
 | `pkg/aptinstall/` | `apt-get install` (transitive dep resolution, scriptlets) |
-| `pkg/apkindex/` | `apk update` + `apk add` |
-| `pkg/pacmandb/` | `pacman -Sy` |
+| `pkg/apkindex/` | `apk update` + `apk add`; app-side adapter over `pkgformat/apk` (`Client`, `Index`) with the trust decision |
+| `pkg/pacmandb/` | `pacman -Sy`; thin adapter over `pkgformat/pacman` (`ParseConfigFile`, `Client.Sync`) |
 | `pkg/rpmdb/` | RPM SQLite reader + optional writer (Fedora 33+, RHEL 9+) + native BDB reader (RHEL 8 and earlier) |
-| `pkg/dnfcache/` | `dnf makecache` + dep resolution + RPM downloads (repomd/primary, mirror failover) |
-| `pkg/dnfinstall/` | RPM install (GPG verify → CPIO extract → scriptlets → yapdb) |
+| `pkg/dnfinstall/` | RPM install (GPG verify → CPIO extract → scriptlets → yapdb); host adapter over `pkgformat/rpm/dnf` (`host.go`) and the `rpm --install` path (`rpmcli.go`) |
 | `pkg/yapdb/` | YAP-internal SQLite state DB for installed packages (cross-format) |
-| `pkg/httpclient/` | Shared HTTP client: timeouts, size caps, transient-failure retry with backoff |
-| `pkg/safepath/` | Canonical zip-slip / symlink-escape containment checks for all extractors |
-| `pkg/signing/` | APK RSA + DEB/RPM/Pacman GPG signing |
+| `pkg/signing/` | APK RSA (`APKSigner`, over `pkgformat/apk`) + DEB/RPM/Pacman GPG signing |
 | `pkg/sbom/` | CycloneDX 1.5 + SPDX 2.3 generation |
 | `pkg/publish/` | `yap publish`: upload deb/rpm (native APIs) and apk/pacman (raw repo) to OpenArtifact; Bearer token, retries, sha256 verification, idempotent on 409 |
 | `pkg/color/` | Zero-dependency ANSI color helpers |
@@ -87,7 +84,7 @@ go test ./pkg/builders/deb -v
 go test ./pkg/graph -v
 go test ./cmd/yap/command -v
 go test -race ./pkg/builders/...
-go test -timeout 30s ./pkg/download/...
+go test -timeout 30s ./pkg/fetch/...
 ```
 
 ### YAP CLI quick reference
@@ -107,6 +104,7 @@ yap graph <path>
 --skip-sync --cleanbuild --parallel --sign --sbom --nocheck
 --compression-deb zstd|gzip|xz
 --compression-rpm zstd|gzip|xz
+--rpm-format 4|6
 --target-arch <arch>
 --source-retries <n>
 ```
@@ -178,9 +176,9 @@ These reflect genuine format requirements, not duplication.
 
 | Format | Algorithm | Output |
 |--------|-----------|--------|
-| APK | RSA PKCS#1 v1.5 SHA1 | `.SIGN.RSA.<keyname>.rsa.pub` prepended as third gzip stream |
+| APK | RSA PKCS#1 v1.5 SHA1 (`APKSigner`, `pkgapk.SigRSASHA1`) | `.SIGN.RSA.<keyname>.rsa.pub` prepended as first gzip stream by `pkgapk.SignPackage`; RSA keys of 2048–16384 bits only |
 | DEB | OpenPGP | `<package>.deb.asc` ASCII-armored detached |
-| RPM | OpenPGP | `<package>.rpm.asc` + optional in-RPM via rpmpack |
+| RPM | OpenPGP | embedded via `pkgformat/rpm/pack` `RPM.SetPGPSigner` (v4 RSA+PGP tags, v6 `OPENPGP` tag) + `<package>.rpm.asc` |
 | Pacman | OpenPGP | `<package>.pkg.tar.zst.sig` binary detached |
 
 Key resolution priority (highest first):
@@ -258,24 +256,23 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 ## Current state
 
 ### Implemented (stable)
-- apt/dpkg metadata — `pkg/aptcache` (replaces `apt-cache`/`dpkg` subprocesses)
-- `apt-get update` — `pkg/aptrepo` (InRelease/Release.gpg + OpenPGP verification)
+- apt/dpkg metadata + `apt-get update` — `pkg/apthost` over `pkgformat/deb/apt` (deb822 parsing, InRelease/Release.gpg OpenPGP verification, http→https fallback, closure downloads); replaces `apt-cache`/`dpkg`/`apt-get update` subprocesses
 - `apt-get install` — `pkg/aptinstall` (transitive deps, scriptlets, yapdb state by default)
-- `apk update` + `apk add` — `pkg/apkindex`
-- `pacman -Sy` — `pkg/pacmandb`
+- `apk update` + `apk add` — `pkg/apkindex` over `pkgformat/apk`; indexes are verified against `/etc/apk/keys`; with no matching key a privileged host installs unverified with a warning, an unprivileged one refuses. `epoch:` is ignored with a warning (Alpine has none)
+- `pacman -Sy` — `pkg/pacmandb` over `pkgformat/pacman`
 - RPM database reader — `pkg/rpmdb`: SQLite natively (Fedora 33+, RHEL 9+) and legacy BerkeleyDB natively via `go-rpmdb/pkg/bdb` + in-house header-image parser (`LegacyDB`: ListInstalled / ListInstalledProvides / FilterInstalled); batched `rpm -q` / `rpm -qa` subprocess remains only as last-resort fallback
 - RPM install — `pkg/dnfinstall` (GPG verify → CPIO extract → scriptlets → yapdb); replaces `dnf install` for both `yap install <pkg.rpm>` and build-time makedepends on RPM distros
 - YAP-internal package state — `pkg/yapdb` (cross-format SQLite registry at `<rootDir>/var/lib/yap/installed.db`); decouples YAP from system dpkg/rpm DBs (ephemeral build container friendly)
-- DNF metadata + install resolution — `pkg/dnfcache` (`dnf makecache` replacement: repomd.xml/primary.xml parsing, module filtering, transitive dep resolution, SHA256-verified downloads)
-- Mirror failover (dnf) — `pkg/dnfcache` keeps every `baseurl=` entry (incl. dnf-style continuation lines) and up to 5 mirrorlist/metalink mirrors; repomd + primary always come from the SAME mirror (no mixed metadata generations); dead (4xx/network) or stale (checksum-mismatch) mirrors are skipped with a warn; the winning mirror is persisted in `.baseurl` and preferred for package downloads
-- Transient-failure retry — `pkg/httpclient` `WithRetry`/`IsRetryable` (3 attempts, exponential backoff + jitter; retries transport errors, mid-body EOF, HTTP 408/429/5xx; never other 4xx/size-cap/ctx-cancel); wired into all dnf/apt/apk/pacman metadata and package fetch paths; tests shrink backoff via `httpclient.SetRetryPolicy` in `TestMain`
-- Source download retry (gensum / pkg/source / pkg/platform) — `pkg/download` (grab-based, resume-capable) classifies retryability with typed checks: `grab.StatusCodeError` 408/429/5xx retried, other 4xx definitive, `grab.ErrBadLength` retried after clearing the unresumable partial, ctx-cancel never retried, transport errors defer to `httpclient.IsRetryable`; backoff is `backoffBase` (1s, doubles; tests shrink it in `TestMain`); budget configurable via `--source-retries` / `YAP_SOURCE_MAX_RETRIES` (default 3 retries = 4 attempts), with `pkg/platform`'s toolchain fetch now sharing the same budget instead of the old `0`→3 clamp
-- HTTP→HTTPS escalation (apt) — `httpclient.UpgradeToHTTPS` rewrites a plain-http URL to https (stripping an explicit `:80`, keeping other ports); `pkg/aptrepo`'s InRelease/Release/Packages.* fetch (`httpFetch`) exhausts the retry policy on the declared scheme, then makes one https attempt if the failure was retryable; `pkg/aptcache`'s `.deb` download (`Cache.Download`) tries the declared scheme once per package (grab batch has no built-in retry) then falls back to one https attempt on the same condition — recovers from networks that block/reset port 80 while leaving 443 untouched, without silently upgrading a scheme that a http-only third-party mirror legitimately needs; `pkg/download.IsRetryableGrabError` (exported from the source-download retry classifier above) is reused by `pkg/aptcache` for this
-- Extraction safety — `pkg/safepath` (`Join`, `JoinStrict`, `SymlinkTarget`, `EntrySymlinkTarget`): one Rel-based containment implementation shared by archive, aptinstall, dnfinstall, apkindex, and container/rootless (per-package wrappers keep local names); hostile `..`-bearing member names are rejected even under root "/" (Clean clamping is NOT trusted), and rootfs layer extraction validates symlink targets
+- DNF metadata + install resolution — `pkgformat/rpm/dnf` (repomd/primary parsing, module filtering, transitive dep resolution, checksum-verified resumable downloads, mirror failover with metadata and primary from the same mirror); yap wires it in `pkg/dnfinstall/host.go`. Packages without a SHA-256/512 checksum are refused
+- Transient-failure retry — `pkgformat/httpclient` (retries transport errors, mid-body EOF, HTTP 408/429/5xx; never other 4xx/size-cap/ctx-cancel); used by every apt/dnf/apk/pacman client and `pkg/publish` (`publish.Config.Retry`)
+- Source download retry (gensum / pkg/source / pkg/platform) — `pkg/fetch` over `pkgformat/download` (resume-capable, no grab); budget configurable via `--source-retries` / `YAP_SOURCE_MAX_RETRIES` (default 3 retries = 4 attempts), shared with `pkg/platform`'s toolchain fetch
+- Extraction safety — `pkgformat/safepath` plus `pkg/archive`'s stricter `safeJoin`/`safeSymlinkTarget` (hostile `..`-bearing member names rejected even under root "/"); `.deb` and `.rpm` payloads are extracted by the pkgformat readers, confined with `os.Root`
 - Transitive cross-build dep extraction — `pkg/builders/common/cross.go` `DownloadClosure`
-- Package signing — APK RSA + DEB/RPM/Pacman GPG
+- Package signing — APK RSA (`pkgapk.SignPackage`) + DEB/RPM/Pacman GPG
 - SBOM — CycloneDX 1.5 + SPDX 2.3
 - Per-format compression — DEB/RPM
+- RPM v6 package format — opt-in via `--rpm-format 6` / yap.json `rpmFormat` / MCP `rpmFormat` (default 4). Writer: `pkgformat/rpm/pack` (`RPMMetaData.Format`; SHA256+SHA3-256 header digests, 64-bit sizes, stripped `07070X` cpio, `OPENPGP` signature tag). Reader: `pkgformat/rpm` (used by `pkg/dnfinstall` and `pkg/archive`). Validated against rpm 6.0.1 (`rpm -K`, `rpm -i`)
+- Embedded RPM signatures — with `--sign`, RPM artifacts carry the signature in the package header (`prepareEmbeddedSigning` → `pack.RPM.SetPGPSigner`), required by rpm 6's default `%_pkgverify_level signature`
 - Pacman `.INSTALL` scriptlets — 6-hook parity
 - Changelog support — DEB (Lintian-compliant), RPM (native %changelog), Pacman
 - Builder interface unification — `BuildPackage` returns `(string, error)`
@@ -295,7 +292,7 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - `pkg/aptinstall` rejects `Options.RootDir` other than `/` (dpkg state + maintainer scripts are not yet re-rooted)
 - Extraction into a non-`/` root (archive, aptinstall, dnfinstall, apkindex, rootless pull) resolves every path through `safepath.ResolveInRoot` (chroot-semantics symlink resolution); extraction into `/` keeps plain OS semantics
 - `pkg/dnfinstall` hard-fails cryptographically invalid RPM signatures even with `AllowUnverifiedRPMs`; only missing keyring / unknown signer / unsigned are tolerated in that mode
-- `pkg/dnfinstall` coverage at ~40% (rpmpack→rpmutils interop blocks happy-path integration tests); pure-unit coverage of helpers is strong, full pipeline validated via `make test-e2e-rpm` on Rocky 8
+- `pkg/dnfinstall` coverage at ~40% (pack→rpm interop blocks happy-path integration tests); pure-unit coverage of helpers is strong, full pipeline validated via `make test-e2e-rpm` on Rocky 8
 
 ### MCP surface (`pkg/mcp/`, `cmd/yap-mcp/`)
 
@@ -323,11 +320,11 @@ Test script: `scripts/e2e-rpm.sh` (runs inside Rocky 8 container)
 - Verify library availability in `go.mod` before importing
 - Run `make fmt lint` before committing
 - Tests require `-p 1` (sequential)
-- APK work requires `github.com/M0Rf30/archives` (morfeo branch)
+- Package formats (deb, rpm, apk, pacman writers and readers, apt/dnf/apk/pacman repository clients, safepath, httpclient, download) live in `github.com/M0Rf30/pkgformat`; do not add a second implementation to yap
 - ldflags inject into `pkg/buildinfo` vars, not `main.*`
 - Use `logger.Info/Warn/Error/Debug(msg, "key", val, ...)` — flat variadic k/v
 - Use `pkg/color` helpers — never import external color/UI libraries
-- Use `pkg/aptcache.Load()` instead of spawning `apt-cache`/`dpkg` subprocesses
+- Use `pkg/apthost.Cache()` instead of spawning `apt-cache`/`dpkg` subprocesses
 
 ### For documentation
 - Keep this file updated with current project state

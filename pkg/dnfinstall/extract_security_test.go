@@ -12,15 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/M0Rf30/rpmpack"
+	"github.com/M0Rf30/pkgformat/rpm/pack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func buildFilesRPM(t *testing.T, files []rpmpack.RPMFile) string {
+func buildFilesRPM(t *testing.T, files []pack.RPMFile) string {
 	t.Helper()
 
-	rpm, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+	rpm, err := pack.NewRPM(pack.RPMMetaData{
 		Name: "sec-pkg", Version: "1", Release: "1", Arch: "x86_64",
 		Compressor: "gzip", BuildTime: time.Now(),
 	})
@@ -49,7 +49,7 @@ func TestExtractSymlinkCannotEscapeRoot(t *testing.T) {
 	require.NoError(t, os.MkdirAll(root, 0o755))
 	require.NoError(t, os.MkdirAll(outside, 0o755))
 
-	rpmPath := buildFilesRPM(t, []rpmpack.RPMFile{
+	rpmPath := buildFilesRPM(t, []pack.RPMFile{
 		{Name: "/link", Body: []byte(outside), Mode: 0o120777},
 		{Name: "/link/x", Body: []byte("pwn"), Mode: 0o644},
 	})
@@ -75,7 +75,7 @@ func TestExtractSymlinkCannotEscapeRoot(t *testing.T) {
 
 func TestExtractUsrmergeSymlinkUnderRoot(t *testing.T) {
 	root := t.TempDir()
-	rpmPath := buildFilesRPM(t, []rpmpack.RPMFile{
+	rpmPath := buildFilesRPM(t, []pack.RPMFile{
 		{Name: "/lib", Body: []byte("usr/lib"), Mode: 0o120777},
 		{Name: "/lib/x", Body: []byte("hello"), Mode: 0o644},
 	})
@@ -107,7 +107,7 @@ func TestExtractUsrmergeSymlinkUnderRoot(t *testing.T) {
 
 func TestExtractPreservesSetuidAndRootRelativePaths(t *testing.T) {
 	root := t.TempDir()
-	rpmPath := buildFilesRPM(t, []rpmpack.RPMFile{
+	rpmPath := buildFilesRPM(t, []pack.RPMFile{
 		{Name: "/usr/bin/su", Body: []byte("x"), Mode: 0o104755},
 	})
 

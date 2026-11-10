@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	pkgdeb "github.com/M0Rf30/pkgformat/deb"
+
 	"github.com/M0Rf30/yap/v2/pkg/constants"
 	"github.com/M0Rf30/yap/v2/pkg/dnfinstall"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
@@ -80,6 +82,12 @@ func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
 	processed := make([]string, len(depends))
 
 	for index, depend := range depends {
+		if bb.Format == formatDeb {
+			processed[index] = pkgdeb.NormalizeDependency(depend)
+
+			continue
+		}
+
 		// Already in deb "name (op ver)" form, or an RPM rich dependency.
 		// Capabilities like "libfoo(x86-64)>=1" still need formatting.
 		if strings.HasPrefix(depend, "(") || strings.Contains(depend, " (") {
@@ -95,17 +103,6 @@ func (bb *BaseBuilder) ProcessDependencies(depends []string) []string {
 			version := result[1]
 
 			switch bb.Format {
-			case formatDeb:
-				// Debian's bare ">" and "<" are deprecated aliases for ">=" and
-				// "<="; strict comparisons are spelled ">>" and "<<".
-				switch operator {
-				case ">":
-					operator = ">>"
-				case "<":
-					operator = "<<"
-				}
-
-				processed[index] = fmt.Sprintf("%s (%s %s)", name, operator, version)
 			case constants.FormatRPM:
 				processed[index] = fmt.Sprintf("%s %s %s", name, operator, version)
 			default:
@@ -561,7 +558,7 @@ func (bb *BaseBuilder) refreshCcacheSymlinks() {
 // For DEB, --allow-insecure-repositories is passed so that apt writes
 // Packages index files for unsigned extra repos (e.g. --repo flags) to
 // /var/lib/apt/lists/. Without it, apt silently skips those repos and
-// aptcache.Reload() cannot see their packages for arch classification.
+// apthost.Reload() cannot see their packages for arch classification.
 func (bb *BaseBuilder) Update(ctx context.Context) error {
 	cmd := getUpdateCommand(bb.Format)
 	if bb.Format == constants.FormatDEB {

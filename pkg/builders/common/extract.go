@@ -44,11 +44,11 @@ func (bb *BaseBuilder) ExtractToRoot(packagePath string) error {
 	switch bb.Format {
 	case constants.FormatDEB:
 		// DEB packages need special handling to extract data.tar from AR archive
-		extractErr = ExtractDEB(packagePath, "/")
+		extractErr = archive.ExtractDEB(packagePath, "/")
 	case constants.FormatRPM:
 		// RPM format: header + cpio payload — the generic archive identifier
 		// does not recognize RPM, so we must decode the payload ourselves.
-		extractErr = ExtractRPM(packagePath, "/")
+		extractErr = archive.ExtractRPM(packagePath, "/")
 	case constants.FormatAPK:
 		// APK is a concatenation of (optional sig.tar.gz +) control.tar.gz +
 		// data.tar.gz. The generic archive extractor only sees the first gzip
@@ -112,12 +112,6 @@ func cleanupMetadataFiles(format string) {
 			_ = os.Remove(pattern) // Best-effort removal
 		}
 	}
-}
-
-// ExtractDEB is a wrapper around archive.ExtractDEB for backward compatibility.
-// It extracts a Debian package (.deb) to the destination directory.
-func ExtractDEB(packagePath, destDir string) error {
-	return archive.ExtractDEB(packagePath, destDir)
 }
 
 // isAPKControlEntry reports whether the given tar entry name belongs to APK
@@ -305,12 +299,6 @@ func writeAPKRegularFile(path string, hdr *tar.Header, tr io.Reader) error {
 	}
 
 	return nil
-}
-
-// ExtractRPM is a wrapper around archive.ExtractRPM for backward compatibility.
-// It extracts an RPM package payload to the destination directory.
-func ExtractRPM(packagePath, destDir string) error {
-	return archive.ExtractRPM(packagePath, destDir)
 }
 
 // InstallOrExtract extracts the built package to the root filesystem (/).

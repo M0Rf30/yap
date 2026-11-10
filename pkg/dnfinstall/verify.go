@@ -13,9 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
 	"github.com/ProtonMail/go-crypto/openpgp"
 	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
-	"github.com/sassoftware/go-rpmutils"
 
 	yaperrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -114,9 +114,9 @@ func verifyRPMSignature(ctx context.Context, path string, opts Options) error {
 	}
 	defer func() { _ = f.Close() }()
 
-	// Verify the RPM signature using go-rpmutils.Verify.
+	// Verify the RPM signature using go-pkgrpm.Verify.
 	// This checks the PGP signature over the RPM file against the provided keyring.
-	_, sigs, err := rpmutils.Verify(f, keyring)
+	_, sigs, err := pkgrpm.Verify(f, keyring)
 	if err != nil {
 		// Determine the error category.
 		verifyErr := wrapRPMSignatureError(err)
@@ -256,7 +256,7 @@ func loadRPMKeyringFile(path string) (openpgp.EntityList, error) {
 	return openpgp.ReadKeyRing(bytes.NewReader(data))
 }
 
-// wrapRPMSignatureError translates go-rpmutils / ProtonMail's sentinel + typed
+// wrapRPMSignatureError translates pkgformat/rpm / ProtonMail's sentinel + typed
 // errors into a stable error that's safe to compare via errors.Is / errors.As.
 func wrapRPMSignatureError(err error) error {
 	if err == nil {
@@ -281,13 +281,13 @@ func wrapRPMSignatureError(err error) error {
 		return ErrUnsupportedSignature
 	}
 
-	// go-rpmutils reports a signing key absent from the keyring with its own
+	// pkgformat/rpm reports a signing key absent from the keyring with its own
 	// type, and an RPM without a PGP signature packet with a sentinel.
-	if _, ok := errors.AsType[rpmutils.KeyNotFoundError](err); ok {
+	if _, ok := errors.AsType[pkgrpm.KeyNotFoundError](err); ok {
 		return ErrUnknownSigner
 	}
 
-	if errors.Is(err, rpmutils.ErrNoPGPSignature) {
+	if errors.Is(err, pkgrpm.ErrNoPGPSignature) {
 		return ErrUnsignedRPM
 	}
 

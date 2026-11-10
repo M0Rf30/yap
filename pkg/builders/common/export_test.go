@@ -5,7 +5,11 @@
 // This file is only compiled when running tests.
 package common
 
-import "github.com/M0Rf30/yap/v2/pkg/aptcache"
+import (
+	"github.com/M0Rf30/pkgformat/deb/apt"
+
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
+)
 
 // IsPerlModule exposes isPerlModule for unit tests.
 var IsPerlModule = isPerlModule
@@ -26,14 +30,14 @@ var CountDirect = countDirect
 // CrossDepDestinations exposes crossDepDestinations for unit tests.
 var CrossDepDestinations = crossDepDestinations
 
-// MakeTestCache builds a minimal aptcache.Cache from a slice of PackageInfo
+// MakeTestCache builds a minimal apt.Cache from a slice of PackageInfo
 // entries and installs it as the global singleton so that partitionArchAllDeps
 // and partitionArchAllDepsForExtract see it during tests.
-func MakeTestCache(entries []aptcache.PackageInfo) {
-	c := aptcache.NewEmptyCache()
+func MakeTestCache(entries []apt.PackageInfo) {
+	c := apt.NewCache("")
 	for i := range entries {
 		c.AddEntry(&entries[i])
 	}
 
-	aptcache.StoreGlobal(c)
+	apthost.SetCache(c)
 }

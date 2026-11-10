@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/pkgformat/deb/apt"
+
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/aptinstall"
 )
 
@@ -41,12 +43,12 @@ func TestFilterForeignArchPackages(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		pkgs     []*aptcache.PackageInfo
+		pkgs     []*apt.PackageInfo
 		expected int
 	}{
 		{
 			name: "all packages",
-			pkgs: []*aptcache.PackageInfo{
+			pkgs: []*apt.PackageInfo{
 				{Name: "pkg1", Architecture: "all"},
 				{Name: "pkg2", Architecture: ""},
 			},
@@ -54,30 +56,30 @@ func TestFilterForeignArchPackages(t *testing.T) {
 		},
 		{
 			name: "host arch packages",
-			pkgs: []*aptcache.PackageInfo{
-				{Name: "pkg1", Architecture: aptcache.GoarchToDebArch()},
+			pkgs: []*apt.PackageInfo{
+				{Name: "pkg1", Architecture: apthost.HostArch()},
 			},
 			expected: 1,
 		},
 		{
 			name: "foreign arch non-multiarch filtered",
-			pkgs: []*aptcache.PackageInfo{
+			pkgs: []*apt.PackageInfo{
 				{Name: "pkg1", Architecture: "arm64", MultiArch: ""},
 			},
 			expected: 0,
 		},
 		{
 			name: "foreign arch multiarch same kept",
-			pkgs: []*aptcache.PackageInfo{
+			pkgs: []*apt.PackageInfo{
 				{Name: "pkg1", Architecture: "arm64", MultiArch: "same"},
 			},
 			expected: 1,
 		},
 		{
 			name: "mixed packages",
-			pkgs: []*aptcache.PackageInfo{
+			pkgs: []*apt.PackageInfo{
 				{Name: "pkg1", Architecture: "all"},
-				{Name: "pkg2", Architecture: aptcache.GoarchToDebArch()},
+				{Name: "pkg2", Architecture: apthost.HostArch()},
 				{Name: "pkg3", Architecture: "arm64", MultiArch: ""},
 				{Name: "pkg4", Architecture: "arm64", MultiArch: "same"},
 			},
@@ -100,7 +102,7 @@ func TestFilterForeignArchPackages(t *testing.T) {
 func TestCurrentInstalledVersionNotInstalled(t *testing.T) {
 	t.Parallel()
 
-	pkg := &aptcache.PackageInfo{
+	pkg := &apt.PackageInfo{
 		Name:         "nonexistent",
 		Architecture: "amd64",
 		Installed:    false,

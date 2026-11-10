@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/M0Rf30/yap/v2/pkg/download"
+	"github.com/M0Rf30/yap/v2/pkg/fetch"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
 )
@@ -40,7 +40,7 @@ var rootCmd = &cobra.Command{
 		// cmd.Root() is unambiguous regardless of which subcommand ran, unlike
 		// relying on the child command's own (inherited) flagset.
 		if cmd.Root().PersistentFlags().Changed("source-retries") {
-			download.SetMaxRetries(sourceRetries)
+			fetch.SetMaxRetries(sourceRetries)
 		}
 	},
 	PersistentPostRun: func(cmd *cobra.Command, _ []string) {
@@ -213,7 +213,7 @@ func init() {
 	// Global flags — descriptions are updated after ParseLanguageFlag() in main().
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "")
-	rootCmd.PersistentFlags().IntVar(&sourceRetries, "source-retries", download.DefaultMaxRetries, "")
+	rootCmd.PersistentFlags().IntVar(&sourceRetries, "source-retries", fetch.DefaultMaxRetries, "")
 	rootCmd.PersistentFlags().StringVarP(&language, "language", "l", "",
 		"set language (en, it) - defaults to system locale")
 	rootCmd.PersistentFlags().StringVar(&containerRuntime, "runtime", "",

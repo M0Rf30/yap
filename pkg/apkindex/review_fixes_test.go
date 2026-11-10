@@ -7,68 +7,30 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
+	pkgapk "github.com/M0Rf30/pkgformat/apk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/M0Rf30/yap/v2/pkg/apkindex"
 )
 
-func TestResolveDepsDedupesVirtualProvider(t *testing.T) {
-	const input = `P:musl
-V:1.0-r0
-A:x86_64
-p:so:libc.musl-x86_64.so.1
-
-P:app
-V:1.0-r0
-A:x86_64
-D:musl so:libc.musl-x86_64.so.1
-
-`
-
-	idx := apkindex.NewIndex()
-	require.NoError(t, idx.ParseIndex(strings.NewReader(input), "https://x"))
-
-	resolved, err := idx.ResolveDeps([]string{"app"})
-	require.NoError(t, err)
-	assert.Len(t, resolved, 2)
-}
-
 func TestRegisterInstalledKeepsEarlierPackages(t *testing.T) {
 	dir := t.TempDir()
-	pkgInfo := "pkgname = a\npkgver = 1\n"
 
-	require.NoError(t, apkindex.ExportRegisterInstalled(dir,
-		&apkindex.Package{Name: "a", Version: "1", Arch: "x86_64", InstSize: 1234}, pkgInfo))
-	require.NoError(t, apkindex.ExportRegisterInstalled(dir,
-		&apkindex.Package{Name: "b", Version: "2", Arch: "x86_64"}, ""))
+	require.NoError(t, apkindex.ExportRegisterInstalled(dir, &pkgapk.RepoPackage{
+		Name: "a", Version: "1", Arch: "x86_64", InstalledSize: 1234}))
+	require.NoError(t, apkindex.ExportRegisterInstalled(dir, &pkgapk.RepoPackage{
+		Name: "b", Version: "2", Arch: "x86_64"}))
 
 	data, err := os.ReadFile(filepath.Join(dir, "lib", "apk", "db", "installed"))
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "P:a\n")
 	assert.Contains(t, string(data), "P:b\n")
 	assert.Contains(t, string(data), "I:1234\n")
-}
-
-func TestBuildDownloadRejectsUnsafeName(t *testing.T) {
-	const input = `P:evil
-V:../../x
-A:x86_64
-
-`
-
-	idx := apkindex.NewIndex()
-	require.NoError(t, idx.ParseIndex(strings.NewReader(input), "https://x"))
-
-	_, _, err := apkindex.ExportBuildAPKDownloadRequests(
-		context.Background(), idx, t.TempDir(), []string{"evil"})
-	require.Error(t, err)
 }
 
 func apkDataTar(t *testing.T, entries []tar.Header, bodies map[string]string) *bytes.Buffer {

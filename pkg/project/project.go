@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/builder"
 	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/files"
@@ -137,6 +137,7 @@ type MultipleProject struct {
 	Projects       []*Project      `json:"projects"       validate:"required,dive,required"`
 	CompressionDeb string          `json:"compressionDeb" validate:""`
 	CompressionRpm string          `json:"compressionRpm" validate:""`
+	RPMFormat      int             `json:"rpmFormat,omitempty" validate:"omitempty,oneof=4 6"`
 	Signing        *signing.Config `json:"signing,omitempty"`
 	Repos          []repo.Repo     `json:"repos,omitempty" validate:"omitempty,dive"`
 	SkipDeps       []string        `json:"skipDeps,omitempty"`
@@ -300,7 +301,7 @@ func (mpc *MultipleProject) syncDependencies(ctx context.Context, makeDepends, r
 		// Invalidate the aptcache singleton so that packages from newly added
 		// repositories (e.g. --repo flags) are visible to subsequent partition
 		// decisions in DownloadAndExtractCrossDeps.
-		aptcache.Reload()
+		apthost.Reload()
 	}
 
 	if !mpc.Opts.NoMakeDeps {
@@ -379,7 +380,7 @@ func (mpc *MultipleProject) MultiProjectContext(
 		return err
 	}
 
-	mpc.packageManager, err = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, "", "")
+	mpc.packageManager, err = packer.GetPackageManager(&pkgbuild.PKGBUILD{}, distro, packer.Options{})
 	if err != nil {
 		return err
 	}
@@ -530,6 +531,10 @@ func (mpc *MultipleProject) createSinglePackage(ctx context.Context, proj *Proje
 		return err
 	}
 
+	if err := mpc.prepareEmbeddedSigning(proj); err != nil {
+		return err
+	}
+
 	logger.Info(i18n.T("logger.building_resulting_package"),
 		"package", proj.Builder.PKGBUILD.PkgName,
 		"version", proj.Builder.PKGBUILD.PkgVer,
@@ -546,6 +551,10 @@ func (mpc *MultipleProject) createSinglePackage(ctx context.Context, proj *Proje
 // createSplitPackages iterates over each sub-package produced by a split PKGBUILD
 // and runs PrepareFakeroot → BuildPackage → post-build hooks for each one.
 func (mpc *MultipleProject) createSplitPackages(ctx context.Context, proj *Project) error {
+	if err := mpc.prepareEmbeddedSigning(proj); err != nil {
+		return err
+	}
+
 	for _, subName := range proj.Builder.PKGBUILD.PkgNames {
 		if err := ctx.Err(); err != nil {
 			return err

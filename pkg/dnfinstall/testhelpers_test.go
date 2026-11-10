@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/M0Rf30/rpmpack"
-	rpmutils "github.com/sassoftware/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	"github.com/M0Rf30/pkgformat/rpm/pack"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,10 +23,10 @@ func buildRPMWithCapabilities(t *testing.T, tmpDir, _, version, release string) 
 
 	const name = "test-pkg"
 
-	provides := rpmpack.Relations{}
-	requires := rpmpack.Relations{}
-	conflicts := rpmpack.Relations{}
-	obsoletes := rpmpack.Relations{}
+	provides := pack.Relations{}
+	requires := pack.Relations{}
+	conflicts := pack.Relations{}
+	obsoletes := pack.Relations{}
 
 	// Set capabilities using the Set method.
 	_ = provides.Set(name + "-lib")
@@ -36,7 +36,7 @@ func buildRPMWithCapabilities(t *testing.T, tmpDir, _, version, release string) 
 	_ = conflicts.Set("old-pkg")
 	_ = obsoletes.Set("legacy-pkg")
 
-	rpm, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+	rpm, err := pack.NewRPM(pack.RPMMetaData{
 		Name:       name,
 		Version:    version,
 		Release:    release,
@@ -51,7 +51,7 @@ func buildRPMWithCapabilities(t *testing.T, tmpDir, _, version, release string) 
 	})
 	require.NoError(t, err)
 
-	rpm.AddFile(rpmpack.RPMFile{
+	rpm.AddFile(pack.RPMFile{
 		Name:  "/usr/bin/test",
 		Body:  []byte("#!/bin/sh\necho test\n"),
 		Mode:  0o755,
@@ -71,7 +71,7 @@ func buildRPMWithCapabilities(t *testing.T, tmpDir, _, version, release string) 
 }
 
 // readRPMHeader reads an RPM file and returns the parsed header.
-func readRPMHeader(t *testing.T, rpmPath string) *rpmutils.Rpm {
+func readRPMHeader(t *testing.T, rpmPath string) *pkgrpm.Rpm {
 	t.Helper()
 
 	f, err := os.Open(rpmPath)
@@ -79,7 +79,7 @@ func readRPMHeader(t *testing.T, rpmPath string) *rpmutils.Rpm {
 
 	defer func() { _ = f.Close() }()
 
-	rpm, err := rpmutils.ReadRpm(f)
+	rpm, err := pkgrpm.ReadRpm(f)
 	require.NoError(t, err, "failed to parse RPM")
 
 	return rpm

@@ -4,8 +4,8 @@
 // Package aptinstall installs Debian packages into a target root.
 //
 // It runs the dpkg install pipeline: transitive dep resolution against
-// pkg/aptcache, .deb download via grab, ar/control.tar/data.tar
-// extraction, maintainer scriptlets via /bin/sh, atomic
+// pkg/apthost, .deb download and parsing through pkgformat/deb,
+// conffile-aware data-archive extraction, maintainer scriptlets via /bin/sh, atomic
 // /var/lib/dpkg/status + /var/lib/dpkg/info/<pkg>.* updates,
 // conffile-preserving extraction, and a single ldconfig at the end of
 // the transaction. Failures surface as errors; nothing falls back to a
@@ -16,7 +16,7 @@
 // Perl IPC::Open2, and update-alternatives/dpkg-trigger/etc. expect
 // real exec semantics.
 //
-// The caller is responsible for refreshing apt indexes (pkg/aptrepo)
+// The caller is responsible for refreshing apt indexes (pkg/apthost)
 // before Install — trust of every downloaded .deb is bounded by the
 // SHA-256 in the apt-index manifest, which itself is only as trustworthy
 // as the InRelease PGP verification that produced it.
@@ -30,7 +30,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/M0Rf30/yap/v2/pkg/aptcache"
+	"github.com/M0Rf30/pkgformat/deb/apt"
+
+	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -168,8 +170,8 @@ func resolveRootDir(opts Options) (string, error) {
 // closure is empty (no work to do).
 func resolveAndPrepare(
 	ctx context.Context, names []string,
-) (pkgs []*aptcache.PackageInfo, tmpDir string, debMetadata map[string]*debContents, err error) {
-	cache := aptcache.Load()
+) (pkgs []*apt.PackageInfo, tmpDir string, debMetadata map[string]*debContents, err error) {
+	cache := apthost.Cache()
 
 	var unresolved []string
 
@@ -222,7 +224,7 @@ func resolveAndPrepare(
 		}
 	}
 
-	if err := cache.Download(ctx, tmpDir, pkgNames); err != nil {
+	if err := cache.Download(ctx, tmpDir, pkgNames, apthost.DownloadOptions()); err != nil {
 		_ = os.RemoveAll(tmpDir)
 
 		return nil, "", nil, errors.Wrap(err, errors.ErrTypeBuild, "download packages").
@@ -264,7 +266,7 @@ func resolveAndPrepare(
 // The OLD version must come from /var/lib/dpkg/status, NOT from the
 // newly-downloaded .deb's control file (which carries the NEW version
 // we're about to install).
-func currentInstalledVersion(rootDir string, pkg *aptcache.PackageInfo) string {
+func currentInstalledVersion(rootDir string, pkg *apt.PackageInfo) string {
 	if !pkg.Installed {
 		return ""
 	}
@@ -293,7 +295,7 @@ func currentInstalledVersion(rootDir string, pkg *aptcache.PackageInfo) string {
 // installPackage installs a single package.
 func installPackage(
 	ctx context.Context,
-	pkg *aptcache.PackageInfo,
+	pkg *apt.PackageInfo,
 	contents *debContents,
 	tmpDir, rootDir string,
 	opts Options,
@@ -452,8 +454,8 @@ func runMaintainerScript(
 // this function now acts as a safety net rather than the primary fix. It
 // catches any remaining foreign-arch packages that slipped through (e.g.
 // packages where the seed explicitly requested the foreign arch).
-func filterForeignArchPackages(pkgs []*aptcache.PackageInfo) []*aptcache.PackageInfo {
-	hostArch := aptcache.GoarchToDebArch()
+func filterForeignArchPackages(pkgs []*apt.PackageInfo) []*apt.PackageInfo {
+	hostArch := apthost.HostArch()
 
 	filtered := pkgs[:0]
 

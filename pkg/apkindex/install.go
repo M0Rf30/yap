@@ -7,9 +7,6 @@ import (
 	"archive/tar"
 	"bufio"
 	"context"
-	"crypto/sha1" //nolint:gosec // apk C: is SHA1
-	"encoding/base64"
-	"hash"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,65 +14,52 @@ import (
 	"strconv"
 	"strings"
 
+	pkgapk "github.com/M0Rf30/pkgformat/apk"
+	"github.com/M0Rf30/pkgformat/safepath"
 	"github.com/klauspost/compress/gzip"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
-	"github.com/M0Rf30/yap/v2/pkg/safepath"
 )
 
 const apkInstalledDB = "/lib/apk/db/installed"
 
-// InstallOptions controls the safety / trust knobs for InstallPackages.
-//
-// AllowUnverifiedPackages: APK packages and APKINDEX tarballs ship with RSA
-// signatures. Verification of those signatures is not yet wired into this
-// package. Callers that accept this gap (e.g. inside a trusted CI container
-// fetching over HTTPS from official mirrors) must set this flag explicitly.
-type InstallOptions struct {
-	AllowUnverifiedPackages bool
-}
-
-// InstallPackages downloads each requested package + transitive deps, extracts each
-// to /, and updates /lib/apk/db/installed. Replaces "apk add".
-//
-// Equivalent to InstallPackagesWithOptions with the zero options (strict).
-func (idx *Index) InstallPackages(ctx context.Context, names []string) error {
-	return idx.InstallPackagesWithOptions(ctx, names, InstallOptions{})
-}
-
-// InstallPackagesWithOptions is the explicit-options variant of InstallPackages.
-// Scriptlets are not currently executed; they are logged as warnings.
-func (idx *Index) InstallPackagesWithOptions(
-	ctx context.Context, names []string, opts InstallOptions,
-) error {
-	if !opts.AllowUnverifiedPackages {
-		return errors.New(errors.ErrTypeValidation,
-			"APK signature verification is not yet implemented; "+
-				"set InstallOptions.AllowUnverifiedPackages to acknowledge").
-			WithOperation("InstallPackagesWithOptions")
-	}
-
-	logger.Warn(i18n.T("logger.apkindex.warn.installing_without_verification"))
-
+// InstallPackages resolves the requested packages and their transitive deps,
+// downloads each one (checked against its index entry), extracts it to /, and
+// updates /lib/apk/db/installed. Replaces "apk add".
+func (r *Repos) InstallPackages(ctx context.Context, names []string) error {
 	// 1. Resolve transitive deps.
-	resolved, err := idx.ResolveDeps(names)
+	resolution, err := r.Index.ResolveDeps(names)
 	if err != nil {
-		return errors.Wrap(err, errors.ErrTypeInternal, "failed to resolve dependencies").
-			WithOperation("InstallPackagesWithOptions")
+		return errors.Wrap(err, errors.ErrTypeValidation, "failed to resolve dependencies").
+			WithOperation("InstallPackages")
 	}
 
-	if len(resolved) == 0 {
+	for _, capability := range resolution.Virtual {
+		logger.Debug(i18n.T("logger.apkindex.debug.resolved_virtual"), "capability", capability)
+	}
+
+	for _, name := range resolution.Unresolved {
+		// Skipped, like apk does: it rejects them at install time if they matter.
+		logger.Debug(i18n.T("logger.apkindex.debug.unresolved"), "package", name)
+	}
+
+	logger.Info(i18n.T("logger.apkindex.info.resolved_transitive_deps"), "seeds", len(names),
+		"to_install", len(resolution.Packages),
+		"via_virtual", len(resolution.Virtual),
+		"unresolved", len(resolution.Unresolved))
+
+	if len(resolution.Packages) == 0 {
 		return nil
 	}
 
 	// 2. Filter out already-installed packages.
 	installed := readInstalledDB()
 
-	var toInstall []*Package
+	var toInstall []*pkgapk.RepoPackage
 
-	for _, p := range resolved {
+	for _, p := range resolution.Packages {
 		if !installed[p.Name] {
 			toInstall = append(toInstall, p)
 		}
@@ -83,7 +67,7 @@ func (idx *Index) InstallPackagesWithOptions(
 
 	if len(toInstall) == 0 {
 		logger.Info(i18n.T("logger.apkindex.info.all_packages_already_installed"), "requested", len(names),
-			"resolved", len(resolved))
+			"resolved", len(resolution.Packages))
 
 		return nil
 	}
@@ -94,34 +78,29 @@ func (idx *Index) InstallPackagesWithOptions(
 	}
 
 	logger.Info(i18n.T("logger.apkindex.info.installing_apk_packages"), "to_install", len(toInstall),
-		"resolved", len(resolved),
-		"skipped_installed", len(resolved)-len(toInstall),
+		"resolved", len(resolution.Packages),
+		"skipped_installed", len(resolution.Packages)-len(toInstall),
 		"total_bytes", totalBytes)
 
 	// 3. Download all .apk files to a temp dir.
 	tmpDir, err := os.MkdirTemp("", "yap-apk-*")
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create temporary directory").
-			WithOperation("InstallPackagesWithOptions")
+			WithOperation("InstallPackages")
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	pkgNames := make([]string, len(toInstall))
-	for i, p := range toInstall {
-		pkgNames[i] = p.Name
-	}
-
-	if _, downloadErr := idx.DownloadPackages(ctx, tmpDir, pkgNames); downloadErr != nil {
-		return downloadErr
+	paths, err := r.client.Download(ctx, tmpDir, toInstall...)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrTypeNetwork, "failed to download packages").
+			WithOperation("InstallPackages")
 	}
 
 	// 4. Extract each .apk to / and register in installed DB.
-	for _, p := range toInstall {
-		apkPath := filepath.Join(tmpDir, p.Name+"-"+p.Version+".apk")
-
-		if err := extractAndRegister(apkPath, p); err != nil {
+	for i, p := range toInstall {
+		if err := extractAndRegister(paths[i], p); err != nil {
 			return errors.Wrap(err, errors.ErrTypePackaging, "failed to install package").
-				WithOperation("InstallPackagesWithOptions").
+				WithOperation("InstallPackages").
 				WithContext("package", p.Name)
 		}
 
@@ -174,8 +153,9 @@ func readInstalledDB() map[string]bool {
 }
 
 // extractAndRegister extracts a .apk file to / and registers it in the installed database.
-// Orchestrates extraction of control and data streams, then registers the package.
-func extractAndRegister(apkPath string, pkg *Package) error {
+// The file was checked against its index entry by the client, so it is a valid
+// package of the size, checksum, name and version the index lists.
+func extractAndRegister(apkPath string, pkg *pkgapk.RepoPackage) error {
 	// Open the .apk file (2-or-3-stream concatenated gzip: [signature] + control + data).
 	f, err := os.Open(apkPath) //nolint:gosec
 	if err != nil {
@@ -187,14 +167,11 @@ func extractAndRegister(apkPath string, pkg *Package) error {
 
 	// Use bufio.Reader so each gzip.NewReader inherits the buffered
 	// position state correctly across stream boundaries.
-	hr := &hashingReader{br: bufio.NewReader(f), h: sha1.New()} //nolint:gosec // apk C: is SHA1
+	br := bufio.NewReader(f)
 
-	pkgInfo, err := readControlVerified(hr, pkg)
-	if err != nil {
+	if err := skipControl(br, pkg); err != nil {
 		return err
 	}
-
-	br := hr.br
 
 	// Now br is positioned at the data.tar.gz stream.
 	if err := extractAPKData(br); err != nil {
@@ -202,7 +179,7 @@ func extractAndRegister(apkPath string, pkg *Package) error {
 	}
 
 	// Register in /lib/apk/db/installed.
-	if err := registerInstalled(pkg, pkgInfo); err != nil {
+	if err := registerInstalled(pkg); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to register installed package").
 			WithOperation("extractAndRegister").
 			WithContext("package", pkg.Name)
@@ -217,73 +194,33 @@ type byteReader interface {
 	io.ByteReader
 }
 
-// hashingReader hashes every byte consumed through it. Because it implements
-// io.ByteReader, gzip reads exactly the bytes of each member (no read-ahead).
-type hashingReader struct {
-	br *bufio.Reader
-	h  hash.Hash
-}
-
-func (r *hashingReader) Read(p []byte) (int, error) {
-	n, err := r.br.Read(p)
-	_, _ = r.h.Write(p[:n])
-
-	return n, err
-}
-
-func (r *hashingReader) ReadByte() (byte, error) {
-	b, err := r.br.ReadByte()
-	if err == nil {
-		_, _ = r.h.Write([]byte{b})
-	}
-
-	return b, err
-}
-
-// readControlVerified reads the optional signature stream and the control
-// stream, returning .PKGINFO. The SHA1 of the compressed control segment
-// (the stream holding .PKGINFO) must equal the index C: field (Q1+base64),
-// as in apk-tools.
-func readControlVerified(hr *hashingReader, pkg *Package) (string, error) {
+// skipControl consumes the optional signature stream and the control stream
+// (the one holding .PKGINFO), leaving r at the start of the data stream.
+func skipControl(r byteReader, pkg *pkgapk.RepoPackage) error {
 	for range 2 {
-		hr.h.Reset()
-
-		pkgInfo, err := tryReadPkgInfoFromNextStream(hr)
+		found, err := skipStream(r)
 		if err != nil {
-			return "", err
+			return err
 		}
 
-		if pkgInfo == "" {
-			continue // signature stream
+		if found {
+			return nil
 		}
-
-		got := "Q1" + base64.StdEncoding.EncodeToString(hr.h.Sum(nil))
-		if pkg.Checksum == "" || got != pkg.Checksum {
-			return "", errors.New(errors.ErrTypeValidation,
-				"APK control checksum does not match repository index").
-				WithOperation("readControlVerified").
-				WithContext("package", pkg.Name).
-				WithContext("expected", pkg.Checksum).
-				WithContext("actual", got)
-		}
-
-		return pkgInfo, nil
 	}
 
-	return "", errors.New(errors.ErrTypeParser, "APK control stream with .PKGINFO not found").
-		WithOperation("readControlVerified").
+	return errors.New(errors.ErrTypeParser, "APK control stream with .PKGINFO not found").
+		WithOperation("skipControl").
 		WithContext("package", pkg.Name)
 }
 
-// tryReadPkgInfoFromNextStream reads the next gzip stream from br, looking for
-// .PKGINFO in the tar archive. Returns empty string if .PKGINFO is not found
-// (e.g., signature stream). Drains the stream so br is positioned at the next
-// member's magic bytes.
-func tryReadPkgInfoFromNextStream(br byteReader) (string, error) {
+// skipStream reads the next gzip stream from br and reports whether its tar
+// archive holds .PKGINFO (false for the signature stream). It drains the stream
+// so br is positioned at the next member's magic bytes.
+func skipStream(br byteReader) (bool, error) {
 	gz, err := gzip.NewReader(br)
 	if err != nil {
-		return "", errors.Wrap(err, errors.ErrTypeParser, "failed to create gzip reader").
-			WithOperation("tryReadPkgInfoFromNextStream")
+		return false, errors.Wrap(err, errors.ErrTypeParser, "failed to create gzip reader").
+			WithOperation("skipStream")
 	}
 	defer func() { _ = gz.Close() }()
 
@@ -292,7 +229,7 @@ func tryReadPkgInfoFromNextStream(br byteReader) (string, error) {
 
 	tr := tar.NewReader(gz)
 
-	var pkgInfo string
+	found := false
 
 	for {
 		hdr, err := tr.Next()
@@ -301,18 +238,12 @@ func tryReadPkgInfoFromNextStream(br byteReader) (string, error) {
 		}
 
 		if err != nil {
-			return "", errors.Wrap(err, errors.ErrTypeParser, "failed to read tar entry").
-				WithOperation("tryReadPkgInfoFromNextStream")
+			return false, errors.Wrap(err, errors.ErrTypeParser, "failed to read tar entry").
+				WithOperation("skipStream")
 		}
 
 		if hdr.Name == ".PKGINFO" {
-			data, err := io.ReadAll(io.LimitReader(tr, 1<<20)) // 1 MiB cap
-			if err != nil {
-				return "", errors.Wrap(err, errors.ErrTypeParser, "failed to read .PKGINFO file").
-					WithOperation("tryReadPkgInfoFromNextStream")
-			}
-
-			pkgInfo = string(data)
+			found = true
 		}
 	}
 
@@ -321,7 +252,7 @@ func tryReadPkgInfoFromNextStream(br byteReader) (string, error) {
 	// to defend against decompression bombs.
 	_, _ = io.Copy(io.Discard, io.LimitReader(gz, 16<<20))
 
-	return pkgInfo, nil
+	return found, nil
 }
 
 // extractAPKData reads the data.tar.gz stream from an APK file and extracts files to /.
@@ -361,7 +292,7 @@ func extractAPKDataTo(r io.Reader, root string) error {
 
 // safeAPKPath joins "/" with a sanitised tar-entry name, rejecting
 // traversal attempts and absolute entry names (APK tarballs always use
-// relative member names). Containment logic lives in pkg/safepath.
+// relative member names). Containment logic lives in github.com/M0Rf30/pkgformat/safepath.
 func safeAPKPath(entryName string) (string, bool) {
 	if filepath.IsAbs(entryName) {
 		return "", false
@@ -405,7 +336,7 @@ func resolveAPKEntry(root, name string, full bool) (string, bool) {
 // safeAPKSymlinkTarget rejects symlink targets that would escape the
 // filesystem root via "..". Absolute targets are permitted because APK
 // packages commonly ship absolute symlinks (/usr/bin/foo → /usr/bin/bar).
-// Containment logic lives in pkg/safepath.
+// Containment logic lives in github.com/M0Rf30/pkgformat/safepath.
 func safeAPKSymlinkTarget(linkPath, target string) error {
 	return safepath.SymlinkTarget("/", linkPath, target)
 }
@@ -601,14 +532,14 @@ func hardlinkOrCopy(linkSrc, targetPath string, mode os.FileMode) error {
 // registerInstalled writes a package stanza into /lib/apk/db/installed.
 // On reinstall/upgrade the existing stanza for the same package name is
 // replaced rather than appended (which would leak duplicate entries).
-func registerInstalled(pkg *Package, pkgInfo string) error {
-	return registerInstalledAt(apkInstalledDB, pkg, pkgInfo)
+func registerInstalled(pkg *pkgapk.RepoPackage) error {
+	return registerInstalledAt(apkInstalledDB, pkg)
 }
 
 // registerInstalledAt is registerInstalled parameterized by the installed-db
 // path. The exported behaviour uses the package-level apkInstalledDB constant;
 // tests drive it against a temp path.
-func registerInstalledAt(dbPath string, pkg *Package, pkgInfo string) error {
+func registerInstalledAt(dbPath string, pkg *pkgapk.RepoPackage) error {
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		return errors.Wrap(err, errors.ErrTypeFileSystem, "failed to create database directory").
 			WithOperation("registerInstalled").
@@ -618,18 +549,13 @@ func registerInstalledAt(dbPath string, pkg *Package, pkgInfo string) error {
 	// Read existing DB → stanza map keyed by package name.
 	existing := readInstalledStanzasAt(dbPath)
 
-	existing[pkg.Name] = buildInstalledStanza(pkg, pkgInfo)
+	existing[pkg.Name] = buildInstalledStanza(pkg)
 
 	return writeInstalledStanzasAt(dbPath, existing)
 }
 
-// readInstalledStanzas parses /lib/apk/db/installed into a map of
+// readInstalledStanzasAt parses the installed db at dbPath into a map of
 // package-name → raw stanza text (newline-terminated, no trailing blank).
-func readInstalledStanzas() map[string]string {
-	return readInstalledStanzasAt(apkInstalledDB)
-}
-
-// readInstalledStanzasAt is readInstalledStanzas parameterized by path.
 func readInstalledStanzasAt(dbPath string) map[string]string {
 	f, err := os.Open(dbPath) //nolint:gosec // caller-controlled db path (constant in prod, temp in tests)
 	if err != nil {
@@ -739,29 +665,8 @@ func writeInstalledStanzasAt(dbPath string, stanzas map[string]string) error {
 }
 
 // buildInstalledStanza synthesises an installed-db stanza (single-letter
-// tags, as read by readInstalledStanzasAt) from the index entry. Dependency
-// and provides lists missing from the index are taken from .PKGINFO.
-func buildInstalledStanza(pkg *Package, pkgInfo string) string {
-	depends, provides := pkg.Depends, pkg.Provides
-
-	for line := range strings.SplitSeq(pkgInfo, "\n") {
-		key, val, ok := strings.Cut(line, " = ")
-		if !ok {
-			continue
-		}
-
-		switch strings.TrimSpace(key) {
-		case "depend":
-			if len(pkg.Depends) == 0 {
-				depends = append(depends, val)
-			}
-		case "provides":
-			if len(pkg.Provides) == 0 {
-				provides = append(provides, val)
-			}
-		}
-	}
-
+// tags, as read by readInstalledStanzasAt) from the index entry.
+func buildInstalledStanza(pkg *pkgapk.RepoPackage) string {
 	var sb strings.Builder
 
 	add := func(tag, val string) {
@@ -774,14 +679,14 @@ func buildInstalledStanza(pkg *Package, pkgInfo string) string {
 	add("V", pkg.Version)
 	add("A", pkg.Arch)
 	add("S", strconv.FormatInt(pkg.Size, 10))
-	add("I", strconv.FormatInt(pkg.InstSize, 10))
+	add("I", strconv.FormatInt(pkg.InstalledSize, 10))
 	add("T", pkg.Description)
-	add("U", pkg.URL)
+	add("U", pkg.Package.URL)
 	add("L", pkg.License)
 	add("o", pkg.Origin)
 	add("m", pkg.Maintainer)
-	add("D", strings.Join(depends, " "))
-	add("p", strings.Join(provides, " "))
+	add("D", strings.Join(pkg.Depends, " "))
+	add("p", strings.Join(pkg.Provides, " "))
 
 	return sb.String()
 }

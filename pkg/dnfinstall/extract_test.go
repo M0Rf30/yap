@@ -75,30 +75,30 @@ func TestExtractRPMContextCancellation(t *testing.T) {
 }
 
 // TestExtractRPMWithValidRPM tests extractRPM with a valid RPM file.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils. This is a known limitation.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm. This is a known limitation.
 // The extraction logic is tested indirectly through TestInstallPackageHappyPath.
 func TestExtractRPMWithValidRPM(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestExtractRPMWithSymlink tests extractRPM with a symlink.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestExtractRPMWithSymlink(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestExtractRPMWithConfigFile tests extractRPM with a config file.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestExtractRPMWithConfigFile(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }
 
 // TestExtractRPMWithCapabilities tests extractRPM with an RPM that has capabilities.
-// NOTE: This test is skipped because rpmpack-generated RPMs have issues with
-// the PayloadReaderExtended() function in rpmutils.
+// NOTE: This test is skipped because pkgformat/rpm/pack-generated RPMs have issues with
+// the PayloadReaderExtended() function in pkgformat/rpm.
 func TestExtractRPMWithCapabilities(t *testing.T) {
-	t.Skip("rpmpack-generated RPMs have payload reader issues")
+	t.Skip("pkgformat/rpm/pack-generated RPMs have payload reader issues")
 }

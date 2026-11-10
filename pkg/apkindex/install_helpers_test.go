@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	pkgapk "github.com/M0Rf30/pkgformat/apk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,13 +18,6 @@ import (
 func TestReadInstalledDBEmpty(t *testing.T) {
 	result := ExportReadInstalledDB()
 	assert.NotNil(t, result)
-}
-
-// TestReadInstalledStanzasEmpty tests readInstalledStanzas with no file.
-func TestReadInstalledStanzasEmpty(t *testing.T) {
-	result := ExportReadInstalledStanzas()
-	assert.NotNil(t, result)
-	assert.Empty(t, result)
 }
 
 // TestWriteInstalledStanzas tests writing stanzas to a temp file.
@@ -78,14 +72,10 @@ func TestWriteInstalledStanzasOrdering(t *testing.T) {
 func TestRegisterInstalledBasic(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	pkg := &Package{
-		Name:     "test-pkg",
-		Version:  "1.0-r0",
-		Arch:     "x86_64",
-		InstSize: 1024,
-	}
+	pkg := &pkgapk.RepoPackage{
+		Name: "test-pkg", Version: "1.0-r0", Arch: "x86_64", InstalledSize: 1024}
 
-	err := ExportRegisterInstalled(tmpDir, pkg, "")
+	err := ExportRegisterInstalled(tmpDir, pkg)
 	require.NoError(t, err)
 
 	dbPath := filepath.Join(tmpDir, "lib", "apk", "db", "installed")
@@ -100,14 +90,10 @@ func TestRegisterInstalledBasic(t *testing.T) {
 func TestRegisterInstalledWithoutPkgInfo(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	pkg := &Package{
-		Name:     "test-pkg",
-		Version:  "1.0-r0",
-		Arch:     "x86_64",
-		InstSize: 2048,
-	}
+	pkg := &pkgapk.RepoPackage{
+		Name: "test-pkg", Version: "1.0-r0", Arch: "x86_64", InstalledSize: 2048}
 
-	err := ExportRegisterInstalled(tmpDir, pkg, "")
+	err := ExportRegisterInstalled(tmpDir, pkg)
 	require.NoError(t, err)
 
 	dbPath := filepath.Join(tmpDir, "lib", "apk", "db", "installed")
@@ -123,22 +109,14 @@ func TestRegisterInstalledWithoutPkgInfo(t *testing.T) {
 func TestRegisterInstalledUpdate(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	pkg1 := &Package{
-		Name:     "test-pkg",
-		Version:  "1.0-r0",
-		Arch:     "x86_64",
-		InstSize: 1024,
-	}
-	err := ExportRegisterInstalled(tmpDir, pkg1, "")
+	pkg1 := &pkgapk.RepoPackage{
+		Name: "test-pkg", Version: "1.0-r0", Arch: "x86_64", InstalledSize: 1024}
+	err := ExportRegisterInstalled(tmpDir, pkg1)
 	require.NoError(t, err)
 
-	pkg2 := &Package{
-		Name:     "test-pkg",
-		Version:  "2.0-r0",
-		Arch:     "x86_64",
-		InstSize: 2048,
-	}
-	err = ExportRegisterInstalled(tmpDir, pkg2, "")
+	pkg2 := &pkgapk.RepoPackage{
+		Name: "test-pkg", Version: "2.0-r0", Arch: "x86_64", InstalledSize: 2048}
+	err = ExportRegisterInstalled(tmpDir, pkg2)
 	require.NoError(t, err)
 
 	dbPath := filepath.Join(tmpDir, "lib", "apk", "db", "installed")
@@ -150,4 +128,23 @@ func TestRegisterInstalledUpdate(t *testing.T) {
 	assert.Equal(t, 1, count, "should have exactly one entry for test-pkg")
 
 	assert.Contains(t, contentStr, "V:2.0-r0")
+}
+
+// TestBuildInstalledStanzaFromIndexEntry checks the installed-db tags written
+// from an index entry, dependencies and provides included.
+func TestBuildInstalledStanzaFromIndexEntry(t *testing.T) {
+	stanza := ExportBuildInstalledStanza(&pkgapk.RepoPackage{Package: pkgapk.Package{
+		Name: "app", Version: "1.0-r0", Arch: "x86_64", Size: 10, InstalledSize: 20,
+		Description: "an app", URL: "https://example.com", License: "MIT", Origin: "app",
+		Maintainer: "me <me@example.com>",
+		Depends:    []string{"musl", "so:libc.musl-x86_64.so.1"}, Provides: []string{"cmd:app=1.0-r0"},
+	}})
+
+	for _, want := range []string{
+		"P:app\n", "V:1.0-r0\n", "A:x86_64\n", "S:10\n", "I:20\n", "T:an app\n",
+		"U:https://example.com\n", "L:MIT\n", "o:app\n", "m:me <me@example.com>\n",
+		"D:musl so:libc.musl-x86_64.so.1\n", "p:cmd:app=1.0-r0\n",
+	} {
+		assert.Contains(t, stanza, want)
+	}
 }

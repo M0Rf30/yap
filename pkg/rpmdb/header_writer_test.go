@@ -10,21 +10,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/M0Rf30/rpmpack"
-	rpmutils "github.com/sassoftware/go-rpmutils"
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	"github.com/M0Rf30/pkgformat/rpm/pack"
+	rpmtag "github.com/M0Rf30/pkgformat/rpm/tag"
 )
 
 // buildTestRPM builds a real RPM in memory with provides and returns it
-// parsed by go-rpmutils.
-func buildTestRPM(t *testing.T) *rpmutils.Rpm {
+// parsed by pkgformat/rpm.
+func buildTestRPM(t *testing.T) *pkgrpm.Rpm {
 	t.Helper()
 
-	provides := rpmpack.Relations{}
+	provides := pack.Relations{}
 	if err := provides.Set("test-pkg-lib"); err != nil {
 		t.Fatal(err)
 	}
 
-	pkg, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+	pkg, err := pack.NewRPM(pack.RPMMetaData{
 		Name:       "test-pkg",
 		Version:    "1.2.3",
 		Release:    "4",
@@ -38,7 +39,7 @@ func buildTestRPM(t *testing.T) *rpmutils.Rpm {
 		t.Fatal(err)
 	}
 
-	pkg.AddFile(rpmpack.RPMFile{
+	pkg.AddFile(pack.RPMFile{
 		Name: "/usr/bin/test", Body: []byte("#!/bin/sh\n"), Mode: 0o755,
 	})
 
@@ -47,7 +48,7 @@ func buildTestRPM(t *testing.T) *rpmutils.Rpm {
 		t.Fatal(err)
 	}
 
-	rpm, err := rpmutils.ReadRpm(&buf)
+	rpm, err := pkgrpm.ReadRpm(&buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,13 +147,13 @@ func TestSerializeHeaderRoundTrip(t *testing.T) {
 	entries, data := indexBlob(t, blob)
 
 	wantTypes := map[int32]uint32{
-		rpmutils.SIZE:           4,
-		rpmutils.BUILDTIME:      4,
-		rpmutils.FILEMODES:      3,
-		rpmutils.FILESIZES:      4,
-		rpmutils.FILEMTIMES:     4,
-		rpmutils.DIRINDEXES:     4,
-		rpmutils.FILEDIGESTALGO: 4,
+		rpmtag.SIZE:           4,
+		rpmtag.BUILDTIME:      4,
+		rpmtag.FILEMODES:      3,
+		rpmtag.FILESIZES:      4,
+		rpmtag.FILEMTIMES:     4,
+		rpmtag.DIRINDEXES:     4,
+		rpmtag.FILEDIGESTALGO: 4,
 	}
 	for tag, typ := range wantTypes {
 		e, ok := entries[tag]
@@ -167,13 +168,13 @@ func TestSerializeHeaderRoundTrip(t *testing.T) {
 		}
 	}
 
-	for _, tag := range []int32{rpmutils.LONGSIZE, rpmutils.LONGFILESIZES} {
+	for _, tag := range []int32{rpmtag.LONGSIZE, rpmtag.LONGFILESIZES} {
 		if _, ok := entries[tag]; ok {
 			t.Errorf("unexpected INT64 tag %d for small sizes", tag)
 		}
 	}
 
-	fm := entries[rpmutils.FILEMODES]
+	fm := entries[rpmtag.FILEMODES]
 	modes := make([]uint16, fm.count)
 
 	for i := range modes {
@@ -201,11 +202,11 @@ func TestSerializeHeaderLargeFiles(t *testing.T) {
 
 	entries, _ := indexBlob(t, blob)
 
-	if e, ok := entries[rpmutils.LONGFILESIZES]; !ok || e.typ != 5 {
+	if e, ok := entries[rpmtag.LONGFILESIZES]; !ok || e.typ != 5 {
 		t.Errorf("LONGFILESIZES entry = %+v ok=%v, want INT64", e, ok)
 	}
 
-	if _, ok := entries[rpmutils.FILESIZES]; ok {
+	if _, ok := entries[rpmtag.FILESIZES]; ok {
 		t.Error("FILESIZES must be absent when LONGFILESIZES is used")
 	}
 }
