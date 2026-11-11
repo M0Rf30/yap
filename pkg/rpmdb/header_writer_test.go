@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -149,8 +150,10 @@ func TestSerializeHeaderRoundTrip(t *testing.T) {
 		t.Errorf("Name = %q, want test-pkg", info.Name)
 	}
 
-	if len(info.Provides) == 0 || info.Provides[0].Name != "test-pkg-lib" {
-		t.Errorf("Provides = %v, want [test-pkg-lib ...]", info.Provides)
+	// The header also carries the package's implicit self-provide.
+	hasLib := func(d pkgrpm.Dependency) bool { return d.Name == "test-pkg-lib" }
+	if !slices.ContainsFunc(info.Provides, hasLib) {
+		t.Errorf("Provides = %v, want it to hold test-pkg-lib", info.Provides)
 	}
 
 	if len(info.Files) != 3 {

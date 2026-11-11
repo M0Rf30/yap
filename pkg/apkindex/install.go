@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,49 +26,42 @@ import (
 
 const apkInstalledDB = "/lib/apk/db/installed"
 
-// InstallPackages resolves the requested packages and their transitive deps,
-// downloads each one (checked against its index entry), extracts it to /, and
-// updates /lib/apk/db/installed. Replaces "apk add".
+// InstallPackages resolves the requested packages and their transitive deps
+// with the apk solver, downloads each one (checked against its index entry),
+// extracts it to /, and updates /lib/apk/db/installed. Replaces "apk add".
+//
+// Everything installed already is part of the request, so the solver keeps it
+// (at the installed version) instead of planning its removal.
 func (r *Repos) InstallPackages(ctx context.Context, names []string) error {
-	// 1. Resolve transitive deps.
-	resolution, err := r.Index.ResolveDeps(names)
+	// 1. Solve the dependencies against what is installed.
+	installed := readInstalledDB()
+
+	world := slices.Clone(names)
+	for i := range installed {
+		world = append(world, installed[i].Name)
+	}
+
+	solution, err := r.Index.Solve(pkgapk.SolveRequest{World: world, Installed: installed})
 	if err != nil {
 		return errors.Wrap(err, errors.ErrTypeValidation, "failed to resolve dependencies").
 			WithOperation("InstallPackages")
 	}
 
-	for _, capability := range resolution.Virtual {
-		logger.Debug(i18n.T("logger.apkindex.debug.resolved_virtual"), "capability", capability)
-	}
-
-	for _, name := range resolution.Unresolved {
-		// Skipped, like apk does: it rejects them at install time if they matter.
-		logger.Debug(i18n.T("logger.apkindex.debug.unresolved"), "package", name)
-	}
-
-	logger.Info(i18n.T("logger.apkindex.info.resolved_transitive_deps"), "seeds", len(names),
-		"to_install", len(resolution.Packages),
-		"via_virtual", len(resolution.Virtual),
-		"unresolved", len(resolution.Unresolved))
-
-	if len(resolution.Packages) == 0 {
-		return nil
-	}
-
-	// 2. Filter out already-installed packages.
-	installed := readInstalledDB()
-
 	var toInstall []*pkgapk.RepoPackage
 
-	for _, p := range resolution.Packages {
-		if !installed[p.Name] {
-			toInstall = append(toInstall, p)
+	for _, change := range solution.Changes {
+		if change.New != nil {
+			toInstall = append(toInstall, change.New)
 		}
 	}
 
+	logger.Info(i18n.T("logger.apkindex.info.resolved_transitive_deps"), "seeds", len(names),
+		"resolved", len(solution.Packages),
+		"to_install", len(toInstall))
+
 	if len(toInstall) == 0 {
 		logger.Info(i18n.T("logger.apkindex.info.all_packages_already_installed"), "requested", len(names),
-			"resolved", len(resolution.Packages))
+			"resolved", len(solution.Packages))
 
 		return nil
 	}
@@ -78,8 +72,8 @@ func (r *Repos) InstallPackages(ctx context.Context, names []string) error {
 	}
 
 	logger.Info(i18n.T("logger.apkindex.info.installing_apk_packages"), "to_install", len(toInstall),
-		"resolved", len(resolution.Packages),
-		"skipped_installed", len(resolution.Packages)-len(toInstall),
+		"resolved", len(solution.Packages),
+		"skipped_installed", len(solution.Packages)-len(toInstall),
 		"total_bytes", totalBytes)
 
 	// 3. Download all .apk files to a temp dir.
@@ -110,13 +104,13 @@ func (r *Repos) InstallPackages(ctx context.Context, names []string) error {
 	return nil
 }
 
-// readInstalledDB returns the set of installed package names of the host's
-// apk database. It is empty when the database cannot be read.
-func readInstalledDB() map[string]bool { return readInstalledDBAt("/") }
+// readInstalledDB returns the packages installed on the host, from its apk
+// database. It is empty when the database cannot be read.
+func readInstalledDB() []pkgapk.Package { return readInstalledDBAt("/") }
 
 // readInstalledDBAt is readInstalledDB for the database under root.
-func readInstalledDBAt(root string) map[string]bool {
-	installed := make(map[string]bool)
+func readInstalledDBAt(root string) []pkgapk.Package {
+	installed := []pkgapk.Package{}
 
 	path, err := pkgapk.FindInstalled(root)
 	if err != nil {
@@ -134,15 +128,15 @@ func readInstalledDBAt(root string) map[string]bool {
 
 	defer func() { _ = db.Close() }()
 
-	names, err := db.InstalledNames(context.Background())
+	pkgs, err := db.List(context.Background())
 	if err != nil {
 		logger.Debug(i18n.T("logger.apkindex.debug.installed_db_unreadable"), "error", err)
 
 		return installed
 	}
 
-	for _, name := range names {
-		installed[name] = true
+	for _, p := range pkgs {
+		installed = append(installed, p.Package)
 	}
 
 	return installed

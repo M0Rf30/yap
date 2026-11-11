@@ -141,7 +141,7 @@ func (d *Package) spec() (*pkgdeb.Spec, error) {
 		return nil, err
 	}
 
-	return &pkgdeb.Spec{
+	spec := &pkgdeb.Spec{
 		Name:         pb.PkgName,
 		Epoch:        pb.Epoch,
 		Version:      pb.PkgVer,
@@ -155,16 +155,6 @@ func (d *Package) spec() (*pkgdeb.Spec, error) {
 		URL:          pb.URL,
 		Bugs:         pb.Bugs,
 		Description:  pb.PkgDesc,
-		Provides:     pb.Provides,
-		PreDepends:   pb.PreDepends,
-		Depends:      pb.Depends,
-		Conflicts:    pb.Conflicts,
-		Breaks:       pb.Breaks,
-		Replaces:     pb.Replaces,
-		Recommends:   pb.OptDepends,
-		Suggests:     pb.Suggests,
-		Enhances:     pb.Enhances,
-		BuiltUsing:   pb.BuiltUsing,
 		Conffiles:    pb.Backup,
 		Licenses:     pb.License,
 		Copyrights:   pb.Copyright,
@@ -179,7 +169,53 @@ func (d *Package) spec() (*pkgdeb.Spec, error) {
 		Changelog:   changelog,
 		Compression: d.compression,
 		ModTime:     files.SourceDateEpochFromEnv(),
-	}, nil
+	}
+
+	if err := setRelations(spec, pb); err != nil {
+		return nil, err
+	}
+
+	return spec, nil
+}
+
+// setRelations parses the PKGBUILD's dependency arrays into the typed
+// relationship fields of spec, after rewriting PKGBUILD operators ("gcc>=11")
+// into control-file syntax ("gcc (>= 11)"); entries already in it are unchanged.
+func setRelations(spec *pkgdeb.Spec, pb *pkgbuild.PKGBUILD) error {
+	fields := []struct {
+		field   string
+		dst     *[]pkgdeb.Alternatives
+		entries []string
+	}{
+		{"provides", &spec.Provides, pb.Provides},
+		{"pre-depends", &spec.PreDepends, pb.PreDepends},
+		{"depends", &spec.Depends, pb.Depends},
+		{"conflicts", &spec.Conflicts, pb.Conflicts},
+		{"breaks", &spec.Breaks, pb.Breaks},
+		{"replaces", &spec.Replaces, pb.Replaces},
+		{"recommends", &spec.Recommends, pb.OptDepends},
+		{"suggests", &spec.Suggests, pb.Suggests},
+		{"enhances", &spec.Enhances, pb.Enhances},
+		{"built-using", &spec.BuiltUsing, pb.BuiltUsing},
+	}
+
+	for _, f := range fields {
+		entries := make([]string, len(f.entries))
+		for i, entry := range f.entries {
+			entries[i] = pkgdeb.NormalizeDependency(entry)
+		}
+
+		rels, err := pkgdeb.ParseRelationList(entries...)
+		if err != nil {
+			return errors.Wrap(err, errors.ErrTypeValidation, "invalid dependency relation").
+				WithOperation("setRelations").
+				WithContext("field", f.field)
+		}
+
+		*f.dst = rels
+	}
+
+	return nil
 }
 
 // scriptlet prepends only the helper function definitions that are actually

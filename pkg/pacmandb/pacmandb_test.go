@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/M0Rf30/pkgformat/gpg"
 	"github.com/M0Rf30/pkgformat/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,29 @@ import (
 
 func noRetry() *httpclient.Client {
 	return httpclient.New(httpclient.Options{Retry: httpclient.RetryPolicy{Attempts: 1, BaseDelay: -1}})
+}
+
+// noKeyring is a keyring directory without any key.
+func noKeyring(t *testing.T) string {
+	t.Helper()
+
+	return t.TempDir()
+}
+
+// withKey is a keyring directory holding one freshly generated public key.
+func withKey(t *testing.T) string {
+	t.Helper()
+
+	entity, err := gpg.GenerateEntity("test", "", "test@example.com", gpg.AlgorithmED25519)
+	require.NoError(t, err)
+
+	f, err := os.Create(filepath.Join(t.TempDir(), "test.gpg"))
+	require.NoError(t, err)
+
+	require.NoError(t, entity.Serialize(f))
+	require.NoError(t, f.Close())
+
+	return filepath.Dir(f.Name())
 }
 
 func writeConf(t *testing.T, body string) string {
@@ -52,7 +76,7 @@ func TestSyncWritesDatabasesFromConfAndMirrorlist(t *testing.T) {
 		"\n\n[extra]\nServer = "+srv.URL+"/$repo/os/$arch\n")
 	dir := filepath.Join(t.TempDir(), "sync")
 
-	n, err := syncTo(t.Context(), conf, dir, noRetry())
+	n, err := syncTo(t.Context(), conf, dir, noKeyring(t), noRetry())
 	require.NoError(t, err)
 	assert.Equal(t, 2, n)
 
@@ -79,7 +103,7 @@ func TestSyncRemovesStaleSignature(t *testing.T) {
 
 	conf := writeConf(t, "[options]\nArchitecture = x86_64\n[core]\nServer = "+srv.URL+"/$repo/os/$arch\n")
 
-	n, err := syncTo(t.Context(), conf, dir, noRetry())
+	n, err := syncTo(t.Context(), conf, dir, noKeyring(t), noRetry())
 	require.NoError(t, err)
 	assert.Equal(t, 1, n)
 	assert.NoFileExists(t, sig, "a signature of the previous database must not linger")
@@ -101,14 +125,57 @@ func TestSyncKeepsGoingAfterFailedRepo(t *testing.T) {
 		"[good]\nServer = "+srv.URL+"/$repo/$arch\n")
 	dir := t.TempDir()
 
-	n, err := syncTo(t.Context(), conf, dir, noRetry())
+	n, err := syncTo(t.Context(), conf, dir, noKeyring(t), noRetry())
 	require.Error(t, err)
 	assert.Equal(t, 1, n)
 	assert.FileExists(t, filepath.Join(dir, "good.db"))
 }
 
 func TestSyncMissingConf(t *testing.T) {
-	n, err := syncTo(t.Context(), filepath.Join(t.TempDir(), "absent.conf"), t.TempDir(), noRetry())
+	absent := filepath.Join(t.TempDir(), "absent.conf")
+
+	n, err := syncTo(t.Context(), absent, t.TempDir(), noKeyring(t), noRetry())
 	require.Error(t, err)
 	assert.Zero(t, n)
+}
+
+func serveCoreDB(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/core/os/x86_64/core.db" {
+			_, _ = w.Write(repoDB)
+
+			return
+		}
+
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
+func TestSyncEnforcesSigLevelWhenKeysAreTrusted(t *testing.T) {
+	srv := serveCoreDB(t)
+	conf := writeConf(t, "[options]\nArchitecture = x86_64\nSigLevel = DatabaseRequired\n"+
+		"[core]\nServer = "+srv.URL+"/$repo/os/$arch\n")
+	dir := t.TempDir()
+
+	n, err := syncTo(t.Context(), conf, dir, withKey(t), noRetry())
+	require.Error(t, err, "the served database carries no signature")
+	assert.Zero(t, n)
+	assert.NoFileExists(t, filepath.Join(dir, "core.db"))
+}
+
+func TestSyncSkipsReposWithoutSyncUsage(t *testing.T) {
+	srv := serveCoreDB(t)
+	conf := writeConf(t, "[options]\nArchitecture = x86_64\n"+
+		"[core]\nServer = "+srv.URL+"/$repo/os/$arch\nUsage = Search\n")
+	dir := t.TempDir()
+
+	n, err := syncTo(t.Context(), conf, dir, noKeyring(t), noRetry())
+	require.NoError(t, err)
+	assert.Zero(t, n)
+	assert.NoFileExists(t, filepath.Join(dir, "core.db"))
 }

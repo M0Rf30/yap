@@ -1047,10 +1047,6 @@
   translation: "Installed"
 - id: logger.apkindex.debug.installed_db_unreadable
   translation: "Installed apk database unreadable; assuming nothing is installed"
-- id: logger.apkindex.debug.resolved_virtual
-  translation: "Resolved virtual"
-- id: logger.apkindex.debug.unresolved
-  translation: "Unresolved"
 - id: logger.apkindex.info.all_packages_already_installed
   translation: "All packages already installed"
 - id: logger.apkindex.info.indexes_loaded
@@ -1313,12 +1309,16 @@
   translation: "Failed to separate debug info"
 - id: logger.options.warn.file_still_not_writable
   translation: "File still not writable after chmod"
+- id: logger.pacmandb.debug.keyring_unreadable
+  translation: "Cannot read the pacman keyring directory"
 - id: logger.pacmandb.info.sync_complete
   translation: "Sync complete"
 - id: logger.pacmandb.info.syncing_repos
   translation: "Syncing repos"
 - id: logger.pacmandb.warn.repo_sync_failed
   translation: "Repo sync failed"
+- id: logger.pacmandb.warn.syncing_without_verification
+  translation: "Syncing without database signature verification: no trusted keys found"
 - id: logger.parser.warn.failed_close_pkgbuild_file
   translation: "Failed to close PKGBUILD file"
 - id: logger.parser.warn.variable_expansion_failed
