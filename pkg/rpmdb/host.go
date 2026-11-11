@@ -18,7 +18,10 @@ package rpmdb
 import (
 	"context"
 	"errors"
+	"maps"
+	"slices"
 
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
 	pkgrpmdb "github.com/M0Rf30/pkgformat/rpm/rpmdb"
 
 	yapErrors "github.com/M0Rf30/yap/v2/pkg/errors"
@@ -59,16 +62,25 @@ func withDB[T any](fn func(*pkgrpmdb.DB) (T, error)) (T, error) {
 	return fn(db)
 }
 
-// ListInstalled returns the sorted names of the installed packages.
-func ListInstalled(ctx context.Context) ([]string, error) {
-	return withDB(func(db *pkgrpmdb.DB) ([]string, error) { return db.InstalledNames(ctx) })
+// InstalledPackages returns every installed package with its dependencies,
+// as the database stores them. The packages must not be modified.
+func InstalledPackages(ctx context.Context) ([]*pkgrpm.Package, error) {
+	return withDB(func(db *pkgrpmdb.DB) ([]*pkgrpm.Package, error) { return db.InstalledPackages(ctx) })
 }
 
-// ListInstalledProvides returns the sorted capabilities (Provides) satisfied
-// by the installed packages, including each package's own name and the virtual
-// names such as "coreutils" provided by "coreutils-single" on minimal images.
-func ListInstalledProvides(ctx context.Context) ([]string, error) {
-	return withDB(func(db *pkgrpmdb.DB) ([]string, error) { return db.InstalledProvides(ctx) })
+// ListInstalled returns the sorted names of the installed packages.
+func ListInstalled(ctx context.Context) ([]string, error) {
+	pkgs, err := InstalledPackages(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	set := make(map[string]struct{}, len(pkgs))
+	for _, p := range pkgs {
+		set[p.Name] = struct{}{}
+	}
+
+	return slices.Sorted(maps.Keys(set)), nil
 }
 
 // FilterInstalled returns the subset of names that are NOT installed, in the

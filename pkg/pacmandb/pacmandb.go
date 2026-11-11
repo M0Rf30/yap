@@ -6,13 +6,17 @@
 // The pacman.conf and mirrorlist parsing, the multi-mirror failover and the
 // atomic <repo>.db / <repo>.db.sig writes are done by
 // github.com/M0Rf30/pkgformat/pacman; this package only supplies the host
-// paths (/etc/pacman.conf, /var/lib/pacman/sync) and yap's logging.
+// paths (/etc/pacman.conf, /var/lib/pacman/sync, the archlinux-keyring files)
+// and yap's logging. Each repository's SigLevel and Usage come from the parsed
+// pacman.conf and are enforced by the client.
 package pacmandb
 
 import (
 	"context"
 	"os"
+	"runtime"
 
+	"github.com/M0Rf30/pkgformat/gpg"
 	"github.com/M0Rf30/pkgformat/httpclient"
 	"github.com/M0Rf30/pkgformat/pacman"
 
@@ -24,19 +28,22 @@ import (
 const (
 	pacmanConfPath = "/etc/pacman.conf"
 	pacmanSyncDir  = "/var/lib/pacman/sync"
+	// pacmanKeyringDir holds the public keys of the distribution keyring
+	// packages (archlinux-keyring), the ones "pacman-key --populate" trusts.
+	pacmanKeyringDir = "/usr/share/pacman/keyrings"
 )
 
 // Sync downloads <repo>.db for every enabled repo in pacman.conf.
 // Returns the number of repos successfully synced and the failures joined.
 func Sync(ctx context.Context) (succeeded int, err error) {
-	return syncTo(ctx, pacmanConfPath, pacmanSyncDir, nil)
+	return syncTo(ctx, pacmanConfPath, pacmanSyncDir, pacmanKeyringDir, nil)
 }
 
 // syncTo is Sync with explicit paths and HTTP client (nil selects the default).
 func syncTo(
-	ctx context.Context, confPath, syncDir string, httpc *httpclient.Client,
+	ctx context.Context, confPath, syncDir, keyringDir string, httpc *httpclient.Client,
 ) (int, error) {
-	cfg, err := pacman.ParseConfigFile(confPath)
+	cfg, err := pacman.ParseConfigFile(confPath, pacman.ParseOptions{})
 	if err != nil {
 		return 0, errors.Wrap(err, errors.ErrTypeConfiguration, "failed to parse pacman.conf").
 			WithOperation("Sync").
@@ -49,20 +56,26 @@ func syncTo(
 			WithContext("dir", syncDir)
 	}
 
-	arch := cfg.Architecture
-	if arch == "" || arch == "auto" {
-		arch = "" // the client maps the running GOARCH
+	// The client resolves $arch itself when the option is absent.
+	arch := cfg.Arch(runtime.GOARCH)
+	repos := cfg.ReposFor(pacman.UsageSync)
+	keyring := loadKeyring(keyringDir)
+
+	if keyring.Len() == 0 {
+		repos = withoutDBSignatures(repos)
 	}
 
-	client, err := pacman.NewClient(pacman.ClientOptions{HTTP: httpc, Arch: arch, Logger: logger.Slog()})
+	client, err := pacman.NewClient(pacman.ClientOptions{
+		HTTP: httpc, Arch: arch, Keyring: keyring, Logger: logger.Slog(),
+	})
 	if err != nil {
 		return 0, errors.Wrap(err, errors.ErrTypeConfiguration, "failed to create pacman client").
 			WithOperation("Sync")
 	}
 
-	logger.Info(i18n.T("logger.pacmandb.info.syncing_repos"), "repos", len(cfg.Repos), "arch", arch)
+	logger.Info(i18n.T("logger.pacmandb.info.syncing_repos"), "repos", len(repos), "arch", arch)
 
-	succeeded, err := client.Sync(ctx, cfg.Repos, syncDir)
+	succeeded, err := client.Sync(ctx, repos, syncDir)
 	if err != nil {
 		// Per-repo failures are warnings; the others were still synced.
 		logger.Warn(i18n.T("logger.pacmandb.warn.repo_sync_failed"), "error", err)
@@ -71,7 +84,35 @@ func syncTo(
 			WithOperation("Sync")
 	}
 
-	logger.Info(i18n.T("logger.pacmandb.info.sync_complete"), "succeeded", succeeded, "total", len(cfg.Repos))
+	logger.Info(i18n.T("logger.pacmandb.info.sync_complete"), "succeeded", succeeded, "total", len(repos))
 
 	return succeeded, err
+}
+
+// loadKeyring reads the distribution keyrings in dir. A missing or empty
+// directory gives an empty keyring.
+func loadKeyring(dir string) *gpg.Keyring {
+	keyring, err := gpg.LoadKeyringDir(dir)
+	if err != nil {
+		logger.Debug(i18n.T("logger.pacmandb.debug.keyring_unreadable"), "dir", dir, "error", err)
+
+		return nil
+	}
+
+	return keyring
+}
+
+// withoutDBSignatures returns repos with database signature checking turned
+// off. Without any trusted key a SigLevel that asks for verification can only
+// fail; sync keeps working as it did before signatures were checked, and says so.
+func withoutDBSignatures(repos []pacman.Repo) []pacman.Repo {
+	logger.Warn(i18n.T("logger.pacmandb.warn.syncing_without_verification"))
+
+	out := make([]pacman.Repo, len(repos))
+	for i, repo := range repos {
+		repo.SigLevel.Database = pacman.SigPolicy{Check: pacman.SigNever}
+		out[i] = repo
+	}
+
+	return out
 }

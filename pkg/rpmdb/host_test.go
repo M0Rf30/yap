@@ -47,12 +47,20 @@ func TestListInstalled(t *testing.T) {
 	assert.Equal(t, []string{"test-pkg"}, names)
 }
 
-func TestListInstalledProvides(t *testing.T) {
+func TestInstalledPackagesCarryProvides(t *testing.T) {
 	useRoot(t, hostWithPackage(t))
 
-	provides, err := ListInstalledProvides(t.Context())
+	pkgs, err := InstalledPackages(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, []string{"test-pkg", "test-pkg-lib"}, provides)
+	require.Len(t, pkgs, 1)
+	assert.Equal(t, "test-pkg", pkgs[0].Name)
+
+	var provides []string
+	for _, d := range pkgs[0].Provides {
+		provides = append(provides, d.Name)
+	}
+
+	assert.Contains(t, provides, "test-pkg-lib")
 }
 
 func TestFilterInstalled(t *testing.T) {
@@ -75,7 +83,7 @@ func TestNoDatabase(t *testing.T) {
 	_, err := ListInstalled(t.Context())
 	require.ErrorIs(t, err, ErrNoDatabase)
 
-	_, err = ListInstalledProvides(t.Context())
+	_, err = InstalledPackages(t.Context())
 	require.ErrorIs(t, err, ErrNoDatabase)
 
 	_, err = FilterInstalled(t.Context(), []string{"bash"})

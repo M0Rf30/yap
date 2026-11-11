@@ -39,7 +39,7 @@ type RPM struct {
 	format int
 	// pgpSigner, when set, embeds an OpenPGP signature in the RPM signature
 	// header (see SetPGPSigner).
-	pgpSigner func([]byte) ([]byte, error)
+	pgpSigner pack.Signer
 	// originalSection/mappedSection remember the PKGBUILD section as written and
 	// its RPM group, so repeated PrepareFakeroot calls (split packages) do not
 	// map an already-mapped group a second time.
@@ -174,7 +174,7 @@ func (r *RPM) BuildPackage(ctx context.Context, artifactsPath string, targetArch
 // signature over its input. BuildPackage then embeds the signature in the
 // package's signature header so `rpm -K` / dnf verify it in place: header and
 // header+payload signatures for v4, OPENPGP header signatures for v6.
-func (r *RPM) SetPGPSigner(f func([]byte) ([]byte, error)) {
+func (r *RPM) SetPGPSigner(f pack.Signer) {
 	r.pgpSigner = f
 }
 

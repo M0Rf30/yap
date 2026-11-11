@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/M0Rf30/pkgformat/rpm/pack"
+
 	yerrors "github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
 	"github.com/M0Rf30/yap/v2/pkg/logger"
@@ -52,10 +54,10 @@ func (mpc *MultipleProject) signArtifact(
 }
 
 // embeddedSigner is implemented by builders whose package format carries
-// signatures inside the artifact (RPM). The function receives the bytes to
+// signatures inside the artifact (RPM). The function reads the bytes to
 // sign and returns a binary OpenPGP detached signature.
 type embeddedSigner interface {
-	SetPGPSigner(f func([]byte) ([]byte, error))
+	SetPGPSigner(f pack.Signer)
 }
 
 // prepareEmbeddedSigning registers the project's OpenPGP key with builders

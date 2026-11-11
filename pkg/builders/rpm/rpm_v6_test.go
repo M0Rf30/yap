@@ -38,10 +38,10 @@ func buildSignedRPM(t *testing.T, format int) (string, openpgp.EntityList) {
 	pkgBuild.PackageDir = packageDir
 
 	r := NewBuilder(pkgBuild, "", format)
-	r.SetPGPSigner(func(data []byte) ([]byte, error) {
+	r.SetPGPSigner(func(data io.Reader) ([]byte, error) {
 		var sig bytes.Buffer
 
-		err := openpgp.DetachSign(&sig, entity, bytes.NewReader(data), nil)
+		err := openpgp.DetachSign(&sig, entity, data, nil)
 
 		return sig.Bytes(), err
 	})

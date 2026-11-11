@@ -8,9 +8,11 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
 	"github.com/M0Rf30/pkgformat/rpm/dnf"
 
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -23,21 +25,29 @@ import (
 const (
 	yumRepoDir  = "/etc/yum.repos.d"
 	dnfCacheDir = "/var/cache/dnf"
-	dnfVarsDir  = "/etc/dnf/vars"
+	dnfConfFile = "/etc/dnf/dnf.conf"
 	osReleaseFn = "/etc/os-release"
 )
 
 // newHostClient returns a dnf client reading the host's repository files and
 // metadata cache, with the host's rpmdb telling it what is installed.
 func newHostClient() *dnf.Client {
-	return dnf.New(dnf.Options{
+	opts := dnf.Options{
 		RepoDir:    yumRepoDir,
 		CacheDir:   dnfCacheDir,
-		VarsDir:    dnfVarsDir,
+		VarsDirs:   []string{"/etc/dnf/vars", "/etc/yum/vars"},
 		Releasever: readReleasever(),
 		Installed:  hostInstalled{},
 		Logger:     logger.Slog(),
-	})
+	}
+
+	// The host's dnf.conf (excludes, gpgcheck and repository defaults) applies
+	// when there is one; a minimal image has none and gets dnf's defaults.
+	if _, err := os.Stat(dnfConfFile); err == nil {
+		opts.ConfigFile = dnfConfFile
+	}
+
+	return dnf.New(opts)
 }
 
 // readReleasever returns VERSION_ID from /etc/os-release, cached for the
@@ -112,47 +122,99 @@ func Update(ctx context.Context) error {
 // nothing installed as far as the resolver is concerned.
 type hostInstalled struct{}
 
-func (hostInstalled) InstalledNames(ctx context.Context) ([]string, error) {
-	return queryInstalled(ctx, rpmdb.ListInstalled, "%{NAME}\n"), nil
-}
-
-func (hostInstalled) InstalledProvides(ctx context.Context) ([]string, error) {
-	return queryInstalled(ctx, rpmdb.ListInstalledProvides, "[%{PROVIDENAME}\n]"), nil
-}
-
-func queryInstalled(
-	ctx context.Context,
-	list func(context.Context) ([]string, error),
-	queryFormat string,
-) []string {
-	out, err := list(ctx)
+// InstalledPackages implements dnf.Installed.
+func (hostInstalled) InstalledPackages(ctx context.Context) ([]*pkgrpm.Package, error) {
+	pkgs, err := rpmdb.InstalledPackages(ctx)
 	if err == nil {
-		return out
+		return pkgs, nil
 	}
 
 	if !errors.Is(err, rpmdb.ErrNoDatabase) {
-		return nil
+		return nil, nil //nolint:nilerr // an unreadable database reads as nothing installed
 	}
 
 	logger.Debug(i18n.T("logger.dnfinstall.debug.no_rpmdb_falling"))
 
-	return rpmQuery(ctx, queryFormat)
+	return rpmQuery(ctx), nil
 }
 
-// rpmQuery lists the lines "rpm -qa --queryformat" prints.
-func rpmQuery(ctx context.Context, queryFormat string) []string {
-	out, err := exec.CommandContext(ctx, "rpm", "-qa", "--queryformat", queryFormat).Output()
+// rpmQueryFormat prints one line per package, "name epoch version release
+// arch" tab-separated, followed by one tab-indented "name version" line per
+// capability it provides.
+const rpmQueryFormat = "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\n" +
+	"[\t%{PROVIDENAME}\t%{PROVIDEVERSION}\n]"
+
+// rpmQuery lists the installed packages "rpm -qa" reports.
+func rpmQuery(ctx context.Context) []*pkgrpm.Package {
+	out, err := exec.CommandContext(ctx, "rpm", "-qa", "--queryformat", rpmQueryFormat).Output()
 	if err != nil {
 		return nil
 	}
 
-	var lines []string
+	return parseRPMQuery(string(out))
+}
 
-	for line := range strings.SplitSeq(string(out), "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			lines = append(lines, line)
+// parseRPMQuery reads the output of rpmQueryFormat.
+func parseRPMQuery(out string) []*pkgrpm.Package {
+	var pkgs []*pkgrpm.Package
+
+	for line := range strings.SplitSeq(out, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		fields := strings.Split(line, "\t")
+
+		if fields[0] != "" {
+			pkgs = append(pkgs, newQueriedPackage(fields))
+
+			continue
+		}
+
+		if len(pkgs) == 0 || len(fields) < 2 {
+			continue
+		}
+
+		pkg := pkgs[len(pkgs)-1]
+		pkg.Provides = append(pkg.Provides, queriedProvide(fields[1:]))
+	}
+
+	return pkgs
+}
+
+// newQueriedPackage builds a package from the name, epoch, version, release and
+// arch fields of a query line. rpm lists the package's own name among its
+// provides, so none is added here.
+func newQueriedPackage(fields []string) *pkgrpm.Package {
+	pkg := &pkgrpm.Package{Name: fields[0]}
+
+	if len(fields) >= 5 {
+		epoch, _ := strconv.ParseUint(fields[1], 10, 32)
+		pkg.Epoch = uint32(epoch)
+		pkg.Version, pkg.Release, pkg.Arch = fields[2], fields[3], fields[4]
+	}
+
+	return pkg
+}
+
+// queriedProvide builds a provide from its name and optional "[epoch:]version-
+// release" fields; a provide with a version is an equality.
+func queriedProvide(fields []string) pkgrpm.Dependency {
+	dep := pkgrpm.Dependency{Name: fields[0]}
+
+	if len(fields) < 2 || fields[1] == "" {
+		return dep
+	}
+
+	dep.Flags = pkgrpm.SenseEqual
+	dep.Version = fields[1]
+
+	if epoch, version, ok := strings.Cut(fields[1], ":"); ok {
+		if n, err := strconv.ParseUint(epoch, 10, 32); err == nil {
+			dep.Epoch = uint32(n)
+			dep.Version = version
 		}
 	}
 
-	return lines
+	return dep
 }

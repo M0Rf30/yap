@@ -4,48 +4,62 @@
 package dnfinstall
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	pkgrpm "github.com/M0Rf30/pkgformat/rpm"
+	pkgrpmdb "github.com/M0Rf30/pkgformat/rpm/rpmdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/M0Rf30/yap/v2/pkg/rpmdb"
 )
 
 // TestHostInstalledNeverFails: whatever the host's rpm database looks like
 // (SQLite, BerkeleyDB, none), the resolver gets an answer, possibly empty.
 func TestHostInstalledNeverFails(t *testing.T) {
-	names, err := hostInstalled{}.InstalledNames(t.Context())
-	require.NoError(t, err)
-
-	provides, err := hostInstalled{}.InstalledProvides(t.Context())
+	pkgs, err := hostInstalled{}.InstalledPackages(t.Context())
 	require.NoError(t, err)
 
 	if _, statErr := os.Stat("/var/lib/rpm"); statErr != nil {
-		assert.Empty(t, names)
-		assert.Empty(t, provides)
+		assert.Empty(t, pkgs)
 	}
 }
 
-// TestRPMQueryWithoutRPM: a failing "rpm -qa" yields no lines.
+// TestRPMQueryWithoutRPM: a failing "rpm -qa" yields no packages.
 func TestRPMQueryWithoutRPM(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
-	assert.Empty(t, rpmQuery(t.Context(), "%{NAME}\n"))
+	assert.Empty(t, rpmQuery(t.Context()))
 }
 
-// TestRPMQueryTrimsLines: output lines are trimmed and blanks dropped.
-func TestRPMQueryTrimsLines(t *testing.T) {
+// TestRPMQueryParsesPackagesAndProvides: each package line starts a package and
+// the tab-indented lines below it are its provides, versioned ones as equalities.
+func TestRPMQueryParsesPackagesAndProvides(t *testing.T) {
 	bin := t.TempDir()
-	script := "#!/bin/sh\nprintf 'bash\\n\\n  glibc  \\n'\n"
+	script := "#!/bin/sh\nprintf 'bash\\t0\\t5.2\\t1.fc40\\tx86_64\\n" +
+		"\\tbash\\t5.2-1.fc40\\n\\t/bin/sh\\t\\n\\nglibc\\t2\\t2.39\\t3\\ti686\\n" +
+		"\\tlibc.so.6\\t\\n\\tglibc\\t2:2.39-3\\n'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "rpm"), []byte(script), 0o755)) //nolint:gosec
 	t.Setenv("PATH", bin)
 
-	assert.Equal(t, []string{"bash", "glibc"}, rpmQuery(t.Context(), "%{NAME}\n"))
+	pkgs := rpmQuery(t.Context())
+	require.Len(t, pkgs, 2)
+
+	assert.Equal(t, "bash", pkgs[0].Name)
+	assert.Equal(t, "5.2", pkgs[0].Version)
+	assert.Equal(t, "1.fc40", pkgs[0].Release)
+	assert.Equal(t, "x86_64", pkgs[0].Arch)
+	require.Len(t, pkgs[0].Provides, 2)
+	assert.Equal(t, pkgrpm.Dependency{Name: "bash", Flags: pkgrpm.SenseEqual, Version: "5.2-1.fc40"},
+		pkgs[0].Provides[0])
+	assert.Equal(t, pkgrpm.Dependency{Name: "/bin/sh"}, pkgs[0].Provides[1])
+
+	assert.Equal(t, uint32(2), pkgs[1].Epoch)
+	require.Len(t, pkgs[1].Provides, 2)
+	assert.Equal(t,
+		pkgrpm.Dependency{Name: "glibc", Flags: pkgrpm.SenseEqual, Version: "2.39-3", Epoch: 2},
+		pkgs[1].Provides[1])
 }
 
 func TestNewHostClientUsesHostPaths(t *testing.T) {
@@ -69,26 +83,21 @@ func TestUpdateWithoutRepos(t *testing.T) {
 	assert.Nil(t, hostState.index)
 }
 
-// TestQueryInstalledFallsBackWithoutDatabase: a host with no rpm database is
-// asked through "rpm -qa"; any other failure reads as nothing installed.
-func TestQueryInstalledFallsBackWithoutDatabase(t *testing.T) {
+// TestInstalledPackagesFallsBackWithoutDatabase: a host with no rpm database
+// is asked through "rpm -qa".
+func TestInstalledPackagesFallsBackWithoutDatabase(t *testing.T) {
 	bin := t.TempDir()
-	script := "#!/bin/sh\nprintf 'bash\\n'\n"
+	script := "#!/bin/sh\nprintf 'bash\\t0\\t5.2\\t1\\tx86_64\\n'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "rpm"), []byte(script), 0o755)) //nolint:gosec
 	t.Setenv("PATH", bin)
 
-	got := queryInstalled(t.Context(), func(context.Context) ([]string, error) {
-		return nil, rpmdb.ErrNoDatabase
-	}, "%{NAME}\n")
-	assert.Equal(t, []string{"bash"}, got)
+	pkgs, err := hostInstalled{}.InstalledPackages(t.Context())
+	require.NoError(t, err)
 
-	got = queryInstalled(t.Context(), func(context.Context) ([]string, error) {
-		return nil, errors.New("corrupt")
-	}, "%{NAME}\n")
-	assert.Empty(t, got)
-
-	got = queryInstalled(t.Context(), func(context.Context) ([]string, error) {
-		return []string{"glibc"}, nil
-	}, "%{NAME}\n")
-	assert.Equal(t, []string{"glibc"}, got)
+	// The test host may have a real rpm database; the fallback only applies
+	// without one.
+	if _, _, findErr := pkgrpmdb.Find("/"); errors.Is(findErr, pkgrpmdb.ErrNotFound) {
+		require.Len(t, pkgs, 1)
+		assert.Equal(t, "bash", pkgs[0].Name)
+	}
 }

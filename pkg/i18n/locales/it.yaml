@@ -1050,10 +1050,6 @@
   translation: "Installato"
 - id: logger.apkindex.debug.installed_db_unreadable
   translation: "Database apk dei pacchetti installati non leggibile; si assume che nulla sia installato"
-- id: logger.apkindex.debug.resolved_virtual
-  translation: "Pacchetto virtuale risolto"
-- id: logger.apkindex.debug.unresolved
-  translation: "Non risolto"
 - id: logger.apkindex.info.all_packages_already_installed
   translation: "Tutti i pacchetti sono già installati"
 - id: logger.apkindex.info.indexes_loaded
@@ -1322,12 +1318,16 @@
   translation: "Separazione delle informazioni di debug non riuscita"
 - id: logger.options.warn.file_still_not_writable
   translation: "File ancora non scrivibile dopo chmod"
+- id: logger.pacmandb.debug.keyring_unreadable
+  translation: "Impossibile leggere la directory del portachiavi di pacman"
 - id: logger.pacmandb.info.sync_complete
   translation: "Sincronizzazione completata"
 - id: logger.pacmandb.info.syncing_repos
   translation: "Sincronizzazione repository"
 - id: logger.pacmandb.warn.repo_sync_failed
   translation: "Sincronizzazione del repository non riuscita"
+- id: logger.pacmandb.warn.syncing_without_verification
+  translation: "Sincronizzazione senza verifica delle firme dei database: nessuna chiave attendibile trovata"
 - id: logger.parser.warn.failed_close_pkgbuild_file
   translation: "Chiusura del file PKGBUILD non riuscita"
 - id: logger.parser.warn.variable_expansion_failed

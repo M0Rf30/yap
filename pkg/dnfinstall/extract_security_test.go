@@ -26,8 +26,8 @@ func buildFilesRPM(t *testing.T, files []pack.RPMFile) string {
 	})
 	require.NoError(t, err)
 
-	for _, f := range files {
-		rpm.AddFile(f)
+	for i := range files {
+		rpm.AddFile(files[i])
 	}
 
 	p := filepath.Join(t.TempDir(), "sec.rpm")

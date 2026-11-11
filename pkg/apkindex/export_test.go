@@ -34,7 +34,7 @@ func ExportExtractAPKDataTo(r io.Reader, root string) error {
 }
 
 // ExportReadInstalledDB exposes readInstalledDB for testing.
-func ExportReadInstalledDB() map[string]bool {
+func ExportReadInstalledDB() []pkgapk.Package {
 	return readInstalledDB()
 }
 
