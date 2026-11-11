@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG GO_VERSION=1.27.3
+ARG GO_VERSION=1.27.4
 
 # Build stage
 FROM golang:${GO_VERSION}-alpine AS builder
@@ -42,7 +42,7 @@ FROM ubuntu:focal
 # Build arguments for runtime stage
 ARG VERSION=dev
 ARG TARGETARCH=amd64
-ARG GO_VERSION=1.27.3
+ARG GO_VERSION=1.27.4
 
 # Metadata labels
 LABEL org.opencontainers.image.title="yap-ubuntu-focal"
