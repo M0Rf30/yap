@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -211,6 +212,19 @@ func isPerlModule(name string) bool {
 	return strings.HasSuffix(name, "-perl")
 }
 
+// hostCompilerRe matches native compiler driver packages (gcc, g++-12,
+// clang-18, …). Target-arch libraries such as libgcc-12-dev do not match.
+var hostCompilerRe = regexp.MustCompile(`^(gcc|g\+\+|cpp|gfortran|clang|clang\+\+)(-[0-9.]+)?$`)
+
+// isHostCompiler reports whether name is a native compiler or the
+// build-essential meta package. A cross build still needs these for the
+// build host (CC_FOR_BUILD=gcc, e.g. OpenJDK's build JDK or generator tools);
+// qualified with the target arch they would replace the host compiler with
+// one that cannot run, as none of them is Multi-Arch: foreign.
+func isHostCompiler(name string) bool {
+	return name == "build-essential" || hostCompilerRe.MatchString(name)
+}
+
 // partitionMode selects how partitionArchAllDeps treats packages that are
 // already installed host-side without Multi-Arch: same.
 type partitionMode int
@@ -234,6 +248,7 @@ const (
 //
 // Unqualified (archAll) in both modes:
 //   - Perl modules — host-side build tools despite Multi-Arch: same.
+//   - Native compilers and build-essential — needed for the build host.
 //   - Architecture: all — no arch-specific variant exists.
 //   - Essential packages (e.g. bash) — a foreign-arch copy alongside the
 //     host one breaks the build environment.
@@ -254,7 +269,8 @@ func partitionArchAllDeps(deps []string, mode partitionMode) (archSpecific, arch
 		// Perl modules (*-perl) ship arch-specific .so files so apt marks them
 		// Multi-Arch: same, but they are host-side build tools (e.g. used by
 		// autoconf/automake) and must never be qualified with the target arch.
-		if isPerlModule(name) {
+		// Same for native compilers, which the cross build runs on the host.
+		if isPerlModule(name) || isHostCompiler(name) {
 			archAll = append(archAll, dep)
 			continue
 		}

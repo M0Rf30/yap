@@ -150,6 +150,32 @@ func TestPartitionArchAllDeps_PerlModuleAlwaysArchAll(t *testing.T) {
 	}
 }
 
+func TestPartitionArchAllDeps_HostCompilersStayNative(t *testing.T) {
+	// gcc/g++ carry no Multi-Arch field and are not preinstalled in the
+	// build image; they must still resolve to the host arch, otherwise the
+	// cross build has no compiler for CC_FOR_BUILD.
+	MakeTestCache([]apt.PackageInfo{
+		makeNotInstalledNoMultiArch("gcc"),
+		makeNotInstalledNoMultiArch("g++-12"),
+		makeNotInstalledNoMultiArch("build-essential"),
+		{Name: "libgcc-12-dev", Architecture: "amd64", MultiArch: "same"},
+	})
+
+	for _, partition := range []func([]string) ([]string, []string){
+		PartitionArchAllDeps, PartitionArchAllDepsForExtract,
+	} {
+		specific, all := partition([]string{"gcc", "g++-12", "build-essential", "libgcc-12-dev"})
+
+		if len(specific) != 1 || specific[0] != "libgcc-12-dev" {
+			t.Errorf("archSpecific: want [libgcc-12-dev], got %v", specific)
+		}
+
+		if len(all) != 3 {
+			t.Errorf("archAll: want [gcc g++-12 build-essential], got %v", all)
+		}
+	}
+}
+
 func TestPartitionArchAllDeps_MultiArchForeign(t *testing.T) {
 	MakeTestCache([]apt.PackageInfo{
 		makeMultiArchForeignPkg("cmake"),
