@@ -35,7 +35,7 @@ func newHostClient() *dnf.Client {
 	opts := dnf.Options{
 		RepoDir:    yumRepoDir,
 		CacheDir:   dnfCacheDir,
-		VarsDirs:   []string{"/etc/dnf/vars", "/etc/yum/vars"},
+		VarsDirs:   hostVarsDirs,
 		Releasever: readReleasever(),
 		Installed:  hostInstalled{},
 		Logger:     logger.Slog(),
@@ -49,27 +49,6 @@ func newHostClient() *dnf.Client {
 
 	return dnf.New(opts)
 }
-
-// readReleasever returns VERSION_ID from /etc/os-release, cached for the
-// process lifetime (the file is static host configuration). It is empty when
-// the file cannot be read or the field is absent.
-var readReleasever = sync.OnceValue(func() string {
-	data, err := os.ReadFile(osReleaseFn)
-	if err != nil {
-		return ""
-	}
-
-	for line := range strings.SplitSeq(string(data), "\n") {
-		key, val, ok := strings.Cut(line, "=")
-		if !ok || strings.TrimSpace(key) != "VERSION_ID" {
-			continue
-		}
-
-		return strings.Trim(strings.TrimSpace(val), `"'`)
-	}
-
-	return ""
-})
 
 // hostState is the process-global repository client and its index, loaded on
 // first use and dropped by Update so freshly fetched metadata is visible.
