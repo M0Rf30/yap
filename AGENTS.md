@@ -25,7 +25,7 @@
 | `pkg/apkindex/` | `apk update` + `apk add`; app-side adapter over `pkgformat/apk` (`Client`, `Index`, `OpenInstalled` for the installed set) with the trust decision |
 | `pkg/pacmandb/` | `pacman -Sy`; thin adapter over `pkgformat/pacman` (`ParseConfigFile`, `Client.Sync`) |
 | `pkg/rpmdb/` | Host RPM database queries (ListInstalled / ListInstalledProvides / FilterInstalled) via `pkgformat/rpm/rpmdb` (SQLite, ndb, BerkeleyDB) + optional SQLite writer (Fedora 33+, RHEL 9+) |
-| `pkg/dnfinstall/` | RPM install (GPG verify → CPIO extract → scriptlets → yapdb); host adapter over `pkgformat/rpm/dnf` (`host.go`) and the `rpm --install` path (`rpmcli.go`) |
+| `pkg/dnfinstall/` | RPM install (GPG verify → CPIO extract → scriptlets → yapdb); host adapter over `pkgformat/rpm/dnf` (`host.go`) and the `rpm --upgrade` path (`rpmcli.go`) |
 | `pkg/yapdb/` | YAP-internal SQLite state DB for installed packages (cross-format) |
 | `pkg/signing/` | APK RSA (`APKSigner`, over `pkgformat/apk`) + DEB/RPM/Pacman GPG signing |
 | `pkg/sbom/` | CycloneDX 1.5 + SPDX 2.3 generation |

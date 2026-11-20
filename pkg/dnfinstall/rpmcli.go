@@ -15,7 +15,9 @@ import (
 
 // InstallWithRPM resolves the transitive closure of names against the cached
 // repository metadata, downloads the verified .rpm files and installs them
-// with "rpm --install --nodeps" (the dependency closure is already resolved).
+// with "rpm --upgrade --nodeps" (the dependency closure is already resolved;
+// --upgrade rather than --install because the closure replaces installed
+// packages with newer versions, which --install rejects as file conflicts).
 // It replaces "dnf install" on hosts where the rpm tool must own the
 // transaction; Install is the in-process variant.
 func InstallWithRPM(ctx context.Context, names []string) error {
@@ -64,13 +66,14 @@ func InstallWithRPM(ctx context.Context, names []string) error {
 	return rpmInstall(ctx, paths)
 }
 
-// rpmInstall installs the given .rpm files via "rpm --install --nodeps".
+// rpmInstall installs or upgrades the given .rpm files via
+// "rpm --upgrade --nodeps".
 func rpmInstall(ctx context.Context, paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
 
-	cmd := exec.CommandContext(ctx, "rpm", append([]string{"--install", "--nodeps"}, paths...)...)
+	cmd := exec.CommandContext(ctx, "rpm", append([]string{"--upgrade", "--nodeps"}, paths...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
