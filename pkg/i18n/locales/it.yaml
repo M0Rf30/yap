@@ -1196,8 +1196,6 @@
   translation: "Scaricamento pacchetti"
 - id: logger.dnfinstall.info.installing_rpm_packages
   translation: "Installazione pacchetti RPM"
-- id: logger.dnfinstall.warn.unresolvable_dependency
-  translation: "Dipendenza non risolvibile"
 - id: logger.dnfinstall.debug.downloaded_rpm
   translation: "RPM scaricato"
 - id: logger.dnfinstall.debug.extracted_rpm
@@ -1220,8 +1218,8 @@
   translation: "ldconfig ignorato, non in esecuzione come root"
 - id: logger.dnfinstall.debug.skipping_non_regular_rpm
   translation: "Voce RPM non regolare ignorata"
-- id: logger.dnfinstall.debug.unresolved_package
-  translation: "Pacchetto non risolto"
+- id: logger.dnfinstall.warn.repositories_unavailable
+  translation: "Repository non disponibili, i loro pacchetti non sono installabili"
 - id: logger.dnfinstall.info.installation_complete
   translation: "Installazione completata"
 - id: logger.dnfinstall.info.installed_rpm_file
@@ -1254,8 +1252,6 @@
   translation: "Percorso non sicuro nell'archivio RPM ignorato"
 - id: logger.dnfinstall.warn.skipping_unsafe_rpm_symlink
   translation: "Collegamento simbolico RPM non sicuro ignorato"
-- id: logger.dnfinstall.warn.some_packages_could_not
-  translation: "Alcuni pacchetti non è stato possibile risolverli"
 - id: logger.download.info.downloading
   translation: "Scaricamento in corso"
 - id: logger.download.warn.invalid_max_retries

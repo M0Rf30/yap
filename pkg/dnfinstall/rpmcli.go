@@ -31,9 +31,8 @@ func InstallWithRPM(ctx context.Context, names []string) error {
 			WithOperation("InstallWithRPM")
 	}
 
-	// Non-fatal: log and continue — rpm will surface hard errors.
-	for _, name := range resolution.Unresolved {
-		logger.Warn(i18n.T("logger.dnfinstall.warn.unresolvable_dependency"), "package", name)
+	if err := unresolvedError("InstallWithRPM", resolution.Unresolved); err != nil {
+		return err
 	}
 
 	if len(resolution.Packages) == 0 {

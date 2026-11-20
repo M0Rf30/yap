@@ -92,7 +92,45 @@ func Update(ctx context.Context) error {
 
 	hostState.index = nil
 
-	return hostState.client.Update(ctx)
+	if err := hostState.client.Update(ctx); err != nil {
+		return err
+	}
+
+	warnUnavailableRepos(hostState.client)
+
+	return nil
+}
+
+// warnUnavailableRepos reports the enabled repositories that Update could not
+// refresh. The dnf client logs each failing mirror and skips a repository whose
+// mirrors all answer with an HTTP 4xx; that leaves the repository out of the
+// index, so a package only it carries cannot be resolved. A repository whose
+// metadata is missing or past its expiry after a refresh is such a repository.
+func warnUnavailableRepos(client *dnf.Client) {
+	if ids := unavailableRepos(client); len(ids) > 0 {
+		logger.Warn(i18n.T("logger.dnfinstall.warn.repositories_unavailable"),
+			"count", len(ids), "repos", strings.Join(ids, ", "))
+	}
+}
+
+// unavailableRepos returns the ids of the enabled repositories whose cached
+// metadata is missing or expired.
+func unavailableRepos(client *dnf.Client) []string {
+	repos, err := client.Repos()
+	if err != nil {
+		return nil
+	}
+
+	var ids []string
+
+	for i := range repos {
+		repo := &repos[i]
+		if repo.Enabled && (len(repo.BaseURLs) > 0 || repo.MirrorList != "") && client.Expired(repo) {
+			ids = append(ids, repo.ID)
+		}
+	}
+
+	return ids
 }
 
 // hostInstalled answers the dnf resolver from the host's RPM database, in
