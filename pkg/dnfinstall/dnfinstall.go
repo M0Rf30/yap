@@ -5,7 +5,9 @@ package dnfinstall
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/M0Rf30/yap/v2/pkg/errors"
 	"github.com/M0Rf30/yap/v2/pkg/i18n"
@@ -105,16 +107,11 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 			WithOperation("InstallWithOptions")
 	}
 
-	resolved, unresolved := resolution.Packages, resolution.Unresolved
-
-	if len(unresolved) > 0 {
-		// Non-fatal: log and continue — installation will surface hard errors.
-		logger.Warn(i18n.T("logger.dnfinstall.warn.some_packages_could_not"), "count", len(unresolved))
-
-		for _, name := range unresolved {
-			logger.Debug(i18n.T("logger.dnfinstall.debug.unresolved_package"), "name", name)
-		}
+	if err := unresolvedError("InstallWithOptions", resolution.Unresolved); err != nil {
+		return err
 	}
+
+	resolved := resolution.Packages
 
 	if len(resolved) == 0 {
 		return nil
@@ -139,6 +136,23 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 	logger.Info(i18n.T("logger.dnfinstall.info.installation_complete"), "count", len(resolved))
 
 	return nil
+}
+
+// unresolvedError is the error for requirements that no repository package
+// satisfies, nil when there are none. Every name reaching the resolver is an
+// explicit makedepends/depends entry, or a hard requirement of a package it
+// pulls in (weak dependencies are not followed): skipping one would only
+// surface later as a confusing build failure, so the install stops here like
+// the apt path does.
+func unresolvedError(op string, unresolved []string) error {
+	if len(unresolved) == 0 {
+		return nil
+	}
+
+	return errors.New(errors.ErrTypeBuild,
+		fmt.Sprintf("unresolvable packages: %v", unresolved)).
+		WithOperation(op).
+		WithContext("packages", strings.Join(unresolved, ", "))
 }
 
 // InstallFile installs a single local RPM file to the target filesystem.

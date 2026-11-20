@@ -1189,8 +1189,6 @@
   translation: "Downloading packages"
 - id: logger.dnfinstall.info.installing_rpm_packages
   translation: "Installing RPM packages"
-- id: logger.dnfinstall.warn.unresolvable_dependency
-  translation: "Unresolvable dependency"
 - id: logger.dnfinstall.debug.downloaded_rpm
   translation: "Downloaded RPM"
 - id: logger.dnfinstall.debug.extracted_rpm
@@ -1211,8 +1209,8 @@
   translation: "Skipping ldconfig, not running as root"
 - id: logger.dnfinstall.debug.skipping_non_regular_rpm
   translation: "Skipping non-regular RPM entry"
-- id: logger.dnfinstall.debug.unresolved_package
-  translation: "Unresolved package"
+- id: logger.dnfinstall.warn.repositories_unavailable
+  translation: "Repositories unavailable, their packages cannot be installed"
 - id: logger.dnfinstall.info.installation_complete
   translation: "Installation complete"
 - id: logger.dnfinstall.info.installed_rpm_file
@@ -1245,8 +1243,6 @@
   translation: "Skipping unsafe path in RPM archive"
 - id: logger.dnfinstall.warn.skipping_unsafe_rpm_symlink
   translation: "Skipping unsafe RPM symlink"
-- id: logger.dnfinstall.warn.some_packages_could_not
-  translation: "Some packages could not be resolved"
 - id: logger.download.info.downloading
   translation: "Downloading"
 - id: logger.download.warn.invalid_max_retries
