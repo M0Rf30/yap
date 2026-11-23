@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,6 +70,18 @@ func hostIndex(ctx context.Context) (*dnf.Client, *dnf.Index, error) {
 	}
 
 	if hostState.index == nil {
+		// --skip-sync keeps an existing cache as is, but a repository that was
+		// never fetched (a fresh image) has nothing to resolve against: every
+		// requirement would come back unresolvable.
+		if ids := uncachedRepos(hostState.client); len(ids) > 0 {
+			logger.Info(i18n.T("logger.dnfinstall.info.fetching_uncached_repos"),
+				"repos", strings.Join(ids, ", "))
+
+			if err := hostState.client.Update(ctx); err != nil {
+				return nil, nil, err
+			}
+		}
+
 		idx, err := hostState.client.Load(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -126,6 +139,44 @@ func unavailableRepos(client *dnf.Client) []string {
 	for i := range repos {
 		repo := &repos[i]
 		if repo.Enabled && (len(repo.BaseURLs) > 0 || repo.MirrorList != "") && client.Expired(repo) {
+			ids = append(ids, repo.ID)
+		}
+	}
+
+	return ids
+}
+
+// uncachedRepos returns the ids of the enabled remote repositories that have
+// no repomd.xml in the cache at all, under <cache>/<id> or dnf's
+// <cache>/<id>-<hash>. Expired metadata does not count: it still resolves.
+func uncachedRepos(client *dnf.Client) []string {
+	repos, err := client.Repos()
+	if err != nil {
+		return nil
+	}
+
+	var ids []string
+
+	for i := range repos {
+		repo := &repos[i]
+		if !repo.Enabled || (len(repo.BaseURLs) == 0 && repo.MirrorList == "") {
+			continue
+		}
+
+		dirs, _ := filepath.Glob(filepath.Join(dnfCacheDir, repo.ID+"-*"))
+		dirs = append(dirs, filepath.Join(dnfCacheDir, repo.ID))
+
+		cached := false
+
+		for _, d := range dirs {
+			if _, err := os.Stat(filepath.Join(d, "repodata", "repomd.xml")); err == nil {
+				cached = true
+
+				break
+			}
+		}
+
+		if !cached {
 			ids = append(ids, repo.ID)
 		}
 	}
