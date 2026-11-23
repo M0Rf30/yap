@@ -1211,6 +1211,8 @@
   translation: "Skipping non-regular RPM entry"
 - id: logger.dnfinstall.warn.repositories_unavailable
   translation: "Repositories unavailable, their packages cannot be installed"
+- id: logger.dnfinstall.info.fetching_uncached_repos
+  translation: "Fetching metadata for repositories never synced"
 - id: logger.dnfinstall.info.installation_complete
   translation: "Installation complete"
 - id: logger.dnfinstall.info.installed_rpm_file

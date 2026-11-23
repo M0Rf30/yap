@@ -1220,6 +1220,8 @@
   translation: "Voce RPM non regolare ignorata"
 - id: logger.dnfinstall.warn.repositories_unavailable
   translation: "Repository non disponibili, i loro pacchetti non sono installabili"
+- id: logger.dnfinstall.info.fetching_uncached_repos
+  translation: "Scaricamento dei metadati dei repository mai sincronizzati"
 - id: logger.dnfinstall.info.installation_complete
   translation: "Installazione completata"
 - id: logger.dnfinstall.info.installed_rpm_file
