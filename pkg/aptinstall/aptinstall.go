@@ -265,12 +265,10 @@ func resolveAndPrepare(
 //
 // The OLD version must come from /var/lib/dpkg/status, NOT from the
 // newly-downloaded .deb's control file (which carries the NEW version
-// we're about to install).
+// we're about to install). pkg is that new version: for an upgrade the
+// resolver hands over the index entry, never marked Installed, so the status
+// file is the only source of the old version.
 func currentInstalledVersion(rootDir string, pkg *apt.PackageInfo) string {
-	if !pkg.Installed {
-		return ""
-	}
-
 	entries, err := readDpkgStatus(rootDir)
 	if err != nil {
 		return ""

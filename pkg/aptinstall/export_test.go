@@ -330,8 +330,8 @@ func FilterForeignArchPackagesForTesting(pkgs []*apt.PackageInfo) []*apt.Package
 }
 
 // CurrentInstalledVersionForTesting exposes currentInstalledVersion for unit tests.
-func CurrentInstalledVersionForTesting(pkg *apt.PackageInfo) string {
-	return currentInstalledVersion("/", pkg)
+func CurrentInstalledVersionForTesting(rootDir string, pkg *apt.PackageInfo) string {
+	return currentInstalledVersion(rootDir, pkg)
 }
 
 // RootedForTesting exposes rooted for unit tests.
