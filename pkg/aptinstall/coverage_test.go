@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/M0Rf30/pkgformat/deb/apt"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/M0Rf30/yap/v2/pkg/apthost"
 	"github.com/M0Rf30/yap/v2/pkg/aptinstall"
@@ -108,10 +110,28 @@ func TestCurrentInstalledVersionNotInstalled(t *testing.T) {
 		Installed:    false,
 	}
 
-	version := aptinstall.CurrentInstalledVersionForTesting(pkg)
+	version := aptinstall.CurrentInstalledVersionForTesting(t.TempDir(), pkg)
 	if version != "" {
 		t.Errorf("expected empty version for non-installed package, got %q", version)
 	}
+}
+
+// TestCurrentInstalledVersionUpgrade tests that an upgrade gets the version
+// the dpkg status records, although the resolver hands over the new index
+// entry, which is not marked installed.
+func TestCurrentInstalledVersionUpgrade(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	statusDir := filepath.Join(root, "var", "lib", "dpkg")
+	require.NoError(t, os.MkdirAll(statusDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(statusDir, "status"), []byte(
+		"Package: binutils-common\nStatus: install ok installed\nArchitecture: amd64\n"+
+			"Version: 2.38-4ubuntu2.12\n\n"), 0o644))
+
+	pkg := &apt.PackageInfo{Name: "binutils-common", Architecture: "amd64", Version: "2.38-4ubuntu2.14"}
+
+	assert.Equal(t, "2.38-4ubuntu2.12", aptinstall.CurrentInstalledVersionForTesting(root, pkg))
 }
 
 // TestCurrentInstalledVersionFromStatus tests currentInstalledVersion
