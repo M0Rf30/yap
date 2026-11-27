@@ -3,7 +3,7 @@ module github.com/M0Rf30/yap/v2
 go 1.27.3
 
 require (
-	github.com/M0Rf30/pkgformat v0.4.1
+	github.com/M0Rf30/pkgformat v0.4.2
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/github/go-spdx/v2 v2.8.0
@@ -79,7 +79,7 @@ require (
 	github.com/stangelandcl/ppmd v0.1.1 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	go4.org v0.0.0-20261019143151-5b882263cdaf // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
