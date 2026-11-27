@@ -19,7 +19,6 @@ import (
 // Convenience aliases for test helpers
 var (
 	FilterForeignArchPackagesForTesting         = aptinstall.FilterForeignArchPackagesForTesting
-	CurrentInstalledVersionForTesting           = aptinstall.CurrentInstalledVersionForTesting
 	CurrentInstalledVersionFromStatusForTesting = aptinstall.CurrentInstalledVersionFromStatusForTesting
 	EnsureDpkgDirsForTesting                    = aptinstall.EnsureDpkgDirsForTesting
 	WriteDpkgInfoFilesForTesting                = aptinstall.WriteDpkgInfoFilesForTesting
@@ -97,24 +96,7 @@ func TestFilterForeignArchPackages(t *testing.T) {
 	}
 }
 
-// TestCurrentInstalledVersionNotInstalled tests currentInstalledVersion
-// when the package is not installed.
-func TestCurrentInstalledVersionNotInstalled(t *testing.T) {
-	t.Parallel()
-
-	pkg := &apt.PackageInfo{
-		Name:         "nonexistent",
-		Architecture: "amd64",
-		Installed:    false,
-	}
-
-	version := aptinstall.CurrentInstalledVersionForTesting(pkg)
-	if version != "" {
-		t.Errorf("expected empty version for non-installed package, got %q", version)
-	}
-}
-
-// TestCurrentInstalledVersionFromStatus tests currentInstalledVersion
+// TestCurrentInstalledVersionFromStatus tests the installed-version lookup
 // with synthetic dpkg status data.
 func TestCurrentInstalledVersionFromStatus(t *testing.T) {
 	t.Parallel()

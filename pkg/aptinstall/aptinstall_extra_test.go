@@ -6,7 +6,7 @@ package aptinstall_test
 // aptinstall_extra_test.go covers functions that were at 0% coverage:
 //
 //   - resolveRootDir      (line 138 in aptinstall.go)
-//   - currentInstalledVersion (line 243 — tested via the in-memory helper)
+//   - readStatusData      (installed-version lookup via the in-memory helper)
 //   - runMaintainerScript (line 373 — tested via RunMaintainerScriptForPhaseForTesting)
 //   - RefreshLDCache      (line 418 — exported, smoke-tested)
 //
@@ -96,7 +96,7 @@ func TestResolveRootDirFakerootPathWithAllowFlag(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// currentInstalledVersion (via in-memory helper)
+// installed-version lookup in dpkg status (via in-memory helper)
 // ---------------------------------------------------------------------------
 
 // TestCurrentInstalledVersionFound verifies that the version is returned

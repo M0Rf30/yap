@@ -329,9 +329,11 @@ func FilterForeignArchPackagesForTesting(pkgs []*apt.PackageInfo) []*apt.Package
 	return filterForeignArchPackages(pkgs)
 }
 
-// CurrentInstalledVersionForTesting exposes currentInstalledVersion for unit tests.
-func CurrentInstalledVersionForTesting(pkg *apt.PackageInfo) string {
-	return currentInstalledVersion("/", pkg)
+// PlanInstallForTesting exposes planInstall for unit tests.
+func PlanInstallForTesting(
+	cache *apt.Cache, names []string,
+) ([]*apt.PackageInfo, map[string]string, error) {
+	return planInstall(cache, names)
 }
 
 // RootedForTesting exposes rooted for unit tests.

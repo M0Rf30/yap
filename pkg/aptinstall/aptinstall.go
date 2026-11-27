@@ -111,7 +111,7 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 
 	defer lock.Release()
 
-	pkgs, tmpDir, debMetadata, err := resolveAndPrepare(ctx, names)
+	pkgs, oldVersions, tmpDir, debMetadata, err := resolveAndPrepare(ctx, names)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,8 @@ func InstallWithOptions(ctx context.Context, names []string, opts Options) error
 	for _, p := range pkgs {
 		contents := debMetadata[p.Filename]
 
-		if err := installPackage(ctx, p, contents, tmpDir, rootDir, opts); err != nil {
+		err := installPackage(ctx, p, oldVersions[p.Filename], contents, tmpDir, rootDir, opts)
+		if err != nil {
 			return errors.Wrap(err, errors.ErrTypeBuild, "install package").
 				WithContext("package", p.Name).
 				WithOperation("Install")
@@ -164,40 +165,93 @@ func resolveRootDir(opts Options) (string, error) {
 	return rootDir, nil
 }
 
-// resolveAndPrepare resolves the transitive closure, downloads every .deb,
-// and pre-parses each .deb's control metadata. The caller takes ownership
-// of tmpDir and must os.RemoveAll it. Returns ("", nil, nil) when the
-// closure is empty (no work to do).
+// planInstall works out what installing names takes, the way apt-get install
+// does: new packages and their dependencies, and upgrades of installed
+// packages whose new dependents need a newer version (an exact
+// "binutils-common (= X)" against an older installed one). Packages come in
+// apt's unpack order; oldVersions maps each upgraded package's Filename to
+// the installed version it replaces.
+//
+// A plan that removes or downgrades an installed package is refused: Install
+// has no removal step, and a build must not take packages away from the host.
+// Recommends are not installed, as before.
+func planInstall(
+	cache *apt.Cache, names []string,
+) (pkgs []*apt.PackageInfo, oldVersions map[string]string, err error) {
+	noRecommends := false
+
+	// SIMPLIFIED: the resolver spends one step per cache slot on each of its
+	// up to 20 passes, so apt.DefaultPlanSteps (200000) is used up by one
+	// pass over an Ubuntu cache with a foreign architecture (~210000 slots).
+	// The budget grows with the cache here until pkgformat scales its own.
+	plan, err := cache.Plan(apt.PlanRequest{Install: names}, apt.PlanOptions{
+		InstallRecommends: &noRecommends,
+		MaxSteps:          apt.DefaultPlanSteps + 20*cache.PackageCount(),
+	})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errors.ErrTypeBuild, "resolve dependencies").
+			WithOperation("Install")
+	}
+
+	if len(plan.Unresolved) > 0 {
+		return nil, nil, errors.New(errors.ErrTypeBuild,
+			fmt.Sprintf("unresolvable packages: %v", plan.Unresolved)).
+			WithOperation("Install")
+	}
+
+	if len(plan.Remove) > 0 || len(plan.Downgrade) > 0 {
+		return nil, nil, errors.New(errors.ErrTypeBuild,
+			fmt.Sprintf("installing %v would remove %v and downgrade %v",
+				names, labels(plan.Remove), labels(plan.Downgrade))).
+			WithOperation("Install")
+	}
+
+	oldVersions = make(map[string]string)
+
+	for _, ch := range plan.Changes {
+		pkgs = append(pkgs, ch.Package)
+
+		if ch.From != nil {
+			oldVersions[ch.Package.Filename] = ch.From.Version
+		}
+	}
+
+	// Filter out foreign-arch packages that are not Multi-Arch: same: they
+	// are not executable on the host. Multi-Arch: same packages (dev
+	// libraries) are intentionally kept because they are legitimately
+	// installed for the foreign arch.
+	return filterForeignArchPackages(pkgs), oldVersions, nil
+}
+
+// labels names packages as name:arch version for an error message.
+func labels(pkgs []*apt.PackageInfo) []string {
+	out := make([]string, 0, len(pkgs))
+	for _, p := range pkgs {
+		out = append(out, p.Name+":"+p.Architecture+" "+p.Version)
+	}
+
+	return out
+}
+
+// resolveAndPrepare plans the install, downloads every .deb, and pre-parses
+// each .deb's control metadata. The caller takes ownership of tmpDir and
+// must os.RemoveAll it. Returns an empty tmpDir when the plan is empty (no
+// work to do).
 func resolveAndPrepare(
 	ctx context.Context, names []string,
-) (pkgs []*apt.PackageInfo, tmpDir string, debMetadata map[string]*debContents, err error) {
+) (
+	pkgs []*apt.PackageInfo, oldVersions map[string]string,
+	tmpDir string, debMetadata map[string]*debContents, err error,
+) {
 	cache := apthost.Cache()
 
-	var unresolved []string
-
-	pkgs, unresolved, err = cache.ResolveDeps(names)
+	pkgs, oldVersions, err = planInstall(cache, names)
 	if err != nil {
-		return nil, "", nil, errors.Wrap(err, errors.ErrTypeBuild, "resolve dependencies").
-			WithOperation("Install")
+		return nil, nil, "", nil, err
 	}
-
-	if len(unresolved) > 0 {
-		return nil, "", nil, errors.New(errors.ErrTypeBuild,
-			fmt.Sprintf("unresolvable packages: %v", unresolved)).
-			WithOperation("Install")
-	}
-
-	// Filter out foreign-arch packages that are not Multi-Arch: same.
-	// The cache uses unqualified names as keys, so when both amd64 and arm64
-	// indexes are loaded the arm64 entry can overwrite the amd64 one.
-	// ResolveDeps then follows arm64 transitive deps (e.g. gcc:arm64) and
-	// adds them to the install list even though they are not executable on
-	// the host. Multi-Arch: same packages (dev libraries) are intentionally
-	// kept because they are legitimately installed for the foreign arch.
-	pkgs = filterForeignArchPackages(pkgs)
 
 	if len(pkgs) == 0 {
-		return nil, "", nil, nil
+		return nil, nil, "", nil, nil
 	}
 
 	var totalBytes int64
@@ -211,7 +265,7 @@ func resolveAndPrepare(
 
 	tmpDir, err = os.MkdirTemp("", "yap-aptinstall-*")
 	if err != nil {
-		return nil, "", nil, errors.Wrap(err, errors.ErrTypeFileSystem, "create temp dir").
+		return nil, nil, "", nil, errors.Wrap(err, errors.ErrTypeFileSystem, "create temp dir").
 			WithOperation("Install")
 	}
 
@@ -227,7 +281,7 @@ func resolveAndPrepare(
 	if err := cache.Download(ctx, tmpDir, pkgNames, apthost.DownloadOptions()); err != nil {
 		_ = os.RemoveAll(tmpDir)
 
-		return nil, "", nil, errors.Wrap(err, errors.ErrTypeBuild, "download packages").
+		return nil, nil, "", nil, errors.Wrap(err, errors.ErrTypeBuild, "download packages").
 			WithOperation("Install")
 	}
 
@@ -242,7 +296,7 @@ func resolveAndPrepare(
 		if err != nil {
 			_ = os.RemoveAll(tmpDir)
 
-			return nil, "", nil, errors.Wrap(err, errors.ErrTypeBuild, "parse DEB").
+			return nil, nil, "", nil, errors.Wrap(err, errors.ErrTypeBuild, "parse DEB").
 				WithContext("package", p.Name).
 				WithOperation("Install")
 		}
@@ -250,52 +304,21 @@ func resolveAndPrepare(
 		debMetadata[p.Filename] = contents
 	}
 
-	return pkgs, tmpDir, debMetadata, nil
+	return pkgs, oldVersions, tmpDir, debMetadata, nil
 }
 
-// currentInstalledVersion returns the version currently recorded in
-// /var/lib/dpkg/status for pkg, or "" when the package is not installed.
-//
-// dpkg semantics for maintainer scripts:
+// installPackage installs a single package. oldVersion is the installed
+// version an upgrade replaces, "" for a fresh install; it selects the dpkg
+// maintainer script arguments:
 //
 //	preinst install                 — fresh install
 //	preinst upgrade <old-version>   — upgrading an existing install
 //	postinst configure [<old-version>] — configure; old-version empty on
 //	                                     first install
-//
-// The OLD version must come from /var/lib/dpkg/status, NOT from the
-// newly-downloaded .deb's control file (which carries the NEW version
-// we're about to install).
-func currentInstalledVersion(rootDir string, pkg *apt.PackageInfo) string {
-	if !pkg.Installed {
-		return ""
-	}
-
-	entries, err := readDpkgStatus(rootDir)
-	if err != nil {
-		return ""
-	}
-
-	key := pkg.Name
-	if pkg.Architecture != "" {
-		key = pkg.Name + ":" + pkg.Architecture
-	}
-
-	if e, ok := entries[key]; ok {
-		return e.fields["Version"]
-	}
-	// Fallback for entries without arch qualifier.
-	if e, ok := entries[pkg.Name]; ok {
-		return e.fields["Version"]
-	}
-
-	return ""
-}
-
-// installPackage installs a single package.
 func installPackage(
 	ctx context.Context,
 	pkg *apt.PackageInfo,
+	oldVersion string,
 	contents *debContents,
 	tmpDir, rootDir string,
 	opts Options,
@@ -304,8 +327,6 @@ func installPackage(
 	arch := pkg.Architecture
 
 	logger.Debug(i18n.T("logger.aptinstall.debug.installing"), "package", pkgName, "arch", arch)
-
-	oldVersion := currentInstalledVersion(rootDir, pkg)
 
 	// Sequence mirrors dpkg's own unpack flow:
 	//
@@ -450,7 +471,7 @@ func runMaintainerScript(
 // filterForeignArchPackages removes packages from the list that are foreign-arch
 // and not Multi-Arch: same.
 //
-// WITH the arch-aware cache (name:arch keys + ResolveDeps arch inheritance),
+// WITH the arch-aware cache (name:arch keys + Cache.Plan multi-arch rules),
 // this function now acts as a safety net rather than the primary fix. It
 // catches any remaining foreign-arch packages that slipped through (e.g.
 // packages where the seed explicitly requested the foreign arch).
